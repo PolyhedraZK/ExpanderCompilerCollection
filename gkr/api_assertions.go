@@ -10,8 +10,6 @@ import (
 )
 
 // AssertIsEqual adds an assertion in the constraint builder (i1 == i2)
-// TODO: optimize this
-// currently this is implemented by AssertIsDifferent(pow(x, p-1), 1)
 func (builder *builder) AssertIsEqual(i1, i2 frontend.Variable) {
 	x := builder.Sub(i1, i2).(expr.Expression)
 	v, xConstant := builder.constantValue(x)
@@ -22,19 +20,23 @@ func (builder *builder) AssertIsEqual(i1, i2 frontend.Variable) {
 		return
 	}
 
-	powResult := builder.eOne
-	n := builder.Field()
-	if n.Bit(0) != 1 {
-		panic("field must be odd")
-	}
-	k := n.BitLen()
-	for i := 1; i < k; i++ {
-		x = builder.Mul(x, x).(expr.Expression)
-		if n.Bit(i) != 0 {
-			powResult = builder.Mul(powResult, x).(expr.Expression)
+	h := x.HashCode()
+	c, ok := builder.constraints[h]
+	if !ok {
+		c = make([]expr.Expression, 1)
+		c[0] = x
+	} else {
+		exists := false
+		for _, y := range c {
+			if y.Equal(x) {
+				exists = true
+			}
+		}
+		if !exists {
+			c = append(c, x)
 		}
 	}
-	builder.AssertIsDifferent(powResult, builder.eOne)
+	builder.constraints[h] = c
 }
 
 // AssertIsDifferent constrain i1 and i2 to be different
@@ -44,7 +46,7 @@ func (builder *builder) AssertIsDifferent(i1, i2 frontend.Variable) {
 		panic("AssertIsDifferent(x,x) will never be satisfied")
 	}
 
-	builder.constraints = append(builder.constraints, s)
+	builder.Inverse(s)
 }
 
 // AssertIsBoolean adds an assertion in the constraint builder (v == 0 ∥ v == 1)

@@ -29,11 +29,15 @@ type builder struct {
 	// normal internal wires expressions
 	cachedInternalVariables map[uint64][]internalVariable
 
-	hints []hint
+	hints   []hint
+	nbInput int
 
-	// each constraint is expr != 0
-	// they will be multiplied together at last
-	constraints []expr.Expression
+	// (probably estimated) layer of each variable
+	vLayer []int
+
+	// each constraint is expr == 0
+	// output = ai*r^i where r is the last input (r should be committed)
+	constraints map[uint64][]expr.Expression
 
 	// implement kvstore.Store
 	db map[any]any
@@ -63,6 +67,7 @@ func newBuilder(field *big.Int, config frontend.CompileConfig) *builder {
 		mtBooleans:              make(map[uint64][]expr.Expression),
 		cachedInternalVariables: make(map[uint64][]internalVariable),
 		db:                      make(map[any]any),
+		constraints:             make(map[uint64][]expr.Expression),
 	}
 
 	// TODO: check different fields
@@ -75,6 +80,7 @@ func newBuilder(field *big.Int, config frontend.CompileConfig) *builder {
 
 	builder.tOne = builder.cs.One()
 	builder.cs.AddPublicVariable("1")
+	builder.vLayer = append(builder.vLayer, 1)
 
 	builder.eZero = expr.NewConstantExpression(constraint.Element{})
 	builder.eOne = expr.NewConstantExpression(builder.tOne)
@@ -85,12 +91,16 @@ func newBuilder(field *big.Int, config frontend.CompileConfig) *builder {
 // PublicVariable creates a new public Variable
 func (builder *builder) PublicVariable(f schema.LeafInfo) frontend.Variable {
 	idx := builder.cs.AddPublicVariable(f.FullName())
+	builder.vLayer = append(builder.vLayer, 1)
+	builder.nbInput++
 	return expr.NewLinearExpression(idx, builder.tOne)
 }
 
 // SecretVariable creates a new secret Variable
 func (builder *builder) SecretVariable(f schema.LeafInfo) frontend.Variable {
 	idx := builder.cs.AddSecretVariable(f.FullName())
+	builder.vLayer = append(builder.vLayer, 1)
+	builder.nbInput++
 	return expr.NewLinearExpression(idx, builder.tOne)
 }
 
@@ -98,18 +108,26 @@ func (builder *builder) SecretVariable(f schema.LeafInfo) frontend.Variable {
 // the wire's id to the number of wires, and returns it
 // It remembers previous results, and uses cached id if possible
 // TODO: improve cache (maybe force constant=1)
-func (builder *builder) asInternalVariable(e expr.Expression) expr.Expression {
+func (builder *builder) asInternalVariable(eall expr.Expression, forceRaw bool) expr.Expression {
+	if len(eall) == 1 && eall[0].VID1 == 0 {
+		return eall
+	}
+	e, coeff, constant := builder.stripConstant(eall, forceRaw)
+	if len(e) == 1 && e[0].VID1 == 0 && !forceRaw {
+		return eall
+	}
 	h := e.HashCode()
 	s, ok := builder.cachedInternalVariables[h]
 	if ok {
 		for _, v := range s {
 			if e.Equal(v.expr) {
-				return expr.NewLinearExpression(v.idx, builder.tOne)
+				return builder.unstripConstant(v.idx, coeff, constant)
 			}
 		}
 	} else {
 		s = make([]internalVariable, 0, 1)
 	}
+	builder.vLayer = append(builder.vLayer, builder.layerOfExpr(e)+1)
 	idx := builder.cs.AddInternalVariable()
 	builder.cachedInternalVariables[h] = append(s, internalVariable{
 		expr: e,
@@ -120,7 +138,70 @@ func (builder *builder) asInternalVariable(e expr.Expression) expr.Expression {
 		inputs:    []expr.Expression{e},
 		outputIds: []int{idx},
 	})
-	return expr.NewLinearExpression(idx, builder.tOne)
+	return builder.unstripConstant(idx, coeff, constant)
+}
+
+func (builder *builder) tryAsInternalVariable(eall expr.Expression) expr.Expression {
+	if len(eall) == 1 && eall[0].VID1 == 0 {
+		return eall
+	}
+	e, coeff, constant := builder.stripConstant(eall, false)
+	if len(e) == 1 && e[0].VID1 == 0 {
+		return eall
+	}
+	h := e.HashCode()
+	s, ok := builder.cachedInternalVariables[h]
+	if ok {
+		for _, v := range s {
+			if e.Equal(v.expr) {
+				return builder.unstripConstant(v.idx, coeff, constant)
+			}
+		}
+	}
+	return eall
+}
+
+func (builder *builder) unstripConstant(x int, coeff constraint.Element, constant constraint.Element) expr.Expression {
+	if x == 0 {
+		panic("can't unstrip 0")
+	}
+	e := expr.NewLinearExpression(x, coeff)
+	if !constant.IsZero() {
+		e = append(e, expr.NewConstantExpression(constant)...)
+	}
+	sort.Sort(e)
+	return e
+}
+
+func (builder *builder) stripConstant(e_ expr.Expression, forceRaw bool) (expr.Expression, constraint.Element, constraint.Element) {
+	if forceRaw {
+		return e_, builder.tOne, constraint.Element{}
+	}
+	cst := constraint.Element{}
+	e := make(expr.Expression, 0, len(e_))
+	for _, term := range e_ {
+		if term.VID0 == 0 {
+			cst = term.Coeff
+		} else {
+			e = append(e, term)
+		}
+	}
+	if len(e) == 0 {
+		e = builder.eZero
+	}
+	sort.Sort(e)
+	v := e[0].Coeff
+	vi, ok := builder.cs.Inverse(v)
+	if !ok {
+		vi = constraint.Element{}
+		if len(e) != 1 {
+			panic("malformed expression")
+		}
+	}
+	for i := 0; i < len(e); i++ {
+		e[i].Coeff = builder.cs.Mul(e[i].Coeff, vi)
+	}
+	return e, v, cst
 }
 
 func (builder *builder) Field() *big.Int {
@@ -129,6 +210,19 @@ func (builder *builder) Field() *big.Int {
 
 func (builder *builder) FieldBitLen() int {
 	return builder.cs.FieldBitLen()
+}
+
+func (builder *builder) layerOfExpr(e expr.Expression) int {
+	layer := 1
+	for _, term := range e {
+		if builder.vLayer[term.VID0] > layer {
+			layer = builder.vLayer[term.VID0]
+		}
+		if builder.vLayer[term.VID1] > layer {
+			layer = builder.vLayer[term.VID1]
+		}
+	}
+	return layer
 }
 
 // MarkBoolean sets (but do not **constraint**!) v to be boolean
@@ -289,6 +383,7 @@ func (builder *builder) newHint(f solver.Hint, nbOutputs int, inputs []frontend.
 	outId := make([]int, nbOutputs)
 	for i := 0; i < nbOutputs; i++ {
 		outId[i] = builder.cs.AddInternalVariable()
+		builder.vLayer = append(builder.vLayer, 1)
 	}
 
 	builder.hints = append(builder.hints, hint{
@@ -296,6 +391,7 @@ func (builder *builder) newHint(f solver.Hint, nbOutputs int, inputs []frontend.
 		inputs:    hintInputs,
 		outputIds: outId,
 	})
+	builder.nbInput += len(outId)
 
 	// make the variables
 	res := make([]frontend.Variable, nbOutputs)
@@ -323,6 +419,57 @@ func assertIsSet(e expr.Expression) {
 			panic("unsorted linear expression")
 		}
 	}
+}
+
+// TODO: add special flag if it's the output
+func (builder *builder) layeredAdd(es_ []expr.Expression) expr.Expression {
+	es := builder.newExprList(es_)
+	sort.Sort(es)
+	cur := []expr.Expression{builder.eZero}
+	lastLayer := -1
+	for i, x := range es.e {
+		if es.l[i] != lastLayer && lastLayer != -1 {
+			sum := builder.asInternalVariable(builder.add(cur, false, 0, nil, true), false)
+			cur = []expr.Expression{sum}
+		}
+		cur = append(cur, x)
+		lastLayer = es.l[i]
+	}
+	return builder.add(cur, false, 0, nil, true)
+}
+
+func (builder *builder) compress(e expr.Expression) expr.Expression {
+	minL := 1 << 60
+	maxL := -1 << 60
+	for _, term := range e {
+		if term.VID0 == 0 {
+			// nop
+		} else if term.VID1 == 0 {
+			if builder.vLayer[term.VID0] < minL {
+				minL = builder.vLayer[term.VID0]
+			}
+			if builder.vLayer[term.VID0] > maxL {
+				maxL = builder.vLayer[term.VID0]
+			}
+		} else {
+			if builder.vLayer[term.VID1] < minL {
+				minL = builder.vLayer[term.VID1]
+			}
+			if builder.vLayer[term.VID0] > maxL {
+				maxL = builder.vLayer[term.VID0]
+			}
+		}
+	}
+	if maxL-minL >= 1 {
+		es := make([]expr.Expression, 0, len(e))
+		for _, term := range e {
+			t := make(expr.Expression, 1)
+			t[0] = term
+			es = append(es, t)
+		}
+		e = builder.layeredAdd(es)
+	}
+	return e
 }
 
 func (builder *builder) Defer(cb func(frontend.API) error) {

@@ -9,13 +9,14 @@ import (
 	"github.com/Zklib/gkr-compiler/gkr/expr"
 	"github.com/consensys/gnark/constraint/solver"
 	"github.com/consensys/gnark/frontend"
+	"github.com/consensys/gnark/logger"
 )
 
 type compileResult struct {
 	builder *builder
 }
 
-func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool) (*compileResult, error) {
+func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool, opts ...frontend.CompileOption) (*compileResult, error) {
 	var builder *builder
 	newBuilder_ := func(field *big.Int, config frontend.CompileConfig) (frontend.Builder, error) {
 		if builder != nil {
@@ -25,12 +26,31 @@ func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool) (*compileResu
 		return builder, nil
 	}
 	// returned R1CS is useless
-	_, err := frontend.Compile(field, newBuilder_, circuit)
+	_, err := frontend.Compile(field, newBuilder_, circuit, opts...)
 	if err != nil {
 		return nil, err
 	}
+	log := logger.Logger()
+	log.Info().
+		Int("nbConstraints", len(builder.constraints)).
+		Int("nbInternal", builder.cs.GetNbInternalVariables()).
+		Int("nbInput", builder.nbInput).
+		Msg("built basic circuit")
 	builder.finalize()
+	log.Info().
+		Int("nbInternal", builder.cs.GetNbInternalVariables()).
+		Int("nbInput", builder.nbInput).
+		Int("estimatedLayer", builder.vLayer[builder.output]).
+		Msg("constraints finalized")
 	builder.compile(pad2n)
+	stats := builder.circuit.getStats()
+	log.Info().
+		Int("nbHybridArg", stats.hybridArgCount).
+		Int("nbHybrid", stats.hybridCount).
+		Int("nbRelay", stats.relayCount).
+		Int("nbInput", stats.inputCount).
+		Int("layers", stats.layers).
+		Msg("compiled")
 	res := compileResult{
 		builder: builder,
 	}
@@ -71,7 +91,11 @@ func (c *compileResult) Print() {
 			for i, x := range hint_.inputs {
 				strs[i] = varToStr(x)
 			}
-			fmt.Printf("v%d = %s(%s)\n", hint_.outputIds[0], solver.GetHintName(hint_.f), strings.Join(strs, ","))
+			fmt.Printf("v%d", hint_.outputIds[0])
+			for i := 1; i < len(hint_.outputIds); i++ {
+				fmt.Printf(",v%d", hint_.outputIds[i])
+			}
+			fmt.Printf(" = %s(%s)\n", solver.GetHintName(hint_.f), strings.Join(strs, ","))
 		}
 	}
 }
