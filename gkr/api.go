@@ -3,6 +3,7 @@ package gkr
 import (
 	"errors"
 	"math/big"
+	"sort"
 
 	"github.com/Zklib/gkr-compiler/gkr/expr"
 	"github.com/consensys/gnark/constraint"
@@ -99,9 +100,8 @@ func (builder *builder) add(vars []expr.Expression, sub bool, capacity int, res 
 		// keep the linear expression valid (assertIsSet)
 		(*res) = append((*res), expr.NewTerm(0, 0, constraint.Element{}))
 	}
-	// TODO: compress?
 
-	return *res
+	return builder.compress(*res)
 }
 
 // Neg returns -i
@@ -171,12 +171,13 @@ func (builder *builder) Mul(i1, i2 frontend.Variable, in ...frontend.Variable) f
 		return builder.add(vars, false, len(v1)*len(v2), nil)
 	}
 
-	// TODO: multiply order may extract more internal parallelism
+	e := builder.newExprList(vars)
+	sort.Sort(e)
 
-	res := mul(vars[0], vars[1], true)
+	res := mul(e.e[0], e.e[1], true)
 
-	for i := 2; i < len(vars); i++ {
-		res = mul(res, vars[i], false)
+	for i := 2; i < len(e.e); i++ {
+		res = mul(res, e.e[i], false)
 	}
 
 	return res

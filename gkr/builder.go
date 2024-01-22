@@ -345,6 +345,12 @@ func assertIsSet(e expr.Expression) {
 		}
 	}
 }
+func (builder *builder) compress(e expr.Expression) expr.Expression {
+	if builder.config.CompressThreshold <= 0 || len(e) < builder.config.CompressThreshold {
+		return e
+	}
+	return builder.asInternalVariable(e)
+}
 
 func (builder *builder) Defer(cb func(frontend.API) error) {
 	panic("unimplemented")

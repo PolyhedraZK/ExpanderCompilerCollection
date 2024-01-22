@@ -15,7 +15,7 @@ type compileResult struct {
 	builder *builder
 }
 
-func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool) (*compileResult, error) {
+func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool, opts ...frontend.CompileOption) (*compileResult, error) {
 	var builder *builder
 	newBuilder_ := func(field *big.Int, config frontend.CompileConfig) (frontend.Builder, error) {
 		if builder != nil {
@@ -25,7 +25,7 @@ func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool) (*compileResu
 		return builder, nil
 	}
 	// returned R1CS is useless
-	_, err := frontend.Compile(field, newBuilder_, circuit)
+	_, err := frontend.Compile(field, newBuilder_, circuit, opts...)
 	if err != nil {
 		return nil, err
 	}
