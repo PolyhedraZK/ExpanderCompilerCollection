@@ -1,11 +1,12 @@
 package gkr
 
 import (
+	"crypto/rand"
 	"fmt"
 	"math/big"
+	"sort"
 
 	"github.com/Zklib/gkr-compiler/gkr/expr"
-	"github.com/consensys/gnark/frontend"
 )
 
 type gateType uint32
@@ -33,21 +34,32 @@ type circuit struct {
 	pad2n  bool
 }
 
+// this is used to provide a random coeff for all output
+// in real cases, it should be provided by hash
+func randomHint(field *big.Int, inputs []*big.Int, outputs []*big.Int) error {
+	x, err := rand.Int(rand.Reader, field)
+	outputs[0].Set(x)
+	return err
+}
+
 // finalize will convert conditions to a single output wire
 func (builder *builder) finalize() {
-	res := make([]frontend.Variable, len(builder.constraints))
-	for i, e := range builder.constraints {
-		res[i] = e
+	e := builder.newExprList(builder.constraints)
+	sort.Sort(e)
+
+	w_, _ := builder.NewHint(randomHint, 1)
+	w := w_[0]
+
+	// TODO: check layer of each expression
+	cur := w
+	res := make([]expr.Expression, len(e.e))
+	for i, x := range e.e {
+		res[i] = builder.Mul(cur, x).(expr.Expression)
+		cur = builder.Mul(cur, w).(expr.Expression)
 	}
-	var out frontend.Variable
-	if len(res) == 0 {
-		out = builder.eOne
-	} else if len(res) == 1 {
-		out = res[0]
-	} else {
-		out = builder.Mul(res[0], res[1], res[2:]...)
-	}
-	finalOut := builder.asInternalVariable(out.(expr.Expression))
+
+	out := builder.add(res, false, 0, nil)
+	finalOut := builder.asInternalVariable(out)
 	builder.output = finalOut[0].VID0
 	builder.constraints = nil
 }

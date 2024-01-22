@@ -21,20 +21,7 @@ func (builder *builder) AssertIsEqual(i1, i2 frontend.Variable) {
 		}
 		return
 	}
-
-	powResult := builder.eOne
-	n := builder.Field()
-	if n.Bit(0) != 1 {
-		panic("field must be odd")
-	}
-	k := n.BitLen()
-	for i := 1; i < k; i++ {
-		x = builder.Mul(x, x).(expr.Expression)
-		if n.Bit(i) != 0 {
-			powResult = builder.Mul(powResult, x).(expr.Expression)
-		}
-	}
-	builder.AssertIsDifferent(powResult, builder.eOne)
+	builder.constraints = append(builder.constraints, x)
 }
 
 // AssertIsDifferent constrain i1 and i2 to be different
@@ -44,7 +31,7 @@ func (builder *builder) AssertIsDifferent(i1, i2 frontend.Variable) {
 		panic("AssertIsDifferent(x,x) will never be satisfied")
 	}
 
-	builder.constraints = append(builder.constraints, s)
+	builder.Inverse(s)
 }
 
 // AssertIsBoolean adds an assertion in the constraint builder (v == 0 ∥ v == 1)

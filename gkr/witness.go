@@ -84,7 +84,7 @@ func (builder *builder) getWitness(assignment frontend.Circuit) witness {
 		fmt.Printf("v%d=%s\n", i, builder.cs.ToBigInt(values[i]).String())
 	}*/
 
-	if values[builder.output].IsZero() {
+	if !values[builder.output].IsZero() {
 		panic("witness doesn't safisfy the requirements")
 	}
 
