@@ -3,6 +3,7 @@ package gkr
 import (
 	"errors"
 	"math/big"
+	"sort"
 
 	"github.com/Zklib/gkr-compiler/gkr/expr"
 	"github.com/consensys/gnark/constraint"
@@ -18,7 +19,7 @@ import (
 func (builder *builder) Add(i1, i2 frontend.Variable, in ...frontend.Variable) frontend.Variable {
 	// extract frontend.Variables from input
 	vars, s := builder.toVariables(append([]frontend.Variable{i1, i2}, in...)...)
-	return builder.add(vars, false, s, nil)
+	return builder.add(vars, false, s, nil, false)
 }
 
 func (builder *builder) MulAcc(a, b, c frontend.Variable) frontend.Variable {
@@ -28,11 +29,11 @@ func (builder *builder) MulAcc(a, b, c frontend.Variable) frontend.Variable {
 // Sub returns res = i1 - i2
 func (builder *builder) Sub(i1, i2 frontend.Variable, in ...frontend.Variable) frontend.Variable {
 	vars, s := builder.toVariables(append([]frontend.Variable{i1, i2}, in...)...)
-	return builder.add(vars, true, s, nil)
+	return builder.add(vars, true, s, nil, false)
 }
 
 // returns res = Σ(vars) or res = vars[0] - Σ(vars[1:]) if sub == true.
-func (builder *builder) add(vars []expr.Expression, sub bool, capacity int, res *expr.Expression) expr.Expression {
+func (builder *builder) add(vars []expr.Expression, sub bool, capacity int, res *expr.Expression, noCompress bool) expr.Expression {
 	// we want to merge all terms from input linear expressions
 	// if they are duplicate, we reduce; that is, if multiple terms in different vars have the
 	// same variable id.
@@ -99,9 +100,11 @@ func (builder *builder) add(vars []expr.Expression, sub bool, capacity int, res 
 		// keep the linear expression valid (assertIsSet)
 		(*res) = append((*res), expr.NewTerm(0, 0, constraint.Element{}))
 	}
-	// TODO: compress?
 
-	return *res
+	if noCompress {
+		return *res
+	}
+	return builder.compress(*res)
 }
 
 // Neg returns -i
@@ -152,10 +155,10 @@ func (builder *builder) Mul(i1, i2 frontend.Variable, in ...frontend.Variable) f
 		}
 
 		if v1Deg == 2 {
-			v1 = builder.asInternalVariable(v1)
+			v1 = builder.asInternalVariable(v1, false)
 		}
 		if v2Deg == 2 {
-			v2 = builder.asInternalVariable(v2)
+			v2 = builder.asInternalVariable(v2, false)
 		}
 
 		// TODO: optimize speed
@@ -166,17 +169,22 @@ func (builder *builder) Mul(i1, i2 frontend.Variable, in ...frontend.Variable) f
 				coeff := builder.cs.Mul(v1[i].Coeff, v2[j].Coeff)
 				exp = append(exp, expr.NewTerm(v1[i].VID0, v2[j].VID0, coeff))
 			}
+			sort.Sort(exp)
 			vars = append(vars, exp)
 		}
-		return builder.add(vars, false, len(v1)*len(v2), nil)
+		return builder.add(vars, false, len(v1)*len(v2), nil, false)
 	}
 
-	// TODO: multiply order may extract more internal parallelism
+	e := builder.newExprList(vars)
+	sort.Sort(e)
 
-	res := mul(vars[0], vars[1], true)
+	// TODO: is order important?
+	// almost all Mul have only 2 vars, so the order might be useless
 
-	for i := 2; i < len(vars); i++ {
-		res = mul(res, vars[i], false)
+	res := mul(e.e[0], e.e[1], true)
+
+	for i := 2; i < len(e.e); i++ {
+		res = mul(res, e.e[i], false)
 	}
 
 	return res
@@ -367,7 +375,7 @@ func (builder *builder) Or(_a, _b frontend.Variable) frontend.Variable {
 			a, b,
 			builder.negateLinExp(builder.Mul(a, b).(expr.Expression)),
 		},
-		false, 0, nil,
+		false, 0, nil, false,
 	)
 
 	builder.MarkBoolean(res)
@@ -508,6 +516,8 @@ func (builder *builder) IsZero(i1 frontend.Variable) frontend.Variable {
 
 	// a * m = 0            // constrain m to be 0 if a != 0
 	builder.AssertIsEqual(builder.Mul(a, m), builder.eZero)
+
+	builder.MarkBoolean(m)
 
 	return m
 }

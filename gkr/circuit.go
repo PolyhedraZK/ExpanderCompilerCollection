@@ -1,11 +1,12 @@
 package gkr
 
 import (
+	"crypto/rand"
 	"fmt"
 	"math/big"
+	"sort"
 
 	"github.com/Zklib/gkr-compiler/gkr/expr"
-	"github.com/consensys/gnark/frontend"
 )
 
 type gateType uint32
@@ -35,19 +36,26 @@ type circuit struct {
 
 // finalize will convert conditions to a single output wire
 func (builder *builder) finalize() {
-	res := make([]frontend.Variable, len(builder.constraints))
-	for i, e := range builder.constraints {
-		res[i] = e
+	constraints := []expr.Expression{}
+	for _, es := range builder.constraints {
+		constraints = append(constraints, es...)
 	}
-	var out frontend.Variable
-	if len(res) == 0 {
-		out = builder.eOne
-	} else if len(res) == 1 {
-		out = res[0]
-	} else {
-		out = builder.Mul(res[0], res[1], res[2:]...)
+	e := builder.newExprList(constraints)
+	sort.Sort(e)
+
+	wi, _ := rand.Int(rand.Reader, builder.Field())
+	w := builder.cs.FromInterface(wi)
+
+	curpow := w
+	res := make([]expr.Expression, len(e.e))
+	for i, x := range e.e {
+		res[i] = builder.Mul(curpow, x).(expr.Expression)
+		curpow = builder.cs.Mul(curpow, w)
 	}
-	finalOut := builder.asInternalVariable(out.(expr.Expression))
+
+	// add the results by layers
+	out := builder.layeredAdd(res)
+	finalOut := builder.asInternalVariable(out, true)
 	builder.output = finalOut[0].VID0
 	builder.constraints = nil
 }
@@ -323,4 +331,30 @@ func (c *circuit) Print() {
 			}
 		}
 	}
+}
+
+type circuitStats struct {
+	layers         int
+	inputCount     int
+	relayCount     int
+	hybridCount    int
+	hybridArgCount int
+}
+
+func (c *circuit) getStats() (res circuitStats) {
+	res.layers = len(c.layers)
+	for i := 0; i < len(c.layers); i++ {
+		gates := c.layers[i].gates
+		for _, gate := range gates {
+			if gate.gateType == gateInput {
+				res.inputCount++
+			} else if gate.gateType == gateRelay {
+				res.relayCount++
+			} else if gate.gateType == gateHybrid {
+				res.hybridCount++
+				res.hybridArgCount += int(gate.gateParam[0]) + int(gate.gateParam[1]) + int(gate.gateParam[2])
+			}
+		}
+	}
+	return
 }
