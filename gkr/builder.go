@@ -31,8 +31,11 @@ type builder struct {
 
 	hints []hint
 
-	// each constraint is expr != 0
-	// they will be multiplied together at last
+	// (probably estimated) layer of each variable
+	vLayer []int
+
+	// each constraint is expr == 0
+	// output = ai*r^i where r is the last input (r should be committed)
 	constraints []expr.Expression
 
 	// implement kvstore.Store
@@ -75,6 +78,7 @@ func newBuilder(field *big.Int, config frontend.CompileConfig) *builder {
 
 	builder.tOne = builder.cs.One()
 	builder.cs.AddPublicVariable("1")
+	builder.vLayer = append(builder.vLayer, 1)
 
 	builder.eZero = expr.NewConstantExpression(constraint.Element{})
 	builder.eOne = expr.NewConstantExpression(builder.tOne)
@@ -85,12 +89,14 @@ func newBuilder(field *big.Int, config frontend.CompileConfig) *builder {
 // PublicVariable creates a new public Variable
 func (builder *builder) PublicVariable(f schema.LeafInfo) frontend.Variable {
 	idx := builder.cs.AddPublicVariable(f.FullName())
+	builder.vLayer = append(builder.vLayer, 1)
 	return expr.NewLinearExpression(idx, builder.tOne)
 }
 
 // SecretVariable creates a new secret Variable
 func (builder *builder) SecretVariable(f schema.LeafInfo) frontend.Variable {
 	idx := builder.cs.AddSecretVariable(f.FullName())
+	builder.vLayer = append(builder.vLayer, 1)
 	return expr.NewLinearExpression(idx, builder.tOne)
 }
 
@@ -110,6 +116,7 @@ func (builder *builder) asInternalVariable(e expr.Expression) expr.Expression {
 	} else {
 		s = make([]internalVariable, 0, 1)
 	}
+	builder.vLayer = append(builder.vLayer, builder.layerOfExpr(e)+1)
 	idx := builder.cs.AddInternalVariable()
 	builder.cachedInternalVariables[h] = append(s, internalVariable{
 		expr: e,
@@ -129,6 +136,19 @@ func (builder *builder) Field() *big.Int {
 
 func (builder *builder) FieldBitLen() int {
 	return builder.cs.FieldBitLen()
+}
+
+func (builder *builder) layerOfExpr(e expr.Expression) int {
+	layer := 1
+	for _, term := range e {
+		if builder.vLayer[term.VID0] > layer {
+			layer = builder.vLayer[term.VID0]
+		}
+		if builder.vLayer[term.VID1] > layer {
+			layer = builder.vLayer[term.VID1]
+		}
+	}
+	return layer
 }
 
 // MarkBoolean sets (but do not **constraint**!) v to be boolean
@@ -289,6 +309,7 @@ func (builder *builder) newHint(f solver.Hint, nbOutputs int, inputs []frontend.
 	outId := make([]int, nbOutputs)
 	for i := 0; i < nbOutputs; i++ {
 		outId[i] = builder.cs.AddInternalVariable()
+		builder.vLayer = append(builder.vLayer, 1)
 	}
 
 	builder.hints = append(builder.hints, hint{
