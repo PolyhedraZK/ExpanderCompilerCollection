@@ -174,6 +174,9 @@ func (builder *builder) Mul(i1, i2 frontend.Variable, in ...frontend.Variable) f
 	e := builder.newExprList(vars)
 	sort.Sort(e)
 
+	// TODO: is order important?
+	// almost all Mul have only 2 vars, so the order might be useless
+
 	res := mul(e.e[0], e.e[1], true)
 
 	for i := 2; i < len(e.e); i++ {

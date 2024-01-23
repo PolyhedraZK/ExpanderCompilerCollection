@@ -29,14 +29,15 @@ type builder struct {
 	// normal internal wires expressions
 	cachedInternalVariables map[uint64][]internalVariable
 
-	hints []hint
+	hints   []hint
+	nbInput int
 
 	// (probably estimated) layer of each variable
 	vLayer []int
 
 	// each constraint is expr == 0
 	// output = ai*r^i where r is the last input (r should be committed)
-	constraints []expr.Expression
+	constraints map[uint64][]expr.Expression
 
 	// implement kvstore.Store
 	db map[any]any
@@ -66,6 +67,7 @@ func newBuilder(field *big.Int, config frontend.CompileConfig) *builder {
 		mtBooleans:              make(map[uint64][]expr.Expression),
 		cachedInternalVariables: make(map[uint64][]internalVariable),
 		db:                      make(map[any]any),
+		constraints:             make(map[uint64][]expr.Expression),
 	}
 
 	// TODO: check different fields
@@ -90,6 +92,7 @@ func newBuilder(field *big.Int, config frontend.CompileConfig) *builder {
 func (builder *builder) PublicVariable(f schema.LeafInfo) frontend.Variable {
 	idx := builder.cs.AddPublicVariable(f.FullName())
 	builder.vLayer = append(builder.vLayer, 1)
+	builder.nbInput++
 	return expr.NewLinearExpression(idx, builder.tOne)
 }
 
@@ -97,6 +100,7 @@ func (builder *builder) PublicVariable(f schema.LeafInfo) frontend.Variable {
 func (builder *builder) SecretVariable(f schema.LeafInfo) frontend.Variable {
 	idx := builder.cs.AddSecretVariable(f.FullName())
 	builder.vLayer = append(builder.vLayer, 1)
+	builder.nbInput++
 	return expr.NewLinearExpression(idx, builder.tOne)
 }
 
@@ -317,6 +321,7 @@ func (builder *builder) newHint(f solver.Hint, nbOutputs int, inputs []frontend.
 		inputs:    hintInputs,
 		outputIds: outId,
 	})
+	builder.nbInput += len(outId)
 
 	// make the variables
 	res := make([]frontend.Variable, nbOutputs)

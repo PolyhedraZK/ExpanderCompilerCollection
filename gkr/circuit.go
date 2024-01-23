@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/Zklib/gkr-compiler/gkr/expr"
+	"github.com/consensys/gnark/frontend"
 )
 
 type gateType uint32
@@ -44,21 +45,47 @@ func randomHint(field *big.Int, inputs []*big.Int, outputs []*big.Int) error {
 
 // finalize will convert conditions to a single output wire
 func (builder *builder) finalize() {
-	e := builder.newExprList(builder.constraints)
+	constraints := []expr.Expression{}
+	for _, es := range builder.constraints {
+		constraints = append(constraints, es...)
+	}
+	e := builder.newExprList(constraints)
 	sort.Sort(e)
 
 	w_, _ := builder.NewHint(randomHint, 1)
 	w := w_[0]
 
-	// TODO: check layer of each expression
-	cur := w
-	res := make([]expr.Expression, len(e.e))
-	for i, x := range e.e {
-		res[i] = builder.Mul(cur, x).(expr.Expression)
-		cur = builder.Mul(cur, w).(expr.Expression)
+	powers := make([]frontend.Variable, len(e.e)+1)
+	powers[1] = w
+	for i := 2; i < len(powers); i++ {
+		lb := i & -i
+		// if i is 2^n, w^i=(w^i/2)^2, else w^i=w^(i-lb)*w^lb
+		if i == lb {
+			powers[i] = builder.Mul(powers[i/2], powers[i/2])
+		} else {
+			powers[i] = builder.Mul(powers[i-lb], powers[lb])
+		}
 	}
 
-	out := builder.add(res, false, 0, nil)
+	res := make([]expr.Expression, len(e.e))
+	for i, x := range e.e {
+		res[i] = builder.Mul(powers[i+1], x).(expr.Expression)
+	}
+
+	// add the results by layers
+	// TODO: is it better to do such optimization in the compiler below?
+	eres := builder.newExprList(res)
+	sort.Sort(eres)
+	cur := []expr.Expression{builder.eZero}
+	lastLayer := -1
+	for i, x := range eres.e {
+		if eres.l[i] != lastLayer {
+			cur = []expr.Expression{builder.add(cur, false, 0, nil)}
+		}
+		cur = append(cur, x)
+	}
+
+	out := builder.add(cur, false, 0, nil)
 	finalOut := builder.asInternalVariable(out)
 	builder.output = finalOut[0].VID0
 	builder.constraints = nil
@@ -335,4 +362,30 @@ func (c *circuit) Print() {
 			}
 		}
 	}
+}
+
+type circuitStats struct {
+	layers         int
+	inputCount     int
+	relayCount     int
+	hybridCount    int
+	hybridArgCount int
+}
+
+func (c *circuit) getStats() (res circuitStats) {
+	res.layers = len(c.layers)
+	for i := 0; i < len(c.layers); i++ {
+		gates := c.layers[i].gates
+		for _, gate := range gates {
+			if gate.gateType == gateInput {
+				res.inputCount++
+			} else if gate.gateType == gateRelay {
+				res.relayCount++
+			} else if gate.gateType == gateHybrid {
+				res.hybridCount++
+				res.hybridArgCount += int(gate.gateParam[0]) + int(gate.gateParam[1]) + int(gate.gateParam[2])
+			}
+		}
+	}
+	return
 }

@@ -71,6 +71,7 @@ func (e Expression) HashCode() uint64 {
 	}
 	return h
 }
+
 func (e Expression) Degree() int {
 	res := 0
 	for _, val := range e {
