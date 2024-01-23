@@ -10,8 +10,6 @@ import (
 )
 
 // AssertIsEqual adds an assertion in the constraint builder (i1 == i2)
-// TODO: optimize this
-// currently this is implemented by AssertIsDifferent(pow(x, p-1), 1)
 func (builder *builder) AssertIsEqual(i1, i2 frontend.Variable) {
 	x := builder.Sub(i1, i2).(expr.Expression)
 	v, xConstant := builder.constantValue(x)
@@ -21,7 +19,24 @@ func (builder *builder) AssertIsEqual(i1, i2 frontend.Variable) {
 		}
 		return
 	}
-	builder.constraints = append(builder.constraints, x)
+
+	h := x.HashCode()
+	c, ok := builder.constraints[h]
+	if !ok {
+		c = make([]expr.Expression, 1)
+		c[0] = x
+	} else {
+		exists := false
+		for _, y := range c {
+			if y.Equal(x) {
+				exists = true
+			}
+		}
+		if !exists {
+			c = append(c, x)
+		}
+	}
+	builder.constraints[h] = c
 }
 
 // AssertIsDifferent constrain i1 and i2 to be different

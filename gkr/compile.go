@@ -9,6 +9,7 @@ import (
 	"github.com/Zklib/gkr-compiler/gkr/expr"
 	"github.com/consensys/gnark/constraint/solver"
 	"github.com/consensys/gnark/frontend"
+	"github.com/consensys/gnark/logger"
 )
 
 type compileResult struct {
@@ -29,8 +30,27 @@ func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool, opts ...front
 	if err != nil {
 		return nil, err
 	}
+	log := logger.Logger()
+	log.Info().
+		Int("nbConstraints", len(builder.constraints)).
+		Int("nbInternal", builder.cs.GetNbInternalVariables()).
+		Int("nbInput", builder.nbInput).
+		Msg("built basic circuit")
 	builder.finalize()
+	log.Info().
+		Int("nbInternal", builder.cs.GetNbInternalVariables()).
+		Int("nbInput", builder.nbInput).
+		Int("estimatedLayer", builder.vLayer[builder.output]).
+		Msg("constraints finalized")
 	builder.compile(pad2n)
+	stats := builder.circuit.getStats()
+	log.Info().
+		Int("nbHybridArg", stats.hybridArgCount).
+		Int("nbHybrid", stats.hybridCount).
+		Int("nbRelay", stats.relayCount).
+		Int("nbInput", stats.inputCount).
+		Int("layers", stats.layers).
+		Msg("compiled")
 	res := compileResult{
 		builder: builder,
 	}
