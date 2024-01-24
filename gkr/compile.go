@@ -91,7 +91,11 @@ func (c *compileResult) Print() {
 			for i, x := range hint_.inputs {
 				strs[i] = varToStr(x)
 			}
-			fmt.Printf("v%d = %s(%s)\n", hint_.outputIds[0], solver.GetHintName(hint_.f), strings.Join(strs, ","))
+			fmt.Printf("v%d", hint_.outputIds[0])
+			for i := 1; i < len(hint_.outputIds); i++ {
+				fmt.Printf(",v%d", hint_.outputIds[i])
+			}
+			fmt.Printf(" = %s(%s)\n", solver.GetHintName(hint_.f), strings.Join(strs, ","))
 		}
 	}
 }

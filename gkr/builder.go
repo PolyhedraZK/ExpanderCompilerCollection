@@ -350,7 +350,55 @@ func assertIsSet(e expr.Expression) {
 		}
 	}
 }
+
+// TODO: add special flag if it's the output
+func (builder *builder) layeredAdd(es_ []expr.Expression) expr.Expression {
+	es := builder.newExprList(es_)
+	sort.Sort(es)
+	cur := []expr.Expression{builder.eZero}
+	lastLayer := -1
+	for i, x := range es.e {
+		if es.l[i] != lastLayer && lastLayer != -1 {
+			sum := builder.asInternalVariable(builder.add(cur, false, 0, nil, true))
+			cur = []expr.Expression{sum}
+		}
+		cur = append(cur, x)
+		lastLayer = es.l[i]
+	}
+	return builder.add(cur, false, 0, nil, true)
+}
+
 func (builder *builder) compress(e expr.Expression) expr.Expression {
+	minL := 1 << 60
+	maxL := -1 << 60
+	for _, term := range e {
+		if term.VID0 == 0 {
+			// nop
+		} else if term.VID1 == 0 {
+			if builder.vLayer[term.VID0] < minL {
+				minL = builder.vLayer[term.VID0]
+			}
+			if builder.vLayer[term.VID0] > maxL {
+				maxL = builder.vLayer[term.VID0]
+			}
+		} else {
+			if builder.vLayer[term.VID1] < minL {
+				minL = builder.vLayer[term.VID1]
+			}
+			if builder.vLayer[term.VID0] > maxL {
+				maxL = builder.vLayer[term.VID0]
+			}
+		}
+	}
+	if maxL-minL >= 1 {
+		es := make([]expr.Expression, 0, len(e))
+		for _, term := range e {
+			t := make(expr.Expression, 1)
+			t[0] = term
+			es = append(es, t)
+		}
+		e = builder.layeredAdd(es)
+	}
 	if builder.config.CompressThreshold <= 0 || len(e) < builder.config.CompressThreshold {
 		return e
 	}

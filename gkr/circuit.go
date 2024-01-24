@@ -7,7 +7,6 @@ import (
 	"sort"
 
 	"github.com/Zklib/gkr-compiler/gkr/expr"
-	"github.com/consensys/gnark/frontend"
 )
 
 type gateType uint32
@@ -52,40 +51,18 @@ func (builder *builder) finalize() {
 	e := builder.newExprList(constraints)
 	sort.Sort(e)
 
-	w_, _ := builder.NewHint(randomHint, 1)
-	w := w_[0]
+	wi, _ := rand.Int(rand.Reader, builder.Field())
+	w := builder.cs.FromInterface(wi)
 
-	powers := make([]frontend.Variable, len(e.e)+1)
-	powers[1] = w
-	for i := 2; i < len(powers); i++ {
-		lb := i & -i
-		// if i is 2^n, w^i=(w^i/2)^2, else w^i=w^(i-lb)*w^lb
-		if i == lb {
-			powers[i] = builder.Mul(powers[i/2], powers[i/2])
-		} else {
-			powers[i] = builder.Mul(powers[i-lb], powers[lb])
-		}
-	}
-
+	curpow := w
 	res := make([]expr.Expression, len(e.e))
 	for i, x := range e.e {
-		res[i] = builder.Mul(powers[i+1], x).(expr.Expression)
+		res[i] = builder.Mul(curpow, x).(expr.Expression)
+		curpow = builder.cs.Mul(curpow, w)
 	}
 
 	// add the results by layers
-	// TODO: is it better to do such optimization in the compiler below?
-	eres := builder.newExprList(res)
-	sort.Sort(eres)
-	cur := []expr.Expression{builder.eZero}
-	lastLayer := -1
-	for i, x := range eres.e {
-		if eres.l[i] != lastLayer {
-			cur = []expr.Expression{builder.add(cur, false, 0, nil)}
-		}
-		cur = append(cur, x)
-	}
-
-	out := builder.add(cur, false, 0, nil)
+	out := builder.layeredAdd(res)
 	finalOut := builder.asInternalVariable(out)
 	builder.output = finalOut[0].VID0
 	builder.constraints = nil

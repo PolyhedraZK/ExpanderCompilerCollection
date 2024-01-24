@@ -19,7 +19,7 @@ import (
 func (builder *builder) Add(i1, i2 frontend.Variable, in ...frontend.Variable) frontend.Variable {
 	// extract frontend.Variables from input
 	vars, s := builder.toVariables(append([]frontend.Variable{i1, i2}, in...)...)
-	return builder.add(vars, false, s, nil)
+	return builder.add(vars, false, s, nil, false)
 }
 
 func (builder *builder) MulAcc(a, b, c frontend.Variable) frontend.Variable {
@@ -29,11 +29,11 @@ func (builder *builder) MulAcc(a, b, c frontend.Variable) frontend.Variable {
 // Sub returns res = i1 - i2
 func (builder *builder) Sub(i1, i2 frontend.Variable, in ...frontend.Variable) frontend.Variable {
 	vars, s := builder.toVariables(append([]frontend.Variable{i1, i2}, in...)...)
-	return builder.add(vars, true, s, nil)
+	return builder.add(vars, true, s, nil, false)
 }
 
 // returns res = Σ(vars) or res = vars[0] - Σ(vars[1:]) if sub == true.
-func (builder *builder) add(vars []expr.Expression, sub bool, capacity int, res *expr.Expression) expr.Expression {
+func (builder *builder) add(vars []expr.Expression, sub bool, capacity int, res *expr.Expression, noCompress bool) expr.Expression {
 	// we want to merge all terms from input linear expressions
 	// if they are duplicate, we reduce; that is, if multiple terms in different vars have the
 	// same variable id.
@@ -101,6 +101,9 @@ func (builder *builder) add(vars []expr.Expression, sub bool, capacity int, res 
 		(*res) = append((*res), expr.NewTerm(0, 0, constraint.Element{}))
 	}
 
+	if noCompress {
+		return *res
+	}
 	return builder.compress(*res)
 }
 
@@ -168,7 +171,7 @@ func (builder *builder) Mul(i1, i2 frontend.Variable, in ...frontend.Variable) f
 			}
 			vars = append(vars, exp)
 		}
-		return builder.add(vars, false, len(v1)*len(v2), nil)
+		return builder.add(vars, false, len(v1)*len(v2), nil, false)
 	}
 
 	e := builder.newExprList(vars)
@@ -371,7 +374,7 @@ func (builder *builder) Or(_a, _b frontend.Variable) frontend.Variable {
 			a, b,
 			builder.negateLinExp(builder.Mul(a, b).(expr.Expression)),
 		},
-		false, 0, nil,
+		false, 0, nil, false,
 	)
 
 	builder.MarkBoolean(res)
