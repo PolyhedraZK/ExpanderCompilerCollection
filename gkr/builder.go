@@ -399,10 +399,7 @@ func (builder *builder) compress(e expr.Expression) expr.Expression {
 		}
 		e = builder.layeredAdd(es)
 	}
-	if builder.config.CompressThreshold <= 0 || len(e) < builder.config.CompressThreshold {
-		return e
-	}
-	return builder.asInternalVariable(e)
+	return e
 }
 
 func (builder *builder) Defer(cb func(frontend.API) error) {

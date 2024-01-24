@@ -516,6 +516,8 @@ func (builder *builder) IsZero(i1 frontend.Variable) frontend.Variable {
 	// a * m = 0            // constrain m to be 0 if a != 0
 	builder.AssertIsEqual(builder.Mul(a, m), builder.eZero)
 
+	builder.MarkBoolean(m)
+
 	return m
 }
 
