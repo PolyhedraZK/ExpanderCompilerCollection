@@ -155,10 +155,10 @@ func (builder *builder) Mul(i1, i2 frontend.Variable, in ...frontend.Variable) f
 		}
 
 		if v1Deg == 2 {
-			v1 = builder.asInternalVariable(v1)
+			v1 = builder.asInternalVariable(v1, false)
 		}
 		if v2Deg == 2 {
-			v2 = builder.asInternalVariable(v2)
+			v2 = builder.asInternalVariable(v2, false)
 		}
 
 		// TODO: optimize speed
@@ -169,6 +169,7 @@ func (builder *builder) Mul(i1, i2 frontend.Variable, in ...frontend.Variable) f
 				coeff := builder.cs.Mul(v1[i].Coeff, v2[j].Coeff)
 				exp = append(exp, expr.NewTerm(v1[i].VID0, v2[j].VID0, coeff))
 			}
+			sort.Sort(exp)
 			vars = append(vars, exp)
 		}
 		return builder.add(vars, false, len(v1)*len(v2), nil, false)

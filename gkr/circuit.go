@@ -34,14 +34,6 @@ type circuit struct {
 	pad2n  bool
 }
 
-// this is used to provide a random coeff for all output
-// in real cases, it should be provided by hash
-func randomHint(field *big.Int, inputs []*big.Int, outputs []*big.Int) error {
-	x, err := rand.Int(rand.Reader, field)
-	outputs[0].Set(x)
-	return err
-}
-
 // finalize will convert conditions to a single output wire
 func (builder *builder) finalize() {
 	constraints := []expr.Expression{}
@@ -63,7 +55,7 @@ func (builder *builder) finalize() {
 
 	// add the results by layers
 	out := builder.layeredAdd(res)
-	finalOut := builder.asInternalVariable(out)
+	finalOut := builder.asInternalVariable(out, true)
 	builder.output = finalOut[0].VID0
 	builder.constraints = nil
 }

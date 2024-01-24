@@ -108,13 +108,20 @@ func (builder *builder) SecretVariable(f schema.LeafInfo) frontend.Variable {
 // the wire's id to the number of wires, and returns it
 // It remembers previous results, and uses cached id if possible
 // TODO: improve cache (maybe force constant=1)
-func (builder *builder) asInternalVariable(e expr.Expression) expr.Expression {
+func (builder *builder) asInternalVariable(eall expr.Expression, forceRaw bool) expr.Expression {
+	if len(eall) == 1 && eall[0].VID1 == 0 {
+		return eall
+	}
+	e, coeff, constant := builder.stripConstant(eall, forceRaw)
+	if len(e) == 1 && e[0].VID1 == 0 && !forceRaw {
+		return eall
+	}
 	h := e.HashCode()
 	s, ok := builder.cachedInternalVariables[h]
 	if ok {
 		for _, v := range s {
 			if e.Equal(v.expr) {
-				return expr.NewLinearExpression(v.idx, builder.tOne)
+				return builder.unstripConstant(v.idx, coeff, constant)
 			}
 		}
 	} else {
@@ -131,7 +138,50 @@ func (builder *builder) asInternalVariable(e expr.Expression) expr.Expression {
 		inputs:    []expr.Expression{e},
 		outputIds: []int{idx},
 	})
-	return expr.NewLinearExpression(idx, builder.tOne)
+	return builder.unstripConstant(idx, coeff, constant)
+}
+
+func (builder *builder) unstripConstant(x int, coeff constraint.Element, constant constraint.Element) expr.Expression {
+	if x == 0 {
+		panic("can't unstrip 0")
+	}
+	e := expr.NewLinearExpression(x, coeff)
+	if !constant.IsZero() {
+		e = append(e, expr.NewConstantExpression(constant)...)
+	}
+	sort.Sort(e)
+	return e
+}
+
+func (builder *builder) stripConstant(e_ expr.Expression, forceRaw bool) (expr.Expression, constraint.Element, constraint.Element) {
+	if forceRaw {
+		return e_, builder.tOne, constraint.Element{}
+	}
+	cst := constraint.Element{}
+	e := make(expr.Expression, 0, len(e_))
+	for _, term := range e_ {
+		if term.VID0 == 0 {
+			cst = term.Coeff
+		} else {
+			e = append(e, term)
+		}
+	}
+	if len(e) == 0 {
+		e = builder.eZero
+	}
+	sort.Sort(e)
+	v := e[0].Coeff
+	vi, ok := builder.cs.Inverse(v)
+	if !ok {
+		vi = constraint.Element{}
+		if len(e) != 1 {
+			panic("malformed expression")
+		}
+	}
+	for i := 0; i < len(e); i++ {
+		e[i].Coeff = builder.cs.Mul(e[i].Coeff, vi)
+	}
+	return e, v, cst
 }
 
 func (builder *builder) Field() *big.Int {
@@ -359,7 +409,7 @@ func (builder *builder) layeredAdd(es_ []expr.Expression) expr.Expression {
 	lastLayer := -1
 	for i, x := range es.e {
 		if es.l[i] != lastLayer && lastLayer != -1 {
-			sum := builder.asInternalVariable(builder.add(cur, false, 0, nil, true))
+			sum := builder.asInternalVariable(builder.add(cur, false, 0, nil, true), false)
 			cur = []expr.Expression{sum}
 		}
 		cur = append(cur, x)
