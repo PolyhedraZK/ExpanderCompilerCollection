@@ -21,11 +21,21 @@ func (builder *builder) newExprList(e []expr.Expression) *exprList {
 		l: make([]int, len(e)),
 		b: builder,
 	}
+	maxl := 1
 	for i, x := range e {
 		res.l[i] = builder.layerOfExpr(x)
+		if res.l[i] > maxl {
+			maxl = res.l[i]
+		}
 		res.e[i] = make(expr.Expression, len(x))
 		copy(res.e[i], x)
 		sort.Sort(res.e[i])
+	}
+	// for constant, set layer=maxlayer
+	for i, x := range e {
+		if x.IsConstant() {
+			res.l[i] = maxl
+		}
 	}
 	return res
 }

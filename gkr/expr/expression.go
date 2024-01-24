@@ -85,3 +85,15 @@ func (e Expression) Degree() int {
 	}
 	return res
 }
+
+func (e Expression) IsConstant() bool {
+	for _, term := range e {
+		if term.VID0 != 0 {
+			return false
+		}
+		if term.VID1 != 0 {
+			return false
+		}
+	}
+	return true
+}
