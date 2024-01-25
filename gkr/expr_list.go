@@ -21,8 +21,10 @@ func (builder *builder) newExprList(e []expr.Expression) *exprList {
 		l: make([]int, len(e)),
 		b: builder,
 	}
+	// TODO: how to do more reuse?
 	maxl := 1
 	for i, x := range e {
+		x = builder.tryAsInternalVariable(x)
 		res.l[i] = builder.layerOfExpr(x)
 		if res.l[i] > maxl {
 			maxl = res.l[i]
