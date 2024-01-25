@@ -141,6 +141,26 @@ func (builder *builder) asInternalVariable(eall expr.Expression, forceRaw bool) 
 	return builder.unstripConstant(idx, coeff, constant)
 }
 
+func (builder *builder) tryAsInternalVariable(eall expr.Expression) expr.Expression {
+	if len(eall) == 1 && eall[0].VID1 == 0 {
+		return eall
+	}
+	e, coeff, constant := builder.stripConstant(eall, false)
+	if len(e) == 1 && e[0].VID1 == 0 {
+		return eall
+	}
+	h := e.HashCode()
+	s, ok := builder.cachedInternalVariables[h]
+	if ok {
+		for _, v := range s {
+			if e.Equal(v.expr) {
+				return builder.unstripConstant(v.idx, coeff, constant)
+			}
+		}
+	}
+	return eall
+}
+
 func (builder *builder) unstripConstant(x int, coeff constraint.Element, constant constraint.Element) expr.Expression {
 	if x == 0 {
 		panic("can't unstrip 0")
