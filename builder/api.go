@@ -1,11 +1,11 @@
-package gkr
+package builder
 
 import (
 	"errors"
 	"math/big"
 	"sort"
 
-	"github.com/Zklib/gkr-compiler/gkr/expr"
+	"github.com/Zklib/gkr-compiler/expr"
 	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/constraint/solver"
 	"github.com/consensys/gnark/frontend"
@@ -34,11 +34,11 @@ func (builder *builder) Sub(i1, i2 frontend.Variable, in ...frontend.Variable) f
 
 // returns res = Σ(vars) or res = vars[0] - Σ(vars[1:]) if sub == true.
 func (builder *builder) add(vars []expr.Expression, sub bool, capacity int, res *expr.Expression, noCompress bool) expr.Expression {
-	// we want to merge all terms from input linear expressions
+	// we want to merge all terms from input expressions
 	// if they are duplicate, we reduce; that is, if multiple terms in different vars have the
 	// same variable id.
 
-	// the frontend/ only builds linear expression that are sorted.
+	// the frontend/ only builds expression that are sorted.
 	// we build a sorted output by iterating all the lists in order and dealing
 	// with the edge cases (same variable ID, coeff == 0, etc.)
 
@@ -77,9 +77,9 @@ func (builder *builder) add(vars []expr.Expression, sub bool, capacity int, res 
 		if curr != -1 && t.VID0 == (*res)[curr].VID0 && t.VID1 == (*res)[curr].VID1 {
 			// accumulate, it's the same variable ID
 			if sub && lID != 0 {
-				(*res)[curr].Coeff = builder.cs.Sub((*res)[curr].Coeff, t.Coeff)
+				(*res)[curr].Coeff = builder.field.Sub((*res)[curr].Coeff, t.Coeff)
 			} else {
-				(*res)[curr].Coeff = builder.cs.Add((*res)[curr].Coeff, t.Coeff)
+				(*res)[curr].Coeff = builder.field.Add((*res)[curr].Coeff, t.Coeff)
 			}
 			if (*res)[curr].Coeff.IsZero() {
 				// remove self.
@@ -91,13 +91,13 @@ func (builder *builder) add(vars []expr.Expression, sub bool, capacity int, res 
 			(*res) = append((*res), *t)
 			curr++
 			if sub && lID != 0 {
-				(*res)[curr].Coeff = builder.cs.Neg((*res)[curr].Coeff)
+				(*res)[curr].Coeff = builder.field.Neg((*res)[curr].Coeff)
 			}
 		}
 	}
 
 	if len((*res)) == 0 {
-		// keep the linear expression valid (assertIsSet)
+		// keep the expression valid (assertIsSet)
 		(*res) = append((*res), expr.NewTerm(0, 0, constraint.Element{}))
 	}
 
@@ -112,19 +112,19 @@ func (builder *builder) Neg(i frontend.Variable) frontend.Variable {
 	v := builder.toVariable(i)
 
 	if n, ok := builder.constantValue(v); ok {
-		n = builder.cs.Neg(n)
+		n = builder.field.Neg(n)
 		return expr.NewConstantExpression(n)
 	}
 
 	return builder.negateLinExp(v)
 }
 
-// returns -le, the result is a copy
+// returns -e, the result is a copy
 func (builder *builder) negateLinExp(e expr.Expression) expr.Expression {
 	res := make(expr.Expression, len(e))
 	copy(res, e)
 	for i := 0; i < len(res); i++ {
-		res[i].Coeff = builder.cs.Neg(res[i].Coeff)
+		res[i].Coeff = builder.field.Neg(res[i].Coeff)
 	}
 	return res
 }
@@ -143,10 +143,11 @@ func (builder *builder) Mul(i1, i2 frontend.Variable, in ...frontend.Variable) f
 
 		// v1 and v2 are constants, we multiply big.Int values and return resulting constant
 		if v1Constant && v2Constant {
-			n1 = builder.cs.Mul(n1, n2)
+			n1 = builder.field.Mul(n1, n2)
 			return expr.NewConstantExpression(n1)
 		}
 
+		// either is constant, we multiply the other by it
 		if v1Constant {
 			return builder.mulConstant(v2, n1, false)
 		}
@@ -154,6 +155,7 @@ func (builder *builder) Mul(i1, i2 frontend.Variable, in ...frontend.Variable) f
 			return builder.mulConstant(v1, n2, !first)
 		}
 
+		// for second degree expressions, we need to compress them to linear
 		if v1Deg == 2 {
 			v1 = builder.asInternalVariable(v1, false)
 		}
@@ -166,7 +168,7 @@ func (builder *builder) Mul(i1, i2 frontend.Variable, in ...frontend.Variable) f
 		for i := 0; i < len(v1); i++ {
 			exp := make(expr.Expression, 0, len(v2))
 			for j := 0; j < len(v2); j++ {
-				coeff := builder.cs.Mul(v1[i].Coeff, v2[j].Coeff)
+				coeff := builder.field.Mul(v1[i].Coeff, v2[j].Coeff)
 				exp = append(exp, expr.NewTerm(v1[i].VID0, v2[j].VID0, coeff))
 			}
 			sort.Sort(exp)
@@ -178,9 +180,8 @@ func (builder *builder) Mul(i1, i2 frontend.Variable, in ...frontend.Variable) f
 	e := builder.newExprList(vars)
 	sort.Sort(e)
 
-	// TODO: is order important?
-	// almost all Mul have only 2 vars, so the order might be useless
-
+	// it might be better to implement binary tree multiplication, but
+	// almost all calls to Mul have only 2 arguments, so the order might be useless
 	res := mul(e.e[0], e.e[1], true)
 
 	for i := 2; i < len(e.e); i++ {
@@ -190,6 +191,7 @@ func (builder *builder) Mul(i1, i2 frontend.Variable, in ...frontend.Variable) f
 	return res
 }
 
+// TODO: fix lambda==0
 func (builder *builder) mulConstant(v1 expr.Expression, lambda constraint.Element, inPlace bool) expr.Expression {
 	// multiplying a frontend.Variable by a constant -> we updated the coefficients in the linear expression
 	// leading to that frontend.Variable
@@ -201,32 +203,31 @@ func (builder *builder) mulConstant(v1 expr.Expression, lambda constraint.Elemen
 	}
 
 	for i := 0; i < len(res); i++ {
-		res[i].Coeff = builder.cs.Mul(res[i].Coeff, lambda)
+		res[i].Coeff = builder.field.Mul(res[i].Coeff, lambda)
 	}
 	return res
 }
 
+// TODO: use a decicated function
 func (builder *builder) divHint(_ *big.Int, inputs []*big.Int, outputs []*big.Int) error {
-	x := builder.cs.FromInterface(inputs[0])
-	y := builder.cs.FromInterface(inputs[1])
-	inv, ok := builder.cs.Inverse(y)
+	x := builder.field.FromInterface(inputs[0])
+	y := builder.field.FromInterface(inputs[1])
+	inv, ok := builder.field.Inverse(y)
 	if !ok {
 		inv = constraint.Element{}
 	}
-	res := builder.cs.Mul(x, inv)
+	res := builder.field.Mul(x, inv)
 	if !ok {
 		// we assume 0/0 is okay
-		check := builder.cs.Sub(builder.cs.Mul(y, res), x)
+		check := builder.field.Sub(builder.field.Mul(y, res), x)
 		if !check.IsZero() {
 			return errors.New("divide by zero in inverseHint")
 		}
 	}
-	outputs[0].Set(builder.cs.ToBigInt(res))
+	outputs[0].Set(builder.field.ToBigInt(res))
 	return nil
 }
 
-// In R1CS, we only need to add the R1C, and the solver will help us to calculate the values.
-// However, here we will need to save the relationship and manually compute the values.
 func (builder *builder) DivUnchecked(i1, i2 frontend.Variable) frontend.Variable {
 	vars, _ := builder.toVariables(i1, i2)
 
@@ -246,10 +247,10 @@ func (builder *builder) DivUnchecked(i1, i2 frontend.Variable) frontend.Variable
 	if n2.IsZero() {
 		panic("div by constant(0)")
 	}
-	n2, _ = builder.cs.Inverse(n2)
+	n2, _ = builder.field.Inverse(n2)
 
 	if v1Constant {
-		n2 = builder.cs.Mul(n2, n1)
+		n2 = builder.field.Mul(n2, n1)
 		return expr.NewLinearExpression(0, n2)
 	}
 
@@ -277,10 +278,10 @@ func (builder *builder) Div(i1, i2 frontend.Variable) frontend.Variable {
 	if n2.IsZero() {
 		panic("div by constant(0)")
 	}
-	n2, _ = builder.cs.Inverse(n2)
+	n2, _ = builder.field.Inverse(n2)
 
 	if v1Constant {
-		n2 = builder.cs.Mul(n2, n1)
+		n2 = builder.field.Mul(n2, n1)
 		return expr.NewLinearExpression(0, n2)
 	}
 
@@ -297,7 +298,7 @@ func (builder *builder) Inverse(i1 frontend.Variable) frontend.Variable {
 			panic("inverse by constant(0)")
 		}
 
-		c, _ = builder.cs.Inverse(c)
+		c, _ = builder.field.Inverse(c)
 		return expr.NewLinearExpression(0, c)
 	}
 
@@ -316,7 +317,7 @@ func (builder *builder) Inverse(i1 frontend.Variable) frontend.Variable {
 // The result in in little endian (first bit= lsb)
 func (builder *builder) ToBinary(i1 frontend.Variable, n ...int) []frontend.Variable {
 	// nbBits
-	nbBits := builder.cs.FieldBitLen()
+	nbBits := builder.field.FieldBitLen()
 	if len(n) == 1 {
 		nbBits = n[0]
 		if nbBits < 0 {
@@ -342,10 +343,6 @@ func (builder *builder) Xor(_a, _b frontend.Variable) frontend.Variable {
 
 	builder.AssertIsBoolean(a)
 	builder.AssertIsBoolean(b)
-
-	// instead of writing a + b - 2ab
-	// we do a * (1 - 2b) + b
-	// to limit large linear expressions
 
 	// moreover, we ensure than b is as small as possible, so that the result
 	// is bounded by len(min(a, b)) + 1
@@ -412,7 +409,7 @@ func (builder *builder) Select(i0, i1, i2 frontend.Variable) frontend.Variable {
 
 	if c, ok := builder.constantValue(cond); ok {
 		// condition is a constant return i1 if true, i2 if false
-		if builder.cs.IsOne(c) {
+		if builder.field.IsOne(c) {
 			return vars[1]
 		}
 		return vars[2]
@@ -422,7 +419,7 @@ func (builder *builder) Select(i0, i1, i2 frontend.Variable) frontend.Variable {
 	n2, ok2 := builder.constantValue(vars[2])
 
 	if ok1 && ok2 {
-		n1 = builder.cs.Sub(n1, n2)
+		n1 = builder.field.Sub(n1, n2)
 		res := builder.Mul(cond, n1)    // no constraint is recorded
 		res = builder.Add(res, vars[2]) // no constraint is recorded
 		return res
@@ -458,8 +455,8 @@ func (builder *builder) Lookup2(b0, b1 frontend.Variable, i0, i1, i2, i3 fronten
 	c1, b1IsConstant := builder.constantValue(s1)
 
 	if b0IsConstant && b1IsConstant {
-		b0 := builder.cs.IsOne(c0)
-		b1 := builder.cs.IsOne(c1)
+		b0 := builder.field.IsOne(c0)
+		b1 := builder.field.IsOne(c1)
 
 		if !b0 && !b1 {
 			return in0
@@ -524,7 +521,7 @@ func (builder *builder) IsZero(i1 frontend.Variable) frontend.Variable {
 
 // Cmp returns 1 if i1>i2, 0 if i1=i2, -1 if i1<i2
 func (builder *builder) Cmp(i1, i2 frontend.Variable) frontend.Variable {
-	nbBits := builder.cs.FieldBitLen()
+	nbBits := builder.field.FieldBitLen()
 	// in AssertIsLessOrEq we omitted comparison against modulus for the left
 	// side as if `a+r<b` implies `a<b`, then here we compute the inequality
 	// directly.
@@ -533,7 +530,8 @@ func (builder *builder) Cmp(i1, i2 frontend.Variable) frontend.Variable {
 
 	res := builder.eZero
 
-	for i := builder.cs.FieldBitLen() - 1; i >= 0; i-- {
+	// TODO: binary tree merge
+	for i := builder.field.FieldBitLen() - 1; i >= 0; i-- {
 
 		iszeroi1 := builder.IsZero(bi1[i])
 		iszeroi2 := builder.IsZero(bi2[i])
