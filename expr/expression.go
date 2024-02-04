@@ -1,19 +1,23 @@
 package expr
 
 import (
+	"github.com/Zklib/gkr-compiler/utils"
 	"github.com/consensys/gnark/constraint"
 )
 
 type Expression []Term
 
+// NewConstantExpression returns c
 func NewConstantExpression(c constraint.Element) Expression {
 	return Expression{NewTerm(0, 0, c)}
 }
 
+// NewLinearExpression returns c * v
 func NewLinearExpression(v int, c constraint.Element) Expression {
 	return Expression{NewTerm(v, 0, c)}
 }
 
+// NewQuadraticExpression returns c * v0 * v1
 func NewQuadraticExpression(v0, v1 int, c constraint.Element) Expression {
 	return Expression{NewTerm(v0, v1, c)}
 }
@@ -47,6 +51,11 @@ func (e Expression) Equal(o Expression) bool {
 	return true
 }
 
+// EqualI is similar to Equal, but o is utils.Hashable. Then it can be saved in a utils.Map
+func (e Expression) EqualI(o utils.Hashable) bool {
+	return e.Equal(o.(Expression))
+}
+
 // Swap swaps terms in the Variable (implements Sort interface)
 func (e Expression) Swap(i, j int) {
 	e[i], e[j] = e[j], e[i]
@@ -64,7 +73,6 @@ func (e Expression) Less(i, j int) bool {
 //
 // requires sorted
 func (e Expression) HashCode() uint64 {
-	// TODO: improve this
 	h := uint64(17)
 	for _, val := range e {
 		h = h*23 + val.HashCode()
@@ -72,6 +80,7 @@ func (e Expression) HashCode() uint64 {
 	return h
 }
 
+// Degree returns the degree of the polynomial
 func (e Expression) Degree() int {
 	res := 0
 	for _, val := range e {

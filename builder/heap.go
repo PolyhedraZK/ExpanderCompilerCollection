@@ -1,4 +1,4 @@
-package gkr
+package builder
 
 // An minHeap is a min-heap of linear expressions. It facilitates merging k-linear expressions.
 //

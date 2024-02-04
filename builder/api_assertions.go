@@ -1,10 +1,12 @@
-package gkr
+// Some content of this file is copied from gnark/frontend/cs/r1cs/api_assertions.go
+
+package builder
 
 import (
 	"fmt"
 	"math/big"
 
-	"github.com/Zklib/gkr-compiler/gkr/expr"
+	"github.com/Zklib/gkr-compiler/expr"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/std/math/bits"
 )
@@ -20,23 +22,7 @@ func (builder *builder) AssertIsEqual(i1, i2 frontend.Variable) {
 		return
 	}
 
-	h := x.HashCode()
-	c, ok := builder.constraints[h]
-	if !ok {
-		c = make([]expr.Expression, 1)
-		c[0] = x
-	} else {
-		exists := false
-		for _, y := range c {
-			if y.Equal(x) {
-				exists = true
-			}
-		}
-		if !exists {
-			c = append(c, x)
-		}
-	}
-	builder.constraints[h] = c
+	builder.zeroes.Add(x, asserted)
 }
 
 // AssertIsDifferent constrain i1 and i2 to be different
@@ -46,7 +32,7 @@ func (builder *builder) AssertIsDifferent(i1, i2 frontend.Variable) {
 		panic("AssertIsDifferent(x,x) will never be satisfied")
 	}
 
-	builder.Inverse(s)
+	builder.nonZeroes.Add(s, asserted)
 }
 
 // AssertIsBoolean adds an assertion in the constraint builder (v == 0 ∥ v == 1)
@@ -54,21 +40,21 @@ func (builder *builder) AssertIsBoolean(i1 frontend.Variable) {
 	v := builder.toVariable(i1)
 
 	if b, ok := builder.constantValue(v); ok {
-		if !(b.IsZero() || builder.cs.IsOne(b)) {
-			panic("assertIsBoolean failed: constant is not 0 or 1") // TODO @gbotrel print
+		if !(b.IsZero() || builder.field.IsOne(b)) {
+			panic("assertIsBoolean failed: constant is not 0 or 1")
 		}
 		return
 	}
 
-	if builder.IsBoolean(v) {
-		return // linearExpression is already constrained
-	}
-	builder.MarkBoolean(v)
+	builder.booleans.Add(v, asserted)
+}
 
-	// ensure v * (1 - v) == 0
-	_v := builder.Sub(builder.eOne, v)
-
-	builder.AssertIsEqual(builder.Mul(v, _v), builder.eZero)
+// AssertIsCrumb fails if v ∉ {0,1,2,3} (crumb is a 2-bit variable; see https://en.wikipedia.org/wiki/Units_of_information)
+// new API added in gnark 0.9.2
+func (builder *builder) AssertIsCrumb(i1 frontend.Variable) {
+	i1 = builder.MulAcc(builder.Mul(-3, i1), i1, i1)
+	i1 = builder.MulAcc(builder.Mul(2, i1), i1, i1)
+	builder.AssertIsEqual(i1, 0)
 }
 
 // AssertIsLessOrEqual adds assertion in constraint builder  (v ⩽ bound)
@@ -83,18 +69,18 @@ func (builder *builder) AssertIsLessOrEqual(v frontend.Variable, bound frontend.
 
 	// both inputs are constants
 	if vConst && bConst {
-		bv, bb := builder.cs.ToBigInt(cv), builder.cs.ToBigInt(cb)
+		bv, bb := builder.field.ToBigInt(cv), builder.field.ToBigInt(cb)
 		if bv.Cmp(bb) == 1 {
 			panic(fmt.Sprintf("AssertIsLessOrEqual: %s > %s", bv.String(), bb.String()))
 		}
 	}
 
-	nbBits := builder.cs.FieldBitLen()
+	nbBits := builder.field.FieldBitLen()
 	vBits := bits.ToBinary(builder, v, bits.WithNbDigits(nbBits), bits.WithUnconstrainedOutputs())
 
 	// bound is constant
 	if bConst {
-		builder.MustBeLessOrEqCst(vBits, builder.cs.ToBigInt(cb), v)
+		builder.MustBeLessOrEqCst(vBits, builder.field.ToBigInt(cb), v)
 		return
 	}
 
@@ -105,7 +91,7 @@ func (builder *builder) mustBeLessOrEqVar(a, bound frontend.Variable) {
 	// here bound is NOT a constant,
 	// but a can be either constant or a wire.
 
-	nbBits := builder.cs.FieldBitLen()
+	nbBits := builder.field.FieldBitLen()
 
 	aBits := bits.ToBinary(builder, a, bits.WithNbDigits(nbBits), bits.WithUnconstrainedOutputs(), bits.OmitModulusCheck())
 	boundBits := bits.ToBinary(builder, bound, bits.WithNbDigits(nbBits))
@@ -145,7 +131,7 @@ func (builder *builder) mustBeLessOrEqVar(a, bound frontend.Variable) {
 // aBits is less or equal than constant bound. The method boolean constraints
 // the bits in aBits, so the caller can provide unconstrained bits.
 func (builder *builder) MustBeLessOrEqCst(aBits []frontend.Variable, bound *big.Int, aForDebug frontend.Variable) {
-	nbBits := builder.cs.FieldBitLen()
+	nbBits := builder.field.FieldBitLen()
 	if len(aBits) > nbBits {
 		panic("more input bits than field bit length")
 	}

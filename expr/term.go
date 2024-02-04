@@ -1,6 +1,6 @@
 package expr
 
-// similar to gnark frontend/internal/expr/term, but we support var2
+// similar to gnark frontend/internal/expr/term, but we support quadratic variables
 
 import "github.com/consensys/gnark/constraint"
 
@@ -23,6 +23,7 @@ func (t *Term) SetCoeff(c constraint.Element) {
 	t.Coeff = c
 }
 
+// Slightly better (?) hash algorithm than the gnark one
 func (t Term) HashCode() uint64 {
 	x := t.Coeff[0] ^ t.Coeff[1] ^ t.Coeff[2] ^ t.Coeff[3] ^ t.Coeff[4] ^ t.Coeff[5]
 	x ^= uint64(t.VID0) * 998244353
