@@ -1,10 +1,10 @@
-package gkr
+package builder
 
 import (
 	"bytes"
 	"sort"
 
-	"github.com/Zklib/gkr-compiler/gkr/expr"
+	"github.com/Zklib/gkr-compiler/expr"
 )
 
 // Sometimes we need to sort expressions by their layers
@@ -21,7 +21,8 @@ func (builder *builder) newExprList(e []expr.Expression) *exprList {
 		l: make([]int, len(e)),
 		b: builder,
 	}
-	// TODO: how to do more reuse?
+	// In the both use cases of this function, it would be better if the variables are smaller
+	// So we try to use the single variable form when possible
 	maxl := 1
 	for i, x := range e {
 		x = builder.tryAsInternalVariable(x)

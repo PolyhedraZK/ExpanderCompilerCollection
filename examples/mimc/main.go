@@ -7,29 +7,33 @@ import (
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/std/hash/mimc"
 
-	"github.com/Zklib/gkr-compiler/gkr"
+	gkr "github.com/Zklib/gkr-compiler"
+	"github.com/Zklib/gkr-compiler/test"
 )
 
+const NHashes = 100
+
 type Circuit struct {
-	PreImage frontend.Variable
-	Hash     frontend.Variable
+	PreImage [NHashes]frontend.Variable
+	Hash     [NHashes]frontend.Variable
+}
+
+func mimcHash(api frontend.API, preImage frontend.Variable, hash frontend.Variable) {
+	mimc, _ := mimc.NewMiMC(api)
+	mimc.Write(preImage)
+	api.AssertIsEqual(mimc.Sum(), hash)
 }
 
 // Define declares the circuit's constraints
 func (circuit *Circuit) Define(api frontend.API) error {
-	// hash function
-	mimc, _ := mimc.NewMiMC(api)
-
-	// specify constraints
-	// mimc(preImage) == hash
-	mimc.Write(circuit.PreImage)
-	api.AssertIsEqual(circuit.Hash, mimc.Sum())
-
+	for i := 0; i < NHashes; i++ {
+		api.(gkr.API).MemorizedCall(mimcHash, circuit.PreImage[i], circuit.Hash[i])
+	}
 	return nil
 }
 
 func main() {
-	circuit, err := gkr.Compile(ecc.BN254.ScalarField(), &Circuit{}, true)
+	circuit, err := gkr.Compile(ecc.BN254.ScalarField(), &Circuit{})
 	if err != nil {
 		panic(err)
 	}
@@ -37,10 +41,22 @@ func main() {
 	c := circuit.GetLayeredCircuit()
 	os.WriteFile("circuit.txt", c.Serialize(), 0o644)
 
-	assignment := &Circuit{
-		PreImage: "16130099170765464552823636852555369511329944820189892919423002775646948828469",
-		Hash:     "12886436712380113721405259596386800092738845035233065858332878701083870690753",
+	assignment := &Circuit{}
+	for i := 0; i < NHashes; i++ {
+		assignment.PreImage[i] = "16130099170765464552823636852555369511329944820189892919423002775646948828469"
+		assignment.Hash[i] = "12886436712380113721405259596386800092738845035233065858332878701083870690753"
 	}
-	witness := circuit.GetWitness(assignment)
+	inputSolver := circuit.GetInputSolver()
+	witness, err := inputSolver.SolveInput(assignment, 8)
+	if err != nil {
+		panic(err)
+	}
+
+	if !test.CheckCircuit(c, witness) {
+		panic("error")
+	}
+
+	os.WriteFile("inputsolver.txt", inputSolver.Serialize(), 0o644)
+	os.WriteFile("circuit.txt", c.Serialize(), 0o644)
 	os.WriteFile("witness.txt", witness.Serialize(), 0o644)
 }
