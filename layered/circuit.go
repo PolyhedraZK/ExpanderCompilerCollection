@@ -1,12 +1,12 @@
-package gkr
+package layered
 
 import (
-	"crypto/rand"
 	"fmt"
 	"math/big"
-	"sort"
 
-	"github.com/Zklib/gkr-compiler/gkr/expr"
+	"github.com/Zklib/gkr-compiler/circuitir"
+	"github.com/Zklib/gkr-compiler/expr"
+	"github.com/Zklib/gkr-compiler/utils"
 )
 
 type gateType uint32
@@ -29,41 +29,16 @@ type layer struct {
 	gates []gate
 }
 
-type circuit struct {
+type Circuit struct {
 	layers []layer
 	pad2n  bool
 }
 
-// finalize will convert conditions to a single output wire
-func (builder *builder) finalize() {
-	constraints := []expr.Expression{}
-	for _, es := range builder.constraints {
-		constraints = append(constraints, es...)
-	}
-	e := builder.newExprList(constraints)
-	sort.Sort(e)
-
-	wi, _ := rand.Int(rand.Reader, builder.Field())
-	w := builder.cs.FromInterface(wi)
-
-	curpow := w
-	res := make([]expr.Expression, len(e.e))
-	for i, x := range e.e {
-		res[i] = builder.Mul(curpow, x).(expr.Expression)
-		curpow = builder.cs.Mul(curpow, w)
-	}
-
-	// add the results by layers
-	out := builder.layeredAdd(res)
-	finalOut := builder.asInternalVariable(out, true)
-	builder.output = finalOut[0].VID0
-	builder.constraints = nil
-}
-
 // TODO: optimize this
-func (builder *builder) compile(pad2n bool) {
-	nInt, nSec, nPub := builder.cs.GetNbVariables()
-	n := nInt + nSec + nPub
+func Compile(rc *circuitir.RootCircuit, pad2n bool) (*Circuit, []int) {
+	// TODO: currently this only supports one circuit and one output
+	ci := rc.Circuits[0]
+	n := ci.Output[0][0].VID0 + 1
 	minLayer := make([]int, n) // the first layer it can be computed
 	maxLayer := make([]int, n) // the last layer it will be used
 	inDeg := make([]int, n)
@@ -73,14 +48,14 @@ func (builder *builder) compile(pad2n bool) {
 	for i := 0; i < n; i++ {
 		minLayer[i] = -1
 	}
-	for i := 0; i < nSec+nPub; i++ {
+	for i := 0; i < ci.NbExternalInput+1; i++ {
 		minLayer[i] = 0
 	}
 
 	// get all input wires and build the graph
-	for _, hint := range builder.hints {
-		if hint.f == nil {
-			e := hint.inputs[0]
+	for _, insn := range ci.Instructions {
+		if insn.Type == circuitir.IInternalVariable {
+			e := insn.Inputs[0]
 			usedVar := make(map[int]bool)
 			for _, term := range e {
 				if term.Coeff.IsZero() {
@@ -93,7 +68,7 @@ func (builder *builder) compile(pad2n bool) {
 					usedVar[term.VID1] = true
 				}
 			}
-			x := hint.outputIds[0]
+			x := insn.OutputIds[0]
 			varExpr[x] = e
 			inDeg[x] = len(usedVar)
 			inEdges[x] = make([]int, 0, len(usedVar))
@@ -102,7 +77,7 @@ func (builder *builder) compile(pad2n bool) {
 				outEdges[y] = append(outEdges[y], x)
 			}
 		} else {
-			for _, x := range hint.outputIds {
+			for _, x := range insn.OutputIds {
 				minLayer[x] = 0
 			}
 		}
@@ -111,7 +86,7 @@ func (builder *builder) compile(pad2n bool) {
 	// bfs from output wire
 	isUsed := make([]bool, n)
 	q := make([]int, 1, n)
-	q[0] = builder.output
+	q[0] = n - 1
 	isUsed[q[0]] = true
 	for i := 0; i < len(q); i++ {
 		x := q[i]
@@ -158,7 +133,7 @@ func (builder *builder) compile(pad2n bool) {
 	}
 
 	// initialize the variables idx in layers
-	nLayers := minLayer[builder.output] + 1
+	nLayers := minLayer[n-1] + 1
 	layerVarIdx := make([][]int, nLayers)
 	layerVarLoc := make([]map[int]int, nLayers)
 	for i := 0; i < nLayers; i++ {
@@ -176,7 +151,7 @@ func (builder *builder) compile(pad2n bool) {
 	}
 
 	// build the circuit
-	circuit := circuit{
+	circuit := Circuit{
 		layers: make([]layer, nLayers),
 	}
 	for l := 0; l < nLayers; l++ {
@@ -210,14 +185,14 @@ func (builder *builder) compile(pad2n bool) {
 				}
 				for _, term := range var2 {
 					gate.op = append(gate.op, uint64(term.VID0), uint64(term.VID1))
-					gate.coef = append(gate.coef, builder.cs.ToBigInt(term.Coeff))
+					gate.coef = append(gate.coef, rc.Field.ToBigInt(term.Coeff))
 				}
 				for _, term := range var1 {
 					gate.op = append(gate.op, uint64(term.VID0))
-					gate.coef = append(gate.coef, builder.cs.ToBigInt(term.Coeff))
+					gate.coef = append(gate.coef, rc.Field.ToBigInt(term.Coeff))
 				}
 				for _, term := range var0 {
-					gate.coef = append(gate.coef, builder.cs.ToBigInt(term.Coeff))
+					gate.coef = append(gate.coef, rc.Field.ToBigInt(term.Coeff))
 				}
 				gate.gateParam = []uint64{uint64(len(var2)), uint64(len(var1)), uint64(len(var0))}
 			} else {
@@ -232,8 +207,7 @@ func (builder *builder) compile(pad2n bool) {
 
 	// finally, set the results
 	circuit.pad2n = pad2n
-	builder.circuit = circuit
-	builder.inputVariableIdx = layerVarIdx[0]
+	return &circuit, layerVarIdx[0]
 }
 
 func nextPowerOfTwo(x int, is4 bool) int {
@@ -249,14 +223,14 @@ func nextPowerOfTwo(x int, is4 bool) int {
 	return 1 << padk
 }
 
-func (c *circuit) Serialize() []byte {
-	buf := outputBuf{}
+func (c *Circuit) Serialize() []byte {
+	buf := utils.OutputBuf{}
 
-	buf.appendUint32(uint32(len(c.layers)))
+	buf.AppendUint32(uint32(len(c.layers)))
 	if c.pad2n {
-		buf.appendUint64(uint64(nextPowerOfTwo(len(c.layers[0].gates), true)))
+		buf.AppendUint64(uint64(nextPowerOfTwo(len(c.layers[0].gates), true)))
 	} else {
-		buf.appendUint64(uint64(len(c.layers[0].gates)))
+		buf.AppendUint64(uint64(len(c.layers[0].gates)))
 	}
 	for i := 1; i < len(c.layers); i++ {
 		gates := c.layers[i].gates
@@ -267,44 +241,44 @@ func (c *circuit) Serialize() []byte {
 		if i+1 == len(c.layers) {
 			n = 1
 		}
-		buf.appendUint64(uint64(n))
+		buf.AppendUint64(uint64(n))
 		for _, gate := range gates {
-			buf.appendUint32(uint32(gate.gateType))
+			buf.AppendUint32(uint32(gate.gateType))
 			if gate.gateType == gateRelay {
-				buf.appendUint64(gate.op[0])
+				buf.AppendUint64(gate.op[0])
 			} else if gate.gateType == gateHybrid {
 				var2OpSize := gate.gateParam[0]
 				var1OpSize := gate.gateParam[1]
 				var0OpSize := gate.gateParam[2]
-				buf.appendUint32(uint32(var2OpSize))
+				buf.AppendUint32(uint32(var2OpSize))
 				for i := 0; i < int(var2OpSize); i++ {
-					buf.appendUint64(gate.op[i*2])
-					buf.appendUint64(gate.op[i*2+1])
+					buf.AppendUint64(gate.op[i*2])
+					buf.AppendUint64(gate.op[i*2+1])
 				}
 				for i := 0; i < int(var2OpSize); i++ {
-					buf.appendBigInt(gate.coef[i])
+					buf.AppendBigInt(gate.coef[i])
 				}
-				buf.appendUint32(uint32(var1OpSize))
+				buf.AppendUint32(uint32(var1OpSize))
 				for i := int(var2OpSize * 2); i < int(var2OpSize*2+var1OpSize); i++ {
-					buf.appendUint64(gate.op[i])
+					buf.AppendUint64(gate.op[i])
 				}
 				for i := int(var2OpSize); i < int(var2OpSize+var1OpSize); i++ {
-					buf.appendBigInt(gate.coef[i])
+					buf.AppendBigInt(gate.coef[i])
 				}
-				buf.appendUint32(uint32(var0OpSize))
+				buf.AppendUint32(uint32(var0OpSize))
 				for i := int(var2OpSize + var1OpSize); i < int(var2OpSize+var1OpSize+var0OpSize); i++ {
-					buf.appendBigInt(gate.coef[i])
+					buf.AppendBigInt(gate.coef[i])
 				}
 			}
 		}
 		for i := 0; i < n-len(gates); i++ {
-			buf.appendUint32(uint32(gateDummy))
+			buf.AppendUint32(uint32(gateDummy))
 		}
 	}
-	return buf.buf
+	return buf.Bytes()
 }
 
-func (c *circuit) Print() {
+func (c *Circuit) Print() {
 	for i := 0; i < len(c.layers); i++ {
 		gates := c.layers[i].gates
 		fmt.Println("==============================")
@@ -333,26 +307,26 @@ func (c *circuit) Print() {
 	}
 }
 
-type circuitStats struct {
-	layers         int
-	inputCount     int
-	relayCount     int
-	hybridCount    int
-	hybridArgCount int
+type CircuitStats struct {
+	Layers         int
+	InputCount     int
+	RelayCount     int
+	HybridCount    int
+	HybridArgCount int
 }
 
-func (c *circuit) getStats() (res circuitStats) {
-	res.layers = len(c.layers)
+func (c *Circuit) GetStats() (res CircuitStats) {
+	res.Layers = len(c.layers)
 	for i := 0; i < len(c.layers); i++ {
 		gates := c.layers[i].gates
 		for _, gate := range gates {
 			if gate.gateType == gateInput {
-				res.inputCount++
+				res.InputCount++
 			} else if gate.gateType == gateRelay {
-				res.relayCount++
+				res.RelayCount++
 			} else if gate.gateType == gateHybrid {
-				res.hybridCount++
-				res.hybridArgCount += int(gate.gateParam[0]) + int(gate.gateParam[1]) + int(gate.gateParam[2])
+				res.HybridCount++
+				res.HybridArgCount += int(gate.gateParam[0]) + int(gate.gateParam[1]) + int(gate.gateParam[2])
 			}
 		}
 	}

@@ -1,10 +1,10 @@
-package gkr
+package builder
 
 import (
 	"bytes"
 	"sort"
 
-	"github.com/Zklib/gkr-compiler/gkr/expr"
+	"github.com/Zklib/gkr-compiler/expr"
 )
 
 // Sometimes we need to sort expressions by their layers

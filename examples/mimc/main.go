@@ -7,7 +7,7 @@ import (
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/std/hash/mimc"
 
-	"github.com/Zklib/gkr-compiler/gkr"
+	gkr "github.com/Zklib/gkr-compiler"
 )
 
 type Circuit struct {

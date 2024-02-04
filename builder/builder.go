@@ -1,4 +1,4 @@
-package gkr
+package builder
 
 import (
 	"errors"
@@ -7,107 +7,85 @@ import (
 	"sort"
 
 	"github.com/consensys/gnark/constraint"
-	bn254r1cs "github.com/consensys/gnark/constraint/bn254"
 	"github.com/consensys/gnark/constraint/solver"
 	"github.com/consensys/gnark/debug"
 	"github.com/consensys/gnark/frontend"
-	"github.com/consensys/gnark/frontend/schema"
 
-	"github.com/Zklib/gkr-compiler/gkr/expr"
+	"github.com/Zklib/gkr-compiler/circuitir"
+	"github.com/Zklib/gkr-compiler/expr"
 )
 
+// builder implements frontend.API and frontend.Compiler, and builds a circuit
+// it can be a root circuit or a sub circuit
 type builder struct {
-	cs     constraint.R1CS
-	config frontend.CompileConfig
+	// This R1CS is only used to provide field operations
+	field constraint.R1CS
+
+	// builder of the root circuit
+	root *Root
 
 	// map for recording boolean constrained variables (to not constrain them twice)
-	mtBooleans map[uint64][]expr.Expression
+	markedBooleans   expr.Map
+	assertedBooleans expr.Map
 
+	// widely used expressions
 	tOne        constraint.Element
 	eZero, eOne expr.Expression
 
-	// normal internal wires expressions
-	cachedInternalVariables map[uint64][]internalVariable
+	// map from expression to idx
+	internalVariables expr.Map
 
-	hints   []hint
-	nbInput int
+	// instruction list, each instruction specifies the method to calculate some variables
+	instructions []circuitir.Instruction
+
+	// count of variables in different types
+	nbInput         int
+	nbExternalInput int
 
 	// (probably estimated) layer of each variable
 	vLayer []int
 
-	// each constraint is expr == 0
-	// output = ai*r^i where r is the last input (r should be committed)
-	constraints map[uint64][]expr.Expression
+	// other constraints
+	assertedZeroes    expr.Map
+	assertedNonZeroes expr.Map
 
-	// implement kvstore.Store
+	// we have to implement kvstore.Store to satisfy XXX
+	// TODO: really?
 	db map[any]any
 
-	// final output internal wire id
-	output int
-
-	// artifacts
-	circuit          circuit
-	inputVariableIdx []int
+	// output of sub circuit
+	output []expr.Expression
 }
 
-type internalVariable struct {
-	expr expr.Expression
-	idx  int
-}
-
-type hint struct {
-	f         solver.Hint // if f is nil, then it's a normal internal variable
-	inputs    []expr.Expression
-	outputIds []int
-}
-
-func newBuilder(field *big.Int, config frontend.CompileConfig) *builder {
+func (r *Root) newBuilder(nbExternalInput int) *builder {
 	builder := builder{
-		config:                  config,
-		mtBooleans:              make(map[uint64][]expr.Expression),
-		cachedInternalVariables: make(map[uint64][]internalVariable),
-		db:                      make(map[any]any),
-		constraints:             make(map[uint64][]expr.Expression),
+		field:             r.field,
+		root:              r,
+		markedBooleans:    make(expr.Map),
+		assertedBooleans:  make(expr.Map),
+		internalVariables: make(expr.Map),
+		assertedZeroes:    make(expr.Map),
+		assertedNonZeroes: make(expr.Map),
+		db:                make(map[any]any),
+		nbExternalInput:   nbExternalInput,
+		nbInput:           nbExternalInput,
 	}
 
-	// TODO: check different fields
-	// This R1CS is only used to manage variables and get a field
-	builder.cs = bn254r1cs.NewR1CS(config.Capacity)
-
-	if field.Cmp(builder.Field()) != 0 {
-		panic("currently only BN254 is supported")
-	}
-
-	builder.tOne = builder.cs.One()
-	builder.cs.AddPublicVariable("1")
+	builder.tOne = builder.field.One()
 	builder.vLayer = append(builder.vLayer, 1)
 
 	builder.eZero = expr.NewConstantExpression(constraint.Element{})
 	builder.eOne = expr.NewConstantExpression(builder.tOne)
 
+	// add 1 for the constant "1"
+	builder.vLayer = make([]int, nbExternalInput+1)
+
 	return &builder
 }
 
-// PublicVariable creates a new public Variable
-func (builder *builder) PublicVariable(f schema.LeafInfo) frontend.Variable {
-	idx := builder.cs.AddPublicVariable(f.FullName())
-	builder.vLayer = append(builder.vLayer, 1)
-	builder.nbInput++
-	return expr.NewLinearExpression(idx, builder.tOne)
-}
-
-// SecretVariable creates a new secret Variable
-func (builder *builder) SecretVariable(f schema.LeafInfo) frontend.Variable {
-	idx := builder.cs.AddSecretVariable(f.FullName())
-	builder.vLayer = append(builder.vLayer, 1)
-	builder.nbInput++
-	return expr.NewLinearExpression(idx, builder.tOne)
-}
-
-// newInternalVariable creates a new wire, appends it on the list of wires of the circuit, sets
-// the wire's id to the number of wires, and returns it
+// asInternalVariable will convert the variable to a single linear term
+// It first convert the input to the form a*(...)+c, and then queries the database
 // It remembers previous results, and uses cached id if possible
-// TODO: improve cache (maybe force constant=1)
 func (builder *builder) asInternalVariable(eall expr.Expression, forceRaw bool) expr.Expression {
 	if len(eall) == 1 && eall[0].VID1 == 0 {
 		return eall
@@ -116,28 +94,16 @@ func (builder *builder) asInternalVariable(eall expr.Expression, forceRaw bool) 
 	if len(e) == 1 && e[0].VID1 == 0 && !forceRaw {
 		return eall
 	}
-	h := e.HashCode()
-	s, ok := builder.cachedInternalVariables[h]
+	idx_, ok := builder.internalVariables.Find(e)
 	if ok {
-		for _, v := range s {
-			if e.Equal(v.expr) {
-				return builder.unstripConstant(v.idx, coeff, constant)
-			}
-		}
-	} else {
-		s = make([]internalVariable, 0, 1)
+		return builder.unstripConstant(idx_.(int), coeff, constant)
 	}
 	builder.vLayer = append(builder.vLayer, builder.layerOfExpr(e)+1)
-	idx := builder.cs.AddInternalVariable()
-	builder.cachedInternalVariables[h] = append(s, internalVariable{
-		expr: e,
-		idx:  idx,
-	})
-	builder.hints = append(builder.hints, hint{
-		f:         nil,
-		inputs:    []expr.Expression{e},
-		outputIds: []int{idx},
-	})
+	idx := len(builder.vLayer) - 1
+	builder.internalVariables.Set(e, idx)
+	builder.instructions = append(builder.instructions,
+		circuitir.NewInternalVariableInstruction(e, idx),
+	)
 	return builder.unstripConstant(idx, coeff, constant)
 }
 
@@ -149,14 +115,9 @@ func (builder *builder) tryAsInternalVariable(eall expr.Expression) expr.Express
 	if len(e) == 1 && e[0].VID1 == 0 {
 		return eall
 	}
-	h := e.HashCode()
-	s, ok := builder.cachedInternalVariables[h]
+	idx_, ok := builder.internalVariables.Find(e)
 	if ok {
-		for _, v := range s {
-			if e.Equal(v.expr) {
-				return builder.unstripConstant(v.idx, coeff, constant)
-			}
-		}
+		return builder.unstripConstant(idx_.(int), coeff, constant)
 	}
 	return eall
 }
@@ -191,7 +152,7 @@ func (builder *builder) stripConstant(e_ expr.Expression, forceRaw bool) (expr.E
 	}
 	sort.Sort(e)
 	v := e[0].Coeff
-	vi, ok := builder.cs.Inverse(v)
+	vi, ok := builder.field.Inverse(v)
 	if !ok {
 		vi = constraint.Element{}
 		if len(e) != 1 {
@@ -199,17 +160,17 @@ func (builder *builder) stripConstant(e_ expr.Expression, forceRaw bool) (expr.E
 		}
 	}
 	for i := 0; i < len(e); i++ {
-		e[i].Coeff = builder.cs.Mul(e[i].Coeff, vi)
+		e[i].Coeff = builder.field.Mul(e[i].Coeff, vi)
 	}
 	return e, v, cst
 }
 
 func (builder *builder) Field() *big.Int {
-	return builder.cs.Field()
+	return builder.field.Field()
 }
 
 func (builder *builder) FieldBitLen() int {
-	return builder.cs.FieldBitLen()
+	return builder.field.FieldBitLen()
 }
 
 func (builder *builder) layerOfExpr(e expr.Expression) int {
@@ -230,7 +191,7 @@ func (builder *builder) layerOfExpr(e expr.Expression) int {
 // that is not api.AssertIsBoolean. If v is a constant, this is a no-op.
 func (builder *builder) MarkBoolean(v frontend.Variable) {
 	if b, ok := builder.constantValue(v); ok {
-		if !(b.IsZero() || builder.cs.IsOne(b)) {
+		if !(b.IsZero() || builder.field.IsOne(b)) {
 			panic("MarkBoolean called a non-boolean constant")
 		}
 		return
@@ -239,10 +200,7 @@ func (builder *builder) MarkBoolean(v frontend.Variable) {
 	l := v.(expr.Expression)
 	sort.Sort(l)
 
-	key := l.HashCode()
-	list := builder.mtBooleans[key]
-	list = append(list, l)
-	builder.mtBooleans[key] = list
+	builder.markedBooleans.Set(l, true)
 }
 
 // IsBoolean returns true if given variable was marked as boolean in the compiler (see MarkBoolean)
@@ -250,24 +208,14 @@ func (builder *builder) MarkBoolean(v frontend.Variable) {
 // This returns true if the v is a constant and v == 0 || v == 1.
 func (builder *builder) IsBoolean(v frontend.Variable) bool {
 	if b, ok := builder.constantValue(v); ok {
-		return (b.IsZero() || builder.cs.IsOne(b))
+		return (b.IsZero() || builder.field.IsOne(b))
 	}
 	// v is a linear expression
 	l := v.(expr.Expression)
 	sort.Sort(l)
 
-	key := l.HashCode()
-	list, ok := builder.mtBooleans[key]
-	if !ok {
-		return false
-	}
-
-	for _, v := range list {
-		if v.Equal(l) {
-			return true
-		}
-	}
-	return false
+	_, ok := builder.markedBooleans.Find(l)
+	return ok
 }
 
 // Compile constructs a rank-1 constraint sytem
@@ -282,7 +230,7 @@ func (builder *builder) ConstantValue(v frontend.Variable) (*big.Int, bool) {
 	if !ok {
 		return nil, false
 	}
-	return builder.cs.ToBigInt(coeff), true
+	return builder.field.ToBigInt(coeff), true
 }
 
 func (builder *builder) constantValue(v frontend.Variable) (constraint.Element, bool) {
@@ -299,7 +247,7 @@ func (builder *builder) constantValue(v frontend.Variable) (constraint.Element, 
 		}
 		return _v[0].Coeff, true
 	}
-	return builder.cs.FromInterface(v), true
+	return builder.field.FromInterface(v), true
 }
 
 // toVariable will return (and allocate if neccesary) an Expression from given value
@@ -322,7 +270,7 @@ func (builder *builder) toVariable(input interface{}) expr.Expression {
 		return expr.NewLinearExpression(0, *t)
 	default:
 		// try to make it into a constant
-		c := builder.cs.FromInterface(t)
+		c := builder.field.FromInterface(t)
 		return expr.NewLinearExpression(0, c)
 	}
 }
@@ -375,22 +323,20 @@ func (builder *builder) newHint(f solver.Hint, nbOutputs int, inputs []frontend.
 			assertIsSet(t)
 			hintInputs[i] = t
 		} else {
-			c := builder.cs.FromInterface(in)
+			c := builder.field.FromInterface(in)
 			hintInputs[i] = expr.NewConstantExpression(c)
 		}
 	}
 
 	outId := make([]int, nbOutputs)
 	for i := 0; i < nbOutputs; i++ {
-		outId[i] = builder.cs.AddInternalVariable()
+		outId[i] = len(builder.vLayer)
 		builder.vLayer = append(builder.vLayer, 1)
 	}
 
-	builder.hints = append(builder.hints, hint{
-		f:         f,
-		inputs:    hintInputs,
-		outputIds: outId,
-	})
+	builder.instructions = append(builder.instructions,
+		circuitir.NewHintInstruction(f, hintInputs, outId),
+	)
 	builder.nbInput += len(outId)
 
 	// make the variables
@@ -422,6 +368,7 @@ func assertIsSet(e expr.Expression) {
 }
 
 // TODO: add special flag if it's the output
+// layeredAdd sums the given expression list by layers
 func (builder *builder) layeredAdd(es_ []expr.Expression) expr.Expression {
 	es := builder.newExprList(es_)
 	sort.Sort(es)
@@ -438,6 +385,7 @@ func (builder *builder) layeredAdd(es_ []expr.Expression) expr.Expression {
 	return builder.add(cur, false, 0, nil, true)
 }
 
+// TODO: revert back size limit
 func (builder *builder) compress(e expr.Expression) expr.Expression {
 	minL := 1 << 60
 	maxL := -1 << 60
@@ -490,8 +438,6 @@ func (builder *builder) InternalVariable(wireID uint32) frontend.Variable {
 	panic("unimplemented")
 }
 
-// ToCanonicalVariable converts a frontend.Variable to a constraint system specific Variable
-// ! Experimental: use in conjunction with constraint.CustomizableSystem
 func (builder *builder) ToCanonicalVariable(in frontend.Variable) frontend.CanonicalVariable {
 	panic("unimplemented")
 }

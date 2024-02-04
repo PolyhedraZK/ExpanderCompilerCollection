@@ -1,6 +1,6 @@
 package expr
 
-// similar to gnark frontend/internal/expr/term, but we support var2
+// similar to gnark frontend/internal/expr/term, but we support second degree variables
 
 import "github.com/consensys/gnark/constraint"
 
