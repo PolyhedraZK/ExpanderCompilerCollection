@@ -36,6 +36,7 @@ type Circuit struct {
 
 // TODO: optimize this
 func Compile(rc *circuitir.RootCircuit, pad2n bool) (*Circuit, []int) {
+	return nil, nil
 	// TODO: currently this only supports one circuit and one output
 	ci := rc.Circuits[0]
 	n := ci.Output[0][0].VID0 + 1
@@ -316,6 +317,7 @@ type CircuitStats struct {
 }
 
 func (c *Circuit) GetStats() (res CircuitStats) {
+	return
 	res.Layers = len(c.layers)
 	for i := 0; i < len(c.layers); i++ {
 		gates := c.layers[i].gates

@@ -11,7 +11,7 @@ import (
 func (r *Root) Finalize() *circuitir.RootCircuit {
 	res := make(map[uint64]*circuitir.Circuit)
 	for x, b := range r.registry {
-		res[x] = b.Finalize()
+		res[x] = b.builder.Finalize()
 	}
 	return &circuitir.RootCircuit{
 		Field:    r.field,
@@ -19,18 +19,22 @@ func (r *Root) Finalize() *circuitir.RootCircuit {
 	}
 }
 
+func shouldAssert(x interface{}) bool {
+	return x.(constraintStatus) == asserted
+}
+
 // Finalize will process assertBooleans and assertNonZeroes, and return a Circuit IR
 func (builder *builder) Finalize() *circuitir.Circuit {
-	for _, e := range builder.assertedBooleans.DumpKeys() {
+	for _, e := range builder.booleans.FilterKeys(shouldAssert) {
 		v := builder.Mul(e, builder.Sub(builder.eOne, e)).(expr.Expression)
-		builder.assertedZeroes.Set(v, true)
+		builder.zeroes.Add(v, asserted)
 	}
-	builder.assertedBooleans = nil
-	for _, e := range builder.assertedNonZeroes.DumpKeys() {
+	builder.booleans.Clear()
+	for _, e := range builder.nonZeroes.FilterKeys(shouldAssert) {
 		builder.Inverse(e)
 	}
-	builder.assertedNonZeroes = nil
-	constraints := builder.assertedZeroes.DumpKeys()
+	builder.nonZeroes.Clear()
+	constraints := builder.zeroes.FilterKeys(shouldAssert)
 
 	output := builder.output
 	// TODO: this part is just copied from the old circuit.go, it should be removed

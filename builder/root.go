@@ -15,7 +15,7 @@ type Root struct {
 	field  constraint.R1CS
 	config frontend.CompileConfig
 
-	registry CircuitRegistry
+	registry SubCircuitRegistry
 }
 
 func NewRoot(field *big.Int, config frontend.CompileConfig) *Root {
@@ -26,10 +26,12 @@ func NewRoot(field *big.Int, config frontend.CompileConfig) *Root {
 	if field.Cmp(root.field.Field()) != 0 {
 		panic("currently only BN254 is supported")
 	}
-	root.registry = make(CircuitRegistry)
+	root.registry = make(SubCircuitRegistry)
 
 	root.builder = root.newBuilder(0)
-	root.registry[0] = root.builder
+	root.registry[0] = &SubCircuit{
+		builder: root.builder,
+	}
 
 	return &root
 }
@@ -44,6 +46,5 @@ func (r *Root) PublicVariable(f schema.LeafInfo) frontend.Variable {
 func (r *Root) SecretVariable(f schema.LeafInfo) frontend.Variable {
 	r.builder.nbExternalInput++
 	r.builder.nbInput++
-	r.builder.vLayer = append(r.builder.vLayer, 1)
-	return expr.NewLinearExpression(len(r.builder.vLayer)-1, r.builder.tOne)
+	return expr.NewLinearExpression(r.newVariable(1), r.builder.tOne)
 }
