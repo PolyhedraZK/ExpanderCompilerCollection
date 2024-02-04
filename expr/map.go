@@ -39,12 +39,39 @@ func (m Map) Set(e Expression, v interface{}) {
 	})
 }
 
-func (m Map) DumpKeys() []Expression {
+// when exists, do nothing
+func (m Map) Add(e Expression, v interface{}) {
+	h := e.HashCode()
+	s, ok := m[h]
+	if !ok {
+		s = make([]mapEntry, 0, 1)
+	} else {
+		for _, x := range s {
+			if x.e.Equal(e) {
+				return
+			}
+		}
+	}
+	m[h] = append(s, mapEntry{
+		e: e,
+		v: v,
+	})
+}
+
+func (m Map) FilterKeys(f func(interface{}) bool) []Expression {
 	keys := []Expression{}
 	for _, s := range m {
 		for _, x := range s {
-			keys = append(keys, x.e)
+			if f(x.v) {
+				keys = append(keys, x.e)
+			}
 		}
 	}
 	return keys
+}
+
+func (m Map) Clear() {
+	for k := range m {
+		delete(m, k)
+	}
 }

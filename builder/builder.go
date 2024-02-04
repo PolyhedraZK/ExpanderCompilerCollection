@@ -24,9 +24,12 @@ type builder struct {
 	// builder of the root circuit
 	root *Root
 
-	// map for recording boolean constrained variables (to not constrain them twice)
-	markedBooleans   expr.Map
-	assertedBooleans expr.Map
+	// map for constraints: map[expr.Expression]constraintStatus
+	// if it's known to be true (e.g. in previous gates or in sub circuits), mark it
+	// if it's required to be true, assert it
+	booleans  expr.Map
+	zeroes    expr.Map
+	nonZeroes expr.Map
 
 	// widely used expressions
 	tOne        constraint.Element
@@ -45,12 +48,7 @@ type builder struct {
 	// (probably estimated) layer of each variable
 	vLayer []int
 
-	// other constraints
-	assertedZeroes    expr.Map
-	assertedNonZeroes expr.Map
-
-	// we have to implement kvstore.Store to satisfy XXX
-	// TODO: really?
+	// we have to implement kvstore.Store (required by gnark/internal/circuitdefer/defer.go:30)
 	db map[any]any
 
 	// output of sub circuit
@@ -61,11 +59,10 @@ func (r *Root) newBuilder(nbExternalInput int) *builder {
 	builder := builder{
 		field:             r.field,
 		root:              r,
-		markedBooleans:    make(expr.Map),
-		assertedBooleans:  make(expr.Map),
+		booleans:          make(expr.Map),
 		internalVariables: make(expr.Map),
-		assertedZeroes:    make(expr.Map),
-		assertedNonZeroes: make(expr.Map),
+		zeroes:            make(expr.Map),
+		nonZeroes:         make(expr.Map),
 		db:                make(map[any]any),
 		nbExternalInput:   nbExternalInput,
 		nbInput:           nbExternalInput,
@@ -79,9 +76,20 @@ func (r *Root) newBuilder(nbExternalInput int) *builder {
 
 	// add 1 for the constant "1"
 	builder.vLayer = make([]int, nbExternalInput+1)
+	for i := 1; i <= nbExternalInput; i++ {
+		builder.vLayer[i] = 1
+	}
 
 	return &builder
 }
+
+type constraintStatus int
+
+const (
+	_                         = 0
+	marked   constraintStatus = iota
+	asserted constraintStatus = iota
+)
 
 // asInternalVariable will convert the variable to a single linear term
 // It first convert the input to the form a*(...)+c, and then queries the database
@@ -98,8 +106,7 @@ func (builder *builder) asInternalVariable(eall expr.Expression, forceRaw bool) 
 	if ok {
 		return builder.unstripConstant(idx_.(int), coeff, constant)
 	}
-	builder.vLayer = append(builder.vLayer, builder.layerOfExpr(e)+1)
-	idx := len(builder.vLayer) - 1
+	idx := builder.newVariable(builder.layerOfExpr(e) + 1)
 	builder.internalVariables.Set(e, idx)
 	builder.instructions = append(builder.instructions,
 		circuitir.NewInternalVariableInstruction(e, idx),
@@ -120,6 +127,12 @@ func (builder *builder) tryAsInternalVariable(eall expr.Expression) expr.Express
 		return builder.unstripConstant(idx_.(int), coeff, constant)
 	}
 	return eall
+}
+
+func (builder *builder) newVariable(layer int) int {
+	r := len(builder.vLayer)
+	builder.vLayer = append(builder.vLayer, layer)
+	return r
 }
 
 func (builder *builder) unstripConstant(x int, coeff constraint.Element, constant constraint.Element) expr.Expression {
@@ -200,7 +213,7 @@ func (builder *builder) MarkBoolean(v frontend.Variable) {
 	l := v.(expr.Expression)
 	sort.Sort(l)
 
-	builder.markedBooleans.Set(l, true)
+	builder.booleans.Set(l, marked)
 }
 
 // IsBoolean returns true if given variable was marked as boolean in the compiler (see MarkBoolean)
@@ -214,7 +227,7 @@ func (builder *builder) IsBoolean(v frontend.Variable) bool {
 	l := v.(expr.Expression)
 	sort.Sort(l)
 
-	_, ok := builder.markedBooleans.Find(l)
+	_, ok := builder.booleans.Find(l)
 	return ok
 }
 
@@ -330,8 +343,7 @@ func (builder *builder) newHint(f solver.Hint, nbOutputs int, inputs []frontend.
 
 	outId := make([]int, nbOutputs)
 	for i := 0; i < nbOutputs; i++ {
-		outId[i] = len(builder.vLayer)
-		builder.vLayer = append(builder.vLayer, 1)
+		outId[i] = builder.newVariable(1)
 	}
 
 	builder.instructions = append(builder.instructions,

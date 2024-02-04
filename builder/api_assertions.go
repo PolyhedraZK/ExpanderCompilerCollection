@@ -20,7 +20,7 @@ func (builder *builder) AssertIsEqual(i1, i2 frontend.Variable) {
 		return
 	}
 
-	builder.assertedZeroes.Set(x, true)
+	builder.zeroes.Add(x, asserted)
 }
 
 // AssertIsDifferent constrain i1 and i2 to be different
@@ -30,7 +30,7 @@ func (builder *builder) AssertIsDifferent(i1, i2 frontend.Variable) {
 		panic("AssertIsDifferent(x,x) will never be satisfied")
 	}
 
-	builder.assertedNonZeroes.Set(s, true)
+	builder.nonZeroes.Add(s, asserted)
 }
 
 // AssertIsBoolean adds an assertion in the constraint builder (v == 0 ∥ v == 1)
@@ -44,12 +44,7 @@ func (builder *builder) AssertIsBoolean(i1 frontend.Variable) {
 		return
 	}
 
-	if builder.IsBoolean(v) {
-		return // linearExpression is already constrained
-	}
-	builder.MarkBoolean(v)
-
-	builder.assertedBooleans.Set(v, true)
+	builder.booleans.Add(v, asserted)
 }
 
 // AssertIsLessOrEqual adds assertion in constraint builder  (v ⩽ bound)
