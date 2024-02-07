@@ -8,6 +8,7 @@ import (
 type RootCircuit struct {
 	Circuits []*Circuit
 	Layers   []uint64
+	Field    *big.Int
 }
 
 type Circuit struct {
