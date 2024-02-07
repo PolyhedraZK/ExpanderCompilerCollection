@@ -1,7 +1,6 @@
 package layering
 
 import (
-	"fmt"
 	"sort"
 
 	"github.com/Zklib/gkr-compiler/ir"
@@ -57,7 +56,7 @@ func (ctx *compileContext) prepareLayerLayoutContext(ic *irContext) {
 	for i := 0; i < len(ic.subCircuitInsnIds); i++ {
 		inputLayer := ic.subCircuitStartLayer[i]
 		for _, x := range ic.subCircuitHintInputs[i] {
-			fmt.Printf("hint enqueue %d (inputLayer=%d)\n", x, inputLayer)
+			//fmt.Printf("hint enqueue %d (inputLayer=%d)\n", x, inputLayer)
 			ic.lcs[0].varIdx = append(ic.lcs[0].varIdx, x)
 			if inputLayer != 0 {
 				ic.lcs[inputLayer].varIdx = append(ic.lcs[inputLayer].varIdx, x)
@@ -305,7 +304,7 @@ func (l *layerReq) EqualI(e utils.Hashable) bool {
 func (ctx *compileContext) memorizedLayerLayout(layout *layerLayout) int {
 	nid := len(ctx.layerLayout)
 	nid = ctx.layerLayoutMap.Add(layout, nid).(int)
-	fmt.Printf("[[[%d %d]]]\n", nid, layout.HashCode())
+	//fmt.Printf("[[[%d %d]]]\n", nid, layout.HashCode())
 	if nid == len(ctx.layerLayout) {
 		ctx.layerLayout = append(ctx.layerLayout, layout)
 	}
@@ -444,21 +443,18 @@ func (ctx *compileContext) solveLayerLayoutNormal(ic *irContext, req *layerReq) 
 		})
 		// convert id to local id
 		layout := ctx.layerLayout[layoutId].CopyForSubs()
-		fmt.Printf("layout %v sublayer %d\n", layout.placementDense, subLayer)
+		//fmt.Printf("layout %v sublayer %d\n", layout.placementDense, subLayer)
 		if subLayer >= 0 {
 			layout.SubsArray(ctx.circuits[insn.SubCircuitId].lcs[subLayer].varIdx)
-			fmt.Printf("layout %v %v\n", layout.placementDense, ctx.circuits[insn.SubCircuitId].outputOrder)
 			layout.SubsMap(ctx.circuits[insn.SubCircuitId].outputOrder)
-			fmt.Printf("layout %v\n", layout.placementDense)
 			layout.SubsArray(insn.OutputIds)
-			fmt.Printf("layout %v\n", layout.placementDense)
 		} else {
 			layout.SubsArray(ctx.circuits[insn.SubCircuitId].lcHint.varIdx)
 			layout.SubsMap(ctx.circuits[insn.SubCircuitId].hintInputsMap)
 			layout.SubsArray(ic.subCircuitHintInputs[ic.subCircuitLocMap[x]])
 		}
 		layout.SubsMap(lc.varMap)
-		fmt.Printf("layout after subs %v\n", layout.placementDense)
+		//fmt.Printf("layout after subs %v\n", layout.placementDense)
 		layouts[x] = layout
 	}
 
@@ -481,7 +477,6 @@ func (ctx *compileContext) solveLayerLayoutNormal(ic *irContext, req *layerReq) 
 		}
 		childrenNodes[x] = append(childrenNodes[x], i)
 	}
-	fmt.Printf("============================================= childrenNodes: %v\n", childrenNodes)
 	placements := make([][]int, len(lc.parent))
 	for i := len(lc.parent) - 1; i >= 0; i-- {
 		s := [][]int{}
@@ -492,7 +487,7 @@ func (ctx *compileContext) solveLayerLayoutNormal(ic *irContext, req *layerReq) 
 			s = append(s, x.placementDense)
 		}
 		placements[i] = ctx.mergeLayouts(s, childrenVariables[i])
-		fmt.Printf("%d %v %v\n", i, placements[i], childrenVariables[i])
+		//fmt.Printf("%d %v %v\n", i, placements[i], childrenVariables[i])
 	}
 
 	// now placements[0] contains all direct variables

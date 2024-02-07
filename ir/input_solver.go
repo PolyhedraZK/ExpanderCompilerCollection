@@ -1,7 +1,6 @@
 package ir
 
 import (
-	"fmt"
 	"math/big"
 
 	"github.com/Zklib/gkr-compiler/expr"
@@ -127,7 +126,7 @@ func (circuit *Circuit) SolveInput(
 			}
 			for i, x := range outB {
 				out[i] = rc.Field.FromInterface(x)
-				fmt.Printf("set %d %d\n", is.CircuitInputIds[i], x)
+				//fmt.Printf("set %d %d\n", is.CircuitInputIds[i], x)
 				globalInput[is.CircuitInputIds[i]] = x
 			}
 		} else if insn.Type == ISubCircuit {

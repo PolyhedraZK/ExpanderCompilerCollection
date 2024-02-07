@@ -1,7 +1,6 @@
 package layering
 
 import (
-	"fmt"
 	"math/big"
 
 	"github.com/Zklib/gkr-compiler/layered"
@@ -18,7 +17,7 @@ func (lq *layoutQuery) query(vs []int, f func(int) int, cid uint64, lid int) *su
 	ps := make([]int, len(vs))
 	l := 1 << 62
 	r := -l
-	fmt.Printf("@ %v %v\n", vs, lq.varPos)
+	//fmt.Printf("@ %v %v\n", vs, lq.varPos)
 	for i, x := range vs {
 		ps[i] = lq.varPos[x]
 		if ps[i] < l {
@@ -39,7 +38,6 @@ func (lq *layoutQuery) query(vs []int, f func(int) int, cid uint64, lid int) *su
 		n = xor << 1
 	}
 	offset := l & (^(n - 1))
-	fmt.Printf("========================= [%d %d %d %d]\n", l, r, n, offset)
 	placement := make([]int, n)
 	for i := 0; i < n; i++ {
 		placement[i] = -1
@@ -80,7 +78,7 @@ func (ctx *compileContext) layoutQuery(l *layerLayout, s []int) *layoutQuery {
 	} else {
 		for i, v := range l.placementDense {
 			if v != -1 {
-				fmt.Printf("/%d\n", v)
+				//fmt.Printf("/%d\n", v)
 				q.varPos[s[v]] = i
 			}
 		}
@@ -97,7 +95,7 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 	a := ctx.layerLayout[a_]
 	b := ctx.layerLayout[b_]
 	if (a.layer+1 != b.layer && (a.layer != -1 || b.layer != -1)) || a.circuitId != b.circuitId {
-		fmt.Printf("%d %d %d %d\n", a.layer, b.layer, a.circuitId, b.circuitId)
+		//fmt.Printf("%d %d %d %d\n", a.layer, b.layer, a.circuitId, b.circuitId)
 		panic("unexpected situation")
 	}
 	ic := ctx.circuits[a.circuitId]
@@ -112,16 +110,14 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 		curLc = ic.lcHint
 		nextLc = ic.lcHint
 	}
-	fmt.Printf("%v %v %v\n", a.sparse, a.placementDense, curLc.varIdx)
-	fmt.Printf("%v %v %v\n", b.sparse, b.placementDense, nextLc.varIdx)
 	aq := ctx.layoutQuery(a, curLc.varIdx)
 	bq := ctx.layoutQuery(b, nextLc.varIdx)
 
-	fmt.Printf("connectWires: %d %d circuitId=%d curLayer=%d\n", a_, b_, a.circuitId, curLayer)
-	fmt.Printf("curDense: %v\n", a.placementDense)
-	fmt.Printf("nextDense: %v\n", b.placementDense)
-	fmt.Printf("curVar: %v\n", curLc.varIdx)
-	fmt.Printf("nextVar: %v\n", nextLc.varIdx)
+	//fmt.Printf("connectWires: %d %d circuitId=%d curLayer=%d\n", a_, b_, a.circuitId, curLayer)
+	//fmt.Printf("curDense: %v\n", a.placementDense)
+	//fmt.Printf("nextDense: %v\n", b.placementDense)
+	//fmt.Printf("curVar: %v\n", curLc.varIdx)
+	//fmt.Printf("nextVar: %v\n", nextLc.varIdx)
 
 	subInsnIds := make([]int, 0, len(ic.subCircuitInsnIds))
 	subInsnMap := make(map[int]int)
@@ -172,7 +168,7 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 			}
 			if nextLayer == inputLayer {
 				nextLayout = bq.query(ic.subCircuitHintInputs[i], hintf, subId, -1)
-				fmt.Printf("hint next layout: %v %v\n", *nextLayout, ic.subCircuitHintInputs[i])
+				//fmt.Printf("hint next layout: %v %v\n", *nextLayout, ic.subCircuitHintInputs[i])
 			}
 		} else if curLayer == outputLayer {
 			// it might be possible that some constraints are in the output layer, so we have to check it here
@@ -208,7 +204,7 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 	// connect sub circuits
 	for i := 0; i < len(subInsnIds); i++ {
 		subCurLayoutAll[subInsnIds[i]] = subCurLayout[i]
-		fmt.Printf("recursive: %d %d %d %d\n", subCurLayout[i].id, subNextLayout[i].id, subCurLayout[i].offset, subNextLayout[i].offset)
+		//fmt.Printf("recursive: %d %d %d %d\n", subCurLayout[i].id, subNextLayout[i].id, subCurLayout[i].offset, subNextLayout[i].offset)
 		scid := ctx.connectWires(subCurLayout[i].id, subNextLayout[i].id)
 		al := layered.Allocation{
 			InputOffset:  uint64(subCurLayout[i].offset),
@@ -245,7 +241,7 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 		pos := bq.varPos[x]
 		// if it's not the first layer, just relay it
 		if ic.minLayer[x] != nextLayer {
-			fmt.Printf("/relay %d: %d %d\n", x, aq.varPos[x], pos)
+			//fmt.Printf("/relay %d: %d %d\n", x, aq.varPos[x], pos)
 			res.Add = append(res.Add, layered.GateAdd{
 				In:   uint64(aq.varPos[x]),
 				Out:  uint64(pos),
@@ -255,7 +251,7 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 		}
 		e := ic.internalVariableExpr[x]
 		for _, term := range e {
-			fmt.Printf("/%d %d %d\n", x, term.VID0, term.VID1)
+			//fmt.Printf("/%d %d %d\n", x, term.VID0, term.VID1)
 			if term.VID0 == 0 {
 				// constant
 				res.Cst = append(res.Cst, layered.GateCst{
@@ -288,7 +284,7 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 	if cc != nil {
 		pos := bq.varPos[cc.id]
 		for _, v := range cc.variables {
-			fmt.Printf("combine: %d %d\n", v, cc.id)
+			//fmt.Printf("combine: %d %d\n", v, cc.id)
 			var coef *big.Int
 			if v >= ic.nbVariable {
 				coef = big.NewInt(1)
@@ -307,9 +303,9 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 			inputLayer := ic.subCircuitStartLayer[i]
 			vid := ctx.circuits[insn.SubCircuitId].combinedConstraints[curLayer-inputLayer].id
 			vpid := ctx.circuits[insn.SubCircuitId].lcs[curLayer-inputLayer].varMap[vid]
-			fmt.Printf("vid: %d vpid: %d\n", vid, vpid)
+			//fmt.Printf("vid: %d vpid: %d\n", vid, vpid)
 			layout := ctx.layerLayout[subCurLayoutAll[insnId].id]
-			fmt.Printf("layout: %v\n", layout)
+			//fmt.Printf("layout: %v\n", layout)
 			spos := -1
 			if layout.sparse {
 				for i, v := range layout.placementSparse {
@@ -338,9 +334,6 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 	}
 
 	resId := len(ctx.compiledCircuits)
-	if resId == 4 {
-		fmt.Printf("=========================================================================================================================\n")
-	}
 	ctx.compiledCircuits = append(ctx.compiledCircuits, res)
 	ctx.connectedWires[mapId] = resId
 	return resId
