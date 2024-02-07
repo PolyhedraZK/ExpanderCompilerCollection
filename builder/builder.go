@@ -13,6 +13,7 @@ import (
 
 	"github.com/Zklib/gkr-compiler/circuitir"
 	"github.com/Zklib/gkr-compiler/expr"
+	"github.com/Zklib/gkr-compiler/utils"
 )
 
 // builder implements frontend.API and frontend.Compiler, and builds a circuit
@@ -27,16 +28,17 @@ type builder struct {
 	// map for constraints: map[expr.Expression]constraintStatus
 	// if it's known to be true (e.g. in previous gates or in sub circuits), mark it
 	// if it's required to be true, assert it
-	booleans  expr.Map
-	zeroes    expr.Map
-	nonZeroes expr.Map
+	booleans  utils.Map
+	zeroes    utils.Map
+	nonZeroes utils.Map
+	// TODO: mark constraints for internal variables
 
 	// widely used expressions
 	tOne        constraint.Element
 	eZero, eOne expr.Expression
 
 	// map from expression to idx
-	internalVariables expr.Map
+	internalVariables utils.Map
 
 	// instruction list, each instruction specifies the method to calculate some variables
 	instructions []circuitir.Instruction
@@ -59,10 +61,10 @@ func (r *Root) newBuilder(nbExternalInput int) *builder {
 	builder := builder{
 		field:             r.field,
 		root:              r,
-		booleans:          make(expr.Map),
-		internalVariables: make(expr.Map),
-		zeroes:            make(expr.Map),
-		nonZeroes:         make(expr.Map),
+		booleans:          make(utils.Map),
+		internalVariables: make(utils.Map),
+		zeroes:            make(utils.Map),
+		nonZeroes:         make(utils.Map),
 		db:                make(map[any]any),
 		nbExternalInput:   nbExternalInput,
 		nbInput:           nbExternalInput,

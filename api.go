@@ -13,7 +13,6 @@ import (
 	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/constraint/solver"
 	"github.com/consensys/gnark/frontend"
-	"github.com/consensys/gnark/logger"
 )
 
 type API interface {
@@ -22,9 +21,9 @@ type API interface {
 }
 
 type compileResult struct {
-	rc      *circuitir.RootCircuit
-	circuit *layered.Circuit
-	idx     []int
+	rc         *circuitir.RootCircuit
+	compiled   *layered.RootCircuit
+	inputSolve layered.InputSolve
 }
 
 func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool, opts ...frontend.CompileOption) (*compileResult, error) {
@@ -41,42 +40,19 @@ func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool, opts ...front
 	if err != nil {
 		return nil, err
 	}
-	log := logger.Logger()
-	/*log.Info().
-	Int("nbConstraints", len(builder.constraints)).
-	Int("nbInternal", builder.cs.GetNbInternalVariables()).
-	Int("nbInput", builder.nbInput).
-	Msg("built basic circuit")*/
 	rc := root.Finalize()
-	/*log.Info().
-	Int("nbInternal", builder.cs.GetNbInternalVariables()).
-	Int("nbInput", builder.nbInput).
-	Int("estimatedLayer", builder.vLayer[builder.output]).
-	Msg("constraints finalized")*/
-	c, idx := layered.Compile(rc, pad2n)
-	stats := c.GetStats()
-	log.Info().
-		Int("nbHybridArg", stats.HybridArgCount).
-		Int("nbHybrid", stats.HybridCount).
-		Int("nbRelay", stats.RelayCount).
-		Int("nbInput", stats.InputCount).
-		Int("layers", stats.Layers).
-		Msg("compiled")
+	(&compileResult{rc: rc}).Print()
+	r := layered.Compile(rc)
 	res := compileResult{
-		rc:      rc,
-		circuit: c,
-		idx:     idx,
+		rc:         rc,
+		compiled:   r.RootCircuit,
+		inputSolve: r.InputSolve,
 	}
 	return &res, nil
 }
 
-func (c *compileResult) GetWitness(assignment frontend.Circuit) layered.Witness {
-	values := c.rc.Eval(assignment)
-	return layered.GetWitness(c.rc, c.idx, values, c.circuit)
-}
-
-func (c *compileResult) GetLayeredCircuit() *layered.Circuit {
-	return c.circuit
+func (c *compileResult) GetLayeredCircuit() *layered.RootCircuit {
+	return c.compiled
 }
 
 func PrintCircuit(ci *circuitir.Circuit, field constraint.R1CS) {
