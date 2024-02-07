@@ -35,7 +35,7 @@ func (builder *builder) Finalize() *circuitir.Circuit {
 	constraints_ := builder.zeroes.FilterKeys(shouldAssert)
 	constraints := make([]expr.Expression, len(constraints_))
 	for i, e := range constraints_ {
-		constraints[i] = e.(expr.Expression)
+		constraints[i] = builder.asInternalVariable(e.(expr.Expression), true)
 	}
 
 	return &circuitir.Circuit{

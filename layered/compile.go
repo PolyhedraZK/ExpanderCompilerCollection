@@ -54,11 +54,13 @@ type circuitIrContext struct {
 
 	outputOrder map[int]int // outputOrder[x] == y -> x is the y-th output
 
+	subCircuitLocMap     map[int]int
 	subCircuitInsnIds    []int
 	subCircuitHintInputs [][]int
 	subCircuitStartLayer []int
 
-	hintInputs []int // hint inputs variable id of the circuit itself
+	hintInputs    []int // hint inputs variable id of the circuit itself
+	hintInputsMap map[int]int
 
 	// combined constraints of each layer
 	combinedConstraints []*combinedConstraint
@@ -176,7 +178,9 @@ func (ctx *compileContext) dfsTopoSort(id uint64) {
 		nbSubCircuits:        ns,
 		nbHintInput:          nh,
 		nbHintInputSub:       nhs,
+		subCircuitLocMap:     make(map[int]int),
 		outputOrder:          make(map[int]int),
+		hintInputsMap:        make(map[int]int),
 		internalVariableExpr: make(map[int]expr.Expression),
 	}
 }
@@ -302,6 +306,9 @@ func (ctx *compileContext) computeMinMaxLayers(ic *circuitIrContext) {
 	for i := 0; i < nhs; i++ {
 		ic.hintInputs = append(ic.hintInputs, nv+i)
 	}
+	for i, v := range ic.hintInputs {
+		ic.hintInputsMap[v] = i
+	}
 
 	// bfs from output wire and constraints
 	ic.isUsed = make([]bool, n, preAllocSize)
@@ -375,7 +382,7 @@ func (ctx *compileContext) computeMinMaxLayers(ic *circuitIrContext) {
 			maxOccuredLayer = ic.minLayer[i]
 		}
 	}
-	cc := make([]*combinedConstraint, maxOccuredLayer+2)
+	cc := make([]*combinedConstraint, maxOccuredLayer+3)
 	for i := 0; i < len(cc); i++ {
 		cc[i] = &combinedConstraint{}
 	}
@@ -407,16 +414,23 @@ func (ctx *compileContext) computeMinMaxLayers(ic *circuitIrContext) {
 			last--
 		}
 		for i := first + 1; i <= last; i++ {
-			// these ids should be i-first+n
-			cc[i].variables = append(cc[i].variables, i-first+n)
+			// these ids should be layer-first+n
+			cc[i].variables = append(cc[i].variables, i-1-first+n)
 		}
 		cc = cc[:last+1]
 	}
 	for i := 0; i < len(cc); i++ {
 		if len(cc[i].variables) > 0 || len(cc[i].subCircuitIds) > 0 {
 			cc[i].id = n
-			if i > ic.outputLayer {
-				ic.outputLayer = i
+			if i+1 > ic.outputLayer {
+				// currently the implementation doesn't allow contraint variable in the output layer
+				// so we have to add 1 in non-root circuits
+				// TODO: fix this
+				if ic == ctx.circuits[0] {
+					ic.outputLayer = i
+				} else {
+					ic.outputLayer = i + 1
+				}
 			}
 			// we don't need to add edges here, since they will be never used below
 			ic.minLayer = append(ic.minLayer, i)
@@ -451,6 +465,10 @@ func (ctx *compileContext) computeMinMaxLayers(ic *circuitIrContext) {
 		if ic.minLayer[nv+nhs+i] != ic.maxLayer[nv+nhs+i] {
 			panic("unexpected situation: sub-circuit virtual variable should have equal min/max layer")
 		}
+	}
+
+	for i, v := range ic.subCircuitInsnIds {
+		ic.subCircuitLocMap[v] = i
 	}
 
 	// force outputLayer to be at least 1
