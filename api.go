@@ -42,7 +42,6 @@ func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool, opts ...front
 		return nil, err
 	}
 	rc := root.Finalize()
-	(&compileResult{rc: rc}).Print()
 	lrc, is := layering.Compile(rc)
 	res := compileResult{
 		rc:          rc,

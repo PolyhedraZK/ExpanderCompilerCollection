@@ -1,7 +1,6 @@
 package checker
 
 import (
-	"fmt"
 	"math/big"
 
 	"crypto/rand"
@@ -36,10 +35,6 @@ func EvalCircuit(rc *layered.RootCircuit, input []*big.Int) []*big.Int {
 		for i := range cur {
 			cur[i].Mod(cur[i], rc.Field)
 		}
-		for _, v := range cur {
-			fmt.Printf("%s,", v.String())
-		}
-		fmt.Println()
 	}
 	return cur
 }

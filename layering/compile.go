@@ -1,8 +1,6 @@
 package layering
 
 import (
-	"fmt"
-
 	"github.com/Zklib/gkr-compiler/expr"
 	"github.com/Zklib/gkr-compiler/ir"
 	"github.com/Zklib/gkr-compiler/layered"
@@ -114,7 +112,6 @@ func (ctx *compileContext) compile() {
 
 	// 2. compute min and max layers for each circuit
 	for _, id := range ctx.order {
-		fmt.Printf("==============%d\n", id)
 		ctx.computeMinMaxLayers(ctx.circuits[id])
 	}
 
@@ -258,7 +255,7 @@ func (ctx *compileContext) computeMinMaxLayers(ic *irContext) {
 			}
 			y := insn.OutputIds[0]
 			for x := range usedVar {
-				fmt.Printf("%d %d %d %d\n", i, x, y, n)
+				//fmt.Printf("%d %d %d %d\n", i, x, y, n)
 				addEdge(x, y)
 			}
 			q1 = append(q1, y)
@@ -300,7 +297,7 @@ func (ctx *compileContext) computeMinMaxLayers(ic *irContext) {
 		}
 	}
 	q0 = append(q0, q1...) // the merged topo order
-	fmt.Printf("{%v}\n", q0)
+	//fmt.Printf("{%v}\n", q0)
 
 	for i := 0; i < nhs; i++ {
 		ic.hintInputs = append(ic.hintInputs, nv+i)
@@ -346,7 +343,7 @@ func (ctx *compileContext) computeMinMaxLayers(ic *irContext) {
 	}
 	q := q1
 
-	fmt.Printf("{%v}\n", q)
+	//fmt.Printf("{%v}\n", q)
 
 	// compute the min layer (depth) of each variable
 	for _, x := range q {
@@ -475,10 +472,10 @@ func (ctx *compileContext) computeMinMaxLayers(ic *irContext) {
 		ic.outputLayer = 1
 	}
 
-	fmt.Printf("[%d %d %d]\n", nv, ns, nhs)
-	fmt.Printf("%v\n", ic.isUsed)
-	fmt.Printf("%v\n", ic.minLayer)
-	fmt.Printf("%v\n", ic.maxLayer)
+	//fmt.Printf("[%d %d %d]\n", nv, ns, nhs)
+	//fmt.Printf("%v\n", ic.isUsed)
+	//fmt.Printf("%v\n", ic.minLayer)
+	//fmt.Printf("%v\n", ic.maxLayer)
 
 	// force maxLayer of output to be outputLayer
 	for _, x := range circuit.Output {
