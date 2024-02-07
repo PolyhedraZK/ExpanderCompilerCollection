@@ -1,13 +1,12 @@
 package main
 
 import (
-	"os"
-
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/std/hash/mimc"
 
 	gkr "github.com/Zklib/gkr-compiler"
+	"github.com/Zklib/gkr-compiler/checker"
 )
 
 type Circuit struct {
@@ -35,12 +34,14 @@ func main() {
 	}
 
 	c := circuit.GetLayeredCircuit()
-	os.WriteFile("circuit.txt", c.Serialize(), 0o644)
 
 	assignment := &Circuit{
 		PreImage: "16130099170765464552823636852555369511329944820189892919423002775646948828469",
 		Hash:     "12886436712380113721405259596386800092738845035233065858332878701083870690753",
 	}
 	witness := circuit.GetWitness(assignment)
-	os.WriteFile("witness.txt", witness.Serialize(), 0o644)
+
+	if !checker.CheckCircuit(c, witness) {
+		panic("error")
+	}
 }
