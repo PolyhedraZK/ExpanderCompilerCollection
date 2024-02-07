@@ -1,20 +1,8 @@
-package layered
+package layering
 
-import "github.com/Zklib/gkr-compiler/circuitir"
+import "github.com/Zklib/gkr-compiler/ir"
 
-type InputSolve []InputSolveInstruction
-
-type InputSolveInstruction struct {
-	// instruction id
-	// specially, for the global input, InsnId == 1 << 62
-	InsnId int
-	// if this is a hint instruction, InputIds[i] == j -> insn.OutputIds[i] should be put to j-th global input
-	CircuitInputIds []int
-	// if this is a sub circuit instruction, solve it recursively
-	SubCircuit InputSolve
-}
-
-func (ctx *compileContext) recordInputOrder(layoutId int) InputSolve {
+func (ctx *compileContext) recordInputOrder(layoutId int) ir.InputSolver {
 	l := ctx.layerLayout[layoutId]
 	if l.sparse || l.circuitId != 0 || l.layer != 0 {
 		panic("unexpected situation")
@@ -31,33 +19,33 @@ func (ctx *compileContext) recordInputOrder(layoutId int) InputSolve {
 		gi = append(gi, v[i])
 	}
 
-	return append(ctx.getSubCircuitHintInputOrder(l.circuitId, v), InputSolveInstruction{
+	return append(ctx.getSubCircuitHintInputOrder(l.circuitId, v), ir.InputSolverInstruction{
 		InsnId:          1 << 62,
 		CircuitInputIds: gi,
 	})
 }
 
-func (ctx *compileContext) getSubCircuitHintInputOrder(subId uint64, v map[int]int) InputSolve {
-	res := InputSolve{}
+func (ctx *compileContext) getSubCircuitHintInputOrder(subId uint64, v map[int]int) ir.InputSolver {
+	res := ir.InputSolver{}
 	ic := ctx.circuits[subId]
 	hintInputSubIdx := ic.nbVariable
 	for i, insn := range ic.circuit.Instructions {
-		if insn.Type == circuitir.IHint {
+		if insn.Type == ir.IHint {
 			p := make([]int, len(insn.OutputIds))
 			for j, id := range insn.OutputIds {
 				p[j] = v[id]
 			}
-			res = append(res, InputSolveInstruction{
+			res = append(res, ir.InputSolverInstruction{
 				InsnId:          i,
 				CircuitInputIds: p,
 			})
-		} else if insn.Type == circuitir.ISubCircuit {
+		} else if insn.Type == ir.ISubCircuit {
 			subc := ctx.circuits[insn.SubCircuitId]
 			sv := make(map[int]int)
 			for j, x := range subc.hintInputs {
 				sv[x] = v[hintInputSubIdx+j]
 			}
-			res = append(res, InputSolveInstruction{
+			res = append(res, ir.InputSolverInstruction{
 				InsnId:     i,
 				SubCircuit: ctx.getSubCircuitHintInputOrder(insn.SubCircuitId, sv),
 			})

@@ -48,11 +48,6 @@ type GateCst struct {
 	Coef *big.Int
 }
 
-type CompileResult struct {
-	RootCircuit *RootCircuit
-	InputSolve  InputSolve
-}
-
 func (c *Circuit) Print() {
 	fmt.Printf("Input=%d Output=%d\n", c.InputLen, c.OutputLen)
 	for _, sub := range c.SubCircuits {

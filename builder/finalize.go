@@ -1,16 +1,16 @@
 package builder
 
 import (
-	"github.com/Zklib/gkr-compiler/circuitir"
 	"github.com/Zklib/gkr-compiler/expr"
+	"github.com/Zklib/gkr-compiler/ir"
 )
 
-func (r *Root) Finalize() *circuitir.RootCircuit {
-	res := make(map[uint64]*circuitir.Circuit)
+func (r *Root) Finalize() *ir.RootCircuit {
+	res := make(map[uint64]*ir.Circuit)
 	for x, b := range r.registry {
 		res[x] = b.builder.Finalize()
 	}
-	return &circuitir.RootCircuit{
+	return &ir.RootCircuit{
 		Field:    r.field,
 		Circuits: res,
 	}
@@ -21,7 +21,7 @@ func shouldAssert(x interface{}) bool {
 }
 
 // Finalize will process assertBooleans and assertNonZeroes, and return a Circuit IR
-func (builder *builder) Finalize() *circuitir.Circuit {
+func (builder *builder) Finalize() *ir.Circuit {
 	for _, e := range builder.booleans.FilterKeys(shouldAssert) {
 		v := builder.Mul(e, builder.Sub(builder.eOne, e)).(expr.Expression)
 		builder.zeroes.Add(v, asserted)
@@ -38,7 +38,7 @@ func (builder *builder) Finalize() *circuitir.Circuit {
 		constraints[i] = builder.asInternalVariable(e.(expr.Expression), true)
 	}
 
-	return &circuitir.Circuit{
+	return &ir.Circuit{
 		Instructions:    builder.instructions,
 		Constraints:     constraints,
 		Output:          builder.output,
