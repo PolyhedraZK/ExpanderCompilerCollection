@@ -1,6 +1,7 @@
 package layered
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/Zklib/gkr-compiler/circuitir"
@@ -56,6 +57,7 @@ func (ctx *compileContext) prepareLayerLayoutContext(ic *circuitIrContext) {
 	for i := 0; i < len(ic.subCircuitInsnIds); i++ {
 		inputLayer := ic.subCircuitStartLayer[i]
 		for _, x := range ic.subCircuitHintInputs[i] {
+			fmt.Printf("hint enqueue %d (inputLayer=%d)\n", x, inputLayer)
 			ic.lcs[0].varIdx = append(ic.lcs[0].varIdx, x)
 			if inputLayer != 0 {
 				ic.lcs[inputLayer].varIdx = append(ic.lcs[inputLayer].varIdx, x)
@@ -109,9 +111,9 @@ func (ctx *compileContext) prepareLayerLayoutContext(ic *circuitIrContext) {
 		// hint input is also considered as output of some relay circuit
 		if len(ic.subCircuitHintInputs[i]) != 0 {
 			for _, x := range ic.subCircuitHintInputs[i] {
-				ic.lcs[inputLayer].prevCircuitInsnId[x] = insnId
+				ic.lcs[inputLayer].prevCircuitInsnId[x] = insnId + len(ic.circuit.Instructions)
 			}
-			ic.lcs[inputLayer].prevCircuitNbOut[insnId] = len(ic.subCircuitHintInputs[i])
+			ic.lcs[inputLayer].prevCircuitNbOut[insnId+len(ic.circuit.Instructions)] = len(ic.subCircuitHintInputs[i])
 			for j := 1; j < inputLayer; j++ {
 				ic.lcs[j].middleSubCircuits = append(ic.lcs[j].middleSubCircuits, i)
 			}
@@ -133,11 +135,15 @@ func (ctx *compileContext) prepareLayerLayoutContext(ic *circuitIrContext) {
 			pcCnt := make(map[int]int) // prev circuit count
 			plCnt := make(map[int]int) // placement count
 			for _, x := range req.inputIds {
-				pcCnt[lc.prevCircuitInsnId[x]] = 0
+				if pc, ok := lc.prevCircuitInsnId[x]; ok {
+					pcCnt[pc] = 0
+				}
 				plCnt[lc.placement[x]] = 0
 			}
 			for _, x := range req.inputIds {
-				pcCnt[lc.prevCircuitInsnId[x]] += 1
+				if pc, ok := lc.prevCircuitInsnId[x]; ok {
+					pcCnt[pc] += 1
+				}
 				plCnt[lc.placement[x]] += 1
 			}
 			// if all inputs don't split previout circuits, and they are in the same placement group,
@@ -299,6 +305,7 @@ func (l *layerReq) EqualI(e utils.Hashable) bool {
 func (ctx *compileContext) memorizedLayerLayout(layout *layerLayout) int {
 	nid := len(ctx.layerLayout)
 	nid = ctx.layerLayoutMap.Add(layout, nid).(int)
+	fmt.Printf("[[[%d %d]]]\n", nid, layout.HashCode())
 	if nid == len(ctx.layerLayout) {
 		ctx.layerLayout = append(ctx.layerLayout, layout)
 	}
@@ -400,7 +407,11 @@ func (ctx *compileContext) mergeLayouts(s [][]int, additional []int) []int {
 }
 
 func (ctx *compileContext) solveLayerLayoutHintRelay(ic *circuitIrContext, req *layerReq) *layerLayout {
-	placement := ctx.mergeLayouts(nil, ic.lcHint.varIdx)
+	s := make([]int, len(ic.lcHint.varIdx))
+	for i := 0; i < len(s); i++ {
+		s[i] = i
+	}
+	placement := ctx.mergeLayouts(nil, s)
 	return &layerLayout{
 		circuitId:      req.circuitId,
 		layer:          -1,
@@ -415,19 +426,39 @@ func (ctx *compileContext) solveLayerLayoutNormal(ic *circuitIrContext, req *lay
 
 	// first iterate prev layer circuits, and solve their output layout
 	layouts := make(map[int]*layerLayout)
-	for x := range lc.prevCircuitNbOut {
-		insn := ic.circuit.Instructions[x]
-		subLayer := ctx.circuits[insn.SubCircuitId].outputLayer
+	for x_ := range lc.prevCircuitNbOut {
+		var subLayer int
+		var insn *circuitir.Instruction
+		x := x_
+		if x >= len(ic.circuit.Instructions) {
+			x -= len(ic.circuit.Instructions)
+			insn = &ic.circuit.Instructions[x]
+			subLayer = -1
+		} else {
+			insn = &ic.circuit.Instructions[x]
+			subLayer = ctx.circuits[insn.SubCircuitId].outputLayer
+		}
 		layoutId := ctx.solveLayerLayout(&layerReq{
 			circuitId: insn.SubCircuitId,
 			layer:     subLayer,
 		})
 		// convert id to local id
 		layout := ctx.layerLayout[layoutId].CopyForSubs()
-		layout.SubsArray(ctx.circuits[insn.SubCircuitId].lcs[subLayer].varIdx)
-		layout.SubsMap(ctx.circuits[insn.SubCircuitId].outputOrder)
-		layout.SubsArray(insn.OutputIds)
+		fmt.Printf("layout %v sublayer %d\n", layout.placementDense, subLayer)
+		if subLayer >= 0 {
+			layout.SubsArray(ctx.circuits[insn.SubCircuitId].lcs[subLayer].varIdx)
+			fmt.Printf("layout %v %v\n", layout.placementDense, ctx.circuits[insn.SubCircuitId].outputOrder)
+			layout.SubsMap(ctx.circuits[insn.SubCircuitId].outputOrder)
+			fmt.Printf("layout %v\n", layout.placementDense)
+			layout.SubsArray(insn.OutputIds)
+			fmt.Printf("layout %v\n", layout.placementDense)
+		} else {
+			layout.SubsArray(ctx.circuits[insn.SubCircuitId].lcHint.varIdx)
+			layout.SubsMap(ctx.circuits[insn.SubCircuitId].hintInputsMap)
+			layout.SubsArray(ic.subCircuitHintInputs[ic.subCircuitLocMap[x]])
+		}
 		layout.SubsMap(lc.varMap)
+		fmt.Printf("layout after subs %v\n", layout.placementDense)
 		layouts[x] = layout
 	}
 
@@ -450,6 +481,7 @@ func (ctx *compileContext) solveLayerLayoutNormal(ic *circuitIrContext, req *lay
 		}
 		childrenNodes[x] = append(childrenNodes[x], i)
 	}
+	fmt.Printf("============================================= childrenNodes: %v\n", childrenNodes)
 	placements := make([][]int, len(lc.parent))
 	for i := len(lc.parent) - 1; i >= 0; i-- {
 		s := [][]int{}
@@ -460,6 +492,7 @@ func (ctx *compileContext) solveLayerLayoutNormal(ic *circuitIrContext, req *lay
 			s = append(s, x.placementDense)
 		}
 		placements[i] = ctx.mergeLayouts(s, childrenVariables[i])
+		fmt.Printf("%d %v %v\n", i, placements[i], childrenVariables[i])
 	}
 
 	// now placements[0] contains all direct variables
@@ -511,10 +544,15 @@ func (ctx *compileContext) solveLayerLayoutNormal(ic *circuitIrContext, req *lay
 	}
 	for _, i := range order {
 		if i == 0 {
+			flag := false
 			for j, x := range placements[0] {
 				if x != -1 {
+					flag = true
 					res.placementSparse[cur+j] = x
 				}
+			}
+			if !flag {
+				continue
 			}
 		} else {
 			res.subLayout = append(res.subLayout, subLayout{
@@ -525,6 +563,7 @@ func (ctx *compileContext) solveLayerLayoutNormal(ic *circuitIrContext, req *lay
 		}
 		cur += sizes[i]
 	}
+	res.size = utils.NextPowerOfTwo(cur, false)
 
 	return res
 }
