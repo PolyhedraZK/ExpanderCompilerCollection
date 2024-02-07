@@ -1,6 +1,7 @@
 package expr
 
 import (
+	"github.com/Zklib/gkr-compiler/utils"
 	"github.com/consensys/gnark/constraint"
 )
 
@@ -45,6 +46,10 @@ func (e Expression) Equal(o Expression) bool {
 		}
 	}
 	return true
+}
+
+func (e Expression) EqualI(o utils.Hashable) bool {
+	return e.Equal(o.(Expression))
 }
 
 // Swap swaps terms in the Variable (implements Sort interface)

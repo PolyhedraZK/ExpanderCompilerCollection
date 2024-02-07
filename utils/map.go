@@ -1,33 +1,38 @@
-package expr
+package utils
+
+type Hashable interface {
+	HashCode() uint64
+	EqualI(Hashable) bool
+}
 
 type Map map[uint64][]mapEntry
 
 type mapEntry struct {
-	e Expression
+	e Hashable
 	v interface{}
 }
 
-func (m Map) Find(e Expression) (interface{}, bool) {
+func (m Map) Find(e Hashable) (interface{}, bool) {
 	s, ok := m[e.HashCode()]
 	if !ok {
 		return nil, false
 	}
 	for _, x := range s {
-		if x.e.Equal(e) {
+		if x.e.EqualI(e) {
 			return x.v, true
 		}
 	}
 	return nil, false
 }
 
-func (m Map) Set(e Expression, v interface{}) {
+func (m Map) Set(e Hashable, v interface{}) {
 	h := e.HashCode()
 	s, ok := m[h]
 	if !ok {
 		s = make([]mapEntry, 0, 1)
 	} else {
 		for _, x := range s {
-			if x.e.Equal(e) {
+			if x.e.EqualI(e) {
 				x.v = v
 				return
 			}
@@ -40,15 +45,15 @@ func (m Map) Set(e Expression, v interface{}) {
 }
 
 // when exists, do nothing
-func (m Map) Add(e Expression, v interface{}) {
+func (m Map) Add(e Hashable, v interface{}) interface{} {
 	h := e.HashCode()
 	s, ok := m[h]
 	if !ok {
 		s = make([]mapEntry, 0, 1)
 	} else {
 		for _, x := range s {
-			if x.e.Equal(e) {
-				return
+			if x.e.EqualI(e) {
+				return x.v
 			}
 		}
 	}
@@ -56,10 +61,11 @@ func (m Map) Add(e Expression, v interface{}) {
 		e: e,
 		v: v,
 	})
+	return v
 }
 
-func (m Map) FilterKeys(f func(interface{}) bool) []Expression {
-	keys := []Expression{}
+func (m Map) FilterKeys(f func(interface{}) bool) []Hashable {
+	keys := []Hashable{}
 	for _, s := range m {
 		for _, x := range s {
 			if f(x.v) {

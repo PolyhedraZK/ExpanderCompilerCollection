@@ -7,6 +7,7 @@ import (
 
 type Circuit struct {
 	// each instruction specifies the method to calculate some variables
+	// the output id must be sequential
 	Instructions []Instruction
 	// each constraint constrains some expression to be zero
 	Constraints []expr.Expression

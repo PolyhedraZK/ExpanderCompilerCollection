@@ -41,6 +41,9 @@ func (parent *builder) MemorizedCall(f SubCircuitFunc, input_ []frontend.Variabl
 	circuitId := binary.LittleEndian.Uint64(h[:8])
 
 	input, _ := parent.toVariables(input_...)
+	for i := 0; i < len(input); i++ {
+		input[i] = parent.asInternalVariable(input[i], true)
+	}
 
 	if _, ok := parent.root.registry[circuitId]; !ok {
 		n := len(input)
@@ -52,7 +55,7 @@ func (parent *builder) MemorizedCall(f SubCircuitFunc, input_ []frontend.Variabl
 		subOutput := f(subBuilder, subInput)
 		subBuilder.output = make([]expr.Expression, len(subOutput))
 		for i, v := range subOutput {
-			subBuilder.output[i] = v.(expr.Expression)
+			subBuilder.output[i] = subBuilder.asInternalVariable(v.(expr.Expression), true)
 		}
 		sub := SubCircuit{
 			builder:      subBuilder,
@@ -69,11 +72,11 @@ func (parent *builder) MemorizedCall(f SubCircuitFunc, input_ []frontend.Variabl
 				sub.inputAssertedNonZeroes = append(sub.inputAssertedNonZeroes, i)
 			}
 		}
-		for i, x := range subOutput {
-			if _, ok := subBuilder.booleans.Find(x.(expr.Expression)); ok {
+		for i, x := range subBuilder.output {
+			if _, ok := subBuilder.booleans.Find(x); ok {
 				sub.outputMarkedBooleans = append(sub.outputMarkedBooleans, i)
 			}
-			sub.outputLayers[i] = subBuilder.layerOfExpr(x.(expr.Expression))
+			sub.outputLayers[i] = subBuilder.layerOfExpr(x)
 		}
 		parent.root.registry[circuitId] = &sub
 	}
