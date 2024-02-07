@@ -7,9 +7,10 @@ import (
 	"strings"
 
 	"github.com/Zklib/gkr-compiler/builder"
-	"github.com/Zklib/gkr-compiler/circuitir"
 	"github.com/Zklib/gkr-compiler/expr"
+	"github.com/Zklib/gkr-compiler/ir"
 	"github.com/Zklib/gkr-compiler/layered"
+	"github.com/Zklib/gkr-compiler/layering"
 	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/constraint/solver"
 	"github.com/consensys/gnark/frontend"
@@ -21,9 +22,9 @@ type API interface {
 }
 
 type compileResult struct {
-	rc         *circuitir.RootCircuit
-	compiled   *layered.RootCircuit
-	inputSolve layered.InputSolve
+	rc          *ir.RootCircuit
+	compiled    *layered.RootCircuit
+	inputSolver *ir.InputSolver
 }
 
 func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool, opts ...frontend.CompileOption) (*compileResult, error) {
@@ -42,11 +43,11 @@ func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool, opts ...front
 	}
 	rc := root.Finalize()
 	(&compileResult{rc: rc}).Print()
-	r := layered.Compile(rc)
+	lrc, is := layering.Compile(rc)
 	res := compileResult{
-		rc:         rc,
-		compiled:   r.RootCircuit,
-		inputSolve: r.InputSolve,
+		rc:          rc,
+		compiled:    lrc,
+		inputSolver: is,
 	}
 	return &res, nil
 }
@@ -55,7 +56,11 @@ func (c *compileResult) GetLayeredCircuit() *layered.RootCircuit {
 	return c.compiled
 }
 
-func PrintCircuit(ci *circuitir.Circuit, field constraint.R1CS) {
+func (c *compileResult) GetWitness(assignment frontend.Circuit) []*big.Int {
+	return c.rc.SolveInput(assignment, c.inputSolver)
+}
+
+func PrintCircuit(ci *ir.Circuit, field constraint.R1CS) {
 	varToStr := func(e expr.Expression) string {
 		s := make([]string, len(e))
 		for i, term := range e {
@@ -72,9 +77,9 @@ func PrintCircuit(ci *circuitir.Circuit, field constraint.R1CS) {
 	}
 
 	for _, insn := range ci.Instructions {
-		if insn.Type == circuitir.IInternalVariable {
+		if insn.Type == ir.IInternalVariable {
 			fmt.Printf("v%d = %s\n", insn.OutputIds[0], varToStr(insn.Inputs[0]))
-		} else if insn.Type == circuitir.IHint {
+		} else if insn.Type == ir.IHint {
 			strs := make([]string, len(insn.Inputs))
 			for i, x := range insn.Inputs {
 				strs[i] = varToStr(x)
@@ -84,7 +89,7 @@ func PrintCircuit(ci *circuitir.Circuit, field constraint.R1CS) {
 				fmt.Printf(",v%d", insn.OutputIds[i])
 			}
 			fmt.Printf(" = %s(%s)\n", solver.GetHintName(insn.HintFunc), strings.Join(strs, ","))
-		} else if insn.Type == circuitir.ISubCircuit {
+		} else if insn.Type == ir.ISubCircuit {
 			strs := make([]string, len(insn.Inputs))
 			for i, x := range insn.Inputs {
 				strs[i] = varToStr(x)
