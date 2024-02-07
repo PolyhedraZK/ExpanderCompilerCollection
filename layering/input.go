@@ -19,14 +19,15 @@ func (ctx *compileContext) recordInputOrder(layoutId int) ir.InputSolver {
 		gi = append(gi, v[i])
 	}
 
-	return append(ctx.getSubCircuitHintInputOrder(l.circuitId, v), ir.InputSolverInstruction{
-		InsnId:          1 << 62,
+	return ir.InputSolver{
+		Insn:            ctx.getSubCircuitHintInputOrder(l.circuitId, v),
 		CircuitInputIds: gi,
-	})
+		InputLen:        l.size,
+	}
 }
 
-func (ctx *compileContext) getSubCircuitHintInputOrder(subId uint64, v map[int]int) ir.InputSolver {
-	res := ir.InputSolver{}
+func (ctx *compileContext) getSubCircuitHintInputOrder(subId uint64, v map[int]int) []ir.InputSolverInstruction {
+	res := []ir.InputSolverInstruction{}
 	ic := ctx.circuits[subId]
 	hintInputSubIdx := ic.nbVariable
 	for i, insn := range ic.circuit.Instructions {
@@ -45,6 +46,7 @@ func (ctx *compileContext) getSubCircuitHintInputOrder(subId uint64, v map[int]i
 			for j, x := range subc.hintInputs {
 				sv[x] = v[hintInputSubIdx+j]
 			}
+			hintInputSubIdx += len(subc.hintInputs)
 			res = append(res, ir.InputSolverInstruction{
 				InsnId:     i,
 				SubCircuit: ctx.getSubCircuitHintInputOrder(insn.SubCircuitId, sv),
