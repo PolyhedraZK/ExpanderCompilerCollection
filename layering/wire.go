@@ -1,8 +1,10 @@
-package layered
+package layering
 
 import (
 	"fmt"
 	"math/big"
+
+	"github.com/Zklib/gkr-compiler/layered"
 )
 
 type layoutQuery struct {
@@ -194,13 +196,13 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 		subNextLayout[subInsnMap[b.subLayout[i].insnId]] = &b.subLayout[i]
 	}
 
-	res := &Circuit{
+	res := &layered.Circuit{
 		InputLen:    uint64(a.size),
 		OutputLen:   uint64(b.size),
-		SubCircuits: []SubCircuit{},
-		Mul:         []GateMul{},
-		Add:         []GateAdd{},
-		Cst:         []GateCst{},
+		SubCircuits: []layered.SubCircuit{},
+		Mul:         []layered.GateMul{},
+		Add:         []layered.GateAdd{},
+		Cst:         []layered.GateCst{},
 	}
 
 	// connect sub circuits
@@ -208,15 +210,15 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 		subCurLayoutAll[subInsnIds[i]] = subCurLayout[i]
 		fmt.Printf("recursive: %d %d\n", subCurLayout[i].id, subNextLayout[i].id)
 		scid := ctx.connectWires(subCurLayout[i].id, subNextLayout[i].id)
-		al := Allocation{
+		al := layered.Allocation{
 			InputOffset:  uint64(subCurLayout[i].offset),
 			OutputOffset: uint64(subNextLayout[i].offset),
 		}
 		for j := 0; j <= len(res.SubCircuits); j++ {
 			if j == len(res.SubCircuits) {
-				res.SubCircuits = append(res.SubCircuits, SubCircuit{
+				res.SubCircuits = append(res.SubCircuits, layered.SubCircuit{
 					Id:          uint64(scid),
-					Allocations: []Allocation{al},
+					Allocations: []layered.Allocation{al},
 				})
 				break
 			}
@@ -244,7 +246,7 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 		// if it's not the first layer, just relay it
 		if ic.minLayer[x] != nextLayer {
 			fmt.Printf("/relay %d: %d %d\n", x, aq.varPos[x], pos)
-			res.Add = append(res.Add, GateAdd{
+			res.Add = append(res.Add, layered.GateAdd{
 				In:   uint64(aq.varPos[x]),
 				Out:  uint64(pos),
 				Coef: big.NewInt(1),
@@ -256,20 +258,20 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 			fmt.Printf("/%d %d %d\n", x, term.VID0, term.VID1)
 			if term.VID0 == 0 {
 				// constant
-				res.Cst = append(res.Cst, GateCst{
+				res.Cst = append(res.Cst, layered.GateCst{
 					Out:  uint64(pos),
 					Coef: toBigInt(term.Coeff),
 				})
 			} else if term.VID1 == 0 {
 				// add
-				res.Add = append(res.Add, GateAdd{
+				res.Add = append(res.Add, layered.GateAdd{
 					In:   uint64(aq.varPos[term.VID0]),
 					Out:  uint64(pos),
 					Coef: toBigInt(term.Coeff),
 				})
 			} else {
 				// mul
-				res.Mul = append(res.Mul, GateMul{
+				res.Mul = append(res.Mul, layered.GateMul{
 					In0:  uint64(aq.varPos[term.VID0]),
 					In1:  uint64(aq.varPos[term.VID1]),
 					Out:  uint64(pos),
@@ -293,7 +295,7 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 			} else {
 				coef = field()
 			}
-			res.Add = append(res.Add, GateAdd{
+			res.Add = append(res.Add, layered.GateAdd{
 				In:   uint64(aq.varPos[v]),
 				Out:  uint64(pos),
 				Coef: coef, // p means random
@@ -327,7 +329,7 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 			if pos == -1 {
 				panic("unexpected situation")
 			}
-			res.Add = append(res.Add, GateAdd{
+			res.Add = append(res.Add, layered.GateAdd{
 				In:   uint64(subCurLayoutAll[insnId].offset + spos),
 				Out:  uint64(pos),
 				Coef: toBigInt(ctx.rc.Field.One()),

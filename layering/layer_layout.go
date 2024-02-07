@@ -1,10 +1,10 @@
-package layered
+package layering
 
 import (
 	"fmt"
 	"sort"
 
-	"github.com/Zklib/gkr-compiler/circuitir"
+	"github.com/Zklib/gkr-compiler/ir"
 	"github.com/Zklib/gkr-compiler/utils"
 )
 
@@ -43,7 +43,7 @@ func (e placementReqList) Less(i, j int) bool {
 	return e[i].insnId < e[j].insnId
 }
 
-func (ctx *compileContext) prepareLayerLayoutContext(ic *circuitIrContext) {
+func (ctx *compileContext) prepareLayerLayoutContext(ic *irContext) {
 	// find out the variables in each layer
 	ic.lcs = make([]layerLayoutContext, ic.outputLayer+1)
 	ic.lcHint = new(layerLayoutContext)
@@ -82,7 +82,7 @@ func (ctx *compileContext) prepareLayerLayoutContext(ic *circuitIrContext) {
 
 	// prepare lcHint
 	for _, insn := range ic.circuit.Instructions {
-		if insn.Type == circuitir.IHint {
+		if insn.Type == ir.IHint {
 			ic.lcHint.varIdx = append(ic.lcHint.varIdx, insn.OutputIds...)
 		}
 	}
@@ -406,7 +406,7 @@ func (ctx *compileContext) mergeLayouts(s [][]int, additional []int) []int {
 	return res
 }
 
-func (ctx *compileContext) solveLayerLayoutHintRelay(ic *circuitIrContext, req *layerReq) *layerLayout {
+func (ctx *compileContext) solveLayerLayoutHintRelay(ic *irContext, req *layerReq) *layerLayout {
 	s := make([]int, len(ic.lcHint.varIdx))
 	for i := 0; i < len(s); i++ {
 		s[i] = i
@@ -421,14 +421,14 @@ func (ctx *compileContext) solveLayerLayoutHintRelay(ic *circuitIrContext, req *
 	}
 }
 
-func (ctx *compileContext) solveLayerLayoutNormal(ic *circuitIrContext, req *layerReq) *layerLayout {
+func (ctx *compileContext) solveLayerLayoutNormal(ic *irContext, req *layerReq) *layerLayout {
 	lc := &ic.lcs[req.layer]
 
 	// first iterate prev layer circuits, and solve their output layout
 	layouts := make(map[int]*layerLayout)
 	for x_ := range lc.prevCircuitNbOut {
 		var subLayer int
-		var insn *circuitir.Instruction
+		var insn *ir.Instruction
 		x := x_
 		if x >= len(ic.circuit.Instructions) {
 			x -= len(ic.circuit.Instructions)

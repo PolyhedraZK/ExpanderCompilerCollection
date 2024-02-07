@@ -11,8 +11,8 @@ import (
 	"github.com/consensys/gnark/debug"
 	"github.com/consensys/gnark/frontend"
 
-	"github.com/Zklib/gkr-compiler/circuitir"
 	"github.com/Zklib/gkr-compiler/expr"
+	"github.com/Zklib/gkr-compiler/ir"
 	"github.com/Zklib/gkr-compiler/utils"
 )
 
@@ -41,7 +41,7 @@ type builder struct {
 	internalVariables utils.Map
 
 	// instruction list, each instruction specifies the method to calculate some variables
-	instructions []circuitir.Instruction
+	instructions []ir.Instruction
 
 	// count of variables in different types
 	nbInput         int
@@ -111,7 +111,7 @@ func (builder *builder) asInternalVariable(eall expr.Expression, forceRaw bool) 
 	idx := builder.newVariable(builder.layerOfExpr(e) + 1)
 	builder.internalVariables.Set(e, idx)
 	builder.instructions = append(builder.instructions,
-		circuitir.NewInternalVariableInstruction(e, idx),
+		ir.NewInternalVariableInstruction(e, idx),
 	)
 	return builder.unstripConstant(idx, coeff, constant)
 }
@@ -349,7 +349,7 @@ func (builder *builder) newHint(f solver.Hint, nbOutputs int, inputs []frontend.
 	}
 
 	builder.instructions = append(builder.instructions,
-		circuitir.NewHintInstruction(f, hintInputs, outId),
+		ir.NewHintInstruction(f, hintInputs, outId),
 	)
 	builder.nbInput += len(outId)
 

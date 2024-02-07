@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"runtime"
 
-	"github.com/Zklib/gkr-compiler/circuitir"
 	"github.com/Zklib/gkr-compiler/expr"
+	"github.com/Zklib/gkr-compiler/ir"
 	"github.com/consensys/gnark/frontend"
 )
 
@@ -112,7 +112,7 @@ func (parent *builder) MemorizedCall(f SubCircuitFunc, input_ []frontend.Variabl
 	}
 
 	parent.instructions = append(parent.instructions,
-		circuitir.NewSubCircuitInstruction(circuitId, input, outputIds),
+		ir.NewSubCircuitInstruction(circuitId, input, outputIds),
 	)
 
 	output_ := make([]frontend.Variable, len(output))

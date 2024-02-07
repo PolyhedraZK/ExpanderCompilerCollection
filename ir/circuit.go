@@ -1,4 +1,4 @@
-package circuitir
+package ir
 
 import (
 	"github.com/Zklib/gkr-compiler/expr"

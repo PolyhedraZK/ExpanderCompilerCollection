@@ -1,19 +1,20 @@
-package layered
+package layering
 
 import (
 	"fmt"
 
-	"github.com/Zklib/gkr-compiler/circuitir"
 	"github.com/Zklib/gkr-compiler/expr"
+	"github.com/Zklib/gkr-compiler/ir"
+	"github.com/Zklib/gkr-compiler/layered"
 	"github.com/Zklib/gkr-compiler/utils"
 )
 
 type compileContext struct {
 	// the root circuit
-	rc *circuitir.RootCircuit
+	rc *ir.RootCircuit
 
 	// for each circuit ir, we need a context to store some intermediate information
-	circuits map[uint64]*circuitIrContext
+	circuits map[uint64]*irContext
 
 	// topo-sorted order
 	order []uint64
@@ -25,7 +26,7 @@ type compileContext struct {
 	layerReqToLayout utils.Map
 
 	// compiled layered circuits
-	compiledCircuits []*Circuit
+	compiledCircuits []*layered.Circuit
 	connectedWires   map[int]int
 
 	// layout id of each layer
@@ -34,11 +35,11 @@ type compileContext struct {
 	layers []int
 
 	// input order solver
-	inputSolve InputSolve
+	inputSolver ir.InputSolver
 }
 
-type circuitIrContext struct {
-	circuit        *circuitir.Circuit
+type irContext struct {
+	circuit        *ir.Circuit
 	nbVariable     int // number of variables in the circuit
 	nbSubCircuits  int // number of sub circuits
 	nbHintInput    int // number of hint inputs in the circuit itself
@@ -83,26 +84,23 @@ type combinedConstraint struct {
 	subCircuitIds []int
 }
 
-func Compile(rc *circuitir.RootCircuit) *CompileResult {
+func Compile(rc *ir.RootCircuit) (*layered.RootCircuit, *ir.InputSolver) {
 	ctx := newCompileContext(rc)
 	ctx.compile()
 	layersUint64 := make([]uint64, len(ctx.layers))
 	for i, x := range ctx.layers {
 		layersUint64[i] = uint64(x)
 	}
-	return &CompileResult{
-		RootCircuit: &RootCircuit{
-			Circuits: ctx.compiledCircuits,
-			Layers:   layersUint64,
-		},
-		InputSolve: ctx.inputSolve,
-	}
+	return &layered.RootCircuit{
+		Circuits: ctx.compiledCircuits,
+		Layers:   layersUint64,
+	}, &ctx.inputSolver
 }
 
-func newCompileContext(rc *circuitir.RootCircuit) *compileContext {
+func newCompileContext(rc *ir.RootCircuit) *compileContext {
 	return &compileContext{
 		rc:               rc,
-		circuits:         make(map[uint64]*circuitIrContext),
+		circuits:         make(map[uint64]*irContext),
 		layerLayoutMap:   make(utils.Map),
 		layerReqToLayout: make(utils.Map),
 		connectedWires:   make(map[int]int),
@@ -140,7 +138,7 @@ func (ctx *compileContext) compile() {
 	}
 
 	// 6. record the input order (used to generate witness)
-	ctx.inputSolve = ctx.recordInputOrder(ctx.layoutIds[0])
+	ctx.inputSolver = ctx.recordInputOrder(ctx.layoutIds[0])
 }
 
 // toposort dfs
@@ -155,11 +153,11 @@ func (ctx *compileContext) dfsTopoSort(id uint64) {
 	nhs := 0
 	circuit := ctx.rc.Circuits[id]
 	for _, insn := range circuit.Instructions {
-		if insn.Type == circuitir.ISubCircuit {
+		if insn.Type == ir.ISubCircuit {
 			ctx.dfsTopoSort(insn.SubCircuitId)
 			ns += 1
 			nhs += ctx.circuits[insn.SubCircuitId].nbHintInput + ctx.circuits[insn.SubCircuitId].nbHintInputSub
-		} else if insn.Type == circuitir.IHint {
+		} else if insn.Type == ir.IHint {
 			nh += len(insn.OutputIds)
 		}
 		for _, x := range insn.OutputIds {
@@ -172,7 +170,7 @@ func (ctx *compileContext) dfsTopoSort(id uint64) {
 
 	// when all children are done, we enqueue the current circuit
 	ctx.order = append(ctx.order, id)
-	ctx.circuits[id] = &circuitIrContext{
+	ctx.circuits[id] = &irContext{
 		circuit:              circuit,
 		nbVariable:           nv,
 		nbSubCircuits:        ns,
@@ -189,7 +187,7 @@ func (ctx *compileContext) isSingleVariable(e expr.Expression) bool {
 	return len(e) == 1 && e[0].VID1 == 0 && e[0].VID0 != 0 && ctx.rc.Field.IsOne(e[0].Coeff)
 }
 
-func (ctx *compileContext) computeMinMaxLayers(ic *circuitIrContext) {
+func (ctx *compileContext) computeMinMaxLayers(ic *irContext) {
 	// variables
 	// 0..nbVariable: normal variables
 	// nbVariable..nbVariable+nbHintInputSub: hint inputs. root circuit first, and then sub circuits by insn order
@@ -243,7 +241,7 @@ func (ctx *compileContext) computeMinMaxLayers(ic *circuitIrContext) {
 	}
 	hintInputSubIdx := nv
 	for i, insn := range circuit.Instructions {
-		if insn.Type == circuitir.IInternalVariable {
+		if insn.Type == ir.IInternalVariable {
 			e := insn.Inputs[0]
 			usedVar := make(map[int]bool)
 			for _, term := range e {
@@ -265,13 +263,13 @@ func (ctx *compileContext) computeMinMaxLayers(ic *circuitIrContext) {
 			q1 = append(q1, y)
 			layerAdvance[y] = 1
 			ic.internalVariableExpr[y] = e
-		} else if insn.Type == circuitir.IHint {
+		} else if insn.Type == ir.IHint {
 			for _, x := range insn.OutputIds {
 				ic.minLayer[x] = 0
 				q0 = append(q0, x)
 				ic.hintInputs = append(ic.hintInputs, x)
 			}
-		} else if insn.Type == circuitir.ISubCircuit {
+		} else if insn.Type == ir.ISubCircuit {
 			// check if every input is single variable, and add edges
 			k := len(ic.subCircuitInsnIds) + nv + nhs
 			for _, x := range insn.Inputs {
