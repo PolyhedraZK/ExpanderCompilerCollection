@@ -94,6 +94,7 @@ func Compile(rc *ir.RootCircuit) (*layered.RootCircuit, *ir.InputSolver) {
 	return &layered.RootCircuit{
 		Circuits: ctx.compiledCircuits,
 		Layers:   layersUint64,
+		Field:    rc.Field.Field(),
 	}, &ctx.inputSolver
 }
 

@@ -172,7 +172,7 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 			}
 			if nextLayer == inputLayer {
 				nextLayout = bq.query(ic.subCircuitHintInputs[i], hintf, subId, -1)
-				fmt.Printf("hint next layout: %v\n", *nextLayout)
+				fmt.Printf("hint next layout: %v %v\n", *nextLayout, ic.subCircuitHintInputs[i])
 			}
 		} else if curLayer == outputLayer {
 			// it might be possible that some constraints are in the output layer, so we have to check it here
@@ -208,7 +208,7 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 	// connect sub circuits
 	for i := 0; i < len(subInsnIds); i++ {
 		subCurLayoutAll[subInsnIds[i]] = subCurLayout[i]
-		fmt.Printf("recursive: %d %d\n", subCurLayout[i].id, subNextLayout[i].id)
+		fmt.Printf("recursive: %d %d %d %d\n", subCurLayout[i].id, subNextLayout[i].id, subCurLayout[i].offset, subNextLayout[i].offset)
 		scid := ctx.connectWires(subCurLayout[i].id, subNextLayout[i].id)
 		al := layered.Allocation{
 			InputOffset:  uint64(subCurLayout[i].offset),
@@ -239,7 +239,7 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 	// connect self variables
 	for _, x := range nextLc.varIdx {
 		// only consider real variables
-		if x > ic.nbVariable {
+		if x >= ic.nbVariable {
 			continue
 		}
 		pos := bq.varPos[x]
@@ -338,7 +338,7 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 	}
 
 	resId := len(ctx.compiledCircuits)
-	if resId == 5 {
+	if resId == 4 {
 		fmt.Printf("=========================================================================================================================\n")
 	}
 	ctx.compiledCircuits = append(ctx.compiledCircuits, res)
