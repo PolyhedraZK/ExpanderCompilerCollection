@@ -39,7 +39,10 @@ func (rc *RootCircuit) SolveInput(assignment frontend.Circuit, solver *InputSolv
 		var t big.Int
 		x.BigInt(&t)
 		input[i] = rc.Field.FromInterface(t)
-		globalInput[solver.CircuitInputIds[i]] = &t
+		p := solver.CircuitInputIds[i]
+		if p != -1 {
+			globalInput[p] = &t
+		}
 	}
 
 	circuit := rc.Circuits[0]
@@ -127,10 +130,14 @@ func (circuit *Circuit) SolveInput(
 			for i, x := range outB {
 				out[i] = rc.Field.FromInterface(x)
 				//fmt.Printf("set %d %d\n", is.CircuitInputIds[i], x)
-				globalInput[is.CircuitInputIds[i]] = x
+				p := is.CircuitInputIds[i]
+				if p != -1 {
+					globalInput[p] = x
+				}
 			}
 		} else if insn.Type == ISubCircuit {
-			rc.Circuits[insn.SubCircuitId].SolveInput(rc, in, is.SubCircuit, globalInput)
+			subOut := rc.Circuits[insn.SubCircuitId].SolveInput(rc, in, is.SubCircuit, globalInput)
+			copy(out, subOut)
 		}
 
 		for i, x := range insn.OutputIds {
@@ -146,5 +153,14 @@ func (circuit *Circuit) SolveInput(
 	for i, e := range circuit.Output {
 		res[i] = calcExpr(e)
 	}
+
+	//for _, e := range circuit.Constraints {
+	//	fmt.Printf("constraint: %v\n", rc.Field.ToBigInt(calcExpr(e)))
+	//}
+
+	//for i, x := range values {
+	//	fmt.Printf("solve_input %d = %d\n", i, rc.Field.ToBigInt(x))
+	//}
+
 	return res
 }

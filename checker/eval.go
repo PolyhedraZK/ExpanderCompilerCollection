@@ -1,9 +1,8 @@
 package checker
 
 import (
-	"math/big"
-
 	"crypto/rand"
+	"math/big"
 
 	"github.com/Zklib/gkr-compiler/layered"
 )
@@ -35,6 +34,7 @@ func EvalCircuit(rc *layered.RootCircuit, input []*big.Int) []*big.Int {
 		for i := range cur {
 			cur[i].Mod(cur[i], rc.Field)
 		}
+		//fmt.Printf("eval layer %d: %v\n", id, cur)
 	}
 	return cur
 }

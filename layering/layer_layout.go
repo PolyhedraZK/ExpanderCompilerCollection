@@ -58,7 +58,7 @@ func (ctx *compileContext) prepareLayerLayoutContext(ic *irContext) {
 		for _, x := range ic.subCircuitHintInputs[i] {
 			//fmt.Printf("hint enqueue %d (inputLayer=%d)\n", x, inputLayer)
 			ic.lcs[0].varIdx = append(ic.lcs[0].varIdx, x)
-			if inputLayer != 0 {
+			if inputLayer > 0 {
 				ic.lcs[inputLayer].varIdx = append(ic.lcs[inputLayer].varIdx, x)
 			}
 		}
@@ -74,9 +74,6 @@ func (ctx *compileContext) prepareLayerLayoutContext(ic *irContext) {
 		ic.lcs[i].prevCircuitInsnId = make(map[int]int)
 		ic.lcs[i].prevCircuitNbOut = make(map[int]int)
 		ic.lcs[i].placement = make(map[int]int)
-		for j, x := range ic.lcs[i].varIdx {
-			ic.lcs[i].varMap[x] = j
-		}
 	}
 
 	// prepare lcHint
@@ -85,14 +82,31 @@ func (ctx *compileContext) prepareLayerLayoutContext(ic *irContext) {
 			ic.lcHint.varIdx = append(ic.lcHint.varIdx, insn.OutputIds...)
 		}
 	}
+	for i := range ic.subCircuitInsnIds {
+		if !ic.isUsed[i+ic.nbVariable+ic.nbHintInputSub] {
+			continue
+		}
+		if len(ic.subCircuitHintInputs[i]) != 0 {
+			ic.lcHint.varIdx = append(ic.lcHint.varIdx, ic.subCircuitHintInputs[i]...)
+			//ic.lcs[0].varIdx = append(ic.lcs[0].varIdx, ic.subCircuitHintInputs[i]...)
+		}
+	}
 	ic.lcHint.varMap = make(map[int]int)
 	for j, x := range ic.lcHint.varIdx {
 		ic.lcHint.varMap[x] = j
+	}
+	for i := 0; i <= ic.outputLayer; i++ {
+		for j, x := range ic.lcs[i].varIdx {
+			ic.lcs[i].varMap[x] = j
+		}
 	}
 
 	// for each sub-circuit, enqueue the placement request in input layer, and mark prevCircuitInsnId in output layer
 	// also push all middle layers to the layer context
 	for i, insnId := range ic.subCircuitInsnIds {
+		if !ic.isUsed[i+ic.nbVariable+ic.nbHintInputSub] {
+			continue
+		}
 		insn := ic.circuit.Instructions[insnId]
 		inputLayer := ic.subCircuitStartLayer[i]
 		outputLayer := ctx.circuits[insn.SubCircuitId].outputLayer + inputLayer
@@ -216,7 +230,12 @@ func (l *layerLayout) SubsMap(s map[int]int) {
 	}
 	for i := 0; i < l.size; i++ {
 		if l.placementDense[i] != -1 {
-			l.placementDense[i] = s[l.placementDense[i]]
+			// when a sub circuit thinks it doesn't need some input variable, it won't occur in map
+			if v, ok := s[l.placementDense[i]]; ok {
+				l.placementDense[i] = v
+			} else {
+				l.placementDense[i] = -1
+			}
 		}
 	}
 }
@@ -224,7 +243,7 @@ func (l *layerLayout) SubsMap(s map[int]int) {
 func (l *layerLayout) HashCode() uint64 {
 	const p1 = 1000000007
 	const p2 = 1000000009
-	var res uint64 = l.circuitId ^ uint64(l.layer)
+	var res uint64 = (l.circuitId^uint64(l.layer))*p1 + uint64(l.size)
 	if l.sparse {
 		for k, v := range l.placementSparse {
 			res = (res*p1+uint64(k))*p1 + uint64(v)
@@ -354,7 +373,10 @@ func (ctx *compileContext) mergeLayouts(s [][]int, additional []int) []int {
 		}
 	}
 	utils.SortIntSeq(order, func(i, j int) bool {
-		return len(s[i]) > len(s[j])
+		if len(s[i]) != len(s[j]) {
+			return len(s[i]) > len(s[j])
+		}
+		return i < j
 	})
 
 	for _, x_ := range order {
@@ -528,7 +550,10 @@ func (ctx *compileContext) solveLayerLayoutNormal(ic *irContext, req *layerReq) 
 		order[i] = i
 	}
 	utils.SortIntSeq(order, func(i, j int) bool {
-		return sizes[i] > sizes[j]
+		if sizes[i] != sizes[j] {
+			return sizes[i] > sizes[j]
+		}
+		return i < j
 	})
 	cur := 0
 	res := &layerLayout{

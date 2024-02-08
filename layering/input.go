@@ -1,6 +1,8 @@
 package layering
 
-import "github.com/Zklib/gkr-compiler/ir"
+import (
+	"github.com/Zklib/gkr-compiler/ir"
+)
 
 func (ctx *compileContext) recordInputOrder(layoutId int) ir.InputSolver {
 	l := ctx.layerLayout[layoutId]
@@ -16,7 +18,11 @@ func (ctx *compileContext) recordInputOrder(layoutId int) ir.InputSolver {
 	}
 	gi := []int{}
 	for i := 1; i <= ctx.circuits[0].circuit.NbExternalInput; i++ {
-		gi = append(gi, v[i])
+		if vi, ok := v[i]; ok {
+			gi = append(gi, vi)
+		} else {
+			gi = append(gi, -1)
+		}
 	}
 
 	return ir.InputSolver{
