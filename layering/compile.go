@@ -25,7 +25,7 @@ type compileContext struct {
 
 	// compiled layered circuits
 	compiledCircuits []*layered.Circuit
-	connectedWires   map[int]int
+	connectedWires   map[int64]int
 
 	// layout id of each layer
 	layoutIds []int
@@ -102,7 +102,7 @@ func newCompileContext(rc *ir.RootCircuit) *compileContext {
 		circuits:         make(map[uint64]*irContext),
 		layerLayoutMap:   make(utils.Map),
 		layerReqToLayout: make(utils.Map),
-		connectedWires:   make(map[int]int),
+		connectedWires:   make(map[int64]int),
 	}
 }
 
@@ -327,10 +327,33 @@ func (ctx *compileContext) computeMinMaxLayers(ic *irContext) {
 		}
 		setUsed(e[0].VID0)
 	}
+	// if some constraint is set in a sub circuit, we need to mark the full sub circuit used
+	for i, x := range ic.subCircuitInsnIds {
+		for _, y := range ctx.circuits[circuit.Instructions[x].SubCircuitId].combinedConstraints {
+			if y != nil {
+				for _, z := range outEdges[nv+nhs+i] {
+					setUsed(z)
+				}
+				break
+			}
+		}
+	}
+	// bfs
 	for i := 0; i < len(q1); i++ {
 		y := q1[i]
 		for _, x := range inEdges[y] {
 			setUsed(x)
+		}
+	}
+	// if an output is used, mark all as used
+	for i := range ic.subCircuitInsnIds {
+		for _, y := range outEdges[nv+nhs+i] {
+			if ic.isUsed[y] {
+				for _, z := range outEdges[nv+nhs+i] {
+					setUsed(z)
+				}
+				break
+			}
 		}
 	}
 
@@ -359,7 +382,11 @@ func (ctx *compileContext) computeMinMaxLayers(ic *irContext) {
 	// compute sub circuit start layer
 	ic.subCircuitStartLayer = make([]int, ns)
 	for i := 0; i < len(ic.subCircuitInsnIds); i++ {
-		ic.subCircuitStartLayer[i] = ic.minLayer[nv+nhs+i] - layerAdvance[nv+nhs+i]
+		if ic.isUsed[nv+nhs+i] {
+			ic.subCircuitStartLayer[i] = ic.minLayer[nv+nhs+i] - layerAdvance[nv+nhs+i]
+		} else {
+			ic.subCircuitStartLayer[i] = -1
+		}
 	}
 
 	// compute output layer and order
@@ -388,6 +415,9 @@ func (ctx *compileContext) computeMinMaxLayers(ic *irContext) {
 		cc[xl].variables = append(cc[xl].variables, xid)
 	}
 	for i, subId := range ic.subCircuitInsnIds {
+		if !ic.isUsed[nv+nhs+i] {
+			continue
+		}
 		subCircuit := ctx.circuits[circuit.Instructions[subId].SubCircuitId]
 		for j, x := range subCircuit.combinedConstraints {
 			if x != nil {
@@ -405,10 +435,7 @@ func (ctx *compileContext) computeMinMaxLayers(ic *irContext) {
 		if first == len(cc) {
 			panic("no constraints in the root circuit")
 		}
-		last := len(cc) - 1
-		for last >= 0 && len(cc[last].variables) == 0 && len(cc[last].subCircuitIds) == 0 {
-			last--
-		}
+		last := maxOccuredLayer + 1
 		for i := first + 1; i <= last; i++ {
 			// these ids should be layer-first+n
 			cc[i].variables = append(cc[i].variables, i-1-first+n)
@@ -458,7 +485,7 @@ func (ctx *compileContext) computeMinMaxLayers(ic *irContext) {
 		}
 	}
 	for i := 0; i < len(ic.subCircuitInsnIds); i++ {
-		if ic.minLayer[nv+nhs+i] != ic.maxLayer[nv+nhs+i] {
+		if ic.isUsed[nv+nhs+i] && ic.minLayer[nv+nhs+i] != ic.maxLayer[nv+nhs+i] {
 			panic("unexpected situation: sub-circuit virtual variable should have equal min/max layer")
 		}
 	}
@@ -476,6 +503,22 @@ func (ctx *compileContext) computeMinMaxLayers(ic *irContext) {
 	//fmt.Printf("%v\n", ic.isUsed)
 	//fmt.Printf("%v\n", ic.minLayer)
 	//fmt.Printf("%v\n", ic.maxLayer)
+
+	// if the output includes partial output of a sub circuit, and the sub circuit also ends at the output layer, we have to increate output layer
+	for i := range ic.subCircuitInsnIds {
+		count := 0
+		for _, y := range outEdges[nv+nhs+i] {
+			if ic.minLayer[y] == ic.outputLayer {
+				if _, ok := ic.outputOrder[y]; ok {
+					count++
+				}
+			}
+		}
+		if count != 0 && count != len(outEdges[nv+nhs+i]) {
+			ic.outputLayer++
+			break
+		}
+	}
 
 	// force maxLayer of output to be outputLayer
 	for _, x := range circuit.Output {

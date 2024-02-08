@@ -97,7 +97,8 @@ const (
 // It first convert the input to the form a*(...)+c, and then queries the database
 // It remembers previous results, and uses cached id if possible
 func (builder *builder) asInternalVariable(eall expr.Expression, forceRaw bool) expr.Expression {
-	if len(eall) == 1 && eall[0].VID1 == 0 {
+	// TODO: remove handling of forceRaw (leave that for ir optimizer)
+	if len(eall) == 1 && eall[0].VID1 == 0 && builder.field.IsOne(eall[0].Coeff) {
 		return eall
 	}
 	e, coeff, constant := builder.stripConstant(eall, forceRaw)

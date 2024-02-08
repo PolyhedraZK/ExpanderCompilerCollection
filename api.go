@@ -42,7 +42,13 @@ func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool, opts ...front
 		return nil, err
 	}
 	rc := root.Finalize()
+	if err := ir.ValidateForLayering(rc); err != nil {
+		return nil, err
+	}
 	lrc, is := layering.Compile(rc)
+	if err := layered.Validate(lrc); err != nil {
+		return nil, err
+	}
 	res := compileResult{
 		rc:          rc,
 		compiled:    lrc,

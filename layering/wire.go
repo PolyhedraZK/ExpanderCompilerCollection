@@ -17,7 +17,6 @@ func (lq *layoutQuery) query(vs []int, f func(int) int, cid uint64, lid int) *su
 	ps := make([]int, len(vs))
 	l := 1 << 62
 	r := -l
-	//fmt.Printf("@ %v %v\n", vs, lq.varPos)
 	for i, x := range vs {
 		ps[i] = lq.varPos[x]
 		if ps[i] < l {
@@ -27,6 +26,7 @@ func (lq *layoutQuery) query(vs []int, f func(int) int, cid uint64, lid int) *su
 			r = ps[i]
 		}
 	}
+	//fmt.Printf("@ %v %v %v %d\n", vs, lq.varPos, ps, lid)
 	xor := l ^ r
 	for xor&-xor != xor {
 		xor &= xor - 1
@@ -73,11 +73,17 @@ func (ctx *compileContext) layoutQuery(l *layerLayout, s []int) *layoutQuery {
 	}
 	if l.sparse {
 		for i, v := range l.placementSparse {
+			if _, ok := q.varPos[s[v]]; ok {
+				panic("unexpected situation")
+			}
 			q.varPos[s[v]] = i
 		}
 	} else {
 		for i, v := range l.placementDense {
 			if v != -1 {
+				if _, ok := q.varPos[s[v]]; ok {
+					panic("unexpected situation")
+				}
 				//fmt.Printf("/%d\n", v)
 				q.varPos[s[v]] = i
 			}
@@ -88,7 +94,7 @@ func (ctx *compileContext) layoutQuery(l *layerLayout, s []int) *layoutQuery {
 
 // connectWires solves the wire connection between two layers
 func (ctx *compileContext) connectWires(a_, b_ int) int {
-	mapId := a_*len(ctx.layerLayout) + b_
+	mapId := int64(a_)<<32 | int64(b_)
 	if v, ok := ctx.connectedWires[mapId]; ok {
 		return v
 	}
@@ -119,6 +125,18 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 	//fmt.Printf("curVar: %v\n", curLc.varIdx)
 	//fmt.Printf("nextVar: %v\n", nextLc.varIdx)
 
+	// check if all variables exist in the layout
+	for _, x := range curLc.varIdx {
+		if _, ok := aq.varPos[x]; !ok {
+			panic("unexpected situation")
+		}
+	}
+	for _, x := range nextLc.varIdx {
+		if _, ok := bq.varPos[x]; !ok {
+			panic("unexpected situation")
+		}
+	}
+
 	subInsnIds := make([]int, 0, len(ic.subCircuitInsnIds))
 	subInsnMap := make(map[int]int)
 	subCurLayout := make([]*subLayout, 0, len(ic.subCircuitInsnIds))
@@ -127,6 +145,9 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 
 	// find all sub circuits
 	for i, insnId := range ic.subCircuitInsnIds {
+		if !ic.isUsed[i+ic.nbVariable+ic.nbHintInputSub] {
+			continue
+		}
 		insn := circuit.Instructions[insnId]
 		subId := insn.SubCircuitId
 		subC := ctx.circuits[subId]
@@ -161,7 +182,7 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 				// also for the output layer
 				nextLayout = bq.query(insn.OutputIds, outf, subId, dep)
 			}
-		} else if nextLayer <= inputLayer && len(ic.subCircuitHintInputs[i]) != 0 {
+		} else if nextLayer != -1 && nextLayer <= inputLayer && len(ic.subCircuitHintInputs[i]) != 0 {
 			// relay hint input
 			if curLayer == 0 {
 				curLayout = aq.query(ic.subCircuitHintInputs[i], hintf, subId, -1)
@@ -204,6 +225,7 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 	// connect sub circuits
 	for i := 0; i < len(subInsnIds); i++ {
 		subCurLayoutAll[subInsnIds[i]] = subCurLayout[i]
+		//fmt.Printf("%d %d id=%d curLayout=%v nextLayout=%v\n", a_, b_, subInsnIds[i], subCurLayout[i], subNextLayout[i])
 		//fmt.Printf("recursive: %d %d %d %d\n", subCurLayout[i].id, subNextLayout[i].id, subCurLayout[i].offset, subNextLayout[i].offset)
 		scid := ctx.connectWires(subCurLayout[i].id, subNextLayout[i].id)
 		al := layered.Allocation{
@@ -234,13 +256,13 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 
 	// connect self variables
 	for _, x := range nextLc.varIdx {
-		// only consider real variables
-		if x >= ic.nbVariable {
+		// only consider real variables, except it's hint relay layer
+		if x >= ic.nbVariable && curLayer != -1 {
 			continue
 		}
 		pos := bq.varPos[x]
 		// if it's not the first layer, just relay it
-		if ic.minLayer[x] != nextLayer {
+		if ic.minLayer[x] != nextLayer || curLayer == -1 {
 			//fmt.Printf("/relay %d: %d %d\n", x, aq.varPos[x], pos)
 			res.Add = append(res.Add, layered.GateAdd{
 				In:   uint64(aq.varPos[x]),
@@ -297,7 +319,10 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 				Coef: coef, // p means random
 			})
 		}
-		for _, i := range cc.subCircuitIds {
+		for j, i := range cc.subCircuitIds {
+			if !ic.isUsed[j+ic.nbVariable+ic.nbHintInputSub] {
+				continue
+			}
 			insnId := ic.subCircuitInsnIds[i]
 			insn := circuit.Instructions[insnId]
 			inputLayer := ic.subCircuitStartLayer[i]
@@ -336,5 +361,8 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 	resId := len(ctx.compiledCircuits)
 	ctx.compiledCircuits = append(ctx.compiledCircuits, res)
 	ctx.connectedWires[mapId] = resId
+
+	//fmt.Printf("connected (%d, %d) -> %d\n", a_, b_, resId)
+
 	return resId
 }
