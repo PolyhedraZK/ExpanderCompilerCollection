@@ -2,9 +2,12 @@ package ir
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/Zklib/gkr-compiler/expr"
 	"github.com/consensys/gnark/constraint"
+	"github.com/consensys/gnark/constraint/solver"
 )
 
 type Circuit struct {
@@ -135,4 +138,59 @@ func ValidateForLayering(rc *RootCircuit) error {
 		}
 	}
 	return nil
+}
+
+func (ci *Circuit) Print(field constraint.R1CS) {
+	varToStr := func(e expr.Expression) string {
+		s := make([]string, len(e))
+		for i, term := range e {
+			coeff := field.ToBigInt(term.Coeff).String()
+			if term.VID0 == 0 {
+				s[i] = coeff
+			} else if term.VID1 == 0 {
+				s[i] = "v" + strconv.Itoa(term.VID0) + "*" + coeff
+			} else {
+				s[i] = "v" + strconv.Itoa(term.VID0) + "*v" + strconv.Itoa(term.VID1) + "*" + coeff
+			}
+		}
+		return strings.Join(s, "+")
+	}
+
+	for _, insn := range ci.Instructions {
+		if insn.Type == IInternalVariable {
+			fmt.Printf("v%d = %s\n", insn.OutputIds[0], varToStr(insn.Inputs[0]))
+		} else if insn.Type == IHint {
+			strs := make([]string, len(insn.Inputs))
+			for i, x := range insn.Inputs {
+				strs[i] = varToStr(x)
+			}
+			fmt.Printf("v%d", insn.OutputIds[0])
+			for i := 1; i < len(insn.OutputIds); i++ {
+				fmt.Printf(",v%d", insn.OutputIds[i])
+			}
+			fmt.Printf(" = %s(%s)\n", solver.GetHintName(insn.HintFunc), strings.Join(strs, ","))
+		} else if insn.Type == ISubCircuit {
+			strs := make([]string, len(insn.Inputs))
+			for i, x := range insn.Inputs {
+				strs[i] = varToStr(x)
+			}
+			fmt.Printf("v%d", insn.OutputIds[0])
+			for i := 1; i < len(insn.OutputIds); i++ {
+				fmt.Printf(",v%d", insn.OutputIds[i])
+			}
+			fmt.Printf(" = sub%d(%s)\n", insn.SubCircuitId, strings.Join(strs, ","))
+		}
+	}
+
+	for i, e := range ci.Output {
+		fmt.Printf("out%d = %s\n", i, varToStr(e))
+	}
+}
+
+func (rc *RootCircuit) Print() {
+	for k, v := range rc.Circuits {
+		fmt.Printf("Circuit %d nbIn=%d nbOut=%d =================\n", k, v.NbExternalInput, len(v.Output))
+		v.Print(rc.Field)
+		fmt.Println()
+	}
 }
