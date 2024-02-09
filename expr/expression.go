@@ -69,7 +69,6 @@ func (e Expression) Less(i, j int) bool {
 //
 // requires sorted
 func (e Expression) HashCode() uint64 {
-	// TODO: improve this
 	h := uint64(17)
 	for _, val := range e {
 		h = h*23 + val.HashCode()

@@ -375,7 +375,6 @@ func assertIsSet(e expr.Expression) {
 	}
 }
 
-// TODO: add special flag if it's the output
 // layeredAdd sums the given expression list by layers
 func (builder *builder) layeredAdd(es_ []expr.Expression) expr.Expression {
 	es := builder.newExprList(es_)
@@ -393,7 +392,6 @@ func (builder *builder) layeredAdd(es_ []expr.Expression) expr.Expression {
 	return builder.add(cur, false, 0, nil, true)
 }
 
-// TODO: revert back size limit
 func (builder *builder) compress(e expr.Expression) expr.Expression {
 	minL := 1 << 60
 	maxL := -1 << 60
@@ -425,7 +423,10 @@ func (builder *builder) compress(e expr.Expression) expr.Expression {
 		}
 		e = builder.layeredAdd(es)
 	}
-	return e
+	if builder.root.config.CompressThreshold <= 0 || len(e) < builder.root.config.CompressThreshold {
+		return e
+	}
+	return builder.asInternalVariable(e)
 }
 
 func (builder *builder) Defer(cb func(frontend.API) error) {

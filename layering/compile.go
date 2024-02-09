@@ -455,7 +455,6 @@ func (ctx *compileContext) computeMinMaxLayers(ic *irContext) {
 			if i+1 > ic.outputLayer {
 				// currently the implementation doesn't allow contraint variable in the output layer
 				// so we have to add 1 in non-root circuits
-				// TODO: fix this
 				if ic == ctx.circuits[0] {
 					ic.outputLayer = i
 				} else {
