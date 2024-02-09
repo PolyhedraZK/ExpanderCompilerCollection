@@ -157,10 +157,10 @@ func (builder *builder) Mul(i1, i2 frontend.Variable, in ...frontend.Variable) f
 
 		// for second degree expressions, we need to compress them to linear
 		if v1Deg == 2 {
-			v1 = builder.asInternalVariable(v1, false)
+			v1 = builder.asInternalVariable(v1)
 		}
 		if v2Deg == 2 {
-			v2 = builder.asInternalVariable(v2, false)
+			v2 = builder.asInternalVariable(v2)
 		}
 
 		// TODO: optimize speed
