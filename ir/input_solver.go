@@ -60,7 +60,7 @@ func (rc *RootCircuit) SolveInput(assignment frontend.Circuit, solver *InputSolv
 func (circuit *Circuit) SolveInput(
 	rc *RootCircuit, input []constraint.Element, solver []InputSolverInstruction, globalInput []*big.Int,
 ) []constraint.Element {
-	n := 0
+	n := circuit.NbExternalInput
 	for _, insn := range circuit.Instructions {
 		for _, x := range insn.OutputIds {
 			if x > n {

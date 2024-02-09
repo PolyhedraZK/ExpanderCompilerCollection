@@ -17,13 +17,16 @@ type randomCircuit struct {
 }
 
 type randomCircuitConfig struct {
-	seed     int
-	scNum    randRange
-	scInput  randRange
-	scOutput randRange
-	scInsn   randRange
-	rootInsn randRange
-	field    *big.Int
+	seed       int
+	scNum      randRange
+	scInput    randRange
+	scOutput   randRange
+	scInsn     randRange
+	rootInsn   randRange
+	field      *big.Int
+	addPercent int
+	mulPercent int
+	divPercent int
 }
 
 type randRange struct {
@@ -121,18 +124,18 @@ func (rcg *randomCircuitGenerator) randomCircuit(api frontend.API, input []front
 	}
 	for i := 0; i < m || len(vars) < rcg.outputSize[id]; i++ {
 		op := rand.Intn(100)
-		if op < 60 {
+		if op < rcg.conf.addPercent {
 			x := rand.Intn(len(vars))
 			y := rand.Intn(len(vars))
 			vars = append(vars, api.Add(
 				api.Mul(vars[x], big.NewInt(0).Rand(rand, rcg.conf.field)),
 				api.Mul(vars[y], big.NewInt(0).Rand(rand, rcg.conf.field)),
 			))
-		} else if op < 90 || len(vars) < 2 {
+		} else if op < rcg.conf.mulPercent || len(vars) < 2 {
 			x := rand.Intn(len(vars))
 			y := rand.Intn(len(vars))
 			vars = append(vars, api.Mul(vars[x], vars[y]))
-		} else if op < 97 || len(rcg.subCircuits[id]) == 0 {
+		} else if op < rcg.conf.divPercent || len(rcg.subCircuits[id]) == 0 {
 			for {
 				x := rand.Intn(len(vars))
 				y := rand.Intn(len(vars))
@@ -196,7 +199,7 @@ func (rcg *randomCircuitGenerator) randomEval(input []*big.Int) []*big.Int {
 	}
 	for i := 0; i < m || len(vars) < rcg.outputSize[id]; i++ {
 		op := rand.Intn(100)
-		if op < 60 {
+		if op < rcg.conf.addPercent {
 			x := rand.Intn(len(vars))
 			y := rand.Intn(len(vars))
 			a := big.NewInt(0).Rand(rand, rcg.conf.field)
@@ -205,12 +208,12 @@ func (rcg *randomCircuitGenerator) randomEval(input []*big.Int) []*big.Int {
 			b = b.Mul(b, vars[y])
 			a = a.Add(a, b)
 			vars = append(vars, a.Mod(a, rcg.conf.field))
-		} else if op < 90 || len(vars) < 2 {
+		} else if op < rcg.conf.mulPercent || len(vars) < 2 {
 			x := rand.Intn(len(vars))
 			y := rand.Intn(len(vars))
 			a := big.NewInt(0).Mul(vars[x], vars[y])
 			vars = append(vars, a.Mod(a, rcg.conf.field))
-		} else if op < 97 || len(rcg.subCircuits[id]) == 0 {
+		} else if op < rcg.conf.divPercent || len(rcg.subCircuits[id]) == 0 {
 			for {
 				x := rand.Intn(len(vars))
 				y := rand.Intn(len(vars))

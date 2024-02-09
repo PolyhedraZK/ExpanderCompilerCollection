@@ -150,6 +150,7 @@ func (ctx *compileContext) dfsTopoSort(id uint64) {
 	nh := 0
 	nhs := 0
 	circuit := ctx.rc.Circuits[id]
+	nv = circuit.NbExternalInput
 	for _, insn := range circuit.Instructions {
 		if insn.Type == ir.ISubCircuit {
 			ctx.dfsTopoSort(insn.SubCircuitId)
@@ -164,6 +165,7 @@ func (ctx *compileContext) dfsTopoSort(id uint64) {
 			}
 		}
 	}
+	// nv is currently the maximum id of varaibles, so we need to add 1 to get the count
 	nv += 1
 
 	// when all children are done, we enqueue the current circuit
@@ -261,6 +263,10 @@ func (ctx *compileContext) computeMinMaxLayers(ic *irContext) {
 			q1 = append(q1, y)
 			layerAdvance[y] = 1
 			ic.internalVariableExpr[y] = e
+			if len(usedVar) == 0 {
+				// actually this only happens at output layer
+				ic.minLayer[y] = 1
+			}
 		} else if insn.Type == ir.IHint {
 			for _, x := range insn.OutputIds {
 				ic.minLayer[x] = 0
@@ -282,6 +288,7 @@ func (ctx *compileContext) computeMinMaxLayers(ic *irContext) {
 				addEdge(hintInputSubIdx+j, k)
 				q0 = append(q0, hintInputSubIdx+j)
 				subhs = append(subhs, hintInputSubIdx+j)
+				ic.minLayer[hintInputSubIdx+j] = 0
 			}
 			hintInputSubIdx += subh
 
@@ -504,17 +511,33 @@ func (ctx *compileContext) computeMinMaxLayers(ic *irContext) {
 	//fmt.Printf("%v\n", ic.minLayer)
 	//fmt.Printf("%v\n", ic.maxLayer)
 
-	// if the output includes partial output of a sub circuit, and the sub circuit also ends at the output layer, we have to increate output layer
-	for i := range ic.subCircuitInsnIds {
+	for i, x := range ic.isUsed {
+		if x && ic.minLayer[i] == -1 {
+			panic("unexpected situation")
+		}
+	}
+
+	// if (the output includes partial output of a sub circuit or the sub circuit has constraints),
+	// and the sub circuit also ends at the output layer, we have to increate output layer
+checkNextCircuit:
+	for i, insnId := range ic.subCircuitInsnIds {
 		count := 0
 		for _, y := range outEdges[nv+nhs+i] {
 			if ic.minLayer[y] == ic.outputLayer {
 				if _, ok := ic.outputOrder[y]; ok {
 					count++
 				}
+			} else {
+				continue checkNextCircuit
 			}
 		}
-		if count != 0 && count != len(outEdges[nv+nhs+i]) {
+		anyConstraint := false
+		for _, v := range ctx.circuits[circuit.Instructions[insnId].SubCircuitId].combinedConstraints {
+			if v != nil {
+				anyConstraint = true
+			}
+		}
+		if (count != 0 || anyConstraint) && count != len(outEdges[nv+nhs+i]) {
 			ic.outputLayer++
 			break
 		}

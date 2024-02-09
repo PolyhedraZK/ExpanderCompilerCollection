@@ -116,5 +116,54 @@ func Validate(rc *RootCircuit) error {
 			}
 		}
 	}
+	for i := 1; i < len(rc.Layers); i++ {
+		if rc.Circuits[rc.Layers[i]].InputLen != rc.Circuits[rc.Layers[i-1]].OutputLen {
+			return fmt.Errorf("circuit %d inputlen %d not equal to circuit %d outputlen %d",
+				rc.Layers[i], rc.Circuits[i].InputLen, rc.Layers[i-1], rc.Circuits[i-1].OutputLen,
+			)
+		}
+	}
+	return nil
+}
+
+// ValidateInitialized checks if all wire inputs are initialized
+// TODO: use bitset
+func ValidateInitialized(rc *RootCircuit) error {
+	inputMask := make([][]bool, len(rc.Circuits))
+	outputMask := make([][]bool, len(rc.Circuits))
+	for i, c := range rc.Circuits {
+		inputMask[i] = make([]bool, c.InputLen)
+		outputMask[i] = make([]bool, c.OutputLen)
+		for _, m := range c.Mul {
+			inputMask[i][m.In0] = true
+			inputMask[i][m.In1] = true
+			outputMask[i][m.Out] = true
+		}
+		for _, a := range c.Add {
+			inputMask[i][a.In] = true
+			outputMask[i][a.Out] = true
+		}
+		for _, cs := range c.Cst {
+			outputMask[i][cs.Out] = true
+		}
+		for _, s := range c.SubCircuits {
+			sc := rc.Circuits[s.Id]
+			for _, a := range s.Allocations {
+				for j := uint64(0); j < sc.InputLen; j++ {
+					inputMask[i][a.InputOffset+j] = inputMask[i][a.InputOffset+j] || inputMask[s.Id][j]
+				}
+				for j := uint64(0); j < sc.OutputLen; j++ {
+					outputMask[i][a.OutputOffset+j] = outputMask[i][a.OutputOffset+j] || outputMask[s.Id][j]
+				}
+			}
+		}
+	}
+	for i := 1; i < len(rc.Layers); i++ {
+		for j := uint64(0); j < rc.Circuits[rc.Layers[i]].InputLen; j++ {
+			if inputMask[rc.Layers[i]][j] && !outputMask[rc.Layers[i-1]][j] {
+				return fmt.Errorf("circuit %d input %d not initialized by circuit %d output", rc.Layers[i], j, rc.Layers[i-1])
+			}
+		}
+	}
 	return nil
 }
