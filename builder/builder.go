@@ -96,13 +96,9 @@ const (
 // asInternalVariable will convert the variable to a single linear term
 // It first convert the input to the form a*(...)+c, and then queries the database
 // It remembers previous results, and uses cached id if possible
-func (builder *builder) asInternalVariable(eall expr.Expression, forceRaw bool) expr.Expression {
-	// TODO: remove handling of forceRaw (leave that for ir optimizer)
-	if len(eall) == 1 && eall[0].VID1 == 0 && builder.field.IsOne(eall[0].Coeff) {
-		return eall
-	}
-	e, coeff, constant := builder.stripConstant(eall, forceRaw)
-	if len(e) == 1 && e[0].VID1 == 0 && !forceRaw {
+func (builder *builder) asInternalVariable(eall expr.Expression) expr.Expression {
+	e, coeff, constant := builder.stripConstant(eall)
+	if len(e) == 1 && e[0].VID1 == 0 {
 		return eall
 	}
 	idx_, ok := builder.internalVariables.Find(e)
@@ -121,7 +117,7 @@ func (builder *builder) tryAsInternalVariable(eall expr.Expression) expr.Express
 	if len(eall) == 1 && eall[0].VID1 == 0 {
 		return eall
 	}
-	e, coeff, constant := builder.stripConstant(eall, false)
+	e, coeff, constant := builder.stripConstant(eall)
 	if len(e) == 1 && e[0].VID1 == 0 {
 		return eall
 	}
@@ -150,10 +146,7 @@ func (builder *builder) unstripConstant(x int, coeff constraint.Element, constan
 	return e
 }
 
-func (builder *builder) stripConstant(e_ expr.Expression, forceRaw bool) (expr.Expression, constraint.Element, constraint.Element) {
-	if forceRaw {
-		return e_, builder.tOne, constraint.Element{}
-	}
+func (builder *builder) stripConstant(e_ expr.Expression) (expr.Expression, constraint.Element, constraint.Element) {
 	cst := constraint.Element{}
 	e := make(expr.Expression, 0, len(e_))
 	for _, term := range e_ {
@@ -391,7 +384,7 @@ func (builder *builder) layeredAdd(es_ []expr.Expression) expr.Expression {
 	lastLayer := -1
 	for i, x := range es.e {
 		if es.l[i] != lastLayer && lastLayer != -1 {
-			sum := builder.asInternalVariable(builder.add(cur, false, 0, nil, true), false)
+			sum := builder.asInternalVariable(builder.add(cur, false, 0, nil, true))
 			cur = []expr.Expression{sum}
 		}
 		cur = append(cur, x)

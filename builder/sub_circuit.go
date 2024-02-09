@@ -41,9 +41,6 @@ func (parent *builder) MemorizedCall(f SubCircuitFunc, input_ []frontend.Variabl
 	circuitId := binary.LittleEndian.Uint64(h[:8])
 
 	input, _ := parent.toVariables(input_...)
-	for i := 0; i < len(input); i++ {
-		input[i] = parent.asInternalVariable(input[i], true)
-	}
 
 	if _, ok := parent.root.registry[circuitId]; !ok {
 		n := len(input)
@@ -55,7 +52,7 @@ func (parent *builder) MemorizedCall(f SubCircuitFunc, input_ []frontend.Variabl
 		subOutput := f(subBuilder, subInput)
 		subBuilder.output = make([]expr.Expression, len(subOutput))
 		for i, v := range subOutput {
-			subBuilder.output[i] = subBuilder.asInternalVariable(v.(expr.Expression), true)
+			subBuilder.output[i] = v.(expr.Expression)
 		}
 		sub := SubCircuit{
 			builder:      subBuilder,
