@@ -1,14 +1,15 @@
 package test
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/Zklib/gkr-compiler"
-	"github.com/Zklib/gkr-compiler/checker"
 	"github.com/consensys/gnark-crypto/ecc"
 )
 
-func testRandomCircuit(t *testing.T, conf *randomCircuitConfig, seedL int, seedR int) {
+func testRandomCircuit(t *testing.T, conf *randomCircuitConfig, seedL int, seedR int, nCase int) {
+	a := NewAssert(t)
 	for seed := seedL; seed <= seedR; seed++ {
 		conf.seed = seed
 		rcg := newRandomCircuitGenerator(conf)
@@ -17,11 +18,12 @@ func testRandomCircuit(t *testing.T, conf *randomCircuitConfig, seedL int, seedR
 		if err != nil {
 			t.Fatal(err)
 		}
-		lc := c.GetLayeredCircuit()
-		assignment := rcg.randomAssignment(1)
-		witness := c.GetWitness(assignment)
-		if !checker.CheckCircuit(lc, witness) {
-			t.Fatal("should accept")
+		for i := 1; i <= nCase; i++ {
+			assignment := rcg.randomAssignment(i)
+			a.ProveSucceeded(c, assignment)
+			t := big.NewInt(1)
+			assignment.Output = t.Add(t, assignment.Output.(*big.Int))
+			a.ProveFailed(c, assignment)
 		}
 	}
 }
@@ -38,7 +40,7 @@ func TestRandomCircuit1(t *testing.T) {
 		addPercent: 60,
 		mulPercent: 90,
 		divPercent: 97,
-	}, 1, 1000)
+	}, 1, 1000, 2)
 }
 
 func TestRandomCircuit2(t *testing.T) {
@@ -53,7 +55,7 @@ func TestRandomCircuit2(t *testing.T) {
 		addPercent: 60,
 		mulPercent: 90,
 		divPercent: 97,
-	}, 11, 20)
+	}, 11, 20, 10)
 }
 
 func TestRandomCircuit3(t *testing.T) {
@@ -68,5 +70,5 @@ func TestRandomCircuit3(t *testing.T) {
 		addPercent: 20,
 		mulPercent: 40,
 		divPercent: 40,
-	}, 11, 20)
+	}, 11, 20, 20)
 }
