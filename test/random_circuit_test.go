@@ -35,5 +35,5 @@ func TestRandomCircuit1(t *testing.T) {
 		scInsn:   randRange{20, 50},
 		rootInsn: randRange{30, 200},
 		field:    ecc.BN254.ScalarField(),
-	}, 11, 11)
+	}, 11, 20)
 }

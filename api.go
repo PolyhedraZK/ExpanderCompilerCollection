@@ -42,6 +42,10 @@ func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool, opts ...front
 		return nil, err
 	}
 	rc := root.Finalize()
+	if err := ir.Validate(rc); err != nil {
+		return nil, err
+	}
+	rc = ir.AdjustForLayering(rc)
 	if err := ir.ValidateForLayering(rc); err != nil {
 		return nil, err
 	}
