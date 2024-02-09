@@ -26,6 +26,25 @@ type RootCircuit struct {
 	Circuits map[uint64]*Circuit
 }
 
+func checkExpr(e expr.Expression, totVID int) error {
+	for _, term := range e {
+		if term.VID0 < 0 || term.VID0 >= totVID {
+			return fmt.Errorf("VID0 %d is out of bound", term.VID0)
+		}
+		if term.VID1 < 0 || term.VID1 >= totVID {
+			return fmt.Errorf("VID1 %d is out of bound", term.VID1)
+		}
+		// linear term must have VID0 nonzero
+		if term.VID0 == 0 && term.VID1 != 0 {
+			return fmt.Errorf("VID0 %d is zero but VID1 %d is not", term.VID0, term.VID1)
+		}
+	}
+	if len(e) == 0 {
+		return fmt.Errorf("empty expression")
+	}
+	return nil
+}
+
 // Validate checks if the circuit is valid
 func Validate(rc *RootCircuit) error {
 	for id, c := range rc.Circuits {
@@ -43,18 +62,9 @@ func Validate(rc *RootCircuit) error {
 		}
 		curid := c.NbExternalInput + 1
 		for insnId, insn := range c.Instructions {
-			for _, input := range insn.Inputs {
-				for _, term := range input {
-					if term.VID0 < 0 || term.VID0 >= curid {
-						return fmt.Errorf("circuit %d instruction %d input VID0 %d is out of bound", id, insnId, term.VID0)
-					}
-					if term.VID1 < 0 || term.VID1 >= curid {
-						return fmt.Errorf("circuit %d instruction %d input VID1 %d is out of bound", id, insnId, term.VID1)
-					}
-					// linear term must have VID0 nonzero
-					if term.VID0 == 0 && term.VID1 != 0 {
-						return fmt.Errorf("circuit %d instruction %d input VID0 %d is zero but VID1 %d is not", id, insnId, term.VID0, term.VID1)
-					}
+			for ii, input := range insn.Inputs {
+				if err := checkExpr(input, curid); err != nil {
+					return fmt.Errorf("circuit %d instruction %d input %d: %v", id, insnId, ii, err)
 				}
 			}
 			for _, output := range insn.OutputIds {
@@ -73,17 +83,8 @@ func Validate(rc *RootCircuit) error {
 			}
 		}
 		for _, expr := range append(c.Output, c.Constraints...) {
-			for _, term := range expr {
-				if term.VID0 < 0 || term.VID0 >= curid {
-					return fmt.Errorf("circuit %d output VID0 %d is out of bound", id, term.VID0)
-				}
-				if term.VID1 < 0 || term.VID1 >= curid {
-					return fmt.Errorf("circuit %d output VID1 %d is out of bound", id, term.VID1)
-				}
-				// linear term must have VID0 nonzero
-				if term.VID0 == 0 && term.VID1 != 0 {
-					return fmt.Errorf("circuit %d output VID0 %d is zero but VID1 %d is not", id, term.VID0, term.VID1)
-				}
+			if err := checkExpr(expr, curid); err != nil {
+				return fmt.Errorf("circuit %d output: %v", id, err)
 			}
 		}
 	}

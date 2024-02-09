@@ -53,6 +53,9 @@ func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool, opts ...front
 	if err := layered.Validate(lrc); err != nil {
 		return nil, err
 	}
+	if err := layered.ValidateInitialized(lrc); err != nil {
+		return nil, err
+	}
 	res := compileResult{
 		rc:          rc,
 		compiled:    lrc,

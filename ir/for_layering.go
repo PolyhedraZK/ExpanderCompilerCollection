@@ -1,6 +1,8 @@
 package ir
 
-import "github.com/Zklib/gkr-compiler/expr"
+import (
+	"github.com/Zklib/gkr-compiler/expr"
+)
 
 // AdjustForLayering adjusts the circuit for layering, satisfying ValidateForLayering
 func AdjustForLayering(rc *RootCircuit) *RootCircuit {
@@ -57,8 +59,11 @@ func adjustCircuitForLayering(rc *RootCircuit, c *Circuit) *Circuit {
 			} else {
 				_, ok := occuredId[e[0].VID0]
 				if ok && !allowSame {
-					er := internalVarExpr[e[0].VID0]
-					res[i] = expr.NewLinearExpression(newInternalVariable(er), rc.Field.One())
+					if er, ok := internalVarExpr[e[0].VID0]; ok {
+						res[i] = expr.NewLinearExpression(newInternalVariable(er), rc.Field.One())
+					} else {
+						res[i] = expr.NewLinearExpression(newInternalVariable(e), rc.Field.One())
+					}
 				} else {
 					res[i] = convertExpr(e)
 				}
