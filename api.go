@@ -21,13 +21,13 @@ type API interface {
 	builder.SubCircuitAPI
 }
 
-type compileResult struct {
+type CompileResult struct {
 	rc          *ir.RootCircuit
 	compiled    *layered.RootCircuit
 	inputSolver *ir.InputSolver
 }
 
-func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool, opts ...frontend.CompileOption) (*compileResult, error) {
+func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool, opts ...frontend.CompileOption) (*CompileResult, error) {
 	var root *builder.Root
 	newBuilder_ := func(field *big.Int, config frontend.CompileConfig) (frontend.Builder, error) {
 		if root != nil {
@@ -56,7 +56,7 @@ func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool, opts ...front
 	if err := layered.ValidateInitialized(lrc); err != nil {
 		return nil, err
 	}
-	res := compileResult{
+	res := CompileResult{
 		rc:          rc,
 		compiled:    lrc,
 		inputSolver: is,
@@ -64,11 +64,11 @@ func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool, opts ...front
 	return &res, nil
 }
 
-func (c *compileResult) GetLayeredCircuit() *layered.RootCircuit {
+func (c *CompileResult) GetLayeredCircuit() *layered.RootCircuit {
 	return c.compiled
 }
 
-func (c *compileResult) GetWitness(assignment frontend.Circuit) []*big.Int {
+func (c *CompileResult) GetWitness(assignment frontend.Circuit) []*big.Int {
 	return c.rc.SolveInput(assignment, c.inputSolver)
 }
 
@@ -119,7 +119,7 @@ func PrintCircuit(ci *ir.Circuit, field constraint.R1CS) {
 	}
 }
 
-func (c *compileResult) Print() {
+func (c *CompileResult) Print() {
 	for k, v := range c.rc.Circuits {
 		fmt.Printf("Circuit %d nbIn=%d nbOut=%d =================\n", k, v.NbExternalInput, len(v.Output))
 		PrintCircuit(v, c.rc.Field)
