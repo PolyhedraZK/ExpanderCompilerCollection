@@ -15,7 +15,7 @@ type Root struct {
 	field  constraint.R1CS
 	config frontend.CompileConfig
 
-	registry SubCircuitRegistry
+	registry *SubCircuitRegistry
 }
 
 func NewRoot(field *big.Int, config frontend.CompileConfig) *Root {
@@ -26,10 +26,10 @@ func NewRoot(field *big.Int, config frontend.CompileConfig) *Root {
 	if field.Cmp(root.field.Field()) != 0 {
 		panic("currently only BN254 is supported")
 	}
-	root.registry = make(SubCircuitRegistry)
+	root.registry = newSubCircuitRegistry()
 
 	root.builder = root.newBuilder(0)
-	root.registry[0] = &SubCircuit{
+	root.registry.m[0] = &SubCircuit{
 		builder: root.builder,
 	}
 

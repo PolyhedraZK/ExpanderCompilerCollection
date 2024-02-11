@@ -7,7 +7,7 @@ import (
 
 func (r *Root) Finalize() *ir.RootCircuit {
 	res := make(map[uint64]*ir.Circuit)
-	for x, b := range r.registry {
+	for x, b := range r.registry.m {
 		res[x] = b.builder.Finalize()
 	}
 	return &ir.RootCircuit{
