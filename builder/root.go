@@ -45,6 +45,5 @@ func (r *Root) PublicVariable(f schema.LeafInfo) frontend.Variable {
 // SecretVariable creates a new secret Variable
 func (r *Root) SecretVariable(f schema.LeafInfo) frontend.Variable {
 	r.builder.nbExternalInput++
-	r.builder.nbInput++
 	return expr.NewLinearExpression(r.newVariable(1), r.builder.tOne)
 }

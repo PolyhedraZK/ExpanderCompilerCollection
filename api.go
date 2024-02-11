@@ -8,6 +8,7 @@ import (
 	"github.com/Zklib/gkr-compiler/layered"
 	"github.com/Zklib/gkr-compiler/layering"
 	"github.com/consensys/gnark/frontend"
+	"github.com/consensys/gnark/logger"
 )
 
 type API interface {
@@ -35,14 +36,29 @@ func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool, opts ...front
 	if err != nil {
 		return nil, err
 	}
+	log := logger.Logger()
 	rc := root.Finalize()
 	if err := ir.Validate(rc); err != nil {
 		return nil, err
 	}
+	stats := rc.GetStats()
+	log.Info().
+		Int("nbRootInput", stats.NbRootInput).
+		Int("nbTotTerms", stats.NbTotTerms).
+		Int("nbExpandedTerms", stats.NbExpandedTerms).
+		Int("nbConstraints", stats.NbConstraints).
+		Msg("built circuit ir")
 	rc = ir.AdjustForLayering(rc)
 	if err := ir.ValidateForLayering(rc); err != nil {
 		return nil, err
 	}
+	stats = rc.GetStats()
+	log.Info().
+		Int("nbRootInput", stats.NbRootInput).
+		Int("nbTotTerms", stats.NbTotTerms).
+		Int("nbExpandedTerms", stats.NbExpandedTerms).
+		Int("nbConstraints", stats.NbConstraints).
+		Msg("optimized and adjusted circuit ir")
 	lrc, is := layering.Compile(rc)
 	if err := layered.Validate(lrc); err != nil {
 		return nil, err
@@ -50,6 +66,17 @@ func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool, opts ...front
 	if err := layered.ValidateInitialized(lrc); err != nil {
 		return nil, err
 	}
+	lstats := lrc.GetStats()
+	log.Info().
+		Int("nbLayer", lstats.NbLayer).
+		Int("nbCircuit", lstats.NbCircuit).
+		Int("nbTotMul", lstats.NbTotMul).
+		Int("nbTotAdd", lstats.NbTotAdd).
+		Int("nbTotCst", lstats.NbTotCst).
+		Int("nbExpandedMul", lstats.NbExpandedMul).
+		Int("nbExpandedAdd", lstats.NbExpandedAdd).
+		Int("nbExpandedCst", lstats.NbExpandedCst).
+		Msg("compiled layered circuit")
 	res := CompileResult{
 		rc:          rc,
 		compiled:    lrc,

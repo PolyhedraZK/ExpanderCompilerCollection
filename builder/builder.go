@@ -44,7 +44,6 @@ type builder struct {
 	instructions []ir.Instruction
 
 	// count of variables in different types
-	nbInput         int
 	nbExternalInput int
 
 	// (probably estimated) layer of each variable
@@ -67,7 +66,6 @@ func (r *Root) newBuilder(nbExternalInput int) *builder {
 		nonZeroes:         make(utils.Map),
 		db:                make(map[any]any),
 		nbExternalInput:   nbExternalInput,
-		nbInput:           nbExternalInput,
 	}
 
 	builder.tOne = builder.field.One()
@@ -345,7 +343,6 @@ func (builder *builder) newHint(f solver.Hint, nbOutputs int, inputs []frontend.
 	builder.instructions = append(builder.instructions,
 		ir.NewHintInstruction(f, hintInputs, outId),
 	)
-	builder.nbInput += len(outId)
 
 	// make the variables
 	res := make([]frontend.Variable, nbOutputs)
