@@ -185,6 +185,9 @@ func (ci *Circuit) Print(field constraint.R1CS) {
 	for i, e := range ci.Output {
 		fmt.Printf("out%d = %s\n", i, varToStr(e))
 	}
+	for i, e := range ci.Constraints {
+		fmt.Printf("con%d = %s\n", i, varToStr(e))
+	}
 }
 
 func (rc *RootCircuit) Print() {
