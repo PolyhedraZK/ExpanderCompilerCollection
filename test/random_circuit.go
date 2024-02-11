@@ -153,7 +153,7 @@ func (rcg *randomCircuitGenerator) randomCircuit(api frontend.API, input []front
 					subIn[i] = vars[p[i]]
 				}
 				//subOut := rcg.randomCircuit(api, subIn)
-				subOut := api.(gkr.API).MemorizedCall(rcg.randomCircuit, subIn)
+				subOut := api.(gkr.API).MemorizedSimpleCall(rcg.randomCircuit, subIn)
 				vars = append(vars, subOut...)
 			}
 		}
