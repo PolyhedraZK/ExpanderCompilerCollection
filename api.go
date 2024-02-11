@@ -76,9 +76,29 @@ func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool, opts ...front
 		Int("nbExpandedMul", lstats.NbExpandedMul).
 		Int("nbExpandedAdd", lstats.NbExpandedAdd).
 		Int("nbExpandedCst", lstats.NbExpandedCst).
-		Int("nbTotGates", lstats.NbTotGates).
-		Int("nbUsedGates", lstats.NbUsedGates).
+		Int("nbVariables", lstats.NbTotGates).
+		Int("nbUsedVariables", lstats.NbUsedGates).
 		Msg("compiled layered circuit")
+	lrc = layered.Optimize(lrc)
+	if err := layered.Validate(lrc); err != nil {
+		return nil, err
+	}
+	if err := layered.ValidateInitialized(lrc); err != nil {
+		return nil, err
+	}
+	lstats = lrc.GetStats()
+	log.Info().
+		Int("nbLayer", lstats.NbLayer).
+		Int("nbCircuit", lstats.NbCircuit).
+		Int("nbTotMul", lstats.NbTotMul).
+		Int("nbTotAdd", lstats.NbTotAdd).
+		Int("nbTotCst", lstats.NbTotCst).
+		Int("nbExpandedMul", lstats.NbExpandedMul).
+		Int("nbExpandedAdd", lstats.NbExpandedAdd).
+		Int("nbExpandedCst", lstats.NbExpandedCst).
+		Int("nbVariables", lstats.NbTotGates).
+		Int("nbUsedVariables", lstats.NbUsedGates).
+		Msg("optimized layered circuit")
 	res := CompileResult{
 		rc:          rc,
 		compiled:    lrc,
