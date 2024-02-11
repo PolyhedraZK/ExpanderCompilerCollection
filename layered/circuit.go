@@ -14,7 +14,6 @@ type RootCircuit struct {
 type Circuit struct {
 	InputLen    uint64
 	OutputLen   uint64
-	Flatten     bool // TODO: is this useful?
 	SubCircuits []SubCircuit
 	Mul         []GateMul
 	Add         []GateAdd
@@ -126,9 +125,7 @@ func Validate(rc *RootCircuit) error {
 	return nil
 }
 
-// ValidateInitialized checks if all wire inputs are initialized
-// TODO: use bitset
-func ValidateInitialized(rc *RootCircuit) error {
+func computeMasks(rc *RootCircuit) ([][]bool, [][]bool) {
 	inputMask := make([][]bool, len(rc.Circuits))
 	outputMask := make([][]bool, len(rc.Circuits))
 	for i, c := range rc.Circuits {
@@ -158,6 +155,13 @@ func ValidateInitialized(rc *RootCircuit) error {
 			}
 		}
 	}
+	return inputMask, outputMask
+}
+
+// ValidateInitialized checks if all wire inputs are initialized
+// TODO: use bitset
+func ValidateInitialized(rc *RootCircuit) error {
+	inputMask, outputMask := computeMasks(rc)
 	for i := 1; i < len(rc.Layers); i++ {
 		for j := uint64(0); j < rc.Circuits[rc.Layers[i]].InputLen; j++ {
 			if inputMask[rc.Layers[i]][j] && !outputMask[rc.Layers[i-1]][j] {

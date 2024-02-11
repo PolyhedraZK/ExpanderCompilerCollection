@@ -13,6 +13,10 @@ type Stats struct {
 	NbExpandedMul int
 	NbExpandedAdd int
 	NbExpandedCst int
+	// number of total gates in the final circuit (except input gates)
+	NbTotGates int
+	// number of actually used gates used in the final circuit
+	NbUsedGates int
 }
 
 type circuitStats struct {
@@ -59,5 +63,14 @@ func (rc *RootCircuit) GetStats() Stats {
 	}
 	ar.NbCircuit = len(rc.Circuits)
 	ar.NbLayer = len(rc.Layers)
+	_, outputMask := computeMasks(rc)
+	for i := 1; i < len(rc.Layers); i++ {
+		ar.NbTotGates += int(rc.Circuits[rc.Layers[i]].OutputLen)
+		for j := uint64(0); j < rc.Circuits[rc.Layers[i]].OutputLen; j++ {
+			if outputMask[rc.Layers[i]][j] {
+				ar.NbUsedGates++
+			}
+		}
+	}
 	return ar
 }

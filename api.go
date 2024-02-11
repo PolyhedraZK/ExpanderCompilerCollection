@@ -76,6 +76,8 @@ func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool, opts ...front
 		Int("nbExpandedMul", lstats.NbExpandedMul).
 		Int("nbExpandedAdd", lstats.NbExpandedAdd).
 		Int("nbExpandedCst", lstats.NbExpandedCst).
+		Int("nbTotGates", lstats.NbTotGates).
+		Int("nbUsedGates", lstats.NbUsedGates).
 		Msg("compiled layered circuit")
 	res := CompileResult{
 		rc:          rc,
