@@ -6,7 +6,7 @@ import (
 	"github.com/consensys/gnark/std/hash/mimc"
 
 	gkr "github.com/Zklib/gkr-compiler"
-	"github.com/Zklib/gkr-compiler/checker"
+	"github.com/Zklib/gkr-compiler/test"
 )
 
 type Circuit struct {
@@ -41,7 +41,7 @@ func main() {
 	}
 	witness := circuit.GetWitness(assignment)
 
-	if !checker.CheckCircuit(c, witness) {
+	if !test.CheckCircuit(c, witness) {
 		panic("error")
 	}
 }
