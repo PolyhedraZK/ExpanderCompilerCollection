@@ -6,7 +6,7 @@ import (
 
 	gkr "github.com/Zklib/gkr-compiler"
 	"github.com/Zklib/gkr-compiler/builder"
-	"github.com/Zklib/gkr-compiler/checker"
+	"github.com/Zklib/gkr-compiler/test"
 	"github.com/consensys/gnark/frontend"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -22,7 +22,7 @@ type keccak256Circuit struct {
 }
 
 func (t *keccak256Circuit) Define(api frontend.API) error {
-	f := builder.MemorizedFunc(keccak.Keccak256)
+	f := builder.MemorizedSimpleFunc(keccak.Keccak256)
 
 	for j := 0; j < NHashes; j++ {
 		hash := f(api, t.M[j][:])
@@ -66,7 +66,7 @@ func main() {
 	witness := cr.GetWitness(&assignment)
 	fmt.Printf("ok2\n")
 
-	if !checker.CheckCircuit(c, witness) {
+	if !test.CheckCircuit(c, witness) {
 		panic("error")
 	}
 }
