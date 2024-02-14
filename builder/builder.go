@@ -94,7 +94,7 @@ const (
 // asInternalVariable will convert the variable to a single linear term
 // It first convert the input to the form a*(...)+c, and then queries the database
 // It remembers previous results, and uses cached id if possible
-func (builder *builder) asInternalVariable(eall expr.Expression) expr.Expression {
+func (builder *builder) asInternalVariableInner(eall expr.Expression) expr.Expression {
 	e, coeff, constant := builder.stripConstant(eall)
 	if len(e) == 1 && e[0].VID1 == 0 {
 		return eall
@@ -111,7 +111,15 @@ func (builder *builder) asInternalVariable(eall expr.Expression) expr.Expression
 	return builder.unstripConstant(idx, coeff, constant)
 }
 
-func (builder *builder) tryAsInternalVariable(eall expr.Expression) expr.Expression {
+func (builder *builder) asInternalVariable(eall expr.Expression) expr.Expression {
+	res := builder.asInternalVariableInner(eall)
+	if !eall.Equal(res) {
+		builder.markConstraintsForInternalVariable(eall, res)
+	}
+	return res
+}
+
+func (builder *builder) tryAsInternalVariableInner(eall expr.Expression) expr.Expression {
 	if len(eall) == 1 && eall[0].VID1 == 0 {
 		return eall
 	}
@@ -124,6 +132,31 @@ func (builder *builder) tryAsInternalVariable(eall expr.Expression) expr.Express
 		return builder.unstripConstant(idx_.(int), coeff, constant)
 	}
 	return eall
+}
+
+func (builder *builder) tryAsInternalVariable(eall expr.Expression) expr.Expression {
+	res := builder.tryAsInternalVariableInner(eall)
+	if !eall.Equal(res) {
+		builder.markConstraintsForInternalVariable(eall, res)
+	}
+	return res
+}
+
+func (builder *builder) markConstraintsForInternalVariable(eall expr.Expression, iv expr.Expression) {
+	markConstraintForInternalVariable(&builder.booleans, eall, iv)
+	markConstraintForInternalVariable(&builder.zeroes, eall, iv)
+	markConstraintForInternalVariable(&builder.nonZeroes, eall, iv)
+}
+
+func markConstraintForInternalVariable(m *utils.Map, eall expr.Expression, iv expr.Expression) {
+	x, ok := m.Find(eall)
+	if !ok {
+	} else if x.(constraintStatus) == marked {
+		m.Set(iv, marked)
+	} else if x.(constraintStatus) == asserted {
+		m.Set(iv, asserted)
+		m.Set(eall, marked)
+	}
 }
 
 func (builder *builder) newVariable(layer int) int {
