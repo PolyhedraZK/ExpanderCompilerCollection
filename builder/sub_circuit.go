@@ -55,12 +55,48 @@ func (parent *builder) callSubCircuit(
 	f SubCircuitSimpleFunc,
 ) []frontend.Variable {
 	input, _ := parent.toVariables(input_...)
+	// we need to hash circuitId with the constraint status of input, to get a new circuitId
+	h := sha256.New()
+	h.Write(binary.LittleEndian.AppendUint64(nil, circuitId))
+	subMarkBooleans := make([]int, 0, len(input))
+	subMarkZeroes := make([]int, 0, len(input))
+	subMarkNonZeroes := make([]int, 0, len(input))
+	for i, x := range input {
+		if _, ok := parent.booleans.Find(x); ok {
+			h.Write([]byte("a"))
+			subMarkBooleans = append(subMarkBooleans, i)
+		} else {
+			h.Write([]byte("_"))
+		}
+		if _, ok := parent.zeroes.Find(x); ok {
+			h.Write([]byte("a"))
+			subMarkZeroes = append(subMarkZeroes, i)
+		} else {
+			h.Write([]byte("_"))
+		}
+		if _, ok := parent.nonZeroes.Find(x); ok {
+			h.Write([]byte("a"))
+			subMarkNonZeroes = append(subMarkNonZeroes, i)
+		} else {
+			h.Write([]byte("_"))
+		}
+	}
+	circuitId = binary.LittleEndian.Uint64(h.Sum(nil)[:8])
 	if _, ok := parent.root.registry.m[circuitId]; !ok {
 		n := len(input)
 		subBuilder := parent.root.newBuilder(n)
 		subInput := make([]frontend.Variable, n)
 		for i := 0; i < n; i++ {
 			subInput[i] = expr.NewLinearExpression(i+1, subBuilder.tOne)
+		}
+		for _, i := range subMarkBooleans {
+			subBuilder.booleans.Set(subInput[i].(expr.Expression), marked)
+		}
+		for _, i := range subMarkZeroes {
+			subBuilder.zeroes.Set(subInput[i].(expr.Expression), marked)
+		}
+		for _, i := range subMarkNonZeroes {
+			subBuilder.nonZeroes.Set(subInput[i].(expr.Expression), marked)
 		}
 		subOutput := f(subBuilder, subInput)
 		subBuilder.output = make([]expr.Expression, len(subOutput))
