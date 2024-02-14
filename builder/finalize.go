@@ -1,6 +1,8 @@
 package builder
 
 import (
+	"fmt"
+
 	"github.com/Zklib/gkr-compiler/expr"
 	"github.com/Zklib/gkr-compiler/ir"
 )
@@ -31,6 +33,7 @@ func (builder *builder) Finalize() *ir.Circuit {
 		builder.Inverse(e)
 	}
 	builder.nonZeroes.Clear()
+	fmt.Printf("%d %d %d\n", len(builder.booleans), len(builder.nonZeroes), len(builder.zeroes))
 
 	constraints_ := builder.zeroes.FilterKeys(shouldAssert)
 	constraints := make([]expr.Expression, len(constraints_))
