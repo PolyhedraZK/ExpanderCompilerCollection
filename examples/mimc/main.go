@@ -28,7 +28,7 @@ func (circuit *Circuit) Define(api frontend.API) error {
 }
 
 func main() {
-	circuit, err := gkr.Compile(ecc.BN254.ScalarField(), &Circuit{}, true)
+	circuit, err := gkr.Compile(ecc.BN254.ScalarField(), &Circuit{})
 	if err != nil {
 		panic(err)
 	}

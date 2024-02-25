@@ -56,7 +56,10 @@ func main() {
 		}
 	}
 
-	cr, _ := gkr.Compile(ecc.BN254.ScalarField(), &circuit, true)
+	cr, err := gkr.Compile(ecc.BN254.ScalarField(), &circuit)
+	if err != nil {
+		panic(err)
+	}
 	//cr.Print()
 	_ = cr
 
