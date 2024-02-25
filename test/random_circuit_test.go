@@ -14,7 +14,7 @@ func testRandomCircuit(t *testing.T, conf *randomCircuitConfig, seedL int, seedR
 		conf.seed = seed
 		rcg := newRandomCircuitGenerator(conf)
 		circuit := rcg.circuit()
-		c, err := gkr.Compile(ecc.BN254.ScalarField(), circuit, true)
+		c, err := gkr.Compile(ecc.BN254.ScalarField(), circuit)
 		if err != nil {
 			t.Fatal(err)
 		}
