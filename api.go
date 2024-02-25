@@ -22,7 +22,7 @@ type CompileResult struct {
 	inputSolver *ir.InputSolver
 }
 
-func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool, opts ...frontend.CompileOption) (*CompileResult, error) {
+func Compile(field *big.Int, circuit frontend.Circuit, opts ...frontend.CompileOption) (*CompileResult, error) {
 	var root *builder.Root
 	newBuilder_ := func(field *big.Int, config frontend.CompileConfig) (frontend.Builder, error) {
 		if root != nil {
