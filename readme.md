@@ -10,4 +10,9 @@ Then go to libra-gkr, and run `cargo run --release -- path-to-circuit.txt path-t
 
 `examples/keccak/main.go`
 
-Requires other libs.
+It requires other libs.
+
+## Docs
+
+- [APIs](./docs/apis.md)
+- [Compilation Process](./docs/compilation_process.md)
