@@ -38,6 +38,6 @@ layering 会将 ir 转换成分层电路。具体来说，会执行以下步骤�
 
 ## Layered
 
-见 [APIs](./apis.md)。
+见 [Layered Circuit Format](./layered_circuit_format.md)。
 
 目前实现的优化有：展开出现次数或变量个数较少的 sub circuit。
