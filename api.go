@@ -48,6 +48,7 @@ func Compile(field *big.Int, circuit frontend.Circuit, pad2n bool, opts ...front
 		Int("nbExpandedTerms", stats.NbExpandedTerms).
 		Int("nbConstraints", stats.NbConstraints).
 		Msg("built circuit ir")
+	rc = ir.Optimize(rc)
 	rc = ir.AdjustForLayering(rc)
 	if err := ir.ValidateForLayering(rc); err != nil {
 		return nil, err
