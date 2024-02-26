@@ -185,15 +185,17 @@ func isTypeFrontendAPI(t reflect.Type) bool {
 }
 
 // isTypeSlicesOfVariables returns true if t is any number of slice of frontend.Variable
-func isTypeSlicesOfVariables(t reflect.Type) bool {
+func getTypeSlicesOfVariables(t reflect.Type) (int, bool) {
+	level := 0
 	for {
 		if t == frontendVariableType {
-			return true
+			return level, true
 		}
 		if t.Kind() != reflect.Slice {
-			return false
+			return 0, false
 		}
 		t = t.Elem()
+		level++
 	}
 }
 
@@ -215,9 +217,9 @@ type sliceStructure struct {
 	children    []*sliceStructure
 }
 
-func joinSliceVariables(res *[]frontend.Variable, h hash.Hash, slice reflect.Value) *sliceStructure {
+func joinSliceVariables(res *[]frontend.Variable, h hash.Hash, slice reflect.Value, level int) *sliceStructure {
 	val := slice.Interface()
-	if slice.Type().Kind() != reflect.Slice {
+	if level == 0 {
 		*res = append(*res, val.(frontend.Variable))
 		if h != nil {
 			h.Write([]byte("a."))
@@ -236,7 +238,7 @@ func joinSliceVariables(res *[]frontend.Variable, h hash.Hash, slice reflect.Val
 		if h != nil {
 			h.Write([]byte("("))
 		}
-		sub := joinSliceVariables(res, h, slice.Index(i))
+		sub := joinSliceVariables(res, h, slice.Index(i), level-1)
 		if h != nil {
 			h.Write([]byte(")"))
 		}
@@ -307,10 +309,12 @@ func (parent *builder) MemorizedCall(fn SubCircuitFunc, inputs ...interface{}) i
 	}
 	vars := []int{}
 	others := []int{}
+	varLevel := make([]int, numIn)
 	for i := 1; i < numIn; i++ {
 		argType := fnType.In(i)
-		if isTypeSlicesOfVariables(argType) {
+		if level, ok := getTypeSlicesOfVariables(argType); ok {
 			vars = append(vars, i)
+			varLevel[i] = level
 		} else if isTypeSimple(argType) {
 			others = append(others, i)
 		} else {
@@ -318,13 +322,16 @@ func (parent *builder) MemorizedCall(fn SubCircuitFunc, inputs ...interface{}) i
 		}
 	}
 	numOut := fnType.NumOut()
+	var outLevel int
 	if numOut > 1 {
 		panic(fmt.Sprintf("fn should return at most 1 value, got %d", numOut))
 	} else if numOut == 1 {
 		outType := fnType.Out(0)
-		if !isTypeSlicesOfVariables(outType) {
+		level, ok := getTypeSlicesOfVariables(outType)
+		if !ok {
 			panic("output is not a slice of frontend.Variable")
 		}
+		outLevel = level
 	}
 
 	// check if inputs match the function signature
@@ -369,7 +376,7 @@ func (parent *builder) MemorizedCall(fn SubCircuitFunc, inputs ...interface{}) i
 	h := sha256.New()
 	h.Write([]byte(fmt.Sprintf("normal_%d(%s)_%d_", len(name), name, len(inputs))))
 	for _, i := range vars {
-		varSliceStructures[i] = joinSliceVariables(&joinedVars, h, inputVals[i])
+		varSliceStructures[i] = joinSliceVariables(&joinedVars, h, inputVals[i], varLevel[i])
 		h.Write([]byte("|"))
 	}
 	for _, i := range others {
@@ -396,7 +403,7 @@ func (parent *builder) MemorizedCall(fn SubCircuitFunc, inputs ...interface{}) i
 			return nil
 		}
 		res := []frontend.Variable{}
-		outStructure = joinSliceVariables(&res, nil, outputs[0])
+		outStructure = joinSliceVariables(&res, nil, outputs[0], outLevel)
 		return res
 	}
 
