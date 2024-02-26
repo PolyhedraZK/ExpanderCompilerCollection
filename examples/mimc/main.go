@@ -18,17 +18,16 @@ type Circuit struct {
 	Hash     [NHashes]frontend.Variable
 }
 
-func mimcHash(api frontend.API, preImage frontend.Variable) frontend.Variable {
+func mimcHash(api frontend.API, preImage frontend.Variable, hash frontend.Variable) {
 	mimc, _ := mimc.NewMiMC(api)
 	mimc.Write(preImage)
-	return mimc.Sum()
+	api.AssertIsEqual(mimc.Sum(), hash)
 }
 
 // Define declares the circuit's constraints
 func (circuit *Circuit) Define(api frontend.API) error {
 	for i := 0; i < NHashes; i++ {
-		t := api.(gkr.API).MemorizedCall(mimcHash, circuit.PreImage[i])
-		api.AssertIsEqual(circuit.Hash[i], t)
+		api.(gkr.API).MemorizedCall(mimcHash, circuit.PreImage[i], circuit.Hash[i])
 	}
 	return nil
 }

@@ -400,6 +400,7 @@ func (parent *builder) MemorizedCall(fn SubCircuitFunc, inputs ...interface{}) i
 		}
 		outputs := fnVal.Call(subInputs)
 		if numOut == 0 {
+			outStructure = &sliceStructure{level: -1}
 			return nil
 		}
 		res := []frontend.Variable{}
@@ -413,6 +414,9 @@ func (parent *builder) MemorizedCall(fn SubCircuitFunc, inputs ...interface{}) i
 		outStructure = parent.root.registry.outputStructure[circuitId]
 	} else {
 		parent.root.registry.outputStructure[circuitId] = outStructure
+	}
+	if outStructure.level == -1 {
+		return nil
 	}
 	return rebuildSliceVariables(joinedOut, outStructure).Interface()
 }

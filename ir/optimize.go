@@ -112,5 +112,10 @@ func optimizeUnused(rc *RootCircuit, newrc *RootCircuit, c *Circuit) *Circuit {
 }
 
 func Optimize(c *RootCircuit) *RootCircuit {
-	return optimizeUnusedRoot(c)
+
+	// TODO: fix optimizeUnusedRoot
+	// The current implementation is incorrect: when a subcircuit has user-defined assertions but no output, it will be removed
+
+	return c
+	//return optimizeUnusedRoot(c)
 }
