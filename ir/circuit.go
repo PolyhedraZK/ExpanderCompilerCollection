@@ -58,10 +58,6 @@ func Validate(rc *RootCircuit) error {
 			if len(c.Output) != 0 {
 				return fmt.Errorf("root circuit should not have output")
 			}
-		} else {
-			if len(c.Output) == 0 {
-				return fmt.Errorf("circuit %d has no output", id)
-			}
 		}
 		curid := c.NbExternalInput + 1
 		for insnId, insn := range c.Instructions {

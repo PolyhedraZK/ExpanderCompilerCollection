@@ -338,6 +338,7 @@ func (ctx *compileContext) computeMinMaxLayers(ic *irContext) {
 	for i, x := range ic.subCircuitInsnIds {
 		for _, y := range ctx.circuits[circuit.Instructions[x].SubCircuitId].combinedConstraints {
 			if y != nil {
+				setUsed(nv + nhs + i)
 				for _, z := range outEdges[nv+nhs+i] {
 					setUsed(z)
 				}

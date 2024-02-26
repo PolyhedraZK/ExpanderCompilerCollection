@@ -489,8 +489,10 @@ func (ctx *compileContext) solveLayerLayoutNormal(ic *irContext, req *layerReq) 
 	}
 	childrenPrevCircuits := make([][]*layerLayout, len(lc.parent))
 	for x, layout := range layouts {
-		v := ic.circuit.Instructions[x].OutputIds[0]
-		childrenPrevCircuits[lc.placement[v]] = append(childrenPrevCircuits[lc.placement[v]], layout)
+		if len(ic.circuit.Instructions[x].OutputIds) != 0 {
+			v := ic.circuit.Instructions[x].OutputIds[0]
+			childrenPrevCircuits[lc.placement[v]] = append(childrenPrevCircuits[lc.placement[v]], layout)
+		}
 	}
 	childrenNodes := make([][]int, len(lc.parent))
 	for i, x := range lc.parent {

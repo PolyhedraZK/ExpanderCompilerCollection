@@ -14,6 +14,21 @@ type layoutQuery struct {
 
 // get the sub circuit layout by filtering the variables
 func (lq *layoutQuery) query(vs []int, f func(int) int, cid uint64, lid int) *subLayout {
+	if len(vs) == 0 {
+		subl := &layerLayout{
+			circuitId:      cid,
+			layer:          lid,
+			sparse:         false,
+			size:           1,
+			placementDense: []int{-1},
+		}
+		id := lq.ctx.memorizedLayerLayout(subl)
+		return &subLayout{
+			id:     id,
+			offset: 0,
+			insnId: -1,
+		}
+	}
 	ps := make([]int, len(vs))
 	l := 1 << 62
 	r := -l
