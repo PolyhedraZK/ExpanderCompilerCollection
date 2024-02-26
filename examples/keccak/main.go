@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	"os"
 
 	gkr "github.com/Zklib/gkr-compiler"
 	"github.com/Zklib/gkr-compiler/builder"
@@ -64,6 +65,7 @@ func main() {
 	_ = cr
 
 	c := cr.GetLayeredCircuit()
+	os.WriteFile("circuit.txt", c.Serialize(), 0o644)
 	fmt.Printf("ok1\n")
 
 	witness := cr.GetWitness(&assignment)

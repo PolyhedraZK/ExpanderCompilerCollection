@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/std/hash/mimc"
@@ -34,6 +36,7 @@ func main() {
 	}
 
 	c := circuit.GetLayeredCircuit()
+	os.WriteFile("circuit.txt", c.Serialize(), 0o644)
 
 	assignment := &Circuit{
 		PreImage: "16130099170765464552823636852555369511329944820189892919423002775646948828469",
