@@ -94,9 +94,9 @@ const (
 // asInternalVariable will convert the variable to a single linear term
 // It first convert the input to the form a*(...)+c, and then queries the database
 // It remembers previous results, and uses cached id if possible
-func (builder *builder) asInternalVariableInner(eall expr.Expression) expr.Expression {
+func (builder *builder) asInternalVariableInner(eall expr.Expression, force bool) expr.Expression {
 	e, coeff, constant := builder.stripConstant(eall)
-	if len(e) == 1 && e[0].VID1 == 0 {
+	if len(e) == 1 && e[0].VID1 == 0 && !force {
 		return eall
 	}
 	idx_, ok := builder.internalVariables.Find(e)
@@ -112,7 +112,16 @@ func (builder *builder) asInternalVariableInner(eall expr.Expression) expr.Expre
 }
 
 func (builder *builder) asInternalVariable(eall expr.Expression) expr.Expression {
-	res := builder.asInternalVariableInner(eall)
+	res := builder.asInternalVariableInner(eall, false)
+	if !eall.Equal(res) {
+		builder.markConstraintsForInternalVariable(eall, res)
+	}
+	return res
+}
+
+func (builder *builder) ToSingleVariable(ein frontend.Variable) frontend.Variable {
+	eall := builder.toVariable(ein)
+	res := builder.asInternalVariableInner(eall, true)
 	if !eall.Equal(res) {
 		builder.markConstraintsForInternalVariable(eall, res)
 	}

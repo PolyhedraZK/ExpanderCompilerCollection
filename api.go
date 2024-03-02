@@ -14,6 +14,7 @@ import (
 type API interface {
 	frontend.API
 	builder.SubCircuitAPI
+	builder.API
 }
 
 type CompileResult struct {
