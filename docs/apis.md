@@ -24,7 +24,9 @@ It provides 3 methods to access them:
 
 ### API
 
-`gkr.API` is the API interface of the builder, which extends the `frontend.API` interface of gnark and adds sub-circuit support.
+`gkr.API` is the API interface of the builder, which extends the `frontend.API` interface of gnark and adds sub-circuit support and other utilities.
+
+## Sub-Circuit API
 
 The sub-circuit support is provided by the following methods:
 
@@ -43,6 +45,16 @@ type SubCircuitAPI interface {
 For example, `func(frontend.API, int, uint8, [][]frontend.Variable, string, ...[]frontend.Variable) [][][]frontend.Variable` is a valid `SubCircuitFunc`.
 
 `SubCircuitFunc` should follow another rule: it should be deterministic if those simple type inputs are the same. This is because the compiler will memorize the circuit wiring of the sub-circuit calls, and use the memorized result if the same input is given.
+
+## Other APIs
+
+```go
+type API interface {
+	ToSingleVariable(frontend.Variable) frontend.Variable
+}
+```
+
+`ToSingleVariable` always returns an expression with only one variable. If the input already has only one variable, it returns the input. Otherwise, it creates an internal variable (a gate) and returns it.
 
 ## builder
 
