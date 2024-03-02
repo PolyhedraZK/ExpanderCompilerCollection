@@ -46,6 +46,11 @@ func (ctx *compileContext) prepareLayerLayoutContext(ic *irContext) {
 	// find out the variables in each layer
 	ic.lcs = make([]layerLayoutContext, ic.outputLayer+1)
 	ic.lcHint = new(layerLayoutContext)
+	for i := 0; i <= ic.outputLayer; i++ {
+		if ic.combinedConstraints[i] != nil {
+			ic.lcs[i].varIdx = append(ic.lcs[i].varIdx, ic.combinedConstraints[i].id)
+		}
+	}
 	for i := 0; i < ic.nbVariable; i++ {
 		if ic.isUsed[i] {
 			for j := ic.minLayer[i]; j <= ic.maxLayer[i]; j++ {
@@ -61,11 +66,6 @@ func (ctx *compileContext) prepareLayerLayoutContext(ic *irContext) {
 			if inputLayer > 0 {
 				ic.lcs[inputLayer].varIdx = append(ic.lcs[inputLayer].varIdx, x)
 			}
-		}
-	}
-	for i := 0; i <= ic.outputLayer; i++ {
-		if ic.combinedConstraints[i] != nil {
-			ic.lcs[i].varIdx = append(ic.lcs[i].varIdx, ic.combinedConstraints[i].id)
 		}
 	}
 

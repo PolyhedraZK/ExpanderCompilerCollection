@@ -16,6 +16,8 @@ type Root struct {
 	config frontend.CompileConfig
 
 	registry *SubCircuitRegistry
+
+	publicVariables []int
 }
 
 func NewRoot(field *big.Int, config frontend.CompileConfig) *Root {
@@ -38,8 +40,9 @@ func NewRoot(field *big.Int, config frontend.CompileConfig) *Root {
 
 // PublicVariable creates a new public Variable
 func (r *Root) PublicVariable(f schema.LeafInfo) frontend.Variable {
-	// TODO: really public variable
-	return r.SecretVariable(f)
+	res := r.SecretVariable(f)
+	r.publicVariables = append(r.publicVariables, res.(expr.Expression)[0].VID0)
+	return res
 }
 
 // SecretVariable creates a new secret Variable
