@@ -49,6 +49,9 @@ type builder struct {
 	// (probably estimated) layer of each variable
 	vLayer []int
 
+	// defers (for gnark API)
+	defers []func(frontend.API) error
+
 	// we have to implement kvstore.Store (required by gnark/internal/circuitdefer/defer.go:30)
 	db map[any]any
 
@@ -469,7 +472,7 @@ func (builder *builder) compress(e expr.Expression) expr.Expression {
 }
 
 func (builder *builder) Defer(cb func(frontend.API) error) {
-	panic("unimplemented")
+	builder.defers = append(builder.defers, cb)
 }
 
 // AddInstruction is used to add custom instructions to the constraint system.

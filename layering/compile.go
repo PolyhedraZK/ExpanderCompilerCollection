@@ -475,7 +475,9 @@ func (ctx *compileContext) computeMinMaxLayers(ic *irContext) {
 	}
 	ic.combinedConstraints = cc
 	if ic == ctx.circuits[0] {
-		if ic.outputLayer+1 != len(cc) || len(circuit.Output) > 0 {
+		if ic.outputLayer+1 <= len(cc) {
+			ic.outputLayer = len(cc) - 1
+		} else {
 			panic("unexpected situation")
 		}
 	}

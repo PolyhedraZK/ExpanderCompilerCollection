@@ -40,7 +40,11 @@ func (ctx *compileContext) getSubCircuitHintInputOrder(subId uint64, v map[int]i
 		if insn.Type == ir.IHint {
 			p := make([]int, len(insn.OutputIds))
 			for j, id := range insn.OutputIds {
-				p[j] = v[id]
+				if vi, ok := v[id]; ok {
+					p[j] = vi
+				} else {
+					p[j] = -1
+				}
 			}
 			res = append(res, ir.InputSolverInstruction{
 				InsnId:          i,
@@ -50,7 +54,9 @@ func (ctx *compileContext) getSubCircuitHintInputOrder(subId uint64, v map[int]i
 			subc := ctx.circuits[insn.SubCircuitId]
 			sv := make(map[int]int)
 			for j, x := range subc.hintInputs {
-				sv[x] = v[hintInputSubIdx+j]
+				if vi, ok := v[hintInputSubIdx+j]; ok {
+					sv[x] = vi
+				}
 			}
 			hintInputSubIdx += len(subc.hintInputs)
 			res = append(res, ir.InputSolverInstruction{
