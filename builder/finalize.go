@@ -1,11 +1,10 @@
 package builder
 
 import (
+	"github.com/Zklib/gkr-compiler/circuits/keccak"
 	"github.com/Zklib/gkr-compiler/expr"
 	"github.com/Zklib/gkr-compiler/ir"
 	"github.com/consensys/gnark/frontend"
-	"github.com/consensys/gnark/std/hash/sha2"
-	"github.com/consensys/gnark/std/math/uints"
 )
 
 func (r *Root) Finalize() *ir.RootCircuit {
@@ -29,7 +28,9 @@ func shouldAssert(x interface{}) bool {
 
 // Finalize will process assertBooleans and assertNonZeroes, and return a Circuit IR
 func (builder *builder) Finalize() *ir.Circuit {
-	for _, cb := range builder.defers {
+	// defers may change during the process
+	for i := 0; i < len(builder.defers); i++ {
+		cb := builder.defers[i]
 		err := cb(builder)
 		if err != nil {
 			panic(err)
@@ -62,36 +63,31 @@ func (builder *builder) Finalize() *ir.Circuit {
 
 // This function will only be called on the root circuit
 func (builder *builder) finalizePublicVariables(pvIds []int) {
-	h, err := sha2.New(builder)
-	if err != nil {
-		panic(err)
-	}
-	bytes := []uints.U8{}
+	bytes := [][]frontend.Variable{}
 	for _, id := range pvIds {
 		bits := builder.ToBinary(expr.NewLinearExpression(id, builder.tOne))
 		for i := (len(bits) - 1) / 8 * 8; i >= 0; i -= 8 {
 			var tmp []frontend.Variable
 			if i+8 > len(bits) {
-				tmp = bits[i:]
+				pad := make([]frontend.Variable, i+8-len(bits))
+				for i := 0; i < len(pad); i++ {
+					pad[i] = 0
+				}
+				tmp = append(bits[i:], pad...)
 			} else {
 				tmp = bits[i : i+8]
 			}
-			var curbyte frontend.Variable = 0
-			for j, b := range tmp {
-				curbyte = builder.Add(curbyte, builder.Mul(b, 1<<j))
-			}
-			bytes = append(bytes, uints.U8{Val: curbyte})
+			bytes = append(bytes, tmp)
 		}
 	}
-	h.Write(bytes)
-	sum := h.Sum()
+	sum := keccak.Keccak256(builder, bytes)
 
 	// the hash is decomposed into 2 128-bit integers to fit the BN254 field
 	for i := 0; i < 2; i++ {
 		var cur frontend.Variable = 0
 		var mul frontend.Variable = 1
 		for j := 15; j >= 0; j-- {
-			cur = builder.Add(cur, builder.Mul(sum[i*16+j].Val, mul))
+			cur = builder.Add(cur, builder.Mul(sum[i*16+j], mul))
 			mul = builder.Mul(mul, 1<<8)
 		}
 		builder.output = append(builder.output, builder.toVariable(cur))

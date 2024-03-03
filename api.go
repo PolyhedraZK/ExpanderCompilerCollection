@@ -7,6 +7,7 @@ import (
 	"github.com/Zklib/gkr-compiler/ir"
 	"github.com/Zklib/gkr-compiler/layered"
 	"github.com/Zklib/gkr-compiler/layering"
+	"github.com/Zklib/gkr-compiler/utils"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/logger"
 )
@@ -14,7 +15,7 @@ import (
 type API interface {
 	frontend.API
 	builder.SubCircuitAPI
-	builder.API
+	utils.API
 }
 
 type CompileResult struct {
