@@ -12,10 +12,6 @@ import (
 	"github.com/consensys/gnark/std/math/bits"
 )
 
-type API interface {
-	ToSingleVariable(frontend.Variable) frontend.Variable
-}
-
 // ---------------------------------------------------------------------------------------------
 // Arithmetic
 
