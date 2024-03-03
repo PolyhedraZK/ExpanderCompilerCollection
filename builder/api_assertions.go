@@ -39,7 +39,7 @@ func (builder *builder) AssertIsBoolean(i1 frontend.Variable) {
 
 	if b, ok := builder.constantValue(v); ok {
 		if !(b.IsZero() || builder.field.IsOne(b)) {
-			panic("assertIsBoolean failed: constant is not 0 or 1") // TODO @gbotrel print
+			panic("assertIsBoolean failed: constant is not 0 or 1")
 		}
 		return
 	}

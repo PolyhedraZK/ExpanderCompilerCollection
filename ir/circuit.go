@@ -19,7 +19,6 @@ type Circuit struct {
 	// each output gate of the circuit
 	Output []expr.Expression
 	// number of input gates
-	// TODO: public input
 	NbExternalInput int
 }
 

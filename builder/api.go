@@ -12,6 +12,10 @@ import (
 	"github.com/consensys/gnark/std/math/bits"
 )
 
+func init() {
+	solver.RegisterHint(DivHint)
+}
+
 // ---------------------------------------------------------------------------------------------
 // Arithmetic
 
@@ -163,7 +167,6 @@ func (builder *builder) Mul(i1, i2 frontend.Variable, in ...frontend.Variable) f
 			v2 = builder.asInternalVariable(v2)
 		}
 
-		// TODO: optimize speed
 		vars := make([]expr.Expression, 0, len(v1))
 		for i := 0; i < len(v1); i++ {
 			exp := make(expr.Expression, 0, len(v2))
@@ -208,23 +211,20 @@ func (builder *builder) mulConstant(v1 expr.Expression, lambda constraint.Elemen
 	return res
 }
 
-// TODO: use a decicated function
-func (builder *builder) divHint(_ *big.Int, inputs []*big.Int, outputs []*big.Int) error {
-	x := builder.field.FromInterface(inputs[0])
-	y := builder.field.FromInterface(inputs[1])
-	inv, ok := builder.field.Inverse(y)
-	if !ok {
-		inv = constraint.Element{}
-	}
-	res := builder.field.Mul(x, inv)
-	if !ok {
-		// we assume 0/0 is okay
-		check := builder.field.Sub(builder.field.Mul(y, res), x)
-		if !check.IsZero() {
-			return errors.New("divide by zero in inverseHint")
+func DivHint(field *big.Int, inputs []*big.Int, outputs []*big.Int) error {
+	x := (&big.Int{}).Mod(inputs[0], field)
+	y := (&big.Int{}).Mod(inputs[1], field)
+	if y.Cmp(big.NewInt(0)) == 0 {
+		if x.Cmp(big.NewInt(0)) == 0 {
+			outputs[0] = big.NewInt(0)
+			return nil
 		}
+		return errors.New("divide by zero in DivHint")
 	}
-	outputs[0].Set(builder.field.ToBigInt(res))
+	a := (&big.Int{}).ModInverse(y, field)
+	a.Mul(a, x)
+	a.Mod(a, field)
+	outputs[0] = a
 	return nil
 }
 
@@ -238,7 +238,7 @@ func (builder *builder) DivUnchecked(i1, i2 frontend.Variable) frontend.Variable
 	n2, v2Constant := builder.constantValue(v2)
 
 	if !v2Constant {
-		s, _ := builder.NewHint(builder.divHint, 1, v1, v2)
+		s, _ := builder.NewHint(DivHint, 1, v1, v2)
 		builder.AssertIsEqual(builder.Mul(s[0], v2), v1)
 		return s[0]
 	}
@@ -269,7 +269,7 @@ func (builder *builder) Div(i1, i2 frontend.Variable) frontend.Variable {
 	n2, v2Constant := builder.constantValue(v2)
 
 	if !v2Constant {
-		s, _ := builder.NewHint(builder.divHint, 1, builder.eOne, v2)
+		s, _ := builder.NewHint(DivHint, 1, builder.eOne, v2)
 		builder.AssertIsEqual(builder.Mul(s[0], v2), builder.eOne)
 		return builder.Mul(s[0], v1)
 	}
@@ -302,7 +302,7 @@ func (builder *builder) Inverse(i1 frontend.Variable) frontend.Variable {
 		return expr.NewLinearExpression(0, c)
 	}
 
-	s, _ := builder.NewHint(builder.divHint, 1, builder.eOne, vars[0])
+	s, _ := builder.NewHint(DivHint, 1, builder.eOne, vars[0])
 	builder.AssertIsEqual(builder.Mul(s[0], vars[0]), builder.eOne)
 	return s[0]
 }

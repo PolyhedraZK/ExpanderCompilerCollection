@@ -159,7 +159,6 @@ func computeMasks(rc *RootCircuit) ([][]bool, [][]bool) {
 }
 
 // ValidateInitialized checks if all wire inputs are initialized
-// TODO: use bitset
 func ValidateInitialized(rc *RootCircuit) error {
 	inputMask, outputMask := computeMasks(rc)
 	for i := 1; i < len(rc.Layers); i++ {
