@@ -290,8 +290,6 @@ func (builder *builder) constantValue(v frontend.Variable) (constraint.Element, 
 		assertIsSet(_v)
 
 		if len(_v) != 1 {
-			// TODO @gbotrel this assumes linear expressions of coeff are not possible
-			// and are always reduced to one element. may not always be true?
 			return constraint.Element{}, false
 		}
 		if !(_v[0].VID0 == 0 && _v[0].VID1 == 0) { // public ONE WIRE
@@ -368,8 +366,6 @@ func (builder *builder) NewHintForId(id solver.HintID, nbOutputs int, inputs ...
 func (builder *builder) newHint(f solver.Hint, nbOutputs int, inputs []frontend.Variable) ([]frontend.Variable, error) {
 	hintInputs := make([]expr.Expression, len(inputs))
 
-	// TODO @gbotrel hint input pass
-	// ensure inputs are set and pack them in a []uint64
 	for i, in := range inputs {
 		if t, ok := in.(expr.Expression); ok {
 			assertIsSet(t)
