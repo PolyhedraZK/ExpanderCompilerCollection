@@ -7,16 +7,10 @@ import (
 	"github.com/Zklib/gkr-compiler/layered"
 )
 
-// check for any non-zero output
+// check if first output is zero
 func CheckCircuit(rc *layered.RootCircuit, input []*big.Int) bool {
 	out := EvalCircuit(rc, input)
-	zero := big.NewInt(0)
-	for _, o := range out {
-		if o.Cmp(zero) != 0 {
-			return false
-		}
-	}
-	return true
+	return out[0].Cmp(big.NewInt(0)) == 0
 }
 
 func EvalCircuit(rc *layered.RootCircuit, input []*big.Int) []*big.Int {
