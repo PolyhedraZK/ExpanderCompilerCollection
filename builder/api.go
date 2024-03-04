@@ -16,6 +16,10 @@ func init() {
 	solver.RegisterHint(DivHint)
 }
 
+type API interface {
+	ToSingleVariable(frontend.Variable) frontend.Variable
+}
+
 // ---------------------------------------------------------------------------------------------
 // Arithmetic
 
