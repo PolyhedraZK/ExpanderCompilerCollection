@@ -1,10 +1,8 @@
 package builder
 
 import (
-	"github.com/Zklib/gkr-compiler/circuits/keccak"
 	"github.com/Zklib/gkr-compiler/expr"
 	"github.com/Zklib/gkr-compiler/ir"
-	"github.com/consensys/gnark/frontend"
 )
 
 func (r *Root) Finalize() *ir.RootCircuit {
@@ -63,33 +61,7 @@ func (builder *builder) Finalize() *ir.Circuit {
 
 // This function will only be called on the root circuit
 func (builder *builder) finalizePublicVariables(pvIds []int) {
-	bytes := [][]frontend.Variable{}
 	for _, id := range pvIds {
-		bits := builder.ToBinary(expr.NewLinearExpression(id, builder.tOne))
-		for i := (len(bits) - 1) / 8 * 8; i >= 0; i -= 8 {
-			var tmp []frontend.Variable
-			if i+8 > len(bits) {
-				pad := make([]frontend.Variable, i+8-len(bits))
-				for i := 0; i < len(pad); i++ {
-					pad[i] = 0
-				}
-				tmp = append(bits[i:], pad...)
-			} else {
-				tmp = bits[i : i+8]
-			}
-			bytes = append(bytes, tmp)
-		}
-	}
-	sum := keccak.Keccak256(builder, bytes)
-
-	// the hash is decomposed into 2 128-bit integers to fit the BN254 field
-	for i := 0; i < 2; i++ {
-		var cur frontend.Variable = 0
-		var mul frontend.Variable = 1
-		for j := 15; j >= 0; j-- {
-			cur = builder.Add(cur, builder.Mul(sum[i*16+j], mul))
-			mul = builder.Mul(mul, 1<<8)
-		}
-		builder.output = append(builder.output, builder.toVariable(cur))
+		builder.output = append(builder.output, expr.NewLinearExpression(id, builder.tOne))
 	}
 }
