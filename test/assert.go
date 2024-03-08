@@ -17,7 +17,11 @@ func NewAssert(t *testing.T) *Assert {
 
 func (a *Assert) ProveSucceeded(cr *gkr.CompileResult, assignment frontend.Circuit) {
 	lc := cr.GetLayeredCircuit()
-	witness := cr.GetWitness(assignment)
+	is := cr.GetInputSolver()
+	witness, err := is.SolveInput(assignment, 1)
+	if err != nil {
+		a.t.Fatal(err)
+	}
 	if !CheckCircuit(lc, witness) {
 		a.t.Fatal("should succeed")
 	}
@@ -25,7 +29,11 @@ func (a *Assert) ProveSucceeded(cr *gkr.CompileResult, assignment frontend.Circu
 
 func (a *Assert) ProveFailed(cr *gkr.CompileResult, assignment frontend.Circuit) {
 	lc := cr.GetLayeredCircuit()
-	witness := cr.GetWitness(assignment)
+	is := cr.GetInputSolver()
+	witness, err := is.SolveInput(assignment, 1)
+	if err != nil {
+		a.t.Fatal(err)
+	}
 	if CheckCircuit(lc, witness) {
 		a.t.Fatal("should fail")
 	}

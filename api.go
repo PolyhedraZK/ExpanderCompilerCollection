@@ -18,9 +18,9 @@ type API interface {
 }
 
 type CompileResult struct {
-	rc          *ir.RootCircuit
-	compiled    *layered.RootCircuit
-	inputSolver *ir.InputSolver
+	rc         *ir.RootCircuit
+	compiled   *layered.RootCircuit
+	inputOrder *ir.InputOrder
 }
 
 func Compile(field *big.Int, circuit frontend.Circuit, opts ...frontend.CompileOption) (*CompileResult, error) {
@@ -61,7 +61,7 @@ func Compile(field *big.Int, circuit frontend.Circuit, opts ...frontend.CompileO
 		Int("nbExpandedTerms", stats.NbExpandedTerms).
 		Int("nbConstraints", stats.NbConstraints).
 		Msg("optimized and adjusted circuit ir")
-	lrc, is := layering.Compile(rc)
+	lrc, io := layering.Compile(rc)
 	if err := layered.Validate(lrc); err != nil {
 		return nil, err
 	}
@@ -102,9 +102,9 @@ func Compile(field *big.Int, circuit frontend.Circuit, opts ...frontend.CompileO
 		Int("nbUsedVariables", lstats.NbUsedGates).
 		Msg("optimized layered circuit")
 	res := CompileResult{
-		rc:          rc,
-		compiled:    lrc,
-		inputSolver: is,
+		rc:         rc,
+		compiled:   lrc,
+		inputOrder: io,
 	}
 	return &res, nil
 }
@@ -117,6 +117,6 @@ func (c *CompileResult) GetLayeredCircuit() *layered.RootCircuit {
 	return c.compiled
 }
 
-func (c *CompileResult) GetWitness(assignment frontend.Circuit) []*big.Int {
-	return c.rc.SolveInput(assignment, c.inputSolver)
+func (c *CompileResult) GetInputSolver() *ir.InputSolver {
+	return ir.GetInputSolver(c.rc, c.inputOrder)
 }
