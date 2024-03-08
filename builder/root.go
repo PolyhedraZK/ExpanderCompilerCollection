@@ -4,8 +4,8 @@ import (
 	"math/big"
 
 	"github.com/Zklib/gkr-compiler/expr"
+	"github.com/Zklib/gkr-compiler/utils"
 	"github.com/consensys/gnark/constraint"
-	bn254r1cs "github.com/consensys/gnark/constraint/bn254"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/schema"
 )
@@ -24,10 +24,7 @@ func NewRoot(field *big.Int, config frontend.CompileConfig) *Root {
 	root := Root{
 		config: config,
 	}
-	root.field = bn254r1cs.NewR1CS(config.Capacity)
-	if field.Cmp(root.field.Field()) != 0 {
-		panic("currently only BN254 is supported")
-	}
+	root.field = utils.GetR1CSFromField(field)
 	root.registry = newSubCircuitRegistry()
 
 	root.builder = root.newBuilder(0)
