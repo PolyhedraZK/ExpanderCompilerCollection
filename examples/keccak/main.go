@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"math/rand"
 	"os"
 
@@ -65,13 +64,17 @@ func main() {
 	_ = cr
 
 	c := cr.GetLayeredCircuit()
-	os.WriteFile("circuit.txt", c.Serialize(), 0o644)
-	fmt.Printf("ok1\n")
 
-	witness := cr.GetWitness(&assignment)
-	fmt.Printf("ok2\n")
+	inputSolver := cr.GetInputSolver()
+	witness, err := inputSolver.SolveInput(&assignment, 8)
+	if err != nil {
+		panic(err)
+	}
 
 	if !test.CheckCircuit(c, witness) {
 		panic("error")
 	}
+
+	os.WriteFile("inputsolver.txt", inputSolver.Serialize(), 0o644)
+	os.WriteFile("circuit.txt", c.Serialize(), 0o644)
 }

@@ -46,9 +46,16 @@ func main() {
 		assignment.PreImage[i] = "16130099170765464552823636852555369511329944820189892919423002775646948828469"
 		assignment.Hash[i] = "12886436712380113721405259596386800092738845035233065858332878701083870690753"
 	}
-	witness := circuit.GetWitness(assignment)
+	inputSolver := circuit.GetInputSolver()
+	witness, err := inputSolver.SolveInput(assignment, 8)
+	if err != nil {
+		panic(err)
+	}
 
 	if !test.CheckCircuit(c, witness) {
 		panic("error")
 	}
+
+	os.WriteFile("inputsolver.txt", inputSolver.Serialize(), 0o644)
+	os.WriteFile("circuit.txt", c.Serialize(), 0o644)
 }

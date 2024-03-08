@@ -120,3 +120,11 @@ func (c *CompileResult) GetLayeredCircuit() *layered.RootCircuit {
 func (c *CompileResult) GetInputSolver() *ir.InputSolver {
 	return ir.GetInputSolver(c.rc, c.inputOrder)
 }
+
+func DeserializeLayeredCircuit(buf []byte) *layered.RootCircuit {
+	return layered.DeserializeRootCircuit(buf)
+}
+
+func DeserializeInputSolver(buf []byte) *ir.InputSolver {
+	return ir.DeserializeInputSolver(buf)
+}
