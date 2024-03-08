@@ -32,8 +32,8 @@ type compileContext struct {
 	// compiled circuit id of each layer
 	layers []int
 
-	// input order solver
-	inputSolver ir.InputSolver
+	// input order
+	inputOrder ir.InputOrder
 }
 
 type irContext struct {
@@ -82,7 +82,7 @@ type combinedConstraint struct {
 	subCircuitIds []int
 }
 
-func Compile(rc *ir.RootCircuit) (*layered.RootCircuit, *ir.InputSolver) {
+func Compile(rc *ir.RootCircuit) (*layered.RootCircuit, *ir.InputOrder) {
 	ctx := newCompileContext(rc)
 	ctx.compile()
 	layersUint64 := make([]uint64, len(ctx.layers))
@@ -93,7 +93,7 @@ func Compile(rc *ir.RootCircuit) (*layered.RootCircuit, *ir.InputSolver) {
 		Circuits: ctx.compiledCircuits,
 		Layers:   layersUint64,
 		Field:    rc.Field.Field(),
-	}, &ctx.inputSolver
+	}, &ctx.inputOrder
 }
 
 func newCompileContext(rc *ir.RootCircuit) *compileContext {
@@ -136,7 +136,7 @@ func (ctx *compileContext) compile() {
 	}
 
 	// 6. record the input order (used to generate witness)
-	ctx.inputSolver = ctx.recordInputOrder(ctx.layoutIds[0])
+	ctx.inputOrder = ctx.recordInputOrder(ctx.layoutIds[0])
 }
 
 // toposort dfs
