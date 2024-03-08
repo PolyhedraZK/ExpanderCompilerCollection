@@ -248,7 +248,10 @@ func (isc *inputSolveCtx) worker() {
 			for _, insnId := range task.insns {
 				insn := csc.circuit.Instructions[insnId]
 				var in []constraint.Element
-				outOffset := insn.OutputIds[0]
+				var outOffset int
+				if len(insn.OutputIds) != 0 {
+					outOffset = insn.OutputIds[0]
+				}
 				if insn.Type == ISubCircuit {
 					in = make([]constraint.Element, len(insn.Inputs))
 				} else {
