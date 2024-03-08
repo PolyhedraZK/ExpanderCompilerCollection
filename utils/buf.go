@@ -32,3 +32,33 @@ func (o *OutputBuf) AppendUint64(x uint64) {
 func (o *OutputBuf) Bytes() []byte {
 	return o.buf
 }
+
+type InputBuf struct {
+	buf []byte
+}
+
+func NewInputBuf(buf []byte) *InputBuf {
+	return &InputBuf{buf: buf}
+}
+
+func (i *InputBuf) ReadUint32() uint32 {
+	x := binary.LittleEndian.Uint32(i.buf[:4])
+	i.buf = i.buf[4:]
+	return x
+}
+
+func (i *InputBuf) ReadUint64() uint64 {
+	x := binary.LittleEndian.Uint64(i.buf[:8])
+	i.buf = i.buf[8:]
+	return x
+}
+
+func (i *InputBuf) ReadBigInt() *big.Int {
+	zbuf := make([]byte, 32)
+	for j := 0; j < 32; j++ {
+		zbuf[j] = i.buf[31-j]
+	}
+	x := new(big.Int).SetBytes(zbuf)
+	i.buf = i.buf[32:]
+	return x
+}
