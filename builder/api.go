@@ -171,6 +171,11 @@ func (builder *builder) Mul(i1, i2 frontend.Variable, in ...frontend.Variable) f
 			v2 = builder.asInternalVariable(v2)
 		}
 
+		if len(v1)*len(v2) >= (len(v1)+len(v2))*3 {
+			v1 = builder.asInternalVariable(v1)
+			v2 = builder.asInternalVariable(v2)
+		}
+
 		vars := make([]expr.Expression, 0, len(v1))
 		for i := 0; i < len(v1); i++ {
 			exp := make(expr.Expression, 0, len(v2))
