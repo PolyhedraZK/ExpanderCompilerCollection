@@ -20,6 +20,7 @@ func init() {
 
 type API interface {
 	ToSingleVariable(frontend.Variable) frontend.Variable
+	Output(frontend.Variable)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -582,4 +583,12 @@ func (builder *builder) Commit(v ...frontend.Variable) (frontend.Variable, error
 
 func (builder *builder) SetGkrInfo(info constraint.GkrInfo) error {
 	panic("unimplemented")
+}
+
+func (builder *builder) Output(x_ frontend.Variable) {
+	if builder.root.builder != builder {
+		panic("Output can only be called on root circuit")
+	}
+	x := builder.toVariable(x_)
+	builder.output = append(builder.output, x)
 }
