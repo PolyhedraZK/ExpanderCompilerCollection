@@ -18,6 +18,9 @@ type Root struct {
 	registry *SubCircuitRegistry
 
 	publicVariables []int
+
+	// since Commit is a faulty implementation, we need to warn user about it
+	commitWarned bool
 }
 
 func NewRoot(field *big.Int, config frontend.CompileConfig) *Root {

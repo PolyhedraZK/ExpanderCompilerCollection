@@ -1,7 +1,9 @@
 package builder
 
 import (
+	"crypto/rand"
 	"errors"
+	"fmt"
 	"math/big"
 	"sort"
 
@@ -571,7 +573,11 @@ func (builder *builder) Compiler() frontend.Compiler {
 }
 
 func (builder *builder) Commit(v ...frontend.Variable) (frontend.Variable, error) {
-	panic("unimplemented")
+	if !builder.root.commitWarned {
+		builder.root.commitWarned = true
+		fmt.Println("Warning: Commit uses a compile-time random number, which is not secure!")
+	}
+	return rand.Int(rand.Reader, builder.Field())
 }
 
 func (builder *builder) SetGkrInfo(info constraint.GkrInfo) error {
