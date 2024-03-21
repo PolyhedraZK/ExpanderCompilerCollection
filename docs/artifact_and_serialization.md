@@ -1,8 +1,16 @@
-# Layered Circuit Format
+# Artifact and Serialization
+
+There are two main compilation artifacts: layered circuit and input solver.
+
+Layered circuit is the final form of the circuit, it will be used by the prover and verifier.
+
+Input solver is a middle form of the circuit, it will be used to generate the witness (input).
+
+## Layered Circuit Format
 
 Layered Circuits are defined in `layered/circuit.go`.
 
-## Introduction
+### Introduction
 
 We denote the whole circuit as `RootCircuit`, and each layer of the circuit as `Circuit`.
 
@@ -14,11 +22,11 @@ The ID of a `Circuit` is its index in `RootCircuit.Circuits`.
 
 `RootCircuit.Layers` saves the IDs of the `Circuit` of each layer.
 
-## Special Internal Representation
+### Special Internal Representation
 
 If `Coef` equals to `RootCircuit.Field`, it's a random gate.
 
-## Serialization
+### Serialization
 
 Basically, `uint64` is serialized as little endian, and `big.Int` is serialized as 32-byte little endian.
 
@@ -43,3 +51,15 @@ type Circuit struct {
 where `RandomCoefIdx` saves the index of the random gates in `Mul+Add+Cst`.
 
 Finally, there's a magic uint64 number 3626604230490605891 (`b'CIRCUIT2'`) at the beginning of the serialized `RootCircuit`.
+
+## Input Solver Format
+
+Input solver is defined in `ir/input_solver.go`.
+
+Since it should be only used by go, the serialization is done by gob.
+
+## Witness Format
+
+Witness is a `big.Int` array, it's the input of the layered circuit. It's also defined in `ir/input_solver.go`.
+
+The serialization is really simple. Since we already know the length of the array, we can just serialize the `big.Int` array as 32-byte little endian.
