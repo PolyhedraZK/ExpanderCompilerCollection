@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	"github.com/Zklib/gkr-compiler/expr"
+	"github.com/Zklib/gkr-compiler/utils"
 	fr_bn254 "github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/frontend"
@@ -175,7 +176,9 @@ type inputSolveTask struct {
 	callback chan bool
 }
 
-func (solver *InputSolver) SolveInput(assignment frontend.Circuit, nbThreads int) ([]*big.Int, error) {
+type Witness []*big.Int
+
+func (solver *InputSolver) SolveInput(assignment frontend.Circuit, nbThreads int) (Witness, error) {
 	rc := solver.RootCircuit
 	od := solver.InputOrder
 	wit, err := frontend.NewWitness(assignment, rc.Field.Field())
@@ -335,4 +338,12 @@ func (isc *inputSolveCtx) solve(id uint64, input []constraint.Element, inputInsn
 		output:   output,
 		callback: callback,
 	}
+}
+
+func (w Witness) Serialize() []byte {
+	o := utils.OutputBuf{}
+	for _, x := range w {
+		o.AppendBigInt(x)
+	}
+	return o.Bytes()
 }

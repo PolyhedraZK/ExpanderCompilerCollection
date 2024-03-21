@@ -58,4 +58,5 @@ func main() {
 
 	os.WriteFile("inputsolver.txt", inputSolver.Serialize(), 0o644)
 	os.WriteFile("circuit.txt", c.Serialize(), 0o644)
+	os.WriteFile("witness.txt", witness.Serialize(), 0o644)
 }
