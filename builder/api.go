@@ -21,6 +21,7 @@ func init() {
 type API interface {
 	ToSingleVariable(frontend.Variable) frontend.Variable
 	Output(frontend.Variable)
+	LayerOf(frontend.Variable) int // for debug usage
 }
 
 // ---------------------------------------------------------------------------------------------

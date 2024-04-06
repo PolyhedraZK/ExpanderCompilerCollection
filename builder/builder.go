@@ -225,6 +225,10 @@ func (builder *builder) FieldBitLen() int {
 	return builder.field.FieldBitLen()
 }
 
+func (builder *builder) LayerOf(e frontend.Variable) int {
+	return builder.layerOfExpr(builder.toVariable(e))
+}
+
 func (builder *builder) layerOfExpr(e expr.Expression) int {
 	layer := 1
 	for _, term := range e {
