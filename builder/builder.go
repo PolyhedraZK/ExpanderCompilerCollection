@@ -12,6 +12,7 @@ import (
 	"github.com/consensys/gnark/frontend"
 
 	"github.com/Zklib/gkr-compiler/expr"
+	"github.com/Zklib/gkr-compiler/field"
 	"github.com/Zklib/gkr-compiler/ir"
 	"github.com/Zklib/gkr-compiler/utils"
 )
@@ -19,8 +20,7 @@ import (
 // builder implements frontend.API and frontend.Compiler, and builds a circuit
 // it can be a root circuit or a sub circuit
 type builder struct {
-	// This R1CS is only used to provide field operations
-	field constraint.R1CS
+	field field.Field
 
 	// builder of the root circuit
 	root *Root
@@ -223,6 +223,10 @@ func (builder *builder) Field() *big.Int {
 
 func (builder *builder) FieldBitLen() int {
 	return builder.field.FieldBitLen()
+}
+
+func (builder *builder) LayerOf(e frontend.Variable) int {
+	return builder.layerOfExpr(builder.toVariable(e))
 }
 
 func (builder *builder) layerOfExpr(e expr.Expression) int {

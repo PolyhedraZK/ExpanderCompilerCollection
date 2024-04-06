@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/Zklib/gkr-compiler/expr"
-	"github.com/consensys/gnark/constraint"
+	"github.com/Zklib/gkr-compiler/field"
 	"github.com/consensys/gnark/constraint/solver"
 )
 
@@ -23,7 +23,7 @@ type Circuit struct {
 }
 
 type RootCircuit struct {
-	Field constraint.R1CS
+	Field field.Field
 	// circuit list, we assume idx 0 is the root circuit
 	Circuits map[uint64]*Circuit
 }
@@ -130,7 +130,7 @@ func ValidateForLayering(rc *RootCircuit) error {
 	return nil
 }
 
-func (ci *Circuit) Print(field constraint.R1CS) {
+func (ci *Circuit) Print(field field.Field) {
 	varToStr := func(e expr.Expression) string {
 		s := make([]string, len(e))
 		for i, term := range e {

@@ -4,15 +4,14 @@ import (
 	"math/big"
 
 	"github.com/Zklib/gkr-compiler/expr"
-	"github.com/Zklib/gkr-compiler/utils"
-	"github.com/consensys/gnark/constraint"
+	"github.com/Zklib/gkr-compiler/field"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/schema"
 )
 
 type Root struct {
 	*builder
-	field  constraint.R1CS
+	field  field.Field
 	config frontend.CompileConfig
 
 	registry *SubCircuitRegistry
@@ -23,11 +22,11 @@ type Root struct {
 	commitWarned bool
 }
 
-func NewRoot(field *big.Int, config frontend.CompileConfig) *Root {
+func NewRoot(fieldorder *big.Int, config frontend.CompileConfig) *Root {
 	root := Root{
 		config: config,
 	}
-	root.field = utils.GetR1CSFromField(field)
+	root.field = field.GetFieldFromOrder(fieldorder)
 	root.registry = newSubCircuitRegistry()
 
 	root.builder = root.newBuilder(0)
