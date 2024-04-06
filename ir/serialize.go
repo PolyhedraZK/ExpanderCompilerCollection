@@ -6,7 +6,7 @@ import (
 	"math/big"
 
 	"github.com/Zklib/gkr-compiler/expr"
-	"github.com/Zklib/gkr-compiler/utils"
+	"github.com/Zklib/gkr-compiler/field"
 	"github.com/consensys/gnark/constraint/solver"
 )
 
@@ -77,7 +77,7 @@ func DeserializeInputSolver(data []byte) *InputSolver {
 		panic(err)
 	}
 	rc := &RootCircuit{
-		Field:    utils.GetR1CSFromField(isfs.Field),
+		Field:    field.GetFieldFromOrder(isfs.Field),
 		Circuits: make(map[uint64]*Circuit),
 	}
 	for id, cfs := range isfs.Circuits {
