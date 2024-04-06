@@ -2,12 +2,14 @@ package ir
 
 import (
 	"math/big"
+	"reflect"
 
 	"github.com/Zklib/gkr-compiler/expr"
+	"github.com/Zklib/gkr-compiler/field"
 	"github.com/Zklib/gkr-compiler/utils"
-	fr_bn254 "github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/frontend"
+	"github.com/consensys/gnark/frontend/schema"
 )
 
 // group is the minimum schedule unit, and this is the rough number of field operations (multiplications) per group
@@ -178,14 +180,41 @@ type inputSolveTask struct {
 
 type Witness []*big.Int
 
+var tVariable reflect.Type
+
+func init() {
+	tVariable = reflect.ValueOf(struct{ A frontend.Variable }{}).FieldByName("A").Type()
+}
+
+// reimplement frontend.NewWitness
+func GetCircuitVariables(assignment frontend.Circuit, field field.Field) []constraint.Element {
+	chValues := make(chan any)
+	go func() {
+		defer close(chValues)
+		schema.Walk(assignment, tVariable, func(leaf schema.LeafInfo, tValue reflect.Value) error {
+			if leaf.Visibility == schema.Public {
+				chValues <- tValue.Interface()
+			}
+			return nil
+		})
+		schema.Walk(assignment, tVariable, func(leaf schema.LeafInfo, tValue reflect.Value) error {
+			if leaf.Visibility == schema.Secret {
+				chValues <- tValue.Interface()
+			}
+			return nil
+		})
+	}()
+	res := []constraint.Element{}
+	for v := range chValues {
+		res = append(res, field.FromInterface(v))
+	}
+	return res
+}
+
 func (solver *InputSolver) SolveInput(assignment frontend.Circuit, nbThreads int) (Witness, error) {
 	rc := solver.RootCircuit
 	od := solver.InputOrder
-	wit, err := frontend.NewWitness(assignment, rc.Field.Field())
-	if err != nil {
-		panic(err)
-	}
-	vec := wit.Vector().(fr_bn254.Vector)
+	vec := GetCircuitVariables(assignment, rc.Field)
 
 	ctx := &inputSolveCtx{
 		solver:      solver,
@@ -195,12 +224,11 @@ func (solver *InputSolver) SolveInput(assignment frontend.Circuit, nbThreads int
 	}
 	input := make([]constraint.Element, len(vec))
 	for i, x := range vec {
-		var t big.Int
-		x.BigInt(&t)
+		t := rc.Field.ToBigInt(x)
 		input[i] = rc.Field.FromInterface(t)
 		p := od.CircuitInputIds[i]
 		if p != -1 {
-			ctx.globalInput[p] = &t
+			ctx.globalInput[p] = t
 		}
 	}
 
@@ -227,7 +255,7 @@ func (solver *InputSolver) SolveInput(assignment frontend.Circuit, nbThreads int
 	return ctx.globalInput, nil
 }
 
-func calcExpr(e expr.Expression, values []constraint.Element, field constraint.R1CS) constraint.Element {
+func calcExpr(e expr.Expression, values []constraint.Element, field field.Field) constraint.Element {
 	res := constraint.Element{}
 	for _, term := range e {
 		x := field.Mul(values[term.VID0], values[term.VID1])
