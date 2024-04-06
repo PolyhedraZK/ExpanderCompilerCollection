@@ -366,7 +366,7 @@ func (builder *builder) Xor(_a, _b frontend.Variable) frontend.Variable {
 
 	builder.MarkBoolean(t)
 
-	return t
+	return builder.ToSingleVariable(t)
 }
 
 // Or compute the OR between two frontend.Variables
@@ -389,7 +389,7 @@ func (builder *builder) Or(_a, _b frontend.Variable) frontend.Variable {
 
 	builder.MarkBoolean(res)
 
-	return res
+	return builder.ToSingleVariable(res)
 }
 
 // And compute the AND between two frontend.Variables
@@ -405,7 +405,7 @@ func (builder *builder) And(_a, _b frontend.Variable) frontend.Variable {
 	res := builder.Mul(a, b)
 	builder.MarkBoolean(res)
 
-	return res
+	return builder.ToSingleVariable(res)
 }
 
 // ---------------------------------------------------------------------------------------------
