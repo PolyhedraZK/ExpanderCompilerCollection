@@ -6,11 +6,11 @@ import (
 
 	gkr "github.com/Zklib/gkr-compiler"
 	"github.com/Zklib/gkr-compiler/builder"
+	"github.com/Zklib/gkr-compiler/field/m31"
 	"github.com/Zklib/gkr-compiler/test"
 	"github.com/consensys/gnark/frontend"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/liyue201/gnark-crypto/ecc"
 	"github.com/zkbridge-testnet/circuits/common/keccak"
 )
 
@@ -56,7 +56,7 @@ func main() {
 		}
 	}
 
-	cr, err := gkr.Compile(ecc.BN254.ScalarField(), &circuit)
+	cr, err := gkr.Compile(m31.ScalarField, &circuit)
 	if err != nil {
 		panic(err)
 	}

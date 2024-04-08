@@ -1,4 +1,4 @@
-package mersen
+package m31
 
 import (
 	"math/big"
