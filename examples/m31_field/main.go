@@ -6,7 +6,7 @@ import (
 	"github.com/consensys/gnark/frontend"
 
 	gkr "github.com/Zklib/gkr-compiler"
-	"github.com/Zklib/gkr-compiler/field/mersen"
+	"github.com/Zklib/gkr-compiler/field/m31"
 	"github.com/Zklib/gkr-compiler/test"
 )
 
@@ -22,7 +22,7 @@ func (circuit *Circuit) Define(api frontend.API) error {
 }
 
 func main() {
-	circuit, err := gkr.Compile(mersen.ScalarField, &Circuit{})
+	circuit, err := gkr.Compile(m31.ScalarField, &Circuit{})
 	if err != nil {
 		panic(err)
 	}

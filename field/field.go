@@ -5,7 +5,7 @@ import (
 	"math/big"
 
 	"github.com/Zklib/gkr-compiler/field/bn254"
-	"github.com/Zklib/gkr-compiler/field/mersen"
+	"github.com/Zklib/gkr-compiler/field/m31"
 	"github.com/consensys/gnark/constraint"
 )
 
@@ -19,8 +19,8 @@ func GetFieldFromOrder(x *big.Int) Field {
 	if x.Cmp(bn254.ScalarField) == 0 {
 		return &bn254.Field{}
 	}
-	if x.Cmp(mersen.ScalarField) == 0 {
-		return &mersen.Field{}
+	if x.Cmp(m31.ScalarField) == 0 {
+		return &m31.Field{}
 	}
 	panic(fmt.Sprintf("unknown field %v", x))
 }
