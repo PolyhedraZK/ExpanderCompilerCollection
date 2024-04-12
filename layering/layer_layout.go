@@ -447,6 +447,7 @@ func (ctx *compileContext) solveLayerLayoutNormal(ic *irContext, req *layerReq) 
 
 	// first iterate prev layer circuits, and solve their output layout
 	layouts := make(map[int]*layerLayout)
+	layoutsSubsArr := make(map[int][]int)
 	for x_ := range lc.prevCircuitNbOut {
 		var subLayer int
 		var insn *ir.Instruction
@@ -470,10 +471,12 @@ func (ctx *compileContext) solveLayerLayoutNormal(ic *irContext, req *layerReq) 
 			layout.SubsArray(ctx.circuits[insn.SubCircuitId].lcs[subLayer].varIdx)
 			layout.SubsMap(ctx.circuits[insn.SubCircuitId].outputOrder)
 			layout.SubsArray(insn.OutputIds)
+			layoutsSubsArr[x] = insn.OutputIds
 		} else {
 			layout.SubsArray(ctx.circuits[insn.SubCircuitId].lcHint.varIdx)
 			layout.SubsMap(ctx.circuits[insn.SubCircuitId].hintInputsMap)
 			layout.SubsArray(ic.subCircuitHintInputs[ic.subCircuitLocMap[x]])
+			layoutsSubsArr[x] = ic.subCircuitHintInputs[ic.subCircuitLocMap[x]]
 		}
 		layout.SubsMap(lc.varMap)
 		//fmt.Printf("layout after subs %v\n", layout.placementDense)
@@ -489,8 +492,8 @@ func (ctx *compileContext) solveLayerLayoutNormal(ic *irContext, req *layerReq) 
 	}
 	childrenPrevCircuits := make([][]*layerLayout, len(lc.parent))
 	for x, layout := range layouts {
-		if len(ic.circuit.Instructions[x].OutputIds) != 0 {
-			v := ic.circuit.Instructions[x].OutputIds[0]
+		if len(layoutsSubsArr[x]) != 0 {
+			v := layoutsSubsArr[x][0]
 			childrenPrevCircuits[lc.placement[v]] = append(childrenPrevCircuits[lc.placement[v]], layout)
 		}
 	}
