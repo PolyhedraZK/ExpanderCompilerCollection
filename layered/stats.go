@@ -64,7 +64,7 @@ func (rc *RootCircuit) GetStats() Stats {
 	ar.NbCircuit = len(rc.Circuits)
 	ar.NbLayer = len(rc.Layers)
 	_, outputMask := computeMasks(rc)
-	for i := 1; i < len(rc.Layers); i++ {
+	for i := 0; i < len(rc.Layers); i++ {
 		ar.NbTotGates += int(rc.Circuits[rc.Layers[i]].OutputLen)
 		for j := uint64(0); j < rc.Circuits[rc.Layers[i]].OutputLen; j++ {
 			if outputMask[rc.Layers[i]][j] {
