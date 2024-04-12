@@ -14,23 +14,28 @@ import (
 	"github.com/zkbridge-testnet/circuits/common/keccak"
 )
 
-const NHashes = 100
+// Due to some features of the compiler, it has the best space efficiency when n=2^k-1
+const NHashes = 127
 
 type keccak256Circuit struct {
 	M    [NHashes][100]frontend.Variable
 	Hash [NHashes][32]frontend.Variable
 }
 
+func checkHash(api frontend.API, input []frontend.Variable, output []frontend.Variable) {
+	hash := keccak.Keccak256(api, input)
+	for i := 0; i < len(hash); i++ {
+		api.AssertIsEqual(hash[i], output[i])
+	}
+}
+
 func (t *keccak256Circuit) Define(api frontend.API) error {
-	f := builder.MemorizedSimpleFunc(keccak.Keccak256)
+	check := builder.MemorizedVoidFunc(checkHash)
 
 	for j := 0; j < NHashes; j++ {
-		hash := f(api, t.M[j][:])
-		for i := 0; i < len(hash); i++ {
-			api.AssertIsEqual(hash[i], t.Hash[j][i])
-		}
+		check(api, t.M[j][:], t.Hash[j][:])
 	}
-	//api.Println(hash...)
+
 	return nil
 }
 
@@ -64,6 +69,7 @@ func main() {
 	_ = cr
 
 	c := cr.GetLayeredCircuit()
+	//c.Print()
 
 	inputSolver := cr.GetInputSolver()
 	witness, err := inputSolver.SolveInput(&assignment, 8)
