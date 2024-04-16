@@ -99,7 +99,12 @@ const (
 // It remembers previous results, and uses cached id if possible
 func (builder *builder) asInternalVariableInner(eall expr.Expression, force bool) expr.Expression {
 	e, coeff, constant := builder.stripConstant(eall)
-	if len(e) == 1 && e[0].VID1 == 0 && !force {
+	if force {
+		e = eall
+		coeff = builder.tOne
+		constant = constraint.Element{}
+	}
+	if len(e) == 1 && e[0].VID1 == 0 {
 		return eall
 	}
 	idx_, ok := builder.internalVariables.Find(e)
