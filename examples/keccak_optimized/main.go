@@ -2,6 +2,7 @@ package main
 
 import (
 	"math/big"
+	"math/rand"
 	"os"
 
 	gkr "github.com/Zklib/gkr-compiler"
@@ -9,9 +10,14 @@ import (
 	"github.com/Zklib/gkr-compiler/field/m31"
 	"github.com/Zklib/gkr-compiler/test"
 	"github.com/consensys/gnark/frontend"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 const NHashes = 7
+
+const CheckBits = 256
+const PartitionBits = 30
+const CheckPartitions = (CheckBits + PartitionBits - 1) / PartitionBits
 
 var rcs [][]uint
 
@@ -51,23 +57,37 @@ func init() {
 	}
 }
 
-func compareBits(api frontend.API, a []frontend.Variable, b []frontend.Variable) {
-	if len(a) != len(b) {
+func compressBits(b []int) []int {
+	if len(b) != CheckBits {
+		panic("gg")
+	}
+	res := make([]int, CheckPartitions)
+	for i := 0; i < len(b); i += PartitionBits {
+		r := i + PartitionBits
+		if r > len(b) {
+			r = len(b)
+		}
+		for j := i; j < r; j++ {
+			res[i/PartitionBits] += b[j] << (j - i)
+		}
+	}
+	return res
+}
+
+func checkBits(api frontend.API, a []frontend.Variable, bCompressed []frontend.Variable) {
+	if len(a) != CheckBits || api.Compiler().FieldBitLen() <= PartitionBits {
 		panic("gg")
 	}
 	for i := 0; i < len(a); i++ {
 		a[i] = fromMyBitForm(api, a[i])
-		b[i] = fromMyBitForm(api, b[i])
 		api.Compiler().MarkBoolean(a[i])
-		api.Compiler().MarkBoolean(b[i])
 	}
-	n := api.Compiler().FieldBitLen() - 1
-	for i := 0; i < len(a); i += n {
-		r := i + n
+	for i := 0; i < len(a); i += PartitionBits {
+		r := i + PartitionBits
 		if r > len(a) {
 			r = len(a)
 		}
-		api.AssertIsEqual(api.FromBinary(a[i:r]...), api.FromBinary(b[i:r]...))
+		api.AssertIsEqual(api.FromBinary(a[i:r]...), bCompressed[i/PartitionBits])
 	}
 }
 
@@ -251,32 +271,41 @@ func rotateLeft(bits []frontend.Variable, k int) []frontend.Variable {
 	return append(newBits, bits[:n-s]...)
 }
 
+func copyOutUnaligned(api frontend.API, s [][]frontend.Variable, rate, outputLen int) []frontend.Variable {
+	out := []frontend.Variable{}
+	w := 8
+	for b := 0; b < outputLen; {
+		for y := 0; y < 5; y++ {
+			for x := 0; x < 5; x++ {
+				if x+5*y < (rate/w) && (b < outputLen) {
+					out = append(out, s[5*x+y]...)
+					b += 8
+				}
+			}
+		}
+	}
+	return out
+}
+
 type keccak256Circuit struct {
-	S   [NHashes][25 * 64]frontend.Variable
 	P   [NHashes][136 * 8]frontend.Variable
-	Out [NHashes][25 * 64]frontend.Variable
+	Out [NHashes][CheckPartitions]frontend.Variable
 }
 
 func assertIsBoolean(api frontend.API, x frontend.Variable) {
 	api.AssertIsEqual(api.Mul(x, x), 1)
 }
 
-func checkKeccak(api frontend.API, S, P, Out []frontend.Variable) {
-	for i := 0; i < 25*64; i++ {
-		assertIsBoolean(api, S[i])
-	}
+func checkKeccak(api frontend.API, P, Out []frontend.Variable) {
 	for i := 0; i < 136*8; i++ {
 		assertIsBoolean(api, P[i])
-	}
-	for i := 0; i < 25*64; i++ {
-		assertIsBoolean(api, Out[i])
 	}
 
 	ss := make([][]frontend.Variable, 25)
 	for i := 0; i < 25; i++ {
 		ss[i] = make([]frontend.Variable, 64)
 		for j := 0; j < 64; j++ {
-			ss[i][j] = S[i*64+j]
+			ss[i][j] = 1
 		}
 	}
 	p := make([][]frontend.Variable, 17)
@@ -288,17 +317,14 @@ func checkKeccak(api frontend.API, S, P, Out []frontend.Variable) {
 	}
 	ss = xorIn(api, ss, p)
 	ss = keccakF(api, ss)
-	outflat := []frontend.Variable{}
-	for i := 0; i < 25; i++ {
-		outflat = append(outflat, ss[i]...)
-	}
-	compareBits(api, outflat, Out)
+	out := copyOutUnaligned(api, ss, 136, 32)
+	checkBits(api, out, Out)
 }
 
 func (t *keccak256Circuit) Define(api frontend.API) error {
 	f := builder.MemorizedVoidFunc(checkKeccak)
 	for i := 0; i < NHashes; i++ {
-		f(api, t.S[i][:], t.P[i][:], t.Out[i][:])
+		f(api, t.P[i][:], t.Out[i][:])
 	}
 	return nil
 }
@@ -315,55 +341,32 @@ func main() {
 	os.WriteFile("circuit.txt", c.Serialize(), 0o644)
 
 	for k := 0; k < NHashes; k++ {
-		for i := 0; i < 25*64; i++ {
-			circuit.S[k][i] = 1
-		}
 		for i := 0; i < 136*8; i++ {
 			circuit.P[k][i] = 1
 		}
-		for i := 0; i < 25*64; i++ {
-			circuit.Out[k][i] = 1
-		}
-		for i := 0; i < 10; i++ {
-			t := 97 + i%3
-			if i == 9 {
-				t = 1
-			}
+
+		length := rand.Intn(130 + 2)
+		data := make([]byte, length)
+		rand.Read(data)
+		hash := crypto.Keccak256Hash(data)
+		data = append(data, 1)
+		data = append(data, make([]byte, 200)...)
+		data[135] = 0x80
+		for i := 0; i < 136; i++ {
 			for j := 0; j < 8; j++ {
-				circuit.P[k][i*8+j] = toMyBitForm((t >> j) & 1)
+				circuit.P[k][i*8+j] = toMyBitForm(int((data[i] >> j) & 1))
 			}
 		}
 
-		out := make([]uint64, 25)
-		out[0] = 17219205011983708464
-		out[1] = 17263267039051296837
-		out[2] = 4734580643271052073
-		out[3] = 14210404430156729305
-		out[4] = 14326798916247726117
-		out[5] = 9741415084646213999
-		out[6] = 7657700635244418443
-		out[7] = 17064445256936182899
-		out[8] = 9353040293697576515
-		out[9] = 4956016039090590093
-		out[10] = 14613965790834230574
-		out[11] = 6082825785624035690
-		out[12] = 14543440552284219774
-		out[13] = 3844699381476460584
-		out[14] = 1308273130786354139
-		out[15] = 7511437080392509869
-		out[16] = 2736747253291613912
-		out[17] = 4285095010498297369
-		out[18] = 5348191640999176495
-		out[19] = 2055916821189839315
-		out[20] = 9550189129561540020
-		out[21] = 18176507538384442338
-		out[22] = 10689654814838395219
-		out[23] = 6386678527123596175
-		out[24] = 10689114996529251139
-		for i := 0; i < 25; i++ {
-			for j := 0; j < 64; j++ {
-				circuit.Out[k][i*64+j] = toMyBitForm(int((out[i] >> j) & 1))
+		outBits := make([]int, 256)
+		for i := 0; i < 32; i++ {
+			for j := 0; j < 8; j++ {
+				outBits[i*8+j] = int((hash[i] >> j) & 1)
 			}
+		}
+		outCompressed := compressBits(outBits)
+		for i := 0; i < CheckPartitions; i++ {
+			circuit.Out[k][i] = outCompressed[i]
 		}
 	}
 
@@ -377,7 +380,7 @@ func main() {
 	}
 
 	for k := 0; k < NHashes; k++ {
-		circuit.S[k][0] = -1
+		circuit.P[k][0] = -circuit.P[k][0].(int)
 	}
 	wit, err = cr.GetInputSolver().SolveInput(&circuit, 8)
 	if err != nil {
