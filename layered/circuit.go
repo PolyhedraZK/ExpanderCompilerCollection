@@ -125,6 +125,7 @@ func Validate(rc *RootCircuit) error {
 	return nil
 }
 
+// computeMasks computes whether each input/output occurs in each circuit
 func computeMasks(rc *RootCircuit) ([][]bool, [][]bool) {
 	inputMask := make([][]bool, len(rc.Circuits))
 	outputMask := make([][]bool, len(rc.Circuits))

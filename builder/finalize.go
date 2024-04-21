@@ -5,6 +5,10 @@ import (
 	"github.com/Zklib/gkr-compiler/ir"
 )
 
+// Finalize will
+// 1. process defers
+// 2. convert boolean and nonzero assertions to zero assertions
+// 3. add public variables to output
 func (r *Root) Finalize() *ir.RootCircuit {
 	if len(r.publicVariables) > 0 {
 		r.finalizePublicVariables(r.publicVariables)
@@ -24,7 +28,6 @@ func shouldAssert(x interface{}) bool {
 	return x.(constraintStatus) == asserted
 }
 
-// Finalize will process assertBooleans and assertNonZeroes, and return a Circuit IR
 func (builder *builder) Finalize() *ir.Circuit {
 	// defers may change during the process
 	for i := 0; i < len(builder.defers); i++ {

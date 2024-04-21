@@ -10,6 +10,7 @@ import (
 	"github.com/consensys/gnark/constraint/solver"
 )
 
+// Circuit defines an arithmetic circuit, and it may contain calls to other Circuit
 type Circuit struct {
 	// each instruction specifies the method to calculate some variables
 	// the output id must be sequential
@@ -22,12 +23,14 @@ type Circuit struct {
 	NbExternalInput int
 }
 
+// RootCircuit is a compiled circuit, it contains many "Circuit"-s as components, and the 0-th is the entry point.
 type RootCircuit struct {
 	Field field.Field
 	// circuit list, we assume idx 0 is the root circuit
 	Circuits map[uint64]*Circuit
 }
 
+// checkExpr returns true if all VID is bounded by totVID
 func checkExpr(e expr.Expression, totVID int) error {
 	for _, term := range e {
 		if term.VID0 < 0 || term.VID0 >= totVID {

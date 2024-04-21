@@ -14,24 +14,33 @@ import (
 	"github.com/consensys/gnark/frontend"
 )
 
-// the unique identifier to a sub-circuit function, including
-// 1. function name
-// 2. non frontend.Variable function args
-// 3. dimension of frontend.Variable function args
-
-// SubCircuitSimpleFunc
+// SubCircuitSimpleFunc is the most general form of a subcircuit
 type SubCircuitSimpleFunc func(api frontend.API, input []frontend.Variable) []frontend.Variable
 type SubCircuitFunc interface{}
 
+// SubCircuit has its own builder, and other useful infomations
 type SubCircuit struct {
-	builder                *builder
+	builder *builder
+
+	// When a variable is asserted in child, we can remove the assertion from parent
+	// Of course it's possible to do it reversely, but that may introduce many diffrent subcircuits (because they have different parent input assertions)
 	inputAssertedBooleans  []int
 	inputAssertedZeroes    []int
 	inputAssertedNonZeroes []int
-	outputMarkedBooleans   []int
-	outputLayers           []int
+
+	// When a variable is marked in child, we can mark it in parent
+	outputMarkedBooleans []int
+
+	// Sometimes the output variables of a subcircuit have different layers, this can passthrough to the parent
+	// However, the layering part can't handle this yet.
+	outputLayers []int
 }
 
+// SubCircuitRegistry manages the subcircuit context of each possible subcircuit
+// the uint64 id of a subcircuit function call includes
+// 1. function name
+// 2. value of non frontend.Variable args
+// 3. shape of slice of fontend.Variable args
 type SubCircuitRegistry struct {
 	m               map[uint64]*SubCircuit
 	outputStructure map[uint64]*sliceStructure
@@ -168,6 +177,7 @@ func (parent *builder) callSubCircuit(
 	return output_
 }
 
+// MemorizedSimpleCall calls a SubCircuitSimpleFunc in a memorized way
 func (parent *builder) MemorizedSimpleCall(f SubCircuitSimpleFunc, input []frontend.Variable) []frontend.Variable {
 	name := GetFuncName(f)
 	h := sha256.Sum256([]byte(fmt.Sprintf("simple_%d(%s)_%d", len(name), name, len(input))))
@@ -184,7 +194,7 @@ func isTypeFrontendAPI(t reflect.Type) bool {
 	return t == frontendAPIType
 }
 
-// isTypeSlicesOfVariables returns true if t is any number of slice of frontend.Variable
+// getTypeSlicesOfVariables returns the dimension of slices of frontend.Variable
 func getTypeSlicesOfVariables(t reflect.Type) (int, bool) {
 	level := 0
 	for {
@@ -199,6 +209,7 @@ func getTypeSlicesOfVariables(t reflect.Type) (int, bool) {
 	}
 }
 
+// layerOfSliceOfVariables returns the dimension of slices of frontend.Variable
 func layerOfSliceOfVariables(t reflect.Type) int {
 	for i := 0; ; i++ {
 		if t == frontendVariableType {
@@ -217,6 +228,7 @@ type sliceStructure struct {
 	children    []*sliceStructure
 }
 
+// joinSliceVariables concats a multidimentional slice of frontend.Variable into an 1D-slice, also remembering the shape of the input
 func joinSliceVariables(res *[]frontend.Variable, h hash.Hash, slice reflect.Value, level int) *sliceStructure {
 	val := slice.Interface()
 	if level == 0 {
@@ -252,6 +264,7 @@ func joinSliceVariables(res *[]frontend.Variable, h hash.Hash, slice reflect.Val
 	return r
 }
 
+// typeNLayersOfSliceOfVariables builds an ND slice type
 func typeNLayersOfSliceOfVariables(n int) reflect.Type {
 	if n == 0 {
 		return frontendVariableType
@@ -259,6 +272,7 @@ func typeNLayersOfSliceOfVariables(n int) reflect.Type {
 	return reflect.SliceOf(typeNLayersOfSliceOfVariables(n - 1))
 }
 
+// rebuildSliceVariable rebuilds the multidimentional slice
 func rebuildSliceVariables(vars []frontend.Variable, s *sliceStructure) reflect.Value {
 	if s.level == 0 {
 		return reflect.ValueOf(vars[0])
@@ -292,6 +306,8 @@ func isTypeSimple(t reflect.Type) bool {
 	}
 }
 
+// MemorizedCall calls an arbitrary function in a memorized way
+// However, the function still needs to obey some basic requirements
 func (parent *builder) MemorizedCall(fn SubCircuitFunc, inputs ...interface{}) interface{} {
 	fnVal := reflect.ValueOf(fn)
 	if fnVal.Kind() != reflect.Func {
@@ -426,6 +442,8 @@ func MemorizedSimpleFunc(f SubCircuitSimpleFunc) SubCircuitSimpleFunc {
 		return api.(SubCircuitAPI).MemorizedSimpleCall(f, input)
 	}
 }
+
+// Some helper functions
 
 func MemorizedVoidFunc(f SubCircuitFunc) func(frontend.API, ...interface{}) {
 	return func(api frontend.API, inputs ...interface{}) {

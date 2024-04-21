@@ -1,3 +1,5 @@
+// Some content of this file is copied from gnark/frontend/cs/r1cs/api_assertions.go
+
 package builder
 
 import (
@@ -47,6 +49,7 @@ func (builder *builder) AssertIsBoolean(i1 frontend.Variable) {
 	builder.booleans.Add(v, asserted)
 }
 
+// AssertIsCrumb fails if v ∉ {0,1,2,3} (crumb is a 2-bit variable; see https://en.wikipedia.org/wiki/Units_of_information)
 // new API added in gnark 0.9.2
 func (builder *builder) AssertIsCrumb(i1 frontend.Variable) {
 	i1 = builder.MulAcc(builder.Mul(-3, i1), i1, i1)
