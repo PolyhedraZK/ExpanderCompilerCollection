@@ -12,6 +12,7 @@ type mapEntry struct {
 	v interface{}
 }
 
+// finds the value of e in map
 func (m Map) Find(e Hashable) (interface{}, bool) {
 	s, ok := m[e.HashCode()]
 	if !ok {
@@ -25,6 +26,7 @@ func (m Map) Find(e Hashable) (interface{}, bool) {
 	return nil, false
 }
 
+// sets the value of e to v
 func (m Map) Set(e Hashable, v interface{}) {
 	h := e.HashCode()
 	s, ok := m[h]
@@ -44,7 +46,7 @@ func (m Map) Set(e Hashable, v interface{}) {
 	})
 }
 
-// when exists, do nothing
+// adds (e, v) to the map, does nothing when e already exists
 func (m Map) Add(e Hashable, v interface{}) interface{} {
 	h := e.HashCode()
 	s, ok := m[h]
@@ -64,6 +66,7 @@ func (m Map) Add(e Hashable, v interface{}) interface{} {
 	return v
 }
 
+// filter keys in the map using the given function
 func (m Map) FilterKeys(f func(interface{}) bool) []Hashable {
 	keys := []Hashable{}
 	for _, s := range m {
@@ -76,6 +79,7 @@ func (m Map) FilterKeys(f func(interface{}) bool) []Hashable {
 	return keys
 }
 
+// clear the map
 func (m Map) Clear() {
 	for k := range m {
 		delete(m, k)

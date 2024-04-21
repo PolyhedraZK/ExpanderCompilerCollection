@@ -12,7 +12,7 @@ import (
 	"github.com/consensys/gnark/frontend/schema"
 )
 
-// group is the minimum schedule unit, and this is the rough number of field operations (multiplications) per group
+// group is the minimum scheduling unit, and this is the rough number of field operations (multiplications) per group
 const NbFieldOperationsPerGroup = 1024
 
 type InputOrder struct {
@@ -22,7 +22,7 @@ type InputOrder struct {
 }
 
 type InputOrderInstruction struct {
-	// if this is a hint instruction, InputIds[i] == j -> insn.OutputIds[i] should be put to j-th global input
+	// if this is a hint instruction, InputIds[i] == j means that insn.OutputIds[i] should be put to j-th global input
 	CircuitInputIds []int
 	// if this is a sub circuit instruction, solve it recursively
 	SubCircuit []InputOrderInstruction
@@ -157,6 +157,7 @@ func GetInputSolver(rc *RootCircuit, od *InputOrder) *InputSolver {
 	return res
 }
 
+// the global solving context of a root circuit
 type inputSolveCtx struct {
 	solver      *InputSolver
 	globalInput []*big.Int
@@ -164,6 +165,7 @@ type inputSolveCtx struct {
 	err         chan error
 }
 
+// a smaller solving context, for a circuit (or say, circuit call)
 type circuitSolveCtx struct {
 	circuit   *Circuit
 	si        *CircuitSolveInfo
@@ -171,6 +173,7 @@ type circuitSolveCtx struct {
 	inputInsn []InputOrderInstruction
 }
 
+// task to be scheduled on different workers
 type inputSolveTask struct {
 	csc      *circuitSolveCtx
 	insns    []int
@@ -186,7 +189,7 @@ func init() {
 	tVariable = reflect.ValueOf(struct{ A frontend.Variable }{}).FieldByName("A").Type()
 }
 
-// reimplement frontend.NewWitness
+// reimplement frontend.NewWitness, since we need to support non-standard fields
 func GetCircuitVariables(assignment frontend.Circuit, field field.Field) []constraint.Element {
 	chValues := make(chan any)
 	go func() {
@@ -211,6 +214,7 @@ func GetCircuitVariables(assignment frontend.Circuit, field field.Field) []const
 	return res
 }
 
+// SolveInput is the entry point to solve the final input of the given assignment
 func (solver *InputSolver) SolveInput(assignment frontend.Circuit, nbThreads int) (Witness, error) {
 	rc := solver.RootCircuit
 	od := solver.InputOrder

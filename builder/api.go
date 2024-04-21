@@ -1,3 +1,5 @@
+// Some content of this file is copied from gnark/frontend/cs/r1cs/api.go
+
 package builder
 
 import (
@@ -207,8 +209,11 @@ func (builder *builder) Mul(i1, i2 frontend.Variable, in ...frontend.Variable) f
 	return res
 }
 
-// TODO: fix lambda==0
 func (builder *builder) mulConstant(v1 expr.Expression, lambda constraint.Element, inPlace bool) expr.Expression {
+	if lambda.IsZero() {
+		return expr.NewConstantExpression(constraint.Element{})
+	}
+
 	// multiplying a frontend.Variable by a constant -> we updated the coefficients in the linear expression
 	// leading to that frontend.Variable
 	var res expr.Expression
@@ -224,6 +229,7 @@ func (builder *builder) mulConstant(v1 expr.Expression, lambda constraint.Elemen
 	return res
 }
 
+// DivHint calculates a/b, and returns 0 when a==b==0
 func DivHint(field *big.Int, inputs []*big.Int, outputs []*big.Int) error {
 	x := (&big.Int{}).Mod(inputs[0], field)
 	y := (&big.Int{}).Mod(inputs[1], field)
@@ -241,6 +247,7 @@ func DivHint(field *big.Int, inputs []*big.Int, outputs []*big.Int) error {
 	return nil
 }
 
+// DivUnchecked returns i1 / i2 . if i1 == i2 == 0, returns 0
 func (builder *builder) DivUnchecked(i1, i2 frontend.Variable) frontend.Variable {
 	vars, _ := builder.toVariables(i1, i2)
 
@@ -357,8 +364,6 @@ func (builder *builder) Xor(_a, _b frontend.Variable) frontend.Variable {
 	builder.AssertIsBoolean(a)
 	builder.AssertIsBoolean(b)
 
-	// moreover, we ensure than b is as small as possible, so that the result
-	// is bounded by len(min(a, b)) + 1
 	if len(b) > len(a) {
 		a, b = b, a
 	}
@@ -543,7 +548,6 @@ func (builder *builder) Cmp(i1, i2 frontend.Variable) frontend.Variable {
 
 	res := builder.eZero
 
-	// TODO: binary tree merge
 	for i := builder.field.FieldBitLen() - 1; i >= 0; i-- {
 
 		iszeroi1 := builder.IsZero(bi1[i])
