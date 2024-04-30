@@ -110,7 +110,8 @@ func (parent *builder) callSubCircuit(
 		subOutput := f(subBuilder, subInput)
 		subBuilder.output = make([]expr.Expression, len(subOutput))
 		for i, v := range subOutput {
-			subBuilder.output[i] = v.(expr.Expression)
+			//subBuilder.output[i] = v.(expr.Expression)
+			subBuilder.output[i] = subBuilder.toVariable(v)
 		}
 		sub := SubCircuit{
 			builder:      subBuilder,
@@ -127,11 +128,19 @@ func (parent *builder) callSubCircuit(
 				sub.inputAssertedNonZeroes = append(sub.inputAssertedNonZeroes, i)
 			}
 		}
+		maxOutLayer := 0
+		for _, x := range subBuilder.output {
+			cur := subBuilder.layerOfExpr(x)
+			if cur > maxOutLayer {
+				maxOutLayer = cur
+			}
+		}
 		for i, x := range subBuilder.output {
 			if _, ok := subBuilder.booleans.Find(x); ok {
 				sub.outputMarkedBooleans = append(sub.outputMarkedBooleans, i)
 			}
-			sub.outputLayers[i] = subBuilder.layerOfExpr(x)
+			//sub.outputLayers[i] = subBuilder.layerOfExpr(x)
+			sub.outputLayers[i] = maxOutLayer
 		}
 		parent.root.registry.m[circuitId] = &sub
 	}
