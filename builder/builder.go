@@ -486,6 +486,20 @@ func (builder *builder) compress(e expr.Expression) expr.Expression {
 	}
 	return builder.asInternalVariable(e)
 }
+func IdentityHint(field *big.Int, inputs []*big.Int, outputs []*big.Int) error {
+	a := big.NewInt(0)
+	a.Set(inputs[0])
+	outputs[0] = a
+	return nil
+}
+
+// ToFirstLayer adds a hint to the target variable, so that its depth is cleared to zero
+func (builder *builder) ToFirstLayer(v frontend.Variable) frontend.Variable {
+	x, _ := builder.NewHint(IdentityHint, 1, v)
+	builder.AssertIsEqual(x[0], v)
+	builder.markConstraintsForInternalVariable(builder.toVariable(v), builder.toVariable(x[0]))
+	return x[0]
+}
 
 func (builder *builder) Defer(cb func(frontend.API) error) {
 	builder.defers = append(builder.defers, cb)

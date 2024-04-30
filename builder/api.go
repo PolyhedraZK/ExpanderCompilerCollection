@@ -18,12 +18,14 @@ import (
 
 func init() {
 	solver.RegisterHint(DivHint)
+	solver.RegisterHint(IdentityHint)
 }
 
 type API interface {
 	ToSingleVariable(frontend.Variable) frontend.Variable
 	Output(frontend.Variable)
 	LayerOf(frontend.Variable) int // for debug usage
+	ToFirstLayer(frontend.Variable) frontend.Variable
 }
 
 // ---------------------------------------------------------------------------------------------
