@@ -88,6 +88,10 @@ func Validate(rc *RootCircuit) error {
 		return fmt.Errorf("root circuit is not found")
 	}
 
+	if !IsAllHintsSolvingTimeDeterminable(rc) {
+		return fmt.Errorf("some hints are not solving time determinable, please check what you did after GetRandomValue")
+	}
+
 	return nil
 }
 
@@ -172,6 +176,8 @@ func (ci *Circuit) Print(field field.Field) {
 				fmt.Printf(",v%d", insn.OutputIds[i])
 			}
 			fmt.Printf(" = sub%d(%s)\n", insn.SubCircuitId, strings.Join(strs, ","))
+		} else if insn.Type == IGetRandom {
+			fmt.Printf("v%d = rand()\n", insn.OutputIds[0])
 		}
 	}
 

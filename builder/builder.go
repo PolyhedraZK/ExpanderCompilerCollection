@@ -535,3 +535,13 @@ func (builder *builder) GetKeyValue(key any) any {
 	}
 	return builder.db[key]
 }
+
+// GetRandomValue returns a prove-time determined random value
+// The return value can't be used in hints, since it's unknown at the input solving phase
+func (builder *builder) GetRandomValue() frontend.Variable {
+	idx := builder.newVariable(2)
+	builder.instructions = append(builder.instructions,
+		ir.NewGetRandomInstruction(idx),
+	)
+	return expr.NewLinearExpression(idx, builder.tOne)
+}

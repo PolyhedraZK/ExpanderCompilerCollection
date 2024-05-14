@@ -326,6 +326,10 @@ func (isc *inputSolveCtx) worker() {
 					}
 				} else if insn.Type == ISubCircuit {
 					go isc.solve(insn.SubCircuitId, in, inputInsn[insnId].SubCircuit, csc.values[outOffset:outOffset+len(insn.OutputIds)], task.callback)
+				} else if insn.Type == IGetRandom {
+					// since we already make sure that the output of GetRandom is not used in hints, we can just set it to 0
+					// TODO: elimate unused instructions
+					csc.values[outOffset] = field.FromInterface(big.NewInt(0))
 				}
 			}
 		}
