@@ -26,6 +26,7 @@ type API interface {
 	Output(frontend.Variable)
 	LayerOf(frontend.Variable) int // for debug usage
 	ToFirstLayer(frontend.Variable) frontend.Variable
+	GetRandomValue() frontend.Variable
 }
 
 // ---------------------------------------------------------------------------------------------

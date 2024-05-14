@@ -12,6 +12,7 @@ const (
 	IInternalVariable InstructionType = iota
 	IHint
 	ISubCircuit
+	IGetRandom
 )
 
 // an instruction can be:
@@ -49,5 +50,12 @@ func NewSubCircuitInstruction(subId uint64, inputs []expr.Expression, outputsIds
 		SubCircuitId: subId,
 		Inputs:       inputs,
 		OutputIds:    outputsIds,
+	}
+}
+
+func NewGetRandomInstruction(outputId int) Instruction {
+	return Instruction{
+		Type:      IGetRandom,
+		OutputIds: []int{outputId},
 	}
 }

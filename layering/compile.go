@@ -65,6 +65,7 @@ type irContext struct {
 	combinedConstraints []*combinedConstraint
 
 	internalVariableExpr map[int]expr.Expression
+	isRandomVariable     map[int]bool
 
 	// layer layout contexts
 	lcs    []layerLayoutContext
@@ -180,6 +181,7 @@ func (ctx *compileContext) dfsTopoSort(id uint64) {
 		outputOrder:          make(map[int]int),
 		hintInputsMap:        make(map[int]int),
 		internalVariableExpr: make(map[int]expr.Expression),
+		isRandomVariable:     make(map[int]bool),
 	}
 }
 
@@ -301,6 +303,13 @@ func (ctx *compileContext) computeMinMaxLayers(ic *irContext) {
 			}
 			ic.subCircuitInsnIds = append(ic.subCircuitInsnIds, i)
 			ic.subCircuitHintInputs = append(ic.subCircuitHintInputs, subhs)
+		} else if insn.Type == ir.IGetRandom {
+			for _, x := range insn.OutputIds {
+				// minLayer is 1, since we can't get a random value at input layer
+				ic.minLayer[x] = 1
+				q0 = append(q0, x)
+				ic.isRandomVariable[x] = true
+			}
 		}
 	}
 	q0 = append(q0, q1...) // the merged topo order
@@ -548,5 +557,21 @@ checkNextCircuit:
 	// force maxLayer of output to be outputLayer
 	for _, x := range circuit.Output {
 		ic.maxLayer[x[0].VID0] = ic.outputLayer
+	}
+
+	// adjust minLayer of GetRandomValue variables to a larger value
+	for _, insn := range circuit.Instructions {
+		if insn.Type == ir.IGetRandom {
+			x := insn.OutputIds[0]
+			if !ic.isUsed[x] || ic.maxLayer[x] == ic.outputLayer {
+				continue
+			}
+			ic.minLayer[x] = ic.outputLayer
+			for _, y := range outEdges[x] {
+				if ic.isUsed[y] && ic.minLayer[y]-layerAdvance[y] < ic.minLayer[x] {
+					ic.minLayer[x] = ic.minLayer[y] - layerAdvance[y]
+				}
+			}
+		}
 	}
 }

@@ -312,6 +312,12 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 				})
 			}
 		}
+		if ic.isRandomVariable[x] {
+			res.Cst = append(res.Cst, layered.GateCst{
+				Out:  uint64(pos),
+				Coef: field(),
+			})
+		}
 	}
 	// also combined output variables
 	var cc *combinedConstraint = nil
