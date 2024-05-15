@@ -97,6 +97,20 @@ func Compile(rc *ir.RootCircuit) (*layered.RootCircuit, *ir.InputOrder) {
 	}, &ctx.inputOrder
 }
 
+func ProfilingCompile(rc *ir.RootCircuit) []int {
+	ctx := newCompileContext(rc)
+	ctx.compile()
+
+	ic := ctx.circuits[0]
+	res := make([]int, len(ic.minLayer))
+	for i := range ic.minLayer {
+		if ic.isUsed[i] {
+			res[i] = ic.maxLayer[i] - ic.minLayer[i] + 1
+		}
+	}
+	return res
+}
+
 func newCompileContext(rc *ir.RootCircuit) *compileContext {
 	return &compileContext{
 		rc:               rc,

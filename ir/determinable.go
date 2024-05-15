@@ -54,7 +54,9 @@ func (dc *determinableChecker) call(id uint64, in []bool) []bool {
 						dc.res = false
 					}
 				}
-				determinable = append(determinable, true)
+				for range insn.OutputIds {
+					determinable = append(determinable, true)
+				}
 			}
 		}
 	}

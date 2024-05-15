@@ -7,6 +7,7 @@ import (
 	"github.com/Zklib/gkr-compiler/ir"
 	"github.com/Zklib/gkr-compiler/layered"
 	"github.com/Zklib/gkr-compiler/layering"
+	"github.com/Zklib/gkr-compiler/utils"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/logger"
 )
@@ -108,6 +109,32 @@ func Compile(field *big.Int, circuit frontend.Circuit, opts ...frontend.CompileO
 		inputOrder: io,
 	}
 	return &res, nil
+}
+
+// TODO: support sub circuit
+func ProfilingCompile(field *big.Int, circuit frontend.Circuit, opts ...frontend.CompileOption) error {
+	var root *builder.ProfilingRoot
+	newBuilder_ := func(field *big.Int, config frontend.CompileConfig) (frontend.Builder, error) {
+		if root != nil {
+			panic("newBuilder can only be called once")
+		}
+		root = builder.NewProfilingRoot(field, config)
+		return root.GetRootBuilder(), nil
+	}
+	// returned R1CS is useless
+	_, err := frontend.Compile(field, newBuilder_, circuit, opts...)
+	// make sure gkr.API is implemented by ProfilingBuilder
+	_ = API(root.GetRootBuilder())
+	if err != nil {
+		return err
+	}
+	rc, varSourceInfo := root.Finalize()
+	if err := ir.ValidateForLayering(rc); err != nil {
+		return err
+	}
+	varCost := layering.ProfilingCompile(rc)
+	utils.ShowProfiling(varSourceInfo, varCost)
+	return nil
 }
 
 func (c *CompileResult) GetCircuitIr() *ir.RootCircuit {
