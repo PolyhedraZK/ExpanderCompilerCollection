@@ -1,0 +1,7 @@
+# generated artifact
+*.txt
+
+# dev IDE
+.idea
+.vscode
+.code
