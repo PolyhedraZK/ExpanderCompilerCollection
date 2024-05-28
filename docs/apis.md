@@ -1,34 +1,36 @@
-# APIs
+# Compiler APIs
 
-This page introduces core APIs of the compiler.
+This document provides an overview of the core APIs available in the compiler.
 
-## Root package
+## Root Package
+
+To use the compiler, include the following import in your Go code:
 
 ```go
 import gkr "github.com/Zklib/gkr-compiler"
 ```
 
-### Compile
+### Compile Function
 
-`gkr.Compile` is the main function of the compiler. It takes a `frontend.Circuit` and returns a `CompileResult`.
+`gkr.Compile` serves as the entry point for the compiler. It accepts a `frontend.Circuit` and yields a `CompileResult`.
 
-### CompileResult
+### CompileResult Structure
 
-`gkr.CompileResult` is the result of the compilation. It contains the layered circuit and the IR.
+`gkr.CompileResult` encapsulates the outcome of the compilation process, comprising both the layered circuit and the intermediate representation (IR).
 
-It provides 3 methods to access them:
+The `CompileResult` offers three methods for data retrieval:
 
-1. `GetCircuitIr`: returns the IR.
-2. `GetLayeredCircuit`: returns the layered circuit.
-3. `GetWitness`: given an assignment, calculates the witness.
+1. `GetCircuitIr`: Retrieves the IR.
+2. `GetLayeredCircuit`: Obtains the layered circuit.
+3. `GetInputSolver()`: Gets the compiled witness solver of the circuit.
 
-### API
+### Builder API
 
-`gkr.API` is the API interface of the builder, which extends the `frontend.API` interface of gnark and adds sub-circuit support and other utilities.
+`gkr.API` is the interface for the builder API, enhancing the `frontend.API` interface from gnark with additional capabilities such as sub-circuit support and utility functions.
 
 ## Sub-Circuit API
 
-The sub-circuit support is provided by the following methods:
+Sub-circuit functionality is facilitated through the following methods:
 
 ```go
 type SubCircuitSimpleFunc func(api frontend.API, input []frontend.Variable) []frontend.Variable
@@ -40,25 +42,33 @@ type SubCircuitAPI interface {
 }
 ```
 
-`SubCircuitFunc` can be arbitrary function, which takes simple types and `frontend.Variable` as input, and returns `frontend.Variable` as output.
+`SubCircuitFunc` accommodates any function that accepts simple types and `frontend.Variable` as inputs and returns `frontend.Variable` as the output.
 
-For example, `func(frontend.API, int, uint8, [][]frontend.Variable, string, ...[]frontend.Variable) [][][]frontend.Variable` is a valid `SubCircuitFunc`.
+For instance, a function signature like `func(frontend.API, int, uint8, [][]frontend.Variable, string, ...[]frontend.Variable) [][][]frontend.Variable` qualifies as a `SubCircuitFunc`.
 
-`SubCircuitFunc` should follow another rule: it should be deterministic if those simple type inputs are the same. This is because the compiler will memorize the circuit wiring of the sub-circuit calls, and use the memorized result if the same input is given.
+A crucial requirement for `SubCircuitFunc` is determinism: given identical simple-type inputs, the output should be consistent. This consistency is critical as the compiler memorizes the wiring of sub-circuit calls, reusing the memorized results for identical inputs.
 
-## Other APIs
+## Additional APIs
 
 ```go
 type API interface {
 	ToSingleVariable(frontend.Variable) frontend.Variable
+	Output(frontend.Variable)
+	LayerOf(frontend.Variable) int
+	ToFirstLayer(frontend.Variable) frontend.Variable
+	GetRandomValue() frontend.Variable
 }
 ```
 
-`ToSingleVariable` always returns an expression with only one variable. If the input already has only one variable, it returns the input. Otherwise, it creates an internal variable (a gate) and returns it.
+- `ToSingleVariable`: Converts an expression into a single base variable. If the input expression is already a single variable, it is returned directly. Otherwise, an internal variable or gate is created to represent the expression.
+- `Output`: Adds a variable to the circuit's output. This is used to expose certain variables as public outputs of the circuit.
+- `LayerOf`: Estimates the layer in which a variable will appear in the compiled layered circuit. The term "estimate" is used because subsequent compilation optimizations may alter the exact layer placement determined during the Builder phase.
+- `ToFirstLayer`: Uses a hint to pull a variable back to the first layer.
+- `GetRandomValue`: Retrieves a random value directly, which is more efficient than generating pseudo-random numbers using a hash function. This is possible due to the Libra proving process which allows direct access to random numbers.
 
-## builder
+## Builder Extensions
 
-### MemorizeXXXFunc
+### Memorized Function Wrappers
 
 ```go
 func MemorizedSimpleFunc(f SubCircuitSimpleFunc) SubCircuitSimpleFunc
@@ -69,7 +79,7 @@ func Memorized2DFunc(f SubCircuitFunc) func(frontend.API, ...interface{}) [][]fr
 func Memorized3DFunc(f SubCircuitFunc) func(frontend.API, ...interface{}) [][][]frontend.Variable
 ```
 
-These are just sugars for `MemorizedCall`. For example, the following two are equivalent:
+These function wrappers are syntactic conveniences for `MemorizedCall`. They simplify the usage of memorized calls. For example, the following invocations are functionally equivalent:
 
 ```go
 output := api.MemorizedSimpleCall(f, input)

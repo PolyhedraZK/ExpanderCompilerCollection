@@ -2,7 +2,11 @@ package expr
 
 // similar to gnark frontend/internal/expr/term, but we support quadratic variables
 
-import "github.com/consensys/gnark/constraint"
+import (
+	"math/big"
+
+	"github.com/consensys/gnark/constraint"
+)
 
 type Term struct {
 	// if vid1 is 0, it means linear term.
@@ -39,4 +43,11 @@ func (t *Term) Degree() int {
 		return 1
 	}
 	return 2
+}
+
+// ToBigIntRegular implements gnark toBigIntInterface interface
+// Actually it's impossible to convert a Term to big.Int, but sometimes it requires such evaluation (like in gnark utils.FromInterface).
+// So a fake implementation is created to provide better instructions for users
+func (t Term) ToBigIntRegular(*big.Int) *big.Int {
+	panic("Conversion from expr.Term to big.Int triggered, please check the type of the API call here.")
 }

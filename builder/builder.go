@@ -1,5 +1,9 @@
 // Some content of this file is copied from gnark/frontend/cs/r1cs/builder.go
 
+// Package builder provides an implementation based on the gnark frontend builder with the following modifications:
+// - LinearExpression has been changed to allow for quadratic terms in the form of Expression.
+// - Assert series functions are recorded first and later solidified into the IR.
+// - Support for subcircuits is integrated within the builder.
 package builder
 
 import (
@@ -130,8 +134,7 @@ func (builder *builder) asInternalVariable(eall expr.Expression) expr.Expression
 	return res
 }
 
-// ToInternalVariable converts the variable to one term
-// The output will have no constant term
+// ToSingleVariable converts an expression to a single base variable without a constant term.
 func (builder *builder) ToSingleVariable(ein frontend.Variable) frontend.Variable {
 	eall := builder.toVariable(ein)
 	res := builder.asInternalVariableInner(eall, true)
@@ -233,15 +236,17 @@ func (builder *builder) stripConstant(e_ expr.Expression) (expr.Expression, cons
 	return e, v, cst
 }
 
+// Field returns the value of the current field being used.
 func (builder *builder) Field() *big.Int {
 	return builder.field.Field()
 }
 
+// FieldBitLen returns the bit length of the current field being used.
 func (builder *builder) FieldBitLen() int {
 	return builder.field.FieldBitLen()
 }
 
-// LayerOf returns the expected layer of the variable (actual layer may slightly differ)
+// LayerOf returns the expected layer of the variable, though the actual layer may vary.
 func (builder *builder) LayerOf(e frontend.Variable) int {
 	return builder.layerOfExpr(builder.toVariable(e))
 }
@@ -291,13 +296,12 @@ func (builder *builder) IsBoolean(v frontend.Variable) bool {
 	return ok
 }
 
-// Compile does nothing! It's just for gnark API compatibility
+// Compile is a placeholder for gnark API compatibility; it does nothing.
 func (builder *builder) Compile() (constraint.ConstraintSystem, error) {
 	return nil, nil
 }
 
-// ConstantValue returns the big.Int value of v.
-// Will panic if v.IsConstant() == false
+// ConstantValue returns the big.Int value of v and panics if v is not a constant.
 func (builder *builder) ConstantValue(v frontend.Variable) (*big.Int, bool) {
 	coeff, ok := builder.constantValue(v)
 	if !ok {
@@ -368,10 +372,10 @@ func (builder *builder) toVariables(in ...frontend.Variable) ([]expr.Expression,
 // variables or convertible to *big.Int. The function returns an error if the
 // number of inputs is not compatible with f.
 //
-// The hint function is provided at the proof creation time and is not embedded
-// into the circuit. From the backend point of view, the variable returned by
+// The hint function is provided at the input solving time and is not embedded
+// into the circuit. From the prover point of view, the variable returned by
 // the hint function is equivalent to the user-supplied witness, but its actual
-// value is assigned by the solver, not the caller.
+// value is assigned by the InputSolver, not the caller.
 //
 // No new constraints are added to the newly created wire and must be added
 // manually in the circuit. Failing to do so leads to solver failure.
@@ -379,6 +383,7 @@ func (builder *builder) NewHint(f solver.Hint, nbOutputs int, inputs ...frontend
 	return builder.newHint(f, nbOutputs, inputs)
 }
 
+// NewHintForId is not implemented and will panic if called.
 func (builder *builder) NewHintForId(id solver.HintID, nbOutputs int, inputs ...frontend.Variable) ([]frontend.Variable, error) {
 	panic("unimplemented")
 }
@@ -486,6 +491,8 @@ func (builder *builder) compress(e expr.Expression) expr.Expression {
 	}
 	return builder.asInternalVariable(e)
 }
+
+// IdentityHint sets output[0] to input[0] and is used to implement ToFirstLayer.
 func IdentityHint(field *big.Int, inputs []*big.Int, outputs []*big.Int) error {
 	a := big.NewInt(0)
 	a.Set(inputs[0])
@@ -493,7 +500,7 @@ func IdentityHint(field *big.Int, inputs []*big.Int, outputs []*big.Int) error {
 	return nil
 }
 
-// ToFirstLayer adds a hint to the target variable, so that its depth is cleared to zero
+// ToFirstLayer adds a hint to the target variable to bring it to the first layer.
 func (builder *builder) ToFirstLayer(v frontend.Variable) frontend.Variable {
 	x, _ := builder.NewHint(IdentityHint, 1, v)
 	builder.AssertIsEqual(x[0], v)
@@ -501,27 +508,32 @@ func (builder *builder) ToFirstLayer(v frontend.Variable) frontend.Variable {
 	return x[0]
 }
 
+// Defer adds a callback function to the defer list to be processed later.
 func (builder *builder) Defer(cb func(frontend.API) error) {
 	builder.defers = append(builder.defers, cb)
 }
 
+// AddInstruction is not implemented and will panic if called.
 func (builder *builder) AddInstruction(bID constraint.BlueprintID, calldata []uint32) []uint32 {
 	panic("unimplemented")
 }
 
+// AddBlueprint is not implemented and will panic if called.
 func (builder *builder) AddBlueprint(b constraint.Blueprint) constraint.BlueprintID {
 	panic("unimplemented")
 }
 
+// InternalVariable is not implemented and will panic if called.
 func (builder *builder) InternalVariable(wireID uint32) frontend.Variable {
 	panic("unimplemented")
 }
 
+// ToCanonicalVariable is not implemented and will panic if called.
 func (builder *builder) ToCanonicalVariable(in frontend.Variable) frontend.CanonicalVariable {
 	panic("unimplemented")
 }
 
-// implement kvstore
+// SetKeyValue implements kvstore for the gnark frontend.
 func (builder *builder) SetKeyValue(key, value any) {
 	if !reflect.TypeOf(key).Comparable() {
 		panic("key type not comparable")
@@ -529,6 +541,7 @@ func (builder *builder) SetKeyValue(key, value any) {
 	builder.db[key] = value
 }
 
+// GetKeyValue implements kvstore for the gnark frontend.
 func (builder *builder) GetKeyValue(key any) any {
 	if !reflect.TypeOf(key).Comparable() {
 		panic("key type not comparable")
@@ -536,8 +549,8 @@ func (builder *builder) GetKeyValue(key any) any {
 	return builder.db[key]
 }
 
-// GetRandomValue returns a prove-time determined random value
-// The return value can't be used in hints, since it's unknown at the input solving phase
+// GetRandomValue returns a random value determined during the proving time.
+// The return value cannot be used in hints, since it's unknown at the input solving phase
 func (builder *builder) GetRandomValue() frontend.Variable {
 	idx := builder.newVariable(2)
 	builder.instructions = append(builder.instructions,

@@ -5,10 +5,8 @@ import (
 	"github.com/Zklib/gkr-compiler/ir"
 )
 
-// Finalize will
-// 1. process defers
-// 2. convert boolean and nonzero assertions to zero assertions
-// 3. add public variables to output
+// Finalize processes deferred functions, converts boolean and nonzero assertions to zero assertions,
+// and adds public variables to the output.
 func (r *Root) Finalize() *ir.RootCircuit {
 	if len(r.publicVariables) > 0 {
 		r.finalizePublicVariables(r.publicVariables)

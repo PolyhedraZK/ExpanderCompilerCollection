@@ -7,8 +7,8 @@ type determinableChecker struct {
 	res bool
 }
 
-// IsAllHintsSolvingTimeDeterminable checks if every input variable of hints are solving time determinable
-// (Since the output of GetRandomValue is not solving time determinable)
+// IsAllHintsSolvingTimeDeterminable checks if every input variable of hints is solving time determinable.
+// It returns false if the output of GetRandomValue is used in hints, as these cannot be determined at solving time.
 func IsAllHintsSolvingTimeDeterminable(rc *RootCircuit) bool {
 	dc := determinableChecker{
 		rc:  rc,

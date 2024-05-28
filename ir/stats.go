@@ -23,6 +23,7 @@ type statsContext struct {
 	m  map[uint64]*circuitStats
 }
 
+// GetStats retrieves statistical information about the circuit, such as the number of input gates, terms, and constraints.
 func (rc *RootCircuit) GetStats() Stats {
 	sc := &statsContext{
 		rc: rc,
