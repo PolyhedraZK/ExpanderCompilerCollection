@@ -5,6 +5,7 @@ import (
 	"github.com/consensys/gnark/constraint/solver"
 )
 
+// InstructionType enumerates the types of instructions that can be part of a Circuit.
 type InstructionType int
 
 const (
@@ -15,10 +16,11 @@ const (
 	IGetRandom
 )
 
-// an instruction can be:
+// Instruction represents a computation step within a circuit. It can be:
 //  1. an internal variable, which compress an expression into a single variable
 //  2. a hint, as in gnark
 //  3. a sub circuit
+//  4. a random value
 type Instruction struct {
 	Type         InstructionType
 	HintFunc     solver.Hint

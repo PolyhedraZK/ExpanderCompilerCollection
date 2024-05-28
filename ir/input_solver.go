@@ -13,15 +13,17 @@ import (
 	"github.com/consensys/gnark/frontend/schema"
 )
 
-// group is the minimum scheduling unit, and this is the rough number of field operations (multiplications) per group
+// NbFieldOperationsPerGroup represents the rough number of field operations (multiplications) per group, where a group is the minimum scheduling unit.
 const NbFieldOperationsPerGroup = 1024
 
+// InputOrder maps the circuit inputs (including user and hint inputs) to their final order in the circuit.
 type InputOrder struct {
 	Insn            []InputOrderInstruction
 	CircuitInputIds []int
 	InputLen        int
 }
 
+// InputOrderInstruction represents instructions for ordering inputs within the circuit, specifically for hints and sub-circuit calls.
 type InputOrderInstruction struct {
 	// if this is a hint instruction, InputIds[i] == j means that insn.OutputIds[i] should be put to j-th global input
 	CircuitInputIds []int
@@ -29,12 +31,19 @@ type InputOrderInstruction struct {
 	SubCircuit []InputOrderInstruction
 }
 
+// InputSolver is responsible for solving the entire circuit's inputs.
+// It uses RootCircuit for the circuit structure, InputOrder for the ordering of inputs,
+// and CircuitsSolveInfo for solving information for each sub-circuit.
 type InputSolver struct {
 	RootCircuit       *RootCircuit
 	InputOrder        *InputOrder
 	CircuitsSolveInfo map[uint64]*CircuitSolveInfo
 }
 
+// CircuitSolveInfo contains information required to solve a single circuit's inputs.
+// It details the order of solving for instructions within evaluation groups by layer,
+// the total number of variables, and the number of necessary done signals for each
+// layer, which equals the number of groups plus the number of sub-circuits.
 type CircuitSolveInfo struct {
 	// the dimensions are: which layer -> eval group -> instructions
 	SolveOrder [][][]int
@@ -44,8 +53,7 @@ type CircuitSolveInfo struct {
 	MaxChanSize      int
 }
 
-// GetInputSolver calculates the input solver for the given root circuit and input order
-// It does a toposort on the instructions
+// GetInputSolver calculates the input solver for the given root circuit and input order by performing a topological sort on the instructions.
 func GetInputSolver(rc *RootCircuit, od *InputOrder) *InputSolver {
 	res := &InputSolver{
 		RootCircuit:       rc,
@@ -182,6 +190,7 @@ type inputSolveTask struct {
 	callback chan bool
 }
 
+// Witness represents the solved values of the circuit's inputs.
 type Witness []*big.Int
 
 var tVariable reflect.Type
@@ -190,7 +199,7 @@ func init() {
 	tVariable = reflect.ValueOf(struct{ A frontend.Variable }{}).FieldByName("A").Type()
 }
 
-// reimplement frontend.NewWitness, since we need to support non-standard fields
+// GetCircuitVariables reimplements frontend.NewWitness to support fields that are not present in gnark.
 func GetCircuitVariables(assignment frontend.Circuit, field field.Field) []constraint.Element {
 	chValues := make(chan any)
 	go func() {
@@ -215,11 +224,12 @@ func GetCircuitVariables(assignment frontend.Circuit, field field.Field) []const
 	return res
 }
 
+// SolveInputAuto solves the final input of the given assignment, automatically determining the number of threads to use.
 func (solver *InputSolver) SolveInputAuto(assignment frontend.Circuit) (Witness, error) {
 	return solver.SolveInput(assignment, runtime.NumCPU())
 }
 
-// SolveInput is the entry point to solve the final input of the given assignment
+// SolveInput is the entry point to solve the final input of the given assignment using a specified number of threads.
 func (solver *InputSolver) SolveInput(assignment frontend.Circuit, nbThreads int) (Witness, error) {
 	rc := solver.RootCircuit
 	od := solver.InputOrder
@@ -381,6 +391,7 @@ func (isc *inputSolveCtx) solve(id uint64, input []constraint.Element, inputInsn
 	}
 }
 
+// Serialize converts the Witness into a byte slice for storage or transmission.
 func (w Witness) Serialize() []byte {
 	o := utils.OutputBuf{}
 	for _, x := range w {
