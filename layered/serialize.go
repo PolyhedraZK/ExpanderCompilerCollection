@@ -6,6 +6,7 @@ import (
 	"github.com/Zklib/gkr-compiler/utils"
 )
 
+// Serialize converts a RootCircuit into a byte array for storage or transmission.
 func (rc *RootCircuit) Serialize() []byte {
 	o := utils.OutputBuf{}
 	zero := big.NewInt(0)

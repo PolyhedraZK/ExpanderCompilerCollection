@@ -1,3 +1,8 @@
+// Package layered defines the structures and functions necessary for
+// creating and manipulating layered circuits within the gkr-compiler.
+// A layered circuit is a representation of a computation that is divided
+// into a sequence of discrete layers, facilitating certain types of
+// optimizations and parallel computations.
 package layered
 
 import (
@@ -5,12 +10,20 @@ import (
 	"math/big"
 )
 
+// RootCircuit defines a multi-layered circuit.
+// The Layers field specifies the indices of each layer, which are referenced
+// through the Circuits array. Field denotes the mathematical field over which
+// the circuit operations are carried out.
 type RootCircuit struct {
 	Circuits []*Circuit
 	Layers   []uint64
 	Field    *big.Int
 }
 
+// Circuit represents a single segment within a layered circuit.
+// It contains the length of inputs and outputs, a list of subcircuits
+// that can be called within this segment, and the gates that perform
+// various arithmetic operations within the segment.
 type Circuit struct {
 	InputLen    uint64
 	OutputLen   uint64
@@ -20,16 +33,27 @@ type Circuit struct {
 	Cst         []GateCst
 }
 
+// SubCircuit represents a subcircuit that is used within a Circuit.
+// It has the identifier of the subcircuit (indexed in RootCircuit.Circuits)
+// and a list of allocations that define the input and output connections
+// to the subcircuit.
 type SubCircuit struct {
 	Id          uint64
 	Allocations []Allocation
 }
 
+// Allocation defines the input and output offsets for a subcircuit call.
+// These offsets determine where the subcircuit's inputs and outputs
+// are positioned within the larger circuit context.
 type Allocation struct {
 	InputOffset  uint64
 	OutputOffset uint64
 }
 
+// GateMul represents a multiplication gate within a circuit layer.
+// It specifies two input wire indices and an output wire index,
+// along with a coefficient. The product of the inputs and the coefficient
+// is added to the output.
 type GateMul struct {
 	In0  uint64
 	In1  uint64
@@ -37,17 +61,25 @@ type GateMul struct {
 	Coef *big.Int
 }
 
+// GateAdd represents an addition gate within a circuit layer.
+// It specifies the input and output wire indices, and the coefficient
+// to be multiplied with the input before being added to the output.
 type GateAdd struct {
 	In   uint64
 	Out  uint64
 	Coef *big.Int
 }
 
+// GateCst represents a constant gate within a circuit layer.
+// It directly adds a constant value, defined by Coef, to the output wire.
 type GateCst struct {
 	Out  uint64
 	Coef *big.Int
 }
 
+// Print outputs the entire circuit structure to the console for debugging purposes.
+// It provides a human-readable representation of the circuit's layers, gates, and
+// subcircuits, along with their interconnections.
 func (c *Circuit) Print() {
 	fmt.Printf("Input=%d Output=%d\n", c.InputLen, c.OutputLen)
 	for _, sub := range c.SubCircuits {
@@ -67,6 +99,9 @@ func (c *Circuit) Print() {
 	}
 }
 
+// Print outputs the entire multi-layered circuit structure to the console for debugging purposes.
+// It provides a detailed view of the circuit's construction, including all gates and
+// their connections across layers.
 func (rc *RootCircuit) Print() {
 	for i, c := range rc.Circuits {
 		fmt.Printf("Circuit %d: ", i)
@@ -76,7 +111,9 @@ func (rc *RootCircuit) Print() {
 	fmt.Printf("Layers: %v\n", rc.Layers)
 }
 
-// Validate checks if the circuit is valid
+// Validate checks the structural integrity of a RootCircuit.
+// It ensures that all components and connections within the circuit
+// adhere to the expected format and constraints of a layered circuit.
 func Validate(rc *RootCircuit) error {
 	for i, c := range rc.Circuits {
 		if c.InputLen == 0 || (c.InputLen&(c.InputLen-1)) != 0 {
@@ -159,7 +196,9 @@ func computeMasks(rc *RootCircuit) ([][]bool, [][]bool) {
 	return inputMask, outputMask
 }
 
-// ValidateInitialized checks if all wire inputs are initialized
+// ValidateInitialized verifies that all wire inputs in a RootCircuit
+// have been properly initialized. An uninitialized wire input would
+// indicate an incomplete or improperly constructed circuit.
 func ValidateInitialized(rc *RootCircuit) error {
 	inputMask, outputMask := computeMasks(rc)
 	for i := 1; i < len(rc.Layers); i++ {

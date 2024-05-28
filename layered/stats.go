@@ -33,6 +33,9 @@ type statsContext struct {
 	m  []circuitStats
 }
 
+// GetStats collects and returns statistical information about a RootCircuit,
+// such as the number of layers, circuits, and different types of gates before
+// and after expansion.
 func (rc *RootCircuit) GetStats() Stats {
 	sc := &statsContext{
 		rc: rc,
