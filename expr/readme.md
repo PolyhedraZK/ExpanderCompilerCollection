@@ -1,3 +1,3 @@
 # expr
 
-基于 `gnark/frontend/internal/expr` 实现的支持二次项的表达式。
+An expression supporting quadratic terms, implemented based on gnark `frontend/internal/expr`.
