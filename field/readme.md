@@ -1,7 +1,7 @@
 # field
 
-gnark 的 builder 中，调用了 R1CS（如 `gnark/constraint/bn254`）。而 R1CS 实现了 field。
+Within gnark's builder, the Rank-1 Constraint System (R1CS) is used, such as in `gnark/constraint/bn254`. R1CS implements arithmetic over a field.
 
-由于 R1CS 实现的是 private 的，而我们又需要支持别的 field，所以有了这个独立出来的库。
+Since the R1CS implementation is private and there is a need to support other fields, an independent library for field arithmetic was created.
 
-目前支持的 field 有 `bn254` 和 `m31`，其中 `m31` 的模数是 $2^{31}-1$。
+Currently, the supported fields include `bn254` and `m31`, where the modulus for `m31` is $2^{31}-1$.

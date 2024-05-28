@@ -1,45 +1,42 @@
-# 编译流程
+# Compiler Process
 
-整体编译流程在 api.go 里面，解释如下：
+The compilation process is encapsulated within `api.go` and involves the following phases:
 
-1. gnark 的源码首先经过 builder，生成了 circuit ir。
-2. ir 可以进行一些优化。
-3. ir 经过 layering，生成了 layered circuit。
-4. layered circuit 可以再进行一些优化。
+1. **Circuit IR Construction:** The source code is first processed by the builder, which constructs the circuit intermediate representation (IR). This builder is akin to the gnark's internal builder but extends the `LinearExpression` to support quadratic terms. It maintains a tree structure that represents the computational graph of the circuit and from which the IR is generated.
 
-## Builder
+2. **IR Optimization:** The IR, as a representation of the circuit, is subject to optimization. This may involve merging redundant variables, splitting large variables to improve efficiency, and other transformations that streamline the computational graph without altering its functionality.
 
-builder 和 gnark 内置的 builder 基本一致，不过 LinearExpression 改成了允许二次项的 Expression。
+3. **Circuit Layering:** The IR is then subjected to a layering process that transforms it into a layered circuit. This involves topologically sorting the directed acyclic graph (DAG) of sub-circuit call relationships, computing the necessary layers for each variable, and allocating the variables across these layers. The layering strategy is recursive, prioritizing sub-circuits and ensuring alignment with the Libra protocol's requirements.
 
-builder 会记录整体的树结构，然后生成 ir。
+4. **Layered Circuit Optimization:** Once the circuit is layered, further optimizations can be applied to the layered circuit. These optimizations may involve expanding sub-circuits based on their frequency of occurrence or the number of variables involved.
 
-## IR
+## Detailed Steps in Compilation
 
-ir 是电路在编译过程中的中间表示，每个电路由许多 Instruction 组成，每个 Instruction 可以是：
+### Builder Implementation
 
-1. InternalVariable，表示一个中间变量。
-2. Hint，和 gnark 的 hint 相同。
-3. SubCircuit，表示一次子电路的调用。
+The builder is responsible for capturing the high-level algorithmic structure and translating it into a form suitable for optimization and layering. It records the overall tree structure, then generates the IR, which is a more malleable form for subsequent compilation steps.
 
-## Layering
+### IR (Intermediate Representation)
 
-layering 会将 ir 转换成分层电路。具体来说，会执行以下步骤（见 `layering/compile.go:Compile`）：
+The IR is a pivotal stage in the compilation process, serving as a bridge between the high-level description of the circuit and the layered circuit ready for use in proofs. The IR consists of instructions that can be variables, hints, or sub-circuit calls.
 
-1. 对所有电路形成的（子电路调用关系图）DAG 拓扑排序。
-2. 对于每个电路，计算其中每个变量需要在哪些层出现。含有子电路的情况，会默认子电路的输入/输出节点均在同一层。此时我们已经知道，每一层会出现哪些变量。
-3. 对于每个电路，分配每一层变量的排布。目前的策略大致是，递归地将子电路的该层进行分层，然后按照大小倒序排序，再连起来。接下来把剩余变量放在空余的位置上。最后 pad 到 2^n。子电路的输入/输出层会有一些额外的处理，使得他们能尽量放在一起。
-4. 对于每个电路，对于所有相邻的层，把这两层之间的连线编译成 `layered/Circuit`。这也是一个递归的过程，大致就是把子电路用到的变量拿出来，取最小能放下它的 2^n，然后递归求解。
+### Layering Process
 
-还有一些细节：
-1. Assertion 会被按层划分，归集到一个变量上。每层的这个变量也会累加起来，直到输出层。
-2. 如果子电路用到 Hint，这些 Hint 需要从输入层一路 relay 过来。这些 relay 也会被编译成一个单独的子电路。
+1. Topologically sorts the DAG formed by all circuits (sub-circuit call graphs).
+2. For each circuit, calculates the layers where each variable needs to appear.
+3. Allocates the layout of variables for each layer.
+4. Compiles the connections between all adjacent layers into `layered/Circuit`.
 
-此过程中会删去大多数不必要的变量，并删除不必要的子电路调用。
+Details include:
+1. Assertions are divided by layer and accumulated up to the output layer.
+2. If a sub-circuit uses a hint, these hints must be relayed from the input layer.
 
-## Layered
+This process eliminates most unnecessary variables and redundant sub-circuit calls.
 
-见 [Layered Circuit Format](./layered_circuit_format.md)。
+### Layered Circuit
 
-电路的输出层里面，第 0 个是 Random Combined Assertions，后面的依次是 Public Input。
+Refer to [Layered Circuit Format](./layered_circuit_format.md) for details on the layered circuit's format.
 
-目前实现的优化有：展开出现次数或变量个数较少的 sub circuit。
+The first element in the circuit's output layer is the Random Combined Assertions, followed by Public Inputs.
+
+Current optimizations include the expansion of sub-circuits that have few occurrences or variables.
