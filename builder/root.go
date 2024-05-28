@@ -3,13 +3,13 @@ package builder
 import (
 	"math/big"
 
-	"github.com/Zklib/gkr-compiler/expr"
-	"github.com/Zklib/gkr-compiler/field"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/expr"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/field"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/schema"
 )
 
-// Root is a builder for the root circuit. It implements functions from gkr.API and also handles functions
+// Root is a builder for the root circuit. It implements functions from ExpanderCompilerCollection.API and also handles functions
 // such as PublicVariable that are only called at the root circuit level. Additionally, Root maintains a subcircuit registry.
 type Root struct {
 	*builder

@@ -5,10 +5,10 @@ import (
 	"math/rand"
 	"os"
 
-	gkr "github.com/Zklib/gkr-compiler"
-	"github.com/Zklib/gkr-compiler/builder"
-	"github.com/Zklib/gkr-compiler/field/m31"
-	"github.com/Zklib/gkr-compiler/test"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/builder"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/field/m31"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/test"
 	"github.com/consensys/gnark/frontend"
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -241,7 +241,7 @@ func xor(api frontend.API, a []frontend.Variable, b []frontend.Variable) []front
 	bitsRes := make([]frontend.Variable, nbits)
 	for i := 0; i < nbits; i++ {
 		bitsRes[i] = api.Mul(a[i], b[i])
-		bitsRes[i] = api.(gkr.API).ToSingleVariable(bitsRes[i])
+		bitsRes[i] = api.(ExpanderCompilerCollection.API).ToSingleVariable(bitsRes[i])
 	}
 	return bitsRes
 }
@@ -251,7 +251,7 @@ func and(api frontend.API, a []frontend.Variable, b []frontend.Variable) []front
 	bitsRes := make([]frontend.Variable, nbits)
 	for i := 0; i < nbits; i++ {
 		bitsRes[i] = api.Div(api.Add(api.Neg(api.Mul(a[i], b[i])), a[i], b[i], 1), 2)
-		bitsRes[i] = api.(gkr.API).ToSingleVariable(bitsRes[i])
+		bitsRes[i] = api.(ExpanderCompilerCollection.API).ToSingleVariable(bitsRes[i])
 	}
 	return bitsRes
 }
@@ -332,7 +332,7 @@ func (t *keccak256Circuit) Define(api frontend.API) error {
 func main() {
 	var circuit keccak256Circuit
 
-	cr, _ := gkr.Compile(m31.ScalarField, &circuit)
+	cr, _ := ExpanderCompilerCollection.Compile(m31.ScalarField, &circuit)
 	//cr.Print()
 	_ = cr
 

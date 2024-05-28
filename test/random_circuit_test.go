@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/Zklib/gkr-compiler"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection"
 	"github.com/consensys/gnark-crypto/ecc"
 )
 
@@ -14,7 +14,7 @@ func testRandomCircuit(t *testing.T, conf *randomCircuitConfig, seedL int, seedR
 		conf.seed = seed
 		rcg := newRandomCircuitGenerator(conf)
 		circuit := rcg.circuit()
-		c, err := gkr.Compile(ecc.BN254.ScalarField(), circuit)
+		c, err := ExpanderCompilerCollection.Compile(ecc.BN254.ScalarField(), circuit)
 		if err != nil {
 			t.Fatal(err)
 		}

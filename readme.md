@@ -1,6 +1,6 @@
-# gkr-compiler
+# ExpanderCompilerCollection
 
-gkr-compiler is XXX (todo)
+ExpanderCompilerCollection is XXX (todo)
 
 Visit [here](./docs/example.md) for an example on how to use the compiler.
 

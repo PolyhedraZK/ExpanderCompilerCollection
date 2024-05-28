@@ -3,8 +3,8 @@ package main
 import (
 	"crypto/sha256"
 
-	gkr "github.com/Zklib/gkr-compiler"
-	"github.com/Zklib/gkr-compiler/test"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/test"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/std/hash/sha2"
@@ -29,7 +29,7 @@ func (t *Circuit) Define(api frontend.API) error {
 	h.Write(s)
 	sum := h.Sum()
 	for _, x := range sum {
-		api.(gkr.API).Output(x.Val)
+		api.(ExpanderCompilerCollection.API).Output(x.Val)
 	}
 	api.AssertIsDifferent(t.Input[0], 0)
 	return nil
@@ -38,7 +38,7 @@ func (t *Circuit) Define(api frontend.API) error {
 func main() {
 	var circuit Circuit
 
-	cr, err := gkr.Compile(ecc.BN254.ScalarField(), &circuit)
+	cr, err := ExpanderCompilerCollection.Compile(ecc.BN254.ScalarField(), &circuit)
 	if err != nil {
 		panic(err)
 	}

@@ -7,8 +7,8 @@ import (
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/std/hash/mimc"
 
-	gkr "github.com/Zklib/gkr-compiler"
-	"github.com/Zklib/gkr-compiler/test"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/test"
 )
 
 const NHashes = 100
@@ -27,13 +27,13 @@ func mimcHash(api frontend.API, preImage frontend.Variable, hash frontend.Variab
 // Define declares the circuit's constraints
 func (circuit *Circuit) Define(api frontend.API) error {
 	for i := 0; i < NHashes; i++ {
-		api.(gkr.API).MemorizedCall(mimcHash, circuit.PreImage[i], circuit.Hash[i])
+		api.(ExpanderCompilerCollection.API).MemorizedCall(mimcHash, circuit.PreImage[i], circuit.Hash[i])
 	}
 	return nil
 }
 
 func main() {
-	circuit, err := gkr.Compile(ecc.BN254.ScalarField(), &Circuit{})
+	circuit, err := ExpanderCompilerCollection.Compile(ecc.BN254.ScalarField(), &Circuit{})
 	if err != nil {
 		panic(err)
 	}

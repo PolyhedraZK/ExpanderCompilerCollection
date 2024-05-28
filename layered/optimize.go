@@ -3,7 +3,7 @@ package layered
 import (
 	"math/big"
 
-	"github.com/Zklib/gkr-compiler/utils"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/utils"
 )
 
 func sortMulGates(mul []GateMul) []GateMul {

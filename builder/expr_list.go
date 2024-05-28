@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"sort"
 
-	"github.com/Zklib/gkr-compiler/expr"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/expr"
 )
 
 // Sometimes we need to sort expressions by their layers

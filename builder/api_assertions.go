@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/Zklib/gkr-compiler/expr"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/expr"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/std/math/bits"
 )
