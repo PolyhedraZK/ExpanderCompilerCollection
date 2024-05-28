@@ -1,19 +1,12 @@
 # gkr-compiler
 
-## MIMC Example
+gkr-compiler is XXX (todo)
 
-Run `examples/mimc/main.go`, it generates `circuit.txt` and `witness.txt`.
+Visit [here](./docs/example.md) for an example on how to use the compiler.
 
-Then go to libra-gkr, and run `cargo run --release -- path-to-circuit.txt path-to-witness.txt`.
+For more technical introduction, visit our markdown files [here](./docs/compilation_process.md).
 
-## Keccak Example
-
-`examples/keccak/main.go`
-
-It requires other libs.
-
-## Docs
+## Other Docs
 
 - [APIs](./docs/apis.md)
-- [Compilation Process](./docs/compilation_process.md)
 - [Artifact and Serialization](./docs/artifact_and_serialization.md)

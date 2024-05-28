@@ -1,3 +1,4 @@
+// Package layering provides functionality to compile an IR of a circuit into a layered circuit.
 package layering
 
 import (
@@ -83,6 +84,7 @@ type combinedConstraint struct {
 	subCircuitIds []int
 }
 
+// Compile takes an IR RootCircuit and compiles it into a layered circuit.
 func Compile(rc *ir.RootCircuit) (*layered.RootCircuit, *ir.InputOrder) {
 	ctx := newCompileContext(rc)
 	ctx.compile()
@@ -97,6 +99,8 @@ func Compile(rc *ir.RootCircuit) (*layered.RootCircuit, *ir.InputOrder) {
 	}, &ctx.inputOrder
 }
 
+// ProfilingCompile is similar to Compile but is used for profiling purposes.
+// It partially compiles the circuit and computes cost associated with each variable in the circuit.
 func ProfilingCompile(rc *ir.RootCircuit) []int {
 	ctx := newCompileContext(rc)
 	ctx.compile()

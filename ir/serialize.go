@@ -10,6 +10,7 @@ import (
 	"github.com/consensys/gnark/constraint/solver"
 )
 
+// InputSolverForSerialization is used for serializing an InputSolver.
 type InputSolverForSerialization struct {
 	Field             *big.Int
 	Circuits          map[uint64]*CircuitForSerialization
@@ -17,6 +18,7 @@ type InputSolverForSerialization struct {
 	CircuitsSolveInfo map[uint64]*CircuitSolveInfo
 }
 
+// CircuitForSerialization is used for serializing a Circuit to be stored or transmitted.
 type CircuitForSerialization struct {
 	Instructions    []InstructionForSerialization
 	Constraints     []expr.Expression
@@ -24,6 +26,7 @@ type CircuitForSerialization struct {
 	NbExternalInput int
 }
 
+// InstructionForSerialization is used for serializing an Instruction.
 type InstructionForSerialization struct {
 	Type         InstructionType
 	HintID       solver.HintID
@@ -32,6 +35,7 @@ type InstructionForSerialization struct {
 	OutputIds    []int
 }
 
+// Serialize converts the InputSolver into a byte slice for storage or transmission.
 func (is *InputSolver) Serialize() []byte {
 	isfs := &InputSolverForSerialization{
 		Field:             is.RootCircuit.Field.Field(),
@@ -68,6 +72,7 @@ func (is *InputSolver) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// DeserializeInputSolver creates an InputSolver from serialized data.
 func DeserializeInputSolver(data []byte) *InputSolver {
 	buf := bytes.NewBuffer(data)
 	decoder := gob.NewDecoder(buf)

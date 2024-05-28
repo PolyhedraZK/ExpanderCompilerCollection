@@ -1,6 +1,9 @@
+// An expression supporting quadratic terms, implemented based on gnark `frontend/internal/expr`.
 package expr
 
 import (
+	"math/big"
+
 	"github.com/Zklib/gkr-compiler/utils"
 	"github.com/consensys/gnark/constraint"
 )
@@ -105,4 +108,11 @@ func (e Expression) IsConstant() bool {
 		}
 	}
 	return true
+}
+
+// ToBigIntRegular implements gnark toBigIntInterface interface
+// Actually it's impossible to convert an Expression to big.Int, but sometimes it requires such evaluation (like in gnark utils.FromInterface).
+// So a fake implementation is created to provide better instructions for users
+func (e Expression) ToBigIntRegular(*big.Int) *big.Int {
+	panic("Conversion from expr.Expression to big.Int triggered, please check the type of the API call here.")
 }

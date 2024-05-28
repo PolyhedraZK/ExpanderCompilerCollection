@@ -21,18 +21,24 @@ func init() {
 	solver.RegisterHint(IdentityHint)
 }
 
+// API defines a set of methods for interacting with the circuit builder.
 type API interface {
+	// ToSingleVariable converts an expression to a single base variable.
 	ToSingleVariable(frontend.Variable) frontend.Variable
+	// Output adds a variable to the circuit's output.
 	Output(frontend.Variable)
-	LayerOf(frontend.Variable) int // for debug usage
+	// LayerOf returns an approximation of the layer in which a variable will be placed after compilation.
+	LayerOf(frontend.Variable) int // For debug usage.
+	// ToFirstLayer uses a hint to pull a variable back to the first layer.
 	ToFirstLayer(frontend.Variable) frontend.Variable
+	// GetRandomValue returns a random value for use within the circuit.
 	GetRandomValue() frontend.Variable
 }
 
 // ---------------------------------------------------------------------------------------------
 // Arithmetic
 
-// Add returns res = i1+i2+...in
+// Add computes the sum i1+i2+...in and returns the result.
 func (builder *builder) Add(i1, i2 frontend.Variable, in ...frontend.Variable) frontend.Variable {
 	// extract frontend.Variables from input
 	vars, s := builder.toVariables(append([]frontend.Variable{i1, i2}, in...)...)
@@ -43,7 +49,7 @@ func (builder *builder) MulAcc(a, b, c frontend.Variable) frontend.Variable {
 	return builder.Add(builder.Mul(b, c), a).(expr.Expression)
 }
 
-// Sub returns res = i1 - i2
+// Sub computes the difference between the given variables.
 func (builder *builder) Sub(i1, i2 frontend.Variable, in ...frontend.Variable) frontend.Variable {
 	vars, s := builder.toVariables(append([]frontend.Variable{i1, i2}, in...)...)
 	return builder.add(vars, true, s, nil, false)
@@ -124,7 +130,7 @@ func (builder *builder) add(vars []expr.Expression, sub bool, capacity int, res 
 	return builder.compress(*res)
 }
 
-// Neg returns -i
+// Neg returns the negation of the given variable.
 func (builder *builder) Neg(i frontend.Variable) frontend.Variable {
 	v := builder.toVariable(i)
 
@@ -146,7 +152,7 @@ func (builder *builder) negateLinExp(e expr.Expression) expr.Expression {
 	return res
 }
 
-// Mul returns res = i1 * i2 * ... in
+// Mul computes the product of the given variables.
 func (builder *builder) Mul(i1, i2 frontend.Variable, in ...frontend.Variable) frontend.Variable {
 	vars, _ := builder.toVariables(append([]frontend.Variable{i1, i2}, in...)...)
 
@@ -232,7 +238,7 @@ func (builder *builder) mulConstant(v1 expr.Expression, lambda constraint.Elemen
 	return res
 }
 
-// DivHint calculates a/b, and returns 0 when a==b==0
+// DivHint calculates the division a/b and returns 0 when both a and b are zero.
 func DivHint(field *big.Int, inputs []*big.Int, outputs []*big.Int) error {
 	x := (&big.Int{}).Mod(inputs[0], field)
 	y := (&big.Int{}).Mod(inputs[1], field)
@@ -250,7 +256,7 @@ func DivHint(field *big.Int, inputs []*big.Int, outputs []*big.Int) error {
 	return nil
 }
 
-// DivUnchecked returns i1 / i2 . if i1 == i2 == 0, returns 0
+// DivUnchecked returns i1 divided by i2 and returns 0 if both i1 and i2 are zero.
 func (builder *builder) DivUnchecked(i1, i2 frontend.Variable) frontend.Variable {
 	vars, _ := builder.toVariables(i1, i2)
 
@@ -281,7 +287,7 @@ func (builder *builder) DivUnchecked(i1, i2 frontend.Variable) frontend.Variable
 	return builder.mulConstant(v1, n2, false)
 }
 
-// Div returns res = i1 / i2
+// Div returns the result of i1 divided by i2.
 func (builder *builder) Div(i1, i2 frontend.Variable) frontend.Variable {
 	vars, _ := builder.toVariables(i1, i2)
 
@@ -312,7 +318,7 @@ func (builder *builder) Div(i1, i2 frontend.Variable) frontend.Variable {
 	return builder.mulConstant(v1, n2, false)
 }
 
-// Inverse returns res = inverse(v)
+// Inverse returns the multiplicative inverse of the given variable.
 func (builder *builder) Inverse(i1 frontend.Variable) frontend.Variable {
 	vars, _ := builder.toVariables(i1)
 
@@ -351,12 +357,12 @@ func (builder *builder) ToBinary(i1 frontend.Variable, n ...int) []frontend.Vari
 	return bits.ToBinary(builder, i1, bits.WithNbDigits(nbBits))
 }
 
-// FromBinary packs b, seen as a fr.Element in little endian
+// FromBinary packs the given variables, seen as a fr.Element in little endian, into a single variable.
 func (builder *builder) FromBinary(_b ...frontend.Variable) frontend.Variable {
 	return bits.FromBinary(builder, _b)
 }
 
-// Xor compute the XOR between two frontend.Variables
+// Xor computes the logical XOR between two frontend.Variables.
 func (builder *builder) Xor(_a, _b frontend.Variable) frontend.Variable {
 
 	vars, _ := builder.toVariables(_a, _b)
@@ -378,7 +384,7 @@ func (builder *builder) Xor(_a, _b frontend.Variable) frontend.Variable {
 	return builder.ToSingleVariable(t)
 }
 
-// Or compute the OR between two frontend.Variables
+// Or computes the logical OR between two frontend.Variables.
 func (builder *builder) Or(_a, _b frontend.Variable) frontend.Variable {
 	vars, _ := builder.toVariables(_a, _b)
 
@@ -401,7 +407,7 @@ func (builder *builder) Or(_a, _b frontend.Variable) frontend.Variable {
 	return builder.ToSingleVariable(res)
 }
 
-// And compute the AND between two frontend.Variables
+// And computes the logical AND between two frontend.Variables.
 func (builder *builder) And(_a, _b frontend.Variable) frontend.Variable {
 	vars, _ := builder.toVariables(_a, _b)
 
@@ -420,7 +426,7 @@ func (builder *builder) And(_a, _b frontend.Variable) frontend.Variable {
 // ---------------------------------------------------------------------------------------------
 // Conditionals
 
-// Select if i0 is true, yields i1 else yields i2
+// Select yields the second variable if the first is true, otherwise yields the third variable.
 func (builder *builder) Select(i0, i1, i2 frontend.Variable) frontend.Variable {
 	vars, _ := builder.toVariables(i0, i1, i2)
 	cond := vars[0]
@@ -459,9 +465,7 @@ func (builder *builder) Select(i0, i1, i2 frontend.Variable) frontend.Variable {
 	return builder.Add(w, vars[2])
 }
 
-// Lookup2 performs a 2-bit lookup between i1, i2, i3, i4 based on bits b0
-// and b1. Returns i0 if b0=b1=0, i1 if b0=1 and b1=0, i2 if b0=0 and b1=1
-// and i3 if b0=b1=1.
+// Lookup2 performs a 2-bit lookup based on the given bits and values.
 func (builder *builder) Lookup2(b0, b1 frontend.Variable, i0, i1, i2, i3 frontend.Variable) frontend.Variable {
 	vars, _ := builder.toVariables(b0, b1, i0, i1, i2, i3)
 	s0, s1 := vars[0], vars[1]
@@ -511,7 +515,7 @@ func (builder *builder) Lookup2(b0, b1 frontend.Variable, i0, i1, i2, i3 fronten
 	return res
 }
 
-// IsZero returns 1 if i1 is zero, 0 otherwise
+// IsZero returns 1 if the given variable is zero, otherwise returns 0.
 func (builder *builder) IsZero(i1 frontend.Variable) frontend.Variable {
 	vars, _ := builder.toVariables(i1)
 	a := vars[0]
@@ -540,7 +544,7 @@ func (builder *builder) IsZero(i1 frontend.Variable) frontend.Variable {
 	return m
 }
 
-// Cmp returns 1 if i1>i2, 0 if i1=i2, -1 if i1<i2
+// Cmp compares i1 and i2 and returns 1 if i1>i2, 0 if i1=i2, -1 if i1<i2.
 func (builder *builder) Cmp(i1, i2 frontend.Variable) frontend.Variable {
 	nbBits := builder.field.FieldBitLen()
 	// in AssertIsLessOrEq we omitted comparison against modulus for the left
@@ -568,19 +572,17 @@ func (builder *builder) Cmp(i1, i2 frontend.Variable) frontend.Variable {
 	return res
 }
 
-// Println enables circuit debugging and behaves almost like fmt.Println()
-//
-// the print will be done once the R1CS.Solve() method is executed
-//
-// if one of the input is a variable, its value will be resolved avec R1CS.Solve() method is called
+// Println is not implemented and will panic if called.
 func (builder *builder) Println(a ...frontend.Variable) {
 	panic("unimplemented")
 }
 
+// Compiler returns itself as it implements the frontend.Compiler interface.
 func (builder *builder) Compiler() frontend.Compiler {
 	return builder
 }
 
+// Commit is faulty in its current implementation as it merely returns a compile-time random number.
 func (builder *builder) Commit(v ...frontend.Variable) (frontend.Variable, error) {
 	if !builder.root.commitWarned {
 		builder.root.commitWarned = true
@@ -589,10 +591,12 @@ func (builder *builder) Commit(v ...frontend.Variable) (frontend.Variable, error
 	return rand.Int(rand.Reader, builder.Field())
 }
 
+// SetGkrInfo is not implemented and will panic if called.
 func (builder *builder) SetGkrInfo(info constraint.GkrInfo) error {
 	panic("unimplemented")
 }
 
+// Output adds the given variable to the circuit's output.
 func (builder *builder) Output(x_ frontend.Variable) {
 	if builder.root.builder != builder {
 		panic("Output can only be called on root circuit")

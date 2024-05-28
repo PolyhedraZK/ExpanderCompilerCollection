@@ -1,3 +1,5 @@
+// Package ir implements the internal representation (IR) and related functionalities
+// for the GKR compiler.
 package ir
 
 import (
@@ -10,7 +12,10 @@ import (
 	"github.com/consensys/gnark/constraint/solver"
 )
 
-// Circuit defines an arithmetic circuit, and it may contain calls to other Circuit
+// Circuit defines an arithmetic circuit which may contain calls to other Circuits.
+// Each instruction specifies the method to calculate some variables with the output IDs being sequential.
+// Constraints enforce certain expressions to be zero, while Outputs define the output gates of the circuit.
+// NbExternalInput specifies the number of input gates.
 type Circuit struct {
 	// each instruction specifies the method to calculate some variables
 	// the output id must be sequential
@@ -23,7 +28,8 @@ type Circuit struct {
 	NbExternalInput int
 }
 
-// RootCircuit is a compiled circuit, it contains many "Circuit"-s as components, and the 0-th is the entry point.
+// RootCircuit represents a compiled circuit, containing multiple "Circuit" components.
+// The circuit at index 0 is considered the entry point of the RootCircuit.
 type RootCircuit struct {
 	Field field.Field
 	// circuit list, we assume idx 0 is the root circuit
@@ -50,7 +56,7 @@ func checkExpr(e expr.Expression, totVID int) error {
 	return nil
 }
 
-// Validate checks if the circuit is valid
+// Validate checks if the circuit is valid by ensuring that all instructions are well-formed.
 func Validate(rc *RootCircuit) error {
 	for id, c := range rc.Circuits {
 		if c.NbExternalInput <= 0 {
@@ -99,8 +105,8 @@ func (rc *RootCircuit) isSingleVariable(e expr.Expression) bool {
 	return len(e) == 1 && e[0].VID1 == 0 && e[0].VID0 != 0 && rc.Field.IsOne(e[0].Coeff)
 }
 
-// ValidateForLayering checks if the circuit is valid for layering
-// It requires that all outputs, constraints, and sub circuit inputs are single variable
+// ValidateForLayering checks if the circuit is valid for layering.
+// It requires that all outputs, constraints, and sub-circuit inputs are single variables.
 func ValidateForLayering(rc *RootCircuit) error {
 	err := Validate(rc)
 	if err != nil {
@@ -137,6 +143,7 @@ func ValidateForLayering(rc *RootCircuit) error {
 	return nil
 }
 
+// Print outputs the circuit for debugging purposes.
 func (ci *Circuit) Print(field field.Field) {
 	varToStr := func(e expr.Expression) string {
 		s := make([]string, len(e))
@@ -189,6 +196,7 @@ func (ci *Circuit) Print(field field.Field) {
 	}
 }
 
+// Print outputs the RootCircuit for debugging purposes.
 func (rc *RootCircuit) Print() {
 	for k, v := range rc.Circuits {
 		fmt.Printf("Circuit %d nbIn=%d nbOut=%d =================\n", k, v.NbExternalInput, len(v.Output))

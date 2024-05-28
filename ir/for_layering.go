@@ -4,7 +4,8 @@ import (
 	"github.com/Zklib/gkr-compiler/expr"
 )
 
-// AdjustForLayering adjusts the circuit for layering, satisfying ValidateForLayering
+// AdjustForLayering adjusts the circuit for layering, ensuring it meets the
+// requirements of ValidateForLayering.
 func AdjustForLayering(rc *RootCircuit) *RootCircuit {
 	res := &RootCircuit{
 		Circuits: make(map[uint64]*Circuit),
