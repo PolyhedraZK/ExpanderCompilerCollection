@@ -11,7 +11,7 @@ import (
 	"github.com/consensys/gnark/std/math/bits"
 )
 
-// AssertIsEqual adds an assertion in the constraint builder (i1 == i2)
+// AssertIsEqual adds an assertion that i1 is equal to i2.
 func (builder *builder) AssertIsEqual(i1, i2 frontend.Variable) {
 	x := builder.Sub(i1, i2).(expr.Expression)
 	v, xConstant := builder.constantValue(x)
@@ -25,7 +25,7 @@ func (builder *builder) AssertIsEqual(i1, i2 frontend.Variable) {
 	builder.zeroes.Add(x, asserted)
 }
 
-// AssertIsDifferent constrain i1 and i2 to be different
+// AssertIsDifferent constrains i1 and i2 to have different values.
 func (builder *builder) AssertIsDifferent(i1, i2 frontend.Variable) {
 	s := builder.Sub(i1, i2).(expr.Expression)
 	if len(s) == 1 && s[0].Coeff.IsZero() {
@@ -35,7 +35,7 @@ func (builder *builder) AssertIsDifferent(i1, i2 frontend.Variable) {
 	builder.nonZeroes.Add(s, asserted)
 }
 
-// AssertIsBoolean adds an assertion in the constraint builder (v == 0 ∥ v == 1)
+// AssertIsBoolean adds an assertion that the variable is either 0 or 1.
 func (builder *builder) AssertIsBoolean(i1 frontend.Variable) {
 	v := builder.toVariable(i1)
 
@@ -49,20 +49,14 @@ func (builder *builder) AssertIsBoolean(i1 frontend.Variable) {
 	builder.booleans.Add(v, asserted)
 }
 
-// AssertIsCrumb fails if v ∉ {0,1,2,3} (crumb is a 2-bit variable; see https://en.wikipedia.org/wiki/Units_of_information)
-// new API added in gnark 0.9.2
+// AssertIsCrumb adds an assertion that the variable is a 2-bit value, also known as a crumb.
 func (builder *builder) AssertIsCrumb(i1 frontend.Variable) {
 	i1 = builder.MulAcc(builder.Mul(-3, i1), i1, i1)
 	i1 = builder.MulAcc(builder.Mul(2, i1), i1, i1)
 	builder.AssertIsEqual(i1, 0)
 }
 
-// AssertIsLessOrEqual adds assertion in constraint builder  (v ⩽ bound)
-//
-// bound can be a constant or a Variable
-//
-// derived from:
-// https://github.com/zcash/zips/blob/main/protocol/protocol.pdf
+// AssertIsLessOrEqual adds an assertion that v is less than or equal to bound.
 func (builder *builder) AssertIsLessOrEqual(v frontend.Variable, bound frontend.Variable) {
 	cv, vConst := builder.constantValue(v)
 	cb, bConst := builder.constantValue(bound)
@@ -127,9 +121,7 @@ func (builder *builder) mustBeLessOrEqVar(a, bound frontend.Variable) {
 	}
 }
 
-// MustBeLessOrEqCst asserts that value represented using its bit decomposition
-// aBits is less or equal than constant bound. The method boolean constraints
-// the bits in aBits, so the caller can provide unconstrained bits.
+// MustBeLessOrEqCst asserts that the value represented by its bit decomposition is less than or equal to a constant bound.
 func (builder *builder) MustBeLessOrEqCst(aBits []frontend.Variable, bound *big.Int, aForDebug frontend.Variable) {
 	nbBits := builder.field.FieldBitLen()
 	if len(aBits) > nbBits {

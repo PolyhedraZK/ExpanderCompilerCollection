@@ -13,6 +13,7 @@ import (
 	"github.com/consensys/gnark/frontend/schema"
 )
 
+// ProfilingRoot wraps a Root to facilitate profiling.
 type ProfilingRoot struct {
 	root   *Root
 	rootPb *profilingBuilder
@@ -28,6 +29,7 @@ type profilingBuilder struct {
 	callDep       int
 }
 
+// NewProfilingRoot wraps a Root for profiling purposes.
 func NewProfilingRoot(fieldorder *big.Int, config frontend.CompileConfig) *ProfilingRoot {
 	root := NewRoot(fieldorder, config)
 	pb := &profilingBuilder{
@@ -43,6 +45,7 @@ func NewProfilingRoot(fieldorder *big.Int, config frontend.CompileConfig) *Profi
 	return pr
 }
 
+// GetRootBuilder retrieves the builder used for profiling.
 func (r *ProfilingRoot) GetRootBuilder() *profilingBuilder {
 	return r.rootPb
 }
@@ -85,6 +88,7 @@ func (b *profilingBuilder) MemorizedCall(fn SubCircuitFunc, inputs ...interface{
 	panic("sub-circuit calling is currently unsupported in profiling mode")
 }
 
+// Finalize is similar to Root.Finalize but includes profiling data.
 func (pr *ProfilingRoot) Finalize() (*ir.RootCircuit, []utils.SourceInfo) {
 	pr.rootPb.callDep++
 	res := pr.root.Finalize()

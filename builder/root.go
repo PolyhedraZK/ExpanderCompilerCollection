@@ -9,6 +9,8 @@ import (
 	"github.com/consensys/gnark/frontend/schema"
 )
 
+// Root is a builder for the root circuit. It implements functions from gkr.API and also handles functions
+// such as PublicVariable that are only called at the root circuit level. Additionally, Root maintains a subcircuit registry.
 type Root struct {
 	*builder
 	field  field.Field
@@ -22,6 +24,7 @@ type Root struct {
 	commitWarned bool
 }
 
+// NewRoot returns a new Root instance.
 func NewRoot(fieldorder *big.Int, config frontend.CompileConfig) *Root {
 	root := Root{
 		config: config,
@@ -37,14 +40,14 @@ func NewRoot(fieldorder *big.Int, config frontend.CompileConfig) *Root {
 	return &root
 }
 
-// PublicVariable creates a new public Variable
+// PublicVariable creates a new public variable for the circuit.
 func (r *Root) PublicVariable(f schema.LeafInfo) frontend.Variable {
 	res := r.SecretVariable(f)
 	r.publicVariables = append(r.publicVariables, res.(expr.Expression)[0].VID0)
 	return res
 }
 
-// SecretVariable creates a new secret Variable
+// SecretVariable creates a new secret variable for the circuit.
 func (r *Root) SecretVariable(f schema.LeafInfo) frontend.Variable {
 	r.builder.nbExternalInput++
 	return expr.NewLinearExpression(r.newVariable(1), r.builder.tOne)

@@ -14,11 +14,13 @@ import (
 	"github.com/consensys/gnark/frontend"
 )
 
-// SubCircuitSimpleFunc is the most general form of a subcircuit
+// SubCircuitSimpleFunc is the most general form of a subcircuit function.
 type SubCircuitSimpleFunc func(api frontend.API, input []frontend.Variable) []frontend.Variable
+
+// SubCircuitFunc is an interface that supports any function as a subcircuit.
 type SubCircuitFunc interface{}
 
-// SubCircuit has its own builder, and other useful infomations
+// SubCircuit represents a subcircuit with its own builder and additional information.
 type SubCircuit struct {
 	builder *builder
 
@@ -46,6 +48,7 @@ type SubCircuitRegistry struct {
 	outputStructure map[uint64]*sliceStructure
 }
 
+// SubCircuitAPI defines methods for working with subcircuits.
 type SubCircuitAPI interface {
 	MemorizedSimpleCall(SubCircuitSimpleFunc, []frontend.Variable) []frontend.Variable
 	MemorizedCall(SubCircuitFunc, ...interface{}) interface{}
@@ -186,7 +189,7 @@ func (parent *builder) callSubCircuit(
 	return output_
 }
 
-// MemorizedSimpleCall calls a SubCircuitSimpleFunc in a memorized way
+// MemorizedSimpleCall memorizes a call to a SubCircuitSimpleFunc.
 func (parent *builder) MemorizedSimpleCall(f SubCircuitSimpleFunc, input []frontend.Variable) []frontend.Variable {
 	name := GetFuncName(f)
 	h := sha256.Sum256([]byte(fmt.Sprintf("simple_%d(%s)_%d", len(name), name, len(input))))
@@ -315,8 +318,7 @@ func isTypeSimple(t reflect.Type) bool {
 	}
 }
 
-// MemorizedCall calls an arbitrary function in a memorized way
-// However, the function still needs to obey some basic requirements
+// MemorizedCall memorizes an arbitrary function call with some basic requirements.
 func (parent *builder) MemorizedCall(fn SubCircuitFunc, inputs ...interface{}) interface{} {
 	fnVal := reflect.ValueOf(fn)
 	if fnVal.Kind() != reflect.Func {
@@ -446,44 +448,51 @@ func (parent *builder) MemorizedCall(fn SubCircuitFunc, inputs ...interface{}) i
 	return rebuildSliceVariables(joinedOut, outStructure).Interface()
 }
 
+// Some helper functions
+
+// MemorizedSimpleFunc memorizes a simple subcircuit function.
 func MemorizedSimpleFunc(f SubCircuitSimpleFunc) SubCircuitSimpleFunc {
 	return func(api frontend.API, input []frontend.Variable) []frontend.Variable {
 		return api.(SubCircuitAPI).MemorizedSimpleCall(f, input)
 	}
 }
 
-// Some helper functions
-
+// MemorizedVoidFunc memorizes a function that has no return value.
 func MemorizedVoidFunc(f SubCircuitFunc) func(frontend.API, ...interface{}) {
 	return func(api frontend.API, inputs ...interface{}) {
 		api.(SubCircuitAPI).MemorizedCall(f, inputs...)
 	}
 }
 
+// Memorized0DFunc memorizes a function that returns a single frontend.Variable.
 func Memorized0DFunc(f SubCircuitFunc) func(frontend.API, ...interface{}) frontend.Variable {
 	return func(api frontend.API, inputs ...interface{}) frontend.Variable {
 		return api.(SubCircuitAPI).MemorizedCall(f, inputs...).(frontend.Variable)
 	}
 }
 
+// Memorized1DFunc memorizes a function that returns a one-dimensional slice of frontend.Variables.
 func Memorized1DFunc(f SubCircuitFunc) func(frontend.API, ...interface{}) []frontend.Variable {
 	return func(api frontend.API, inputs ...interface{}) []frontend.Variable {
 		return api.(SubCircuitAPI).MemorizedCall(f, inputs...).([]frontend.Variable)
 	}
 }
 
+// Memorized2DFunc memorizes a function that returns a two-dimensional slice of frontend.Variables.
 func Memorized2DFunc(f SubCircuitFunc) func(frontend.API, ...interface{}) [][]frontend.Variable {
 	return func(api frontend.API, inputs ...interface{}) [][]frontend.Variable {
 		return api.(SubCircuitAPI).MemorizedCall(f, inputs...).([][]frontend.Variable)
 	}
 }
 
+// Memorized3DFunc memorizes a function that returns a three-dimensional slice of frontend.Variables.
 func Memorized3DFunc(f SubCircuitFunc) func(frontend.API, ...interface{}) [][][]frontend.Variable {
 	return func(api frontend.API, inputs ...interface{}) [][][]frontend.Variable {
 		return api.(SubCircuitAPI).MemorizedCall(f, inputs...).([][][]frontend.Variable)
 	}
 }
 
+// GetFuncName returns the name of the function using reflection.
 func GetFuncName(fn interface{}) string {
 	fnptr := reflect.ValueOf(fn).Pointer()
 	return runtime.FuncForPC(fnptr).Name()
