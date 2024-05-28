@@ -6,8 +6,8 @@ import (
 
 	"github.com/consensys/gnark/frontend"
 
-	gkr "github.com/Zklib/gkr-compiler"
-	"github.com/Zklib/gkr-compiler/test"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/test"
 )
 
 const NHashes = 100
@@ -28,9 +28,9 @@ func main() {
 		assignment.Hash[i] = "12886436712380113721405259596386800092738845035233065858332878701083870690753"
 	}
 	s, _ := os.ReadFile("inputsolver.txt")
-	inputSolver := gkr.DeserializeInputSolver(s)
+	inputSolver := ExpanderCompilerCollection.DeserializeInputSolver(s)
 	s, _ = os.ReadFile("circuit.txt")
-	c := gkr.DeserializeLayeredCircuit(s)
+	c := ExpanderCompilerCollection.DeserializeLayeredCircuit(s)
 	witness, err := inputSolver.SolveInput(assignment, 8)
 	if err != nil {
 		panic(err)

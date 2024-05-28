@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/Zklib/gkr-compiler/field/bn254"
-	"github.com/Zklib/gkr-compiler/field/m31"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/field/bn254"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/field/m31"
 	"github.com/consensys/gnark/constraint"
 )
 

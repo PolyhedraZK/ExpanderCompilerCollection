@@ -3,8 +3,8 @@ package layering
 import (
 	"sort"
 
-	"github.com/Zklib/gkr-compiler/ir"
-	"github.com/Zklib/gkr-compiler/utils"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ir"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/utils"
 )
 
 type layerLayoutContext struct {

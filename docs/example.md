@@ -48,8 +48,8 @@ import (
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/frontend"
 
-	gkr "github.com/Zklib/gkr-compiler"
-	"github.com/Zklib/gkr-compiler/test"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/test"
 )
 
 type Circuit struct {
@@ -65,7 +65,7 @@ func (circuit *Circuit) Define(api frontend.API) error {
 func main() {
 	assignment := &Circuit{X: 1, Y: 1}
 
-	circuit, _ := gkr.Compile(ecc.BN254.ScalarField(), &Circuit{})
+	circuit, _ := ExpanderCompilerCollection.Compile(ecc.BN254.ScalarField(), &Circuit{})
 	c := circuit.GetLayeredCircuit()
 	os.WriteFile("circuit.txt", c.Serialize(), 0o644)
 	inputSolver := circuit.GetInputSolver()

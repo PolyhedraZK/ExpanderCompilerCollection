@@ -1,7 +1,7 @@
 package layering
 
 import (
-	"github.com/Zklib/gkr-compiler/ir"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ir"
 )
 
 func (ctx *compileContext) recordInputOrder(layoutId int) ir.InputOrder {

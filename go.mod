@@ -1,16 +1,10 @@
-module github.com/Zklib/gkr-compiler
+module github.com/PolyhedraZK/ExpanderCompilerCollection
 
 go 1.21.6
 
 require (
 	github.com/consensys/gnark v0.9.1
 	github.com/consensys/gnark-crypto v0.12.2-0.20231013160410-1f65e75b6dfb
-)
-
-require (
-	github.com/fxamacker/cbor/v2 v2.5.0 // indirect
-	github.com/x448/float16 v0.8.4 // indirect
-	golang.org/x/crypto v0.17.0 // indirect
 )
 
 require (

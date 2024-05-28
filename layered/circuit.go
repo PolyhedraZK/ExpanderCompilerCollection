@@ -1,5 +1,5 @@
 // Package layered defines the structures and functions necessary for
-// creating and manipulating layered circuits within the gkr-compiler.
+// creating and manipulating layered circuits within the ExpanderCompilerCollection compiler.
 // A layered circuit is a representation of a computation that is divided
 // into a sequence of discrete layers, facilitating certain types of
 // optimizations and parallel computations.

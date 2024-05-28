@@ -4,7 +4,7 @@ package expr
 import (
 	"math/big"
 
-	"github.com/Zklib/gkr-compiler/utils"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/utils"
 	"github.com/consensys/gnark/constraint"
 )
 
