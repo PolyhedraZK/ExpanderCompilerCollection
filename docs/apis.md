@@ -7,16 +7,16 @@ This document provides an overview of the core APIs available in the compiler.
 To use the compiler, include the following import in your Go code:
 
 ```go
-import gkr "github.com/Zklib/gkr-compiler"
+import "github.com/PolyhedraZK/ExpanderCompilerCollection"
 ```
 
 ### Compile Function
 
-`gkr.Compile` serves as the entry point for the compiler. It accepts a `frontend.Circuit` and yields a `CompileResult`.
+`ExpanderCompilerCollection.Compile` serves as the entry point for the compiler. It accepts a `frontend.Circuit` and yields a `CompileResult`.
 
 ### CompileResult Structure
 
-`gkr.CompileResult` encapsulates the outcome of the compilation process, comprising both the layered circuit and the intermediate representation (IR).
+`ExpanderCompilerCollection.CompileResult` encapsulates the outcome of the compilation process, comprising both the layered circuit and the intermediate representation (IR).
 
 The `CompileResult` offers three methods for data retrieval:
 
@@ -26,7 +26,7 @@ The `CompileResult` offers three methods for data retrieval:
 
 ### Builder API
 
-`gkr.API` is the interface for the builder API, enhancing the `frontend.API` interface from gnark with additional capabilities such as sub-circuit support and utility functions.
+`ExpanderCompilerCollection.API` is the interface for the builder API, enhancing the `frontend.API` interface from gnark with additional capabilities such as sub-circuit support and utility functions.
 
 ## Sub-Circuit API
 

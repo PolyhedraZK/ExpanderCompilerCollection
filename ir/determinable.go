@@ -1,6 +1,6 @@
 package ir
 
-import "github.com/Zklib/gkr-compiler/expr"
+import "github.com/PolyhedraZK/ExpanderCompilerCollection/expr"
 
 type determinableChecker struct {
 	rc  *RootCircuit

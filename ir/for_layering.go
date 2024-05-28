@@ -1,7 +1,7 @@
 package ir
 
 import (
-	"github.com/Zklib/gkr-compiler/expr"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/expr"
 )
 
 // AdjustForLayering adjusts the circuit for layering, ensuring it meets the

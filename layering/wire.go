@@ -3,7 +3,7 @@ package layering
 import (
 	"math/big"
 
-	"github.com/Zklib/gkr-compiler/layered"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/layered"
 )
 
 type layoutQuery struct {

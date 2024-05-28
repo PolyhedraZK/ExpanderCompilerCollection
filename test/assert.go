@@ -3,7 +3,7 @@ package test
 import (
 	"testing"
 
-	"github.com/Zklib/gkr-compiler"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection"
 	"github.com/consensys/gnark/frontend"
 )
 
@@ -15,7 +15,7 @@ func NewAssert(t *testing.T) *Assert {
 	return &Assert{t: t}
 }
 
-func (a *Assert) ProveSucceeded(cr *gkr.CompileResult, assignment frontend.Circuit) {
+func (a *Assert) ProveSucceeded(cr *ExpanderCompilerCollection.CompileResult, assignment frontend.Circuit) {
 	lc := cr.GetLayeredCircuit()
 	is := cr.GetInputSolver()
 	witness, err := is.SolveInput(assignment, 1)
@@ -27,7 +27,7 @@ func (a *Assert) ProveSucceeded(cr *gkr.CompileResult, assignment frontend.Circu
 	}
 }
 
-func (a *Assert) ProveFailed(cr *gkr.CompileResult, assignment frontend.Circuit) {
+func (a *Assert) ProveFailed(cr *ExpanderCompilerCollection.CompileResult, assignment frontend.Circuit) {
 	lc := cr.GetLayeredCircuit()
 	is := cr.GetInputSolver()
 	witness, err := is.SolveInput(assignment, 1)

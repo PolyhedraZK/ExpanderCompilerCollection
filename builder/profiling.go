@@ -4,9 +4,9 @@ import (
 	"math/big"
 	"runtime"
 
-	"github.com/Zklib/gkr-compiler/expr"
-	"github.com/Zklib/gkr-compiler/ir"
-	"github.com/Zklib/gkr-compiler/utils"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/expr"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ir"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/utils"
 	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/constraint/solver"
 	"github.com/consensys/gnark/frontend"

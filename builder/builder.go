@@ -17,10 +17,10 @@ import (
 	"github.com/consensys/gnark/debug"
 	"github.com/consensys/gnark/frontend"
 
-	"github.com/Zklib/gkr-compiler/expr"
-	"github.com/Zklib/gkr-compiler/field"
-	"github.com/Zklib/gkr-compiler/ir"
-	"github.com/Zklib/gkr-compiler/utils"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/expr"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/field"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ir"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/utils"
 )
 
 // builder implements frontend.API and frontend.Compiler, and builds a circuit

@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"math/big"
 
-	"github.com/Zklib/gkr-compiler/layered"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/layered"
 )
 
 // check if first output is zero

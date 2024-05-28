@@ -5,9 +5,9 @@ import (
 
 	"github.com/consensys/gnark/frontend"
 
-	gkr "github.com/Zklib/gkr-compiler"
-	"github.com/Zklib/gkr-compiler/field/m31"
-	"github.com/Zklib/gkr-compiler/test"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/field/m31"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/test"
 )
 
 type Circuit struct {
@@ -22,7 +22,7 @@ func (circuit *Circuit) Define(api frontend.API) error {
 }
 
 func main() {
-	circuit, err := gkr.Compile(m31.ScalarField, &Circuit{})
+	circuit, err := ExpanderCompilerCollection.Compile(m31.ScalarField, &Circuit{})
 	if err != nil {
 		panic(err)
 	}
