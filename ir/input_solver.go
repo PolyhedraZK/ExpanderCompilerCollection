@@ -3,6 +3,7 @@ package ir
 import (
 	"math/big"
 	"reflect"
+	"runtime"
 
 	"github.com/Zklib/gkr-compiler/expr"
 	"github.com/Zklib/gkr-compiler/field"
@@ -212,6 +213,10 @@ func GetCircuitVariables(assignment frontend.Circuit, field field.Field) []const
 		res = append(res, field.FromInterface(v))
 	}
 	return res
+}
+
+func (solver *InputSolver) SolveInputAuto(assignment frontend.Circuit) (Witness, error) {
+	return solver.SolveInput(assignment, runtime.NumCPU())
 }
 
 // SolveInput is the entry point to solve the final input of the given assignment
