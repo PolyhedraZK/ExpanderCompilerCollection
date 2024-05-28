@@ -3,7 +3,7 @@ package layered
 import (
 	"math/big"
 
-	"github.com/Zklib/gkr-compiler/utils"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/utils"
 )
 
 // Serialize converts a RootCircuit into a byte array for storage or transmission.

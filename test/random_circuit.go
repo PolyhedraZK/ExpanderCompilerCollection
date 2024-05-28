@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"math/rand"
 
-	"github.com/Zklib/gkr-compiler"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection"
 	"github.com/consensys/gnark/frontend"
 )
 
@@ -153,7 +153,7 @@ func (rcg *randomCircuitGenerator) randomCircuit(api frontend.API, input []front
 					subIn[i] = vars[p[i]]
 				}
 				//subOut := rcg.randomCircuit(api, subIn)
-				subOut := api.(gkr.API).MemorizedSimpleCall(rcg.randomCircuit, subIn)
+				subOut := api.(ExpanderCompilerCollection.API).MemorizedSimpleCall(rcg.randomCircuit, subIn)
 				vars = append(vars, subOut...)
 			}
 		}

@@ -1,21 +1,21 @@
-// Package gkr wraps the most commonly used compiler APIs and provides an entry point for compilation.
+// Package ExpanderCompilerCollection wraps the most commonly used compiler APIs and provides an entry point for compilation.
 // This package simplifies the interaction with the compiler by exposing a unified API interface.
-package gkr
+package ExpanderCompilerCollection
 
 import (
 	"math/big"
 
-	"github.com/Zklib/gkr-compiler/builder"
-	"github.com/Zklib/gkr-compiler/ir"
-	"github.com/Zklib/gkr-compiler/layered"
-	"github.com/Zklib/gkr-compiler/layering"
-	"github.com/Zklib/gkr-compiler/utils"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/builder"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ir"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/layered"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/layering"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/utils"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/logger"
 )
 
-// API encapsulates the gkr's frontend.API along with two new APIs added to facilitate
-// direct invocation of gkr.API within the codebase.
+// API encapsulates the ExpanderCompilerCollection's frontend.API along with two new APIs added to facilitate
+// direct invocation of ExpanderCompilerCollection.API within the codebase.
 type API interface {
 	frontend.API
 	builder.SubCircuitAPI
@@ -71,7 +71,7 @@ func Compile(field *big.Int, circuit frontend.Circuit, opts ...frontend.CompileO
 		Int("nbTotTerms", stats.NbTotTerms).
 		Int("nbExpandedTerms", stats.NbExpandedTerms).
 		Int("nbConstraints", stats.NbConstraints).
-		Msg("optimized and adjusted circuit ir")
+		Msg("adjusted circuit ir")
 	lrc, io := layering.Compile(rc)
 	if err := layered.Validate(lrc); err != nil {
 		return nil, err
@@ -135,7 +135,7 @@ func ProfilingCompile(field *big.Int, circuit frontend.Circuit, opts ...frontend
 	}
 	// returned R1CS is useless
 	_, err := frontend.Compile(field, newBuilder_, circuit, opts...)
-	// make sure gkr.API is implemented by ProfilingBuilder
+	// make sure ExpanderCompilerCollection.API is implemented by ProfilingBuilder
 	_ = API(root.GetRootBuilder())
 	if err != nil {
 		return err

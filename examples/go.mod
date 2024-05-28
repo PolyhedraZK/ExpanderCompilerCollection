@@ -1,9 +1,9 @@
-module github.com/Zklib/gkr-compiler/examples
+module github.com/PolyhedraZK/ExpanderCompilerCollection/examples
 
 go 1.21.6
 
 require (
-	github.com/Zklib/gkr-compiler v0.0.0
+	github.com/PolyhedraZK/ExpanderCompilerCollection v0.0.0
 	github.com/consensys/gnark v0.9.1
 	github.com/consensys/gnark-crypto v0.12.2-0.20231221171913-5d5eded6bb15
 	github.com/ethereum/go-ethereum v1.13.14
@@ -34,4 +34,4 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-replace github.com/Zklib/gkr-compiler v0.0.0 => ../
+replace github.com/PolyhedraZK/ExpanderCompilerCollection v0.0.0 => ../

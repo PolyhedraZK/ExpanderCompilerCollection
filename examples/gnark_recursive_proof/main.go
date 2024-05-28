@@ -6,10 +6,10 @@ import (
 	"os"
 	"runtime/debug"
 
-	gkr "github.com/Zklib/gkr-compiler"
-	"github.com/Zklib/gkr-compiler/ir"
-	"github.com/Zklib/gkr-compiler/layered"
-	"github.com/Zklib/gkr-compiler/test"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ir"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/layered"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/test"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/backend/groth16"
 	"github.com/consensys/gnark/backend/witness"
@@ -127,16 +127,16 @@ func main() {
 	var lc *layered.RootCircuit
 	if len(os.Args) > 1 && os.Args[1] == "--use-compiled" {
 		s, _ := os.ReadFile("inputsolver.txt")
-		is = gkr.DeserializeInputSolver(s)
+		is = ExpanderCompilerCollection.DeserializeInputSolver(s)
 		s, _ = os.ReadFile("circuit.txt")
-		lc = gkr.DeserializeLayeredCircuit(s)
+		lc = ExpanderCompilerCollection.DeserializeLayeredCircuit(s)
 	} else {
 		outerCircuit := &OuterCircuit[sw_bn254.Scalar, sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl]{
 			InnerWitness: stdgroth16.PlaceholderWitness[sw_bn254.Scalar](innerCcs),
 			VerifyingKey: stdgroth16.PlaceholderVerifyingKey[sw_bn254.G1Affine, sw_bn254.G2Affine, sw_bn254.GTEl](innerCcs),
 		}
 
-		cr, _ := gkr.Compile(ecc.BN254.ScalarField(), outerCircuit)
+		cr, _ := ExpanderCompilerCollection.Compile(ecc.BN254.ScalarField(), outerCircuit)
 
 		is = cr.GetInputSolver()
 		lc = cr.GetLayeredCircuit()

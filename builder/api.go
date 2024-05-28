@@ -9,7 +9,7 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/Zklib/gkr-compiler/expr"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/expr"
 	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/constraint/solver"
 	"github.com/consensys/gnark/frontend"

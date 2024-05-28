@@ -6,8 +6,8 @@ import (
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/frontend"
 
-	gkr "github.com/Zklib/gkr-compiler"
-	"github.com/Zklib/gkr-compiler/test"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/test"
 )
 
 const SetSize = 100
@@ -27,7 +27,7 @@ func MulAll(api frontend.API, vars []frontend.Variable) frontend.Variable {
 
 // Define declares the circuit's constraints
 func (circuit *Circuit) Define(api frontend.API) error {
-	z := api.(gkr.API).GetRandomValue()
+	z := api.(ExpanderCompilerCollection.API).GetRandomValue()
 	diff1 := []frontend.Variable{}
 	for _, x := range circuit.Set1 {
 		diff1 = append(diff1, api.Sub(z, x))
@@ -43,7 +43,7 @@ func (circuit *Circuit) Define(api frontend.API) error {
 }
 
 func main() {
-	circuit, err := gkr.Compile(ecc.BN254.ScalarField(), &Circuit{})
+	circuit, err := ExpanderCompilerCollection.Compile(ecc.BN254.ScalarField(), &Circuit{})
 	if err != nil {
 		panic(err)
 	}

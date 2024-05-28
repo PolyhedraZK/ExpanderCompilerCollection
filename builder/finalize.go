@@ -1,8 +1,8 @@
 package builder
 
 import (
-	"github.com/Zklib/gkr-compiler/expr"
-	"github.com/Zklib/gkr-compiler/ir"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/expr"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ir"
 )
 
 // Finalize processes deferred functions, converts boolean and nonzero assertions to zero assertions,

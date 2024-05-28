@@ -5,9 +5,9 @@ import (
 	"reflect"
 	"runtime"
 
-	"github.com/Zklib/gkr-compiler/expr"
-	"github.com/Zklib/gkr-compiler/field"
-	"github.com/Zklib/gkr-compiler/utils"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/expr"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/field"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/utils"
 	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/schema"

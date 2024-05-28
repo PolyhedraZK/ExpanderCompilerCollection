@@ -17,7 +17,7 @@ package bn254
 import (
 	"math/big"
 
-	"github.com/Zklib/gkr-compiler/utils"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/utils"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/consensys/gnark/constraint"
 )
