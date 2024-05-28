@@ -251,6 +251,8 @@ func optimize1(rc *RootCircuit) (*RootCircuit, bool) {
 
 // TODO: implement more optimization strategies: remove unused gates, dedupe exactly same circuits
 
+// Optimize applies various optimization strategies to a RootCircuit to reduce its
+// complexity and improve computational efficiency.
 func Optimize(rc *RootCircuit) *RootCircuit {
 	for {
 		nrc, ok := optimize1(rc)
