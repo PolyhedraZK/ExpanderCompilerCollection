@@ -1,3 +1,5 @@
+// Package gkr wraps the most commonly used compiler APIs and provides an entry point for compilation.
+// This package simplifies the interaction with the compiler by exposing a unified API interface.
 package gkr
 
 import (
@@ -12,18 +14,25 @@ import (
 	"github.com/consensys/gnark/logger"
 )
 
+// API encapsulates the gkr's frontend.API along with two new APIs added to facilitate
+// direct invocation of gkr.API within the codebase.
 type API interface {
 	frontend.API
 	builder.SubCircuitAPI
 	builder.API
 }
 
+// CompileResult represents the result of a compilation process.
+// It contains unexported fields and provides methods to retrieve various components
+// like the intermediate representation (IR) of the circuit, the InputSolver, and the Layered Circuit.
 type CompileResult struct {
 	rc         *ir.RootCircuit
 	compiled   *layered.RootCircuit
 	inputOrder *ir.InputOrder
 }
 
+// Compile is similar to gnark's frontend.Compile. It compiles the given circuit and returns
+// a pointer to CompileResult along with any error encountered during the compilation process.
 func Compile(field *big.Int, circuit frontend.Circuit, opts ...frontend.CompileOption) (*CompileResult, error) {
 	var root *builder.Root
 	newBuilder_ := func(field *big.Int, config frontend.CompileConfig) (frontend.Builder, error) {
@@ -111,7 +120,10 @@ func Compile(field *big.Int, circuit frontend.Circuit, opts ...frontend.CompileO
 	return &res, nil
 }
 
-// TODO: support sub circuit
+// ProfilingCompile compiles the given circuit with profiling enabled, outputting the cost of each line of code.
+// It does not return a compilation result as it does not complete the actual compilation process.
+// Profiling is useful for performance analysis and optimization.
+// TODO: Add support for sub-circuit profiling.
 func ProfilingCompile(field *big.Int, circuit frontend.Circuit, opts ...frontend.CompileOption) error {
 	var root *builder.ProfilingRoot
 	newBuilder_ := func(field *big.Int, config frontend.CompileConfig) (frontend.Builder, error) {
@@ -137,22 +149,29 @@ func ProfilingCompile(field *big.Int, circuit frontend.Circuit, opts ...frontend
 	return nil
 }
 
+// GetCircuitIr returns the intermediate representation (IR) of the compiled circuit as *ir.RootCircuit.
 func (c *CompileResult) GetCircuitIr() *ir.RootCircuit {
 	return c.rc
 }
 
+// GetInputSolver returns the InputSolver component of the compilation result as *ir.InputSolver.
 func (c *CompileResult) GetLayeredCircuit() *layered.RootCircuit {
 	return c.compiled
 }
 
+// GetLayeredCircuit returns the Layered Circuit component of the compilation result as *layered.RootCircuit.
 func (c *CompileResult) GetInputSolver() *ir.InputSolver {
 	return ir.GetInputSolver(c.rc, c.inputOrder)
 }
 
+// DeserializeLayeredCircuit takes a byte buffer and returns a pointer to a layered.RootCircuit
+// which represents a deserialized layered circuit.
 func DeserializeLayeredCircuit(buf []byte) *layered.RootCircuit {
 	return layered.DeserializeRootCircuit(buf)
 }
 
+// DeserializeInputSolver takes a byte buffer and returns a pointer to an ir.InputSolver
+// which represents a deserialized input solver.
 func DeserializeInputSolver(buf []byte) *ir.InputSolver {
 	return ir.DeserializeInputSolver(buf)
 }
