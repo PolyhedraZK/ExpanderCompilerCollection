@@ -83,4 +83,4 @@ In contrast to gnark, where the prover handles a portion of the witness generati
 
 For additional features, please refer to [APIs](./apis.md).
 
-For more examples, please visit [examples](../examples.md).
+For more examples, please visit [examples](../examples).

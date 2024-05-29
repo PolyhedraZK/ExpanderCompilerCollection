@@ -38,7 +38,7 @@ This process effectively eliminates most unnecessary variables and redundant sub
 
 ### Layered Circuit
 
-For detailed information on the format of the layered circuit, please refer to the [Layered Circuit Format](./layered_circuit_format.md) documentation.
+For detailed information on the format of the layered circuit, please refer to the [artifact and serialization](./artifact_and_serialization.md) documentation.
 
 The first element in the circuit's output layer is the Random Combined Assertions, followed by Public Inputs.
 
