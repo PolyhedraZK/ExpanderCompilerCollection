@@ -14,7 +14,7 @@ The APIs for this library are detailed in [APIs](./docs/apis.md).
 
 ## Example 
 
-Refer to [this example](./docs/example.md) for a practical demonstration of our compiler. In this example, we illustrate how a gnark circuit can be compiled using `ExpanderCompilerCollection`. The output of this example includes a circuit description file `"circuit.txt"` and a corresponding witnesses file `"witness.txt"`. Our prover, [Expander](https://github.com/PolyhedraZK/Expander)  or [Expander-RS](https://github.com/PolyhedraZK/Expander-rs), utilizes these IRs to generate the actual proof.
+Refer to [this example](./docs/example.md) for a practical demonstration of our compiler. In this example, we illustrate how a gnark circuit can be compiled using `ExpanderCompilerCollection`. The output of this example includes a circuit description file `"circuit.txt"` and a corresponding witnesses file `"witness.txt"`. Our prover, [Expander](https://github.com/PolyhedraZK/Expander), utilizes these IRs to generate the actual proof.
 
 Additional examples include:
 - Hash functions like [sha2](./examples/gnark_std_sha2/main.go), [keccak](./examples/keccak/main.go), and [MIMC](./examples/mimc/main.go)

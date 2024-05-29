@@ -54,12 +54,12 @@ A unique identifier, the magic number 3626604230490605891 (b'CIRCUIT2'), is pref
 
 ## Input Solver
 
-The input solver is an intermediary form of the circuit that facilitates witness generation. It is defined in ir/input_solver.go.
+The input solver is an intermediary form of the circuit that facilitates witness generation. It is defined in `ir/input_solver.go`.
 
 For Go-specific implementations, serialization is performed using the gob package.
 
 ## Witness Serialization
 
-The witness, an array of big.Int, serves as the input for the layered circuit. It is also defined in ir/input_solver.go.
+The witness, an array of `big.Int`, serves as the input for the layered circuit. It is also defined in `ir/input_solver.go`.
 
-The serialization process for the witness is straightforward. Given the known array length, the big.Int array is serialized as a sequence of 32-byte little-endian values.
+The serialization process for the witness is straightforward. Given the known array length, the `big.Int` array is serialized as a sequence of 32-byte little-endian values.
