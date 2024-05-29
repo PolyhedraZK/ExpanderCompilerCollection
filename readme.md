@@ -1,6 +1,6 @@
 # ExpanderCompilerCollection
 
-Expander is a proof generation backend for the Polyhedra Network. The ExpanderCompilerCollection is a component of the Expander proof system. It transforms circuits written in gnark into an intermediate representation (IR) of a layered circuit. This IR can later be used by the [Expander prover](https://github.com/PolyhedraZK/Expander) to generate proofs.
+Expander is a proof generation backend for the Polyhedra Network. The ExpanderCompilerCollection is a component of the Expander proof system. It transforms circuits written in [gnark](https://github.com/Consensys/gnark) into an intermediate representation (IR) of a layered circuit. This IR can later be used by the [Expander prover](https://github.com/PolyhedraZK/Expander) to generate proofs.
 
 ## Using this Library
 
@@ -15,6 +15,11 @@ The APIs for this library are detailed in [APIs](./docs/apis.md).
 ## Example 
 
 Refer to [this example](./docs/example.md) for a practical demonstration of our compiler. In this example, we illustrate how a gnark circuit can be compiled using `ExpanderCompilerCollection`. The output of this example includes a circuit description file `"circuit.txt"` and a corresponding witnesses file `"witness.txt"`. Our prover, [Expander](https://github.com/PolyhedraZK/Expander)  or [Expander-RS](https://github.com/PolyhedraZK/Expander-rs), utilizes these IRs to generate the actual proof.
+
+Additional examples include:
+- Hash functions like [sha2](./examples/gnark_std_sha2/main.go), [keccak](./examples/keccak/main.go), and [MIMC](./examples/mimc/main.go)
+- A [recursive circuit](./examples/gnark_recursive_proof/main.go)
+- A [mersenne field](./examples/m31_field/main.go)
 
 ## Deeper Dive in to the tech
 
