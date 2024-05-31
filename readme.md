@@ -27,3 +27,9 @@ Additional examples include:
 For a more technical overview of the overall architecture, visit our [Compilation Process](./docs/compilation_process.md) document.
 
 For a detailed explanation of the primary compilation artifacts - the layered circuit and the input solver, as well as their respective serialization formats, refer to [Artifact and Serialization](./docs/artifact_and_serialization.md).
+
+## Acknowledgement
+
+We extend our gratitude to the following projects, whose prior work has been crucial in bringing this project to fruition:
+
+[gnark](https://github.com/Consensys/gnark): our frontend language is based on gnark's frontend.
