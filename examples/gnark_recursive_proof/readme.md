@@ -1,4 +1,4 @@
-**This example faulty since `Commit` returns a compile-time random number.**
+**This example is faulty since `Commit` returns a compile-time random number.**
 
 Also, this example requires a patching on gnark `frontend/variable.go` to recognize our expression type:
 
