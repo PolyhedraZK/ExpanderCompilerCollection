@@ -33,3 +33,11 @@ For a detailed explanation of the primary compilation artifacts - the layered ci
 We extend our gratitude to the following projects, whose prior work has been crucial in bringing this project to fruition:
 
 [gnark](https://github.com/Consensys/gnark): our frontend language is based on gnark's frontend.
+
+## Future roadmap
+
+As a compiler collection, we will support more circuit frontend languages in near term.
+
+## Features in progress
+* On-chain verifier generation
+* Extended in-circuit randomness generation
