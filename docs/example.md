@@ -1,6 +1,6 @@
 # Example
 
-Suppose we have a gnark circuit, like this:
+Consider the following gnark circuit as an example:
 
 ```go
 package main
@@ -37,7 +37,7 @@ func main() {
 }
 ```
 
-How can we modify this circuit to use our compiler? It's quite simple, just need to change the compilation and execution part in the main function:
+To adapt this circuit for our compiler, we only need to modify the compilation and execution sections within the main function. Here's how:
 
 ```go
 package main
@@ -77,10 +77,10 @@ func main() {
 }
 ```
 
-It should be noted that the Prover's implementation is located in [Expander](https://github.com/PolyhedraZK/Expander). Therefore, the `CheckCircuit` function here simply evaluates the circuit once to verify its correctness. To generate and verify the actual proof, provide `circuit.txt` and `witness.txt` to Expander.
+Please note that the Prover's implementation resides in [Expander](https://github.com/PolyhedraZK/Expander). As such, the `CheckCircuit` function in this context merely evaluates the circuit once to confirm its correctness. To generate and verify the actual proof, supply `circuit.txt` and `witness.txt` to Expander.
 
-Additionally, unlike in gnark where part of the witness generation is handled within the prover, our compiler uses an `InputSolver` to compute this part. The `InputSolver` is also capable of serialization and deserialization. For details, please refer to the examples in [MIMC](../examples/mimc) and [MIMC Deserialize](../examples/mimc_deserialize).
+In contrast to gnark, where the prover handles a portion of the witness generation, our compiler employs an `InputSolver` to perform this task. The `InputSolver` also supports serialization and deserialization. For more information, please consult the examples in [MIMC](../examples/mimc) and [MIMC Deserialize](../examples/mimc_deserialize).
 
-For more features, refer to [APIs](./apis.md).
+For additional features, please refer to [APIs](./apis.md).
 
-For more examples, refer to [examples](../examples.md).
+For more examples, please visit [examples](../examples).
