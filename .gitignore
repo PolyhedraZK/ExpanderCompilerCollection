@@ -1,7 +1,9 @@
 # generated artifact
 *.txt
+__*
 
 # dev IDE
 .idea
 .vscode
 .code
+.DS_Store
