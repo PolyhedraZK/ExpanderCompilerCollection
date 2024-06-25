@@ -119,7 +119,7 @@ func (p *Prover) Verify(witnessData []byte, proof_and_claim []byte) (bool, error
 	}
 
 	cmd := exec.Command(bin_loc, "verify", p.circuitDir, tmpFileWit.Name(), tmpFileProof.Name())
-	println("cmd: ", cmd.String())
+	// println("cmd: ", cmd.String())
 	if err := cmd.Run(); err != nil {
 		// no need to print as it is expected to fail on invalid proof
 		return false, err
