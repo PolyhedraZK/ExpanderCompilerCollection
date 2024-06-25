@@ -7,6 +7,8 @@ require (
 	github.com/consensys/gnark-crypto v0.12.2-0.20231221171913-5d5eded6bb15
 )
 
+require github.com/juju/fslock v0.0.0-20160525022230-4d5c94c67b4b // indirect
+
 require (
 	github.com/bits-and-blooms/bitset v1.8.0 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect

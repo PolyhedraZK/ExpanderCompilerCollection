@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+
+	"github.com/juju/fslock"
 )
 
 //go:embed bin/expander-exec-linux-avx2
@@ -20,24 +22,31 @@ type Prover struct {
 }
 
 const bin_loc = "./__expander-exec"
+const bin_lock_loc = "./__expander-exec.lock"
 
 // format from external specification, maxConcurrency and releaseFlags are not used now
 func NewProver(circuitDir string, filename string, maxConcurrency int, releaseFlag bool) (*Prover, error) {
-	switch runtime.GOOS {
-	case "darwin":
-		err := os.WriteFile(bin_loc, embed_expander_exec_macos, 0700)
-		if err != nil {
-			panic("could not write file")
+	lock := fslock.New(bin_lock_loc)
+	lock.Lock()
+	if _, err := os.Stat(bin_loc); os.IsNotExist(err) {
+		// write the binary to the file
+		switch runtime.GOOS {
+		case "darwin":
+			err := os.WriteFile(bin_loc, embed_expander_exec_macos, 0700)
+			if err != nil {
+				panic("could not write file")
+			}
+		case "linux":
+			err := os.WriteFile(bin_loc, embed_expander_exec_linux_avx2, 0700)
+			if err != nil {
+				panic("could not write file")
+			}
+		default:
+			println("Unsupported OS: ", runtime.GOOS)
+			panic("Unsupported OS")
 		}
-	case "linux":
-		err := os.WriteFile(bin_loc, embed_expander_exec_linux_avx2, 0700)
-		if err != nil {
-			panic("could not write file")
-		}
-	default:
-		println("Unsupported OS: ", runtime.GOOS)
-		panic("Unsupported OS")
 	}
+	lock.Unlock()
 	return &Prover{
 		circuitDir: circuitDir,
 		filename:   filename,
@@ -45,9 +54,13 @@ func NewProver(circuitDir string, filename string, maxConcurrency int, releaseFl
 }
 
 func (p *Prover) Prove(witnessData []byte) ([]byte, error) {
-	output_file := "./out.bin"
 	// use external prover executable
 	// format: ./bin/expander-exec prove <input:circuit_file> <input:witness_file> <output:proof>
+	outputFile, err := os.CreateTemp("", "output")
+	if err != nil {
+		fmt.Println("Error creating temporary file:", err)
+		return nil, err
+	}
 
 	tmpFile, err := os.CreateTemp("", "witness")
 	if err != nil {
@@ -60,7 +73,7 @@ func (p *Prover) Prove(witnessData []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	cmd := exec.Command(bin_loc, "prove", p.circuitDir, tmpFile.Name(), output_file)
+	cmd := exec.Command(bin_loc, "prove", p.circuitDir, tmpFile.Name(), outputFile.Name())
 	// println("cmd: ", cmd.String())
 	if err := cmd.Run(); err != nil {
 		fmt.Println("Error running command:", err)
@@ -68,12 +81,13 @@ func (p *Prover) Prove(witnessData []byte) ([]byte, error) {
 	}
 	defer os.Remove(tmpFile.Name()) // Clean up the file when done
 
-	proof_and_claim, err := os.ReadFile(output_file)
+	proof_and_claim, err := os.ReadFile(outputFile.Name())
 	if err != nil {
 		fmt.Println("Error reading output file:", err)
 		return nil, err
 	}
-	os.Remove(output_file)
+	os.Remove(outputFile.Name())
+	defer os.Remove(outputFile.Name()) // Clean up the file when done
 
 	return proof_and_claim, nil
 }
@@ -105,7 +119,7 @@ func (p *Prover) Verify(witnessData []byte, proof_and_claim []byte) (bool, error
 	}
 
 	cmd := exec.Command(bin_loc, "verify", p.circuitDir, tmpFileWit.Name(), tmpFileProof.Name())
-	// println("cmd: ", cmd.String())
+	println("cmd: ", cmd.String())
 	if err := cmd.Run(); err != nil {
 		// no need to print as it is expected to fail on invalid proof
 		return false, err
