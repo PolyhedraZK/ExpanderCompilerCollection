@@ -238,7 +238,6 @@ func FinalCheck(api frontend.API, r frontend.Variable) error {
 	if err != nil {
 		panic(err)
 	}
-	// api.Println("sortedVariables", sortedVariables)
 	// Permutation check
 	sortedVariables1D := compressedKeyValueToValue(api, sortedVariables, 20)
 	UsedVariables2D := make([]frontend.Variable, (len(UsedVariables[0])-1)*2)
@@ -268,7 +267,6 @@ func FinalCheck(api frontend.API, r frontend.Variable) error {
 		checkFlag := api.Sub(sortedVariables[i], sortedVariables[i-1])
 		api.AssertIsBoolean(checkFlag)
 		valueDiff := api.Sub(sortedVariables[i+len(sortedVariables)/2], sortedVariables[i-1+len(sortedVariables)/2])
-		//diff = api.Or(diff, api.Select(checkFlag, 0, valueDiff))
 		api.AssertIsEqual(0, api.Select(checkFlag, 0, valueDiff))
 	}
 	fmt.Println("milestone 5")
@@ -286,12 +284,9 @@ func FinalCheckMultiTable(api frontend.API, r frontend.Variable) error {
 		if err != nil {
 			panic(err)
 		}
-		//tag0 := api.Tag("tag0")
 		// Permutation check
 		// Randomness from the anemoi-hash
 		fmt.Println("milestone1")
-		//tag1 := api.Tag("tag1")
-		//api.AddCounter(tag0, tag1)
 		// Check that the permutation is correct
 		sortedVariables1D := compressedKeyValueToValue(api, sortedVariables, 20)
 		UsedVariables2D := make([]frontend.Variable, (len(MultiTableUsedVariables[i][0])-1)*2)
@@ -300,7 +295,6 @@ func FinalCheckMultiTable(api frontend.API, r frontend.Variable) error {
 		UsedVariables1D := compressedKeyValueToValue(api, UsedVariables2D, 20)
 		sub1 := make([]frontend.Variable, len(UsedVariables1D))
 		sub2 := make([]frontend.Variable, len(UsedVariables1D))
-		// sub3 := make([]frontend.Variable, len(UsedVariables1D))
 		for i := 0; i < len(UsedVariables1D); i++ {
 			sub1[i] = api.Sub(r, UsedVariables1D[i])
 			sub2[i] = api.Sub(r, sortedVariables1D[i])
