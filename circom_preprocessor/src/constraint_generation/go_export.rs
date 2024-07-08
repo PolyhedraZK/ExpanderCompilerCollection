@@ -149,15 +149,28 @@ fn export_go_func(exporter: &GoExporter, program: &ExecutedProgram, pointer: usi
             InfixOp { l_id, r_id, op } => {
                 use super::expression_trace::InfixOpcode::*;
                 let go_op = match op {
-                    Mul => "api.Mul(",
-                    Div => "api.Div(",
-                    Add => "api.Add(",
-                    Sub => "api.Sub(",
-                    _ => {
-                        panic!("Infix operation \"{:?}\" on signals is not implemented yet, please open an issue.",op);
-                    }
+                    Mul => "api.Mul",
+                    Add => "api.Add",
+                    Sub => "api.Sub",
+                    Div => "api.(builder.CircomAPI).CircomDiv",
+                    Pow => "api.(builder.CircomAPI).CircomPow",
+                    IntDiv => "api.(builder.CircomAPI).CircomIntDiv",
+                    Mod => "api.(builder.CircomAPI).CircomMod",
+                    ShiftL => "api.(builder.CircomAPI).CircomShiftL",
+                    ShiftR => "api.(builder.CircomAPI).CircomShiftR",
+                    LesserEq => "api.(builder.CircomAPI).CircomLesserEq",
+                    GreaterEq => "api.(builder.CircomAPI).CircomGreaterEq",
+                    Lesser => "api.(builder.CircomAPI).CircomLesser",
+                    Greater => "api.(builder.CircomAPI).CircomGreater",
+                    Eq => "api.(builder.CircomAPI).CircomEq",
+                    NotEq => "api.(builder.CircomAPI).CircomNotEq",
+                    BoolOr => "api.(builder.CircomAPI).CircomBoolOr",
+                    BoolAnd => "api.(builder.CircomAPI).CircomBoolAnd",
+                    BitOr => "api.(builder.CircomAPI).CircomBitOr",
+                    BitAnd => "api.(builder.CircomAPI).CircomBitAnd",
+                    BitXor => "api.(builder.CircomAPI).CircomBitXor",
                 };
-                res.push(format!("t{} := {}t{}, t{})", i, go_op, l_id, r_id));
+                res.push(format!("t{} := {}(t{}, t{})", i, go_op, l_id, r_id));
             }
             PrefixOp { id, op } => {
                 use super::expression_trace::PrefixOpcode::*;
@@ -165,8 +178,17 @@ fn export_go_func(exporter: &GoExporter, program: &ExecutedProgram, pointer: usi
                     Sub => {
                         res.push(format!("t{} := api.Neg(t{})", i, id));
                     }
-                    _ => {
-                        panic!("Prefix operation \"{:?}\" on signals is not implemented yet, please open an issue.",op);
+                    BoolNot => {
+                        res.push(format!(
+                            "t{} := api.(builder.CircomAPI).CircomBoolNot(t{})",
+                            i, id
+                        ));
+                    }
+                    Complement => {
+                        res.push(format!(
+                            "t{} := api.(builder.CircomAPI).CircomComplement(t{})",
+                            i, id
+                        ));
                     }
                 };
             }
@@ -285,9 +307,10 @@ pub fn export_go(
     }
     let mut res: Vec<String> = Vec::new();
     res.push("package main\n\nimport (\n\t\"math/big\"\n".to_string());
-    res.push("\t\"github.com/consensys/gnark-crypto/ecc\"".to_string());
+    res.push("\t\"github.com/PolyhedraZK/ExpanderCompilerCollection\"".to_string());
+    res.push("\t\"github.com/PolyhedraZK/ExpanderCompilerCollection/builder\"".to_string());
+    res.push("\t\"github.com/PolyhedraZK/ExpanderCompilerCollection/field/bn254\"".to_string());
     res.push("\t\"github.com/consensys/gnark/frontend\"".to_string());
-    res.push("\t\"github.com/consensys/gnark/frontend/cs/r1cs\"".to_string());
     res.push(")\n".to_string());
     for i in 0..program.model.len() {
         res.push(export_go_func(&exporter, program, i));
@@ -298,7 +321,7 @@ pub fn export_go(
         program.model.len() - 1,
         public_inputs,
     ));
-    res.push("func main() {\n\t_, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &Circuit{})\n\tif err != nil {\n\t\tpanic(err)\n\t}\n}".to_string());
+    res.push("func main() {\n\t_, err := ExpanderCompilerCollection.Compile(bn254.ScalarField, &Circuit{})\n\tif err != nil {\n\t\tpanic(err)\n\t}\n}".to_string());
     let code = res.join("\n");
 
     use std::fs::File;

@@ -1,10 +1,10 @@
 use super::slice_types::{
     AExpr, AExpressionSlice, ComponentRepresentation, ComponentSlice, SignalSlice, SliceCapacity,
-    TagInfo, TagDefinitions, TagState,
+    TagDefinitions, TagInfo, TagState,
 };
 use super::{CircomEnvironment, CircomEnvironmentError};
-use program_structure::memory_slice::MemoryError;
 use crate::constraint_generation::ast::Meta;
+use program_structure::memory_slice::MemoryError;
 
 pub type ExecutionEnvironmentError = CircomEnvironmentError;
 pub type ExecutionEnvironment = CircomEnvironment<
@@ -32,7 +32,11 @@ pub fn environment_shortcut_add_input(
     for (t, value) in tags {
         tags_defined.insert(
             t.clone(),
-            TagState { defined: true, value_defined: value.is_some(), complete: true },
+            TagState {
+                defined: true,
+                value_defined: value.is_some(),
+                complete: true,
+            },
         );
     }
 
@@ -49,7 +53,11 @@ pub fn environment_shortcut_add_output(
     for (t, value) in tags {
         tags_defined.insert(
             t.clone(),
-            TagState { defined: true, value_defined: value.is_some(), complete: false },
+            TagState {
+                defined: true,
+                value_defined: value.is_some(),
+                complete: false,
+            },
         );
     }
     environment.add_output(output_name, (tags.clone(), tags_defined, slice));
@@ -65,7 +73,11 @@ pub fn environment_shortcut_add_intermediate(
     for (t, value) in tags {
         tags_defined.insert(
             t.clone(),
-            TagState { defined: true, value_defined: value.is_some(), complete: false },
+            TagState {
+                defined: true,
+                value_defined: value.is_some(),
+                complete: false,
+            },
         );
     }
     environment.add_intermediate(intermediate_name, (tags.clone(), tags_defined, slice));

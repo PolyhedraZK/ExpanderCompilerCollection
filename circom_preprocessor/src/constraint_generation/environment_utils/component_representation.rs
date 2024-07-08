@@ -1,10 +1,10 @@
 use super::slice_types::{
-    MemoryError, TypeInvalidAccess, TypeAssignmentError, SignalSlice, SliceCapacity, TagInfo,
+    MemoryError, SignalSlice, SliceCapacity, TagInfo, TypeAssignmentError, TypeInvalidAccess,
 };
+use crate::constraint_generation::ast::Meta;
 use crate::constraint_generation::execution_data::type_definitions::NodePointer;
 use crate::constraint_generation::execution_data::ExecutedProgram;
 use std::collections::{BTreeMap, HashMap, HashSet};
-use crate::constraint_generation::ast::Meta;
 
 pub struct ComponentRepresentation {
     pub node_pointer: Option<NodePointer>,
@@ -125,13 +125,17 @@ impl ComponentRepresentation {
             let signal_slice = SignalSlice::new_with_route(route, &false);
             let signal_slice_size = SignalSlice::get_number_of_cells(&signal_slice);
             if signal_slice_size > 0 {
-                component.unassigned_inputs.insert(symbol.clone(), signal_slice_size);
+                component
+                    .unassigned_inputs
+                    .insert(symbol.clone(), signal_slice_size);
             }
             component.inputs.insert(symbol.clone(), signal_slice);
         }
 
         for (symbol, route) in node.outputs() {
-            component.outputs.insert(symbol.clone(), SignalSlice::new_with_route(route, &true));
+            component
+                .outputs
+                .insert(symbol.clone(), SignalSlice::new_with_route(route, &true));
 
             let tags_output = node.signal_to_tags.get(symbol);
             let component_tags_output = component.outputs_tags.get_mut(symbol);
@@ -201,23 +205,29 @@ impl ComponentRepresentation {
         if self.outputs.contains_key(signal_name) && !self.unassigned_inputs.is_empty() {
             // we return the name of an input that has not been assigned
             let ex_signal = self.unassigned_inputs.iter().next().unwrap().0.clone();
-            return Result::Err(MemoryError::InvalidAccess(TypeInvalidAccess::MissingInputs(
-                ex_signal,
-            )));
+            return Result::Err(MemoryError::InvalidAccess(
+                TypeInvalidAccess::MissingInputs(ex_signal),
+            ));
         }
 
         if !self.is_initialized {
             // we return the name of an input with tags that has not been assigned
             let ex_signal = self.unassigned_tags.iter().next().unwrap().clone();
-            return Result::Err(MemoryError::InvalidAccess(TypeInvalidAccess::MissingInputTags(
-                ex_signal,
-            )));
+            return Result::Err(MemoryError::InvalidAccess(
+                TypeInvalidAccess::MissingInputTags(ex_signal),
+            ));
         }
 
         let slice = if self.inputs.contains_key(signal_name) {
-            (self.inputs_tags.get(signal_name).unwrap(), self.inputs.get(signal_name).unwrap())
+            (
+                self.inputs_tags.get(signal_name).unwrap(),
+                self.inputs.get(signal_name).unwrap(),
+            )
         } else {
-            (self.outputs_tags.get(signal_name).unwrap(), self.outputs.get(signal_name).unwrap())
+            (
+                self.outputs_tags.get(signal_name).unwrap(),
+                self.outputs.get(signal_name).unwrap(),
+            )
         };
         Result::Ok(slice)
     }

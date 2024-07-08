@@ -6,7 +6,7 @@ mod expression_trace;
 mod go_export;
 
 use ansi_term::Colour;
-use circom_algebra::algebra::{ArithmeticError};
+use circom_algebra::algebra::ArithmeticError;
 use compiler::hir::very_concrete_program::VCP;
 use constraint_list::ConstraintList;
 use constraint_writers::ConstraintExporter;

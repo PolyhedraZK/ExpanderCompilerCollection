@@ -1,4 +1,3 @@
-
 use constraint_writers::debug_writer::DebugWriter;
 use program_structure::program_archive::ProgramArchive;
 
