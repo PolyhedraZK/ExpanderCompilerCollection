@@ -1,10 +1,14 @@
 package layered
 
+import "github.com/PolyhedraZK/ExpanderCompilerCollection/utils"
+
 type Stats struct {
 	// number of layers in the final circuit
 	NbLayer int
-	// number of circuits
+	// number of circuits (or, segments)
 	NbCircuit int
+	// number of used input variables
+	NbInput int
 	// number of mul/add/cst gates in all circuits (unexpanded)
 	NbTotMul int
 	NbTotAdd int
@@ -17,6 +21,8 @@ type Stats struct {
 	NbTotGates int
 	// number of actually used gates used in the final circuit
 	NbUsedGates int
+	// total cost according to some formula
+	TotalCost int
 }
 
 type circuitStats struct {
@@ -66,7 +72,7 @@ func (rc *RootCircuit) GetStats() Stats {
 	}
 	ar.NbCircuit = len(rc.Circuits)
 	ar.NbLayer = len(rc.Layers)
-	_, outputMask := computeMasks(rc)
+	inputMask, outputMask := computeMasks(rc)
 	for i := 0; i < len(rc.Layers); i++ {
 		ar.NbTotGates += int(rc.Circuits[rc.Layers[i]].OutputLen)
 		for j := uint64(0); j < rc.Circuits[rc.Layers[i]].OutputLen; j++ {
@@ -75,5 +81,15 @@ func (rc *RootCircuit) GetStats() Stats {
 			}
 		}
 	}
+	for i := 0; i < int(rc.Circuits[rc.Layers[0]].InputLen); i++ {
+		if inputMask[rc.Layers[0]][i] {
+			ar.NbInput++
+		}
+	}
+	ar.TotalCost = int(rc.Circuits[rc.Layers[0]].InputLen) * utils.CostOfInput
+	ar.TotalCost += ar.NbTotGates * utils.CostOfVariable
+	ar.TotalCost += ar.NbExpandedMul * utils.CostOfMulGate
+	ar.TotalCost += ar.NbExpandedAdd * utils.CostOfAddGate
+	ar.TotalCost += ar.NbExpandedCst * utils.CostOfCstGate
 	return ar
 }

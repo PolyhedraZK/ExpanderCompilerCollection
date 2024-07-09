@@ -98,6 +98,24 @@ func (e Expression) Degree() int {
 	return res
 }
 
+// CountOfDegrees returns the number of terms of each degree
+func (e Expression) CountOfDegrees() (int, int, int) {
+	res0 := 0
+	res1 := 0
+	res2 := 0
+	for _, val := range e {
+		deg := val.Degree()
+		if deg == 2 {
+			res2++
+		} else if deg == 1 {
+			res1++
+		} else {
+			res0++
+		}
+	}
+	return res0, res1, res2
+}
+
 func (e Expression) IsConstant() bool {
 	for _, term := range e {
 		if term.VID0 != 0 {
