@@ -10,6 +10,7 @@ import (
 	"sort"
 
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/expr"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/utils"
 	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/constraint/solver"
 	"github.com/consensys/gnark/frontend"
@@ -186,8 +187,31 @@ func (builder *builder) Mul(i1, i2 frontend.Variable, in ...frontend.Variable) f
 			v2 = builder.asInternalVariable(v2)
 		}
 
-		if len(v1)*len(v2) >= (len(v1)+len(v2))*3 {
+		v1C0, v1C1, _ := v1.CountOfDegrees()
+		v2C0, v2C1, _ := v2.CountOfDegrees()
+		// if directly multiply, the cost will be
+		costDirect := utils.CostOfMultiply(v1C0, v1C1, v2C0, v2C1)
+		// compress one of them
+		costCompressV1 := utils.CostOfMultiply(v1C0, 1, v2C0, v2C1) + utils.CostOfCompress(0, v1C1, 0)
+		costCompressV2 := utils.CostOfMultiply(v1C0, v1C1, v2C0, 1) + utils.CostOfCompress(0, v2C1, 0)
+		// compress both
+		costCompressBoth := utils.CostOfMultiply(v1C0, 1, v2C0, 1) + utils.CostOfCompress(v1C1, 0, v2C1)
+		minCost := costDirect
+		if costCompressV1 < minCost {
+			minCost = costCompressV1
+		}
+		if costCompressV2 < minCost {
+			minCost = costCompressV2
+		}
+		if costCompressBoth < minCost {
+			minCost = costCompressBoth
+		}
+		if costCompressBoth == minCost {
 			v1 = builder.asInternalVariable(v1)
+			v2 = builder.asInternalVariable(v2)
+		} else if costCompressV1 == minCost {
+			v1 = builder.asInternalVariable(v1)
+		} else if costCompressV2 == minCost {
 			v2 = builder.asInternalVariable(v2)
 		}
 
