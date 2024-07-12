@@ -1,0 +1,22 @@
+[package]
+name = "circom_preprocessor"
+version = "2.1.6"
+authors = ["a"]
+edition = "2018"
+
+[dependencies]
+parser = {path = "circom/parser"}
+program_structure = { path = "circom/program_structure" }
+type_analysis = { path = "circom/type_analysis" }
+constraint_writers = { path = "circom/constraint_writers" }
+compiler = { path = "circom/compiler" }
+circom_algebra = { path = "circom/circom_algebra" }
+constraint_list = { path = "circom/constraint_list" }
+dag = { path = "circom/dag" }
+constant_tracking = {path = "circom/constant_tracking" }
+clap = "2.33.0"
+ansi_term = "0.12.1"
+wast = "39.0.0"
+exitcode = "1.1.2"
+num-traits = "0.2.6"
+num-bigint-dig = "0.6.0"
