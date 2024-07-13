@@ -1,6 +1,7 @@
 # generated artifact
 *.txt
 __*
+circom_preprocessor/target
 
 # dev IDE
 .idea
