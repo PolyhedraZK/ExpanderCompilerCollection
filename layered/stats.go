@@ -51,7 +51,10 @@ func (rc *RootCircuit) GetStats() Stats {
 		rc: rc,
 		m:  make([]circuitStats, len(rc.Circuits)),
 	}
-	ar := Stats{}
+	ar := Stats{
+		NbTotCustom:      make(map[uint64]int),
+		NbExpandedCustom: make(map[uint64]int),
+	}
 	for i, circuit := range rc.Circuits {
 		r := &sc.m[i]
 		r.nbSelfMul = len(circuit.Mul)

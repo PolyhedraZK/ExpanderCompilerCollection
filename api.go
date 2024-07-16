@@ -3,6 +3,7 @@
 package ExpanderCompilerCollection
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/builder"
@@ -80,7 +81,7 @@ func Compile(field *big.Int, circuit frontend.Circuit, opts ...frontend.CompileO
 		return nil, err
 	}
 	lstats := lrc.GetStats()
-	log.Info().
+	log1 := log.Info().
 		Int("nbLayer", lstats.NbLayer).
 		Int("nbCircuit", lstats.NbCircuit).
 		Int("numMul", lstats.NbExpandedMul).
@@ -89,8 +90,11 @@ func Compile(field *big.Int, circuit frontend.Circuit, opts ...frontend.CompileO
 		Int("nbVariables", lstats.NbTotGates).
 		Int("nbUsedVariables", lstats.NbUsedGates).
 		Int("nbUsedInputs", lstats.NbInput).
-		Int("totalCost", lstats.TotalCost).
-		Msg("compiled layered circuit")
+		Int("totalCost", lstats.TotalCost)
+	for k, v := range lstats.NbExpandedCustom {
+		log1 = log1.Int(fmt.Sprintf("numCustom%d", k), v)
+	}
+	log1.Msg("compiled layered circuit")
 	lrc = layered.Optimize(lrc)
 	if err := layered.Validate(lrc); err != nil {
 		return nil, err
@@ -99,7 +103,7 @@ func Compile(field *big.Int, circuit frontend.Circuit, opts ...frontend.CompileO
 		return nil, err
 	}
 	lstats = lrc.GetStats()
-	log.Info().
+	log2 := log.Info().
 		Int("nbLayer", lstats.NbLayer).
 		Int("nbCircuit", lstats.NbCircuit).
 		Int("numMul", lstats.NbExpandedMul).
@@ -108,8 +112,11 @@ func Compile(field *big.Int, circuit frontend.Circuit, opts ...frontend.CompileO
 		Int("nbVariables", lstats.NbTotGates).
 		Int("nbUsedVariables", lstats.NbUsedGates).
 		Int("nbUsedInputs", lstats.NbInput).
-		Int("totalCost", lstats.TotalCost).
-		Msg("optimized layered circuit")
+		Int("totalCost", lstats.TotalCost)
+	for k, v := range lstats.NbExpandedCustom {
+		log2 = log2.Int(fmt.Sprintf("numCustom%d", k), v)
+	}
+	log2.Msg("optimized layered circuit")
 	res := CompileResult{
 		rc:         rc,
 		compiled:   lrc,
