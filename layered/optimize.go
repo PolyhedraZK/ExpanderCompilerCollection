@@ -151,6 +151,16 @@ func expandCircuit(circuit *Circuit, prevCircuits []*Circuit, field *big.Int, ex
 					Coef: c.Coef,
 				})
 			}
+			for _, c := range subc.Custom {
+				in := make([]uint64, len(c.In))
+				for i := range c.In {
+					in[i] = c.In[i] + al.InputOffset
+				}
+				res.Custom = append(res.Custom, GateCustom{
+					In:  in,
+					Out: c.Out + al.OutputOffset,
+				})
+			}
 			for _, subsub := range subc.SubCircuits {
 				x := 0
 				for x != len(res.SubCircuits) && res.SubCircuits[x].Id != subsub.Id {

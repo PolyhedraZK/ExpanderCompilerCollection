@@ -45,6 +45,7 @@ type Circuit struct {
     Mul           []GateMul
     Add           []GateAdd
     Cst           []GateCst
+    Custom      []GateCustom
     RandomCoefIdx []uint64
 }
 ```
