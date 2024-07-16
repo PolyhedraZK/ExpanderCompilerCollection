@@ -286,6 +286,17 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 			})
 			continue
 		}
+		if insn, ok := ic.customGateInsn[x]; ok {
+			in := make([]uint64, len(insn.Inputs))
+			for i, e := range insn.Inputs {
+				in[i] = uint64(aq.varPos[e[0].VID0])
+			}
+			res.Custom = append(res.Custom, layered.GateCustom{
+				GateType: insn.CustomGateType,
+				In:       in,
+				Out:      uint64(pos),
+			})
+		}
 		e := ic.internalVariableExpr[x]
 		for _, term := range e {
 			//fmt.Printf("/%d %d %d\n", x, term.VID0, term.VID1)
