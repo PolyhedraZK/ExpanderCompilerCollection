@@ -34,6 +34,8 @@ type API interface {
 	ToFirstLayer(frontend.Variable) frontend.Variable
 	// GetRandomValue returns a random value for use within the circuit.
 	GetRandomValue() frontend.Variable
+	// CustomGate registers a hint, but it compiles to a custom gate in the layered circuit.
+	CustomGate(f solver.Hint, gateType uint64, inputs ...frontend.Variable) frontend.Variable
 }
 
 // ---------------------------------------------------------------------------------------------

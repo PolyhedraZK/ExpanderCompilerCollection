@@ -315,7 +315,7 @@ func (isc *inputSolveCtx) worker() {
 				}
 				if insn.Type == IInternalVariable {
 					csc.values[outOffset] = in[0]
-				} else if insn.Type == IHint {
+				} else if insn.Type == IHint || insn.Type == ICustomGate {
 					inB := make([]*big.Int, len(insn.Inputs))
 					outB := make([]*big.Int, len(insn.OutputIds))
 					for i, e := range in {

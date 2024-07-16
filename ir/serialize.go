@@ -28,11 +28,12 @@ type CircuitForSerialization struct {
 
 // InstructionForSerialization is used for serializing an Instruction.
 type InstructionForSerialization struct {
-	Type         InstructionType
-	HintID       solver.HintID
-	SubCircuitId uint64
-	Inputs       []expr.Expression
-	OutputIds    []int
+	Type           InstructionType
+	HintID         solver.HintID
+	SubCircuitId   uint64
+	CustomGateType uint64
+	Inputs         []expr.Expression
+	OutputIds      []int
 }
 
 // Serialize converts the InputSolver into a byte slice for storage or transmission.
@@ -57,7 +58,7 @@ func (is *InputSolver) Serialize() []byte {
 				Inputs:       insn.Inputs,
 				OutputIds:    insn.OutputIds,
 			}
-			if cfs.Instructions[i].Type == IHint {
+			if cfs.Instructions[i].Type == IHint || cfs.Instructions[i].Type == ICustomGate {
 				cfs.Instructions[i].HintID = solver.GetHintID(insn.HintFunc)
 			}
 		}
@@ -99,7 +100,7 @@ func DeserializeInputSolver(data []byte) *InputSolver {
 				Inputs:       insn.Inputs,
 				OutputIds:    insn.OutputIds,
 			}
-			if c.Instructions[i].Type == IHint {
+			if c.Instructions[i].Type == IHint || c.Instructions[i].Type == ICustomGate {
 				c.Instructions[i].HintFunc = solver.GetRegisteredHint(insn.HintID)
 				if c.Instructions[i].HintFunc == nil {
 					panic("hint not registered")

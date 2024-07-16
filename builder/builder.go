@@ -418,6 +418,28 @@ func (builder *builder) newHint(f solver.Hint, nbOutputs int, inputs []frontend.
 	return res, nil
 }
 
+func (builder *builder) CustomGate(f solver.Hint, gateType uint64, inputs ...frontend.Variable) frontend.Variable {
+	hintInputs := make([]expr.Expression, len(inputs))
+
+	for i, in := range inputs {
+		if t, ok := in.(expr.Expression); ok {
+			assertIsSet(t)
+			hintInputs[i] = t
+		} else {
+			c := builder.field.FromInterface(in)
+			hintInputs[i] = expr.NewConstantExpression(c)
+		}
+	}
+
+	outId := builder.newVariable(1)
+
+	builder.instructions = append(builder.instructions,
+		ir.NewCustomGateInstruction(f, gateType, hintInputs, outId),
+	)
+
+	return expr.NewLinearExpression(outId, builder.tOne)
+}
+
 // assertIsSet panics if the variable is unset
 // this may happen if inside a Define we have
 // var a variable

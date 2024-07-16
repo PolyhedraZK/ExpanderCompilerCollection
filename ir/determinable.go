@@ -48,7 +48,8 @@ func (dc *determinableChecker) call(id uint64, in []bool) []bool {
 				determinable = append(determinable, dc.call(insn.SubCircuitId, subIn)...)
 			} else if insn.Type == IInternalVariable {
 				determinable = append(determinable, subIn...)
-			} else if insn.Type == IHint {
+			} else if insn.Type == IHint || insn.Type == ICustomGate {
+				// TODO: custom gate could rely on random values, but we need to adjust the input solver for this
 				for _, indet := range subIn {
 					if !indet {
 						dc.res = false
