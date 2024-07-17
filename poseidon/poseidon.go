@@ -18,9 +18,14 @@ func sBox(engine m31.Field, f constraint.Element) constraint.Element {
 	return engine.Mul(x4, f)
 }
 
+func PoseidonM31(param *PoseidonParams, input []constraint.Element) constraint.Element {
+	_, output := PoseidonM31WithInternalStates(param, input, false)
+	return output
+}
+
 // Poseidon hash function over M31 field.
 // For convenience, function also outputs an internal state when the hash function is half complete.
-func PoseidonM31(param *PoseidonParams, input []constraint.Element) (PoseidonInternalState, constraint.Element) {
+func PoseidonM31WithInternalStates(param *PoseidonParams, input []constraint.Element, withState bool) (PoseidonInternalState, constraint.Element) {
 	// todo: pad the input if it is too short
 	if len(input) != param.NumStates {
 		panic("input length does not match the number of states in the Poseidon parameters")
@@ -43,7 +48,9 @@ func PoseidonM31(param *PoseidonParams, input []constraint.Element) (PoseidonInt
 			state[j] = sBox(engine, state[j])
 		}
 	}
-	copy(internalState.AfterHalfFullRound[:], state)
+	if withState {
+		copy(internalState.AfterHalfFullRound[:], state)
+	}
 
 	// Applies the first half of partial rounds.
 	for i := 0; i < param.NumHalfPartialRounds; i++ {
@@ -54,7 +61,10 @@ func PoseidonM31(param *PoseidonParams, input []constraint.Element) (PoseidonInt
 		// applyInternalRoundMatrix(engine, state)
 		state[0] = sBox(engine, state[0])
 	}
-	copy(internalState.AfterHalfPartialRound[:], state)
+
+	if withState {
+		copy(internalState.AfterHalfPartialRound[:], state)
+	}
 
 	// Applies the second half of partial rounds.
 	for i := 0; i < param.NumHalfPartialRounds; i++ {
@@ -65,7 +75,9 @@ func PoseidonM31(param *PoseidonParams, input []constraint.Element) (PoseidonInt
 		// applyInternalRoundMatrix(engine, state)
 		state[0] = sBox(engine, state[0])
 	}
-	copy(internalState.AfterPartialRound[:], state)
+	if withState {
+		copy(internalState.AfterPartialRound[:], state)
+	}
 
 	// Applies the full rounds.
 	for i := 0; i < param.NumHalfFullRounds; i++ {

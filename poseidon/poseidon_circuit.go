@@ -2,6 +2,7 @@ package poseidon
 
 import (
 	"log"
+	"math/big"
 
 	"github.com/PolyhedraZK/ExpanderCompilerCollection"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/field/m31"
@@ -22,7 +23,6 @@ func PoseidonCircuit(
 	engine m31.Field,
 	param *PoseidonParams,
 	input []frontend.Variable,
-	internalStateVars PoseidonInternalStateVar,
 	useRandomness bool) frontend.Variable {
 	// todo: pad the input if it is too short
 	if len(input) != param.NumStates {
@@ -60,20 +60,27 @@ func PoseidonCircuit(
 			state[j] = sBoxCircuit(api, state[j])
 		}
 	}
+
+	state2, error := api.NewHint(poseidonHint, 16, state[0], state[1], state[2], state[3], state[4], state[5], state[6], state[7], state[8], state[9], state[10], state[11], state[12], state[13], state[14], state[15])
+
 	if useRandomness {
-		rlc1 := innerProduct(api, r[:], internalStateVars.AfterHalfFullRound[:])
+		rlc1 := innerProduct(api, r[:], state2[:])
 		rlc1_rec := innerProduct(api, r[:], state)
 		api.AssertIsEqual(rlc1, rlc1_rec)
 	} else {
 		for i := 0; i < param.NumStates; i++ {
-			api.AssertIsEqual(state[i], internalStateVars.AfterHalfFullRound[i])
+			api.AssertIsEqual(state[i], state2[i])
 		}
 	}
 
 	// ============================
 	// Applies the first half of partial rounds.
 	// ============================
-	state = internalStateVars.AfterHalfFullRound[:]
+	if error != nil {
+		log.Println("error in NewHint")
+		panic("")
+	}
+	state = state2
 
 	for i := 0; i < param.NumHalfPartialRounds; i++ {
 		// add round constant
@@ -86,20 +93,27 @@ func PoseidonCircuit(
 		state[0] = sBoxCircuit(api, state[0])
 	}
 
+	state2, error = api.NewHint(poseidonHint, 16, state[0], state[1], state[2], state[3], state[4], state[5], state[6], state[7], state[8], state[9], state[10], state[11], state[12], state[13], state[14], state[15])
+
 	if useRandomness {
-		rlc2 := innerProduct(api, r[:], internalStateVars.AfterHalfPartialRound[:])
+		rlc2 := innerProduct(api, r[:], state2[:])
 		rlc2_rec := innerProduct(api, r[:], state)
 		api.AssertIsEqual(rlc2, rlc2_rec)
 	} else {
 		for i := 0; i < param.NumStates; i++ {
-			api.AssertIsEqual(state[i], internalStateVars.AfterHalfPartialRound[i])
+			api.AssertIsEqual(state[i], state2[i])
 		}
 	}
 
 	// ============================
 	// Applies the second half of partial rounds.
 	// ============================
-	state = internalStateVars.AfterHalfPartialRound[:]
+	if error != nil {
+		log.Println("error in NewHint")
+		panic("")
+	}
+	state = state2
+
 	for i := 0; i < param.NumHalfPartialRounds; i++ {
 		// add round constant
 		state[0] = api.Add(state[0], param.InternalRoundConstant[i+param.NumHalfPartialRounds])
@@ -111,21 +125,27 @@ func PoseidonCircuit(
 		state[0] = sBoxCircuit(api, state[0])
 	}
 
+	state2, error = api.NewHint(poseidonHint, 16, state[0], state[1], state[2], state[3], state[4], state[5], state[6], state[7], state[8], state[9], state[10], state[11], state[12], state[13], state[14], state[15])
 	if useRandomness {
-		rlc3 := innerProduct(api, r[:], internalStateVars.AfterPartialRound[:])
+		rlc3 := innerProduct(api, r[:], state2[:])
 		rlc3_rec := innerProduct(api, r[:], state)
 		api.AssertIsEqual(rlc3, rlc3_rec)
 
 	} else {
 		for i := 0; i < param.NumStates; i++ {
-			api.AssertIsEqual(state[i], internalStateVars.AfterPartialRound[i])
+			api.AssertIsEqual(state[i], state2[i])
 		}
 	}
 
 	// ============================
 	// Applies the full rounds.
 	// ============================
-	state = internalStateVars.AfterPartialRound[:]
+	if error != nil {
+		log.Println("error in NewHint")
+		panic("")
+	}
+	state = state2
+
 	for i := 0; i < param.NumHalfFullRounds; i++ {
 		// add round constant
 		for j := 0; j < param.NumStates; j++ {
@@ -178,4 +198,13 @@ func sBoxCircuit(api frontend.API, input frontend.Variable) frontend.Variable {
 	t2 := api.Mul(input, input)
 	t4 := api.Mul(t2, t2)
 	return api.Mul(t4, input)
+}
+
+// function to generate intermediate witnesses for poseidon
+func poseidonHint(field *big.Int, input []*big.Int, outputs []*big.Int) error {
+	for i := 0; i < 16; i++ {
+		outputs[i] = big.NewInt(int64(input[i].Uint64()))
+	}
+
+	return nil
 }

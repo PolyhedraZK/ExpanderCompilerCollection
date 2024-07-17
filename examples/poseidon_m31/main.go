@@ -20,9 +20,8 @@ func main() {
 const NumRepeat = 100
 
 type MockPoseidonM31Circuit struct {
-	State         [NumRepeat][16]frontend.Variable
-	InternalState [NumRepeat]poseidon.PoseidonInternalStateVar
-	Digest        [NumRepeat]frontend.Variable `gnark:",public"`
+	State  [NumRepeat][16]frontend.Variable
+	Digest [NumRepeat]frontend.Variable `gnark:",public"`
 }
 
 func (c *MockPoseidonM31Circuit) Define(api frontend.API) (err error) {
@@ -30,7 +29,7 @@ func (c *MockPoseidonM31Circuit) Define(api frontend.API) (err error) {
 	param := poseidon.NewPoseidonParams()
 	engine := m31.Field{}
 	for i := 0; i < NumRepeat; i++ {
-		digest := poseidon.PoseidonCircuit(api, engine, param, c.State[i][:], c.InternalState[i], true)
+		digest := poseidon.PoseidonCircuit(api, engine, param, c.State[i][:], true)
 		api.AssertIsEqual(digest, c.Digest[i])
 	}
 
@@ -44,26 +43,20 @@ func M31CircuitBuild() {
 	var states [NumRepeat][16]constraint.Element
 	var stateVars [NumRepeat][16]frontend.Variable
 	var outputVars [NumRepeat]frontend.Variable
-	var internalStateVars [NumRepeat]poseidon.PoseidonInternalStateVar
 
 	for i := 0; i < NumRepeat; i++ {
 		for j := 0; j < 16; j++ {
 			states[i][j] = constraint.Element{uint64(i)}
 			stateVars[i][j] = frontend.Variable(uint64(i))
 		}
-		internalState, output := poseidon.PoseidonM31(param, states[i][:])
+		output := poseidon.PoseidonM31(param, states[i][:])
 		outputVars[i] = frontend.Variable(output[0])
-		for j := 0; j < 16; j++ {
-			internalStateVars[i].AfterHalfFullRound[j] = frontend.Variable(internalState.AfterHalfFullRound[j][0])
-			internalStateVars[i].AfterHalfPartialRound[j] = frontend.Variable(internalState.AfterHalfPartialRound[j][0])
-			internalStateVars[i].AfterPartialRound[j] = frontend.Variable(internalState.AfterPartialRound[j][0])
-		}
+
 	}
 
 	assignment := &MockPoseidonM31Circuit{
-		State:         stateVars,
-		InternalState: internalStateVars,
-		Digest:        outputVars,
+		State:  stateVars,
+		Digest: outputVars,
 	}
 
 	// Gnark test disabled as it does not support randomness

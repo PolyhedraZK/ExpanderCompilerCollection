@@ -13,16 +13,15 @@ import (
 )
 
 type MockPoseidonCircuit struct {
-	State             []frontend.Variable      `gnark:",public"`
-	InternalStateVars PoseidonInternalStateVar `gnark:",public"`
-	Output            frontend.Variable        `gnark:",public"`
+	State  []frontend.Variable `gnark:",public"`
+	Output frontend.Variable   `gnark:",public"`
 }
 
 func (c *MockPoseidonCircuit) Define(api frontend.API) (err error) {
 	// Define the circuit
 	param := NewPoseidonParams()
 	engine := m31.Field{}
-	t := PoseidonCircuit(api, engine, param, c.State, c.InternalStateVars, false)
+	t := PoseidonCircuit(api, engine, param, c.State, false)
 	api.AssertIsEqual(t, c.Output)
 
 	return
@@ -41,7 +40,7 @@ func TestPoseidonCircuit(t *testing.T) {
 		state[i] = constraint.Element{uint64(i)}
 		stateVar[i] = frontend.Variable(uint64(i))
 	}
-	internalState, output := PoseidonM31(param, state)
+	internalState, output := PoseidonM31WithInternalStates(param, state, true)
 	outputVar := frontend.Variable(output[0])
 
 	fmt.Println("internal state", internalState)
@@ -54,7 +53,6 @@ func TestPoseidonCircuit(t *testing.T) {
 
 	c := MockPoseidonCircuit{
 		stateVar,
-		internalStateVars,
 		outputVar,
 	}
 
