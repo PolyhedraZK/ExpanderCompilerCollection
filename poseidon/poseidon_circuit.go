@@ -46,6 +46,7 @@ func PoseidonCircuit(
 	// Applies the full rounds.
 	// ============================
 	state := input
+
 	for i := 0; i < param.NumHalfFullRounds; i++ {
 		// add round constant
 		for j := 0; j < param.NumStates; j++ {
@@ -62,6 +63,10 @@ func PoseidonCircuit(
 	}
 
 	state2, error := api.NewHint(poseidonHint, 16, state[0], state[1], state[2], state[3], state[4], state[5], state[6], state[7], state[8], state[9], state[10], state[11], state[12], state[13], state[14], state[15])
+	if error != nil {
+		log.Println("error in NewHint")
+		panic("")
+	}
 
 	if useRandomness {
 		rlc1 := innerProduct(api, r[:], state2[:])
@@ -76,10 +81,6 @@ func PoseidonCircuit(
 	// ============================
 	// Applies the first half of partial rounds.
 	// ============================
-	if error != nil {
-		log.Println("error in NewHint")
-		panic("")
-	}
 	state = state2
 
 	for i := 0; i < param.NumHalfPartialRounds; i++ {
@@ -94,6 +95,10 @@ func PoseidonCircuit(
 	}
 
 	state2, error = api.NewHint(poseidonHint, 16, state[0], state[1], state[2], state[3], state[4], state[5], state[6], state[7], state[8], state[9], state[10], state[11], state[12], state[13], state[14], state[15])
+	if error != nil {
+		log.Println("error in NewHint")
+		panic("")
+	}
 
 	if useRandomness {
 		rlc2 := innerProduct(api, r[:], state2[:])
@@ -108,10 +113,6 @@ func PoseidonCircuit(
 	// ============================
 	// Applies the second half of partial rounds.
 	// ============================
-	if error != nil {
-		log.Println("error in NewHint")
-		panic("")
-	}
 	state = state2
 
 	for i := 0; i < param.NumHalfPartialRounds; i++ {
@@ -126,6 +127,11 @@ func PoseidonCircuit(
 	}
 
 	state2, error = api.NewHint(poseidonHint, 16, state[0], state[1], state[2], state[3], state[4], state[5], state[6], state[7], state[8], state[9], state[10], state[11], state[12], state[13], state[14], state[15])
+	if error != nil {
+		log.Println("error in NewHint")
+		panic("")
+	}
+
 	if useRandomness {
 		rlc3 := innerProduct(api, r[:], state2[:])
 		rlc3_rec := innerProduct(api, r[:], state)
@@ -140,10 +146,6 @@ func PoseidonCircuit(
 	// ============================
 	// Applies the full rounds.
 	// ============================
-	if error != nil {
-		log.Println("error in NewHint")
-		panic("")
-	}
 	state = state2
 
 	for i := 0; i < param.NumHalfFullRounds; i++ {
