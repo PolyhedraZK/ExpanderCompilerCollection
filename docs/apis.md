@@ -57,6 +57,7 @@ type API interface {
 	LayerOf(frontend.Variable) int
 	ToFirstLayer(frontend.Variable) frontend.Variable
 	GetRandomValue() frontend.Variable
+	CustomGate(gateType uint64, inputs ...frontend.Variable) frontend.Variable
 }
 ```
 
@@ -65,6 +66,7 @@ type API interface {
 - `LayerOf`: This method estimates the layer in which a variable will appear in the compiled layered circuit. The term "estimate" is used because subsequent compilation optimizations may modify the exact layer placement initially determined during the Builder phase.
 - `ToFirstLayer`: This method employs a hint to pull a variable back to the first layer.
 - `GetRandomValue`: This method retrieves a random value directly, a more efficient approach than generating pseudo-random numbers using a hash function. This direct access to random numbers is facilitated by the Libra proving process.
+- `CustomGate`: This method is similar to Gnark's `NewHint` in that it essentially calls a hint function to compute a result. In the resulting layered circuit, it will be compiled into a custom gate of the specified gate type. Unlike `NewHint`, it requires pre-registering the hint function and other parameters. For specific details, see [the example](../examples/custom_gate/main.go).
 
 ## Builder Extensions
 

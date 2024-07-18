@@ -21,6 +21,7 @@ import (
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/field"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ir"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/utils"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/utils/customgates"
 )
 
 // builder implements frontend.API and frontend.Compiler, and builds a circuit
@@ -418,7 +419,8 @@ func (builder *builder) newHint(f solver.Hint, nbOutputs int, inputs []frontend.
 	return res, nil
 }
 
-func (builder *builder) CustomGate(f solver.Hint, gateType uint64, inputs ...frontend.Variable) frontend.Variable {
+func (builder *builder) CustomGate(gateType uint64, inputs ...frontend.Variable) frontend.Variable {
+	f := customgates.GetFunc(gateType)
 	hintInputs := make([]expr.Expression, len(inputs))
 
 	for i, in := range inputs {

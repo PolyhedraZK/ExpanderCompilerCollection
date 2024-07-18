@@ -5,14 +5,8 @@ import (
 	"math/big"
 
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/layered"
-	"github.com/consensys/gnark/constraint/solver"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/utils/customgates"
 )
-
-var customGateHintFunc = make(map[uint64]solver.Hint)
-
-func RegisterCustomGateHintFunc(customGateType uint64, f solver.Hint) {
-	customGateHintFunc[customGateType] = f
-}
 
 // check if first output is zero
 func CheckCircuit(rc *layered.RootCircuit, input []*big.Int) bool {
@@ -77,10 +71,7 @@ func applyCircuit(rc *layered.RootCircuit, circuit *layered.Circuit, cur []*big.
 		for i, e := range ct.In {
 			inB[i] = cur[e]
 		}
-		hintFunc, ok := customGateHintFunc[ct.GateType]
-		if !ok {
-			panic("custom gate hint func not registered")
-		}
+		hintFunc := customgates.GetFunc(ct.GateType)
 		err := hintFunc(rc.Field, inB, outB)
 		if err != nil {
 			panic(err)

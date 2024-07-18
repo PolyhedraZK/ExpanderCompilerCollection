@@ -1,6 +1,9 @@
 package layered
 
-import "github.com/PolyhedraZK/ExpanderCompilerCollection/utils"
+import (
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/utils"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/utils/customgates"
+)
 
 type Stats struct {
 	// number of layers in the final circuit
@@ -113,5 +116,8 @@ func (rc *RootCircuit) GetStats() Stats {
 	ar.TotalCost += ar.NbExpandedMul * utils.CostOfMulGate
 	ar.TotalCost += ar.NbExpandedAdd * utils.CostOfAddGate
 	ar.TotalCost += ar.NbExpandedCst * utils.CostOfCstGate
+	for k, v := range ar.NbExpandedCustom {
+		ar.TotalCost += customgates.GetCost(k) * v
+	}
 	return ar
 }

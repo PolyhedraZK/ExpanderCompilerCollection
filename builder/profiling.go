@@ -273,10 +273,10 @@ func (builder *profilingBuilder) NewHintForId(id solver.HintID, nbOutputs int, i
 	defer builder.record()
 	return builder.builder.NewHintForId(id, nbOutputs, inputs...)
 }
-func (builder *profilingBuilder) CustomGate(f solver.Hint, gateType uint64, inputs ...frontend.Variable) frontend.Variable {
+func (builder *profilingBuilder) CustomGate(gateType uint64, inputs ...frontend.Variable) frontend.Variable {
 	builder.entry()
 	defer builder.record()
-	return builder.builder.CustomGate(f, gateType, inputs...)
+	return builder.builder.CustomGate(gateType, inputs...)
 }
 func (builder *profilingBuilder) ToFirstLayer(v frontend.Variable) frontend.Variable {
 	builder.entry()

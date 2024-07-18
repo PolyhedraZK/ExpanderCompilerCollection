@@ -9,7 +9,12 @@ import (
 	"github.com/PolyhedraZK/ExpanderCompilerCollection"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/field/m31"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/test"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/utils/customgates"
 )
+
+// Suppose we have a x^4 gate, which has id 12345 in the prover
+const GATE_4TH_POWER_TYPE = 12345
+const GATE_4TH_POWER_COST = 20
 
 type Circuit struct {
 	X frontend.Variable
@@ -27,12 +32,15 @@ func Power4(field *big.Int, inputs []*big.Int, outputs []*big.Int) error {
 
 // Define declares the circuit's constraints
 func (circuit *Circuit) Define(api frontend.API) error {
-	p := api.(ExpanderCompilerCollection.API).CustomGate(Power4, 12345, api.Sub(circuit.X, circuit.Y))
+	p := api.(ExpanderCompilerCollection.API).CustomGate(GATE_4TH_POWER_TYPE, api.Sub(circuit.X, circuit.Y))
 	api.AssertIsEqual(p, circuit.Z)
 	return nil
 }
 
 func main() {
+	// Before we use custom gates, we must register it
+	customgates.Register(GATE_4TH_POWER_TYPE, Power4, GATE_4TH_POWER_COST)
+
 	circuit, err := ExpanderCompilerCollection.Compile(m31.ScalarField, &Circuit{})
 	if err != nil {
 		panic(err)
@@ -52,7 +60,6 @@ func main() {
 		panic(err)
 	}
 
-	test.RegisterCustomGateHintFunc(12345, Power4)
 	if !test.CheckCircuit(c, witness) {
 		panic("error")
 	}
