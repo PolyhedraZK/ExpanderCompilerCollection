@@ -173,6 +173,16 @@ func (ci *Circuit) Print(field field.Field) {
 				fmt.Printf(",v%d", insn.OutputIds[i])
 			}
 			fmt.Printf(" = %s(%s)\n", solver.GetHintName(insn.HintFunc), strings.Join(strs, ","))
+		} else if insn.Type == ICustomGate {
+			strs := make([]string, len(insn.Inputs))
+			for i, x := range insn.Inputs {
+				strs[i] = varToStr(x)
+			}
+			fmt.Printf("v%d", insn.OutputIds[0])
+			for i := 1; i < len(insn.OutputIds); i++ {
+				fmt.Printf(",v%d", insn.OutputIds[i])
+			}
+			fmt.Printf(" = %s[custom_gate_%d](%s)\n", solver.GetHintName(insn.HintFunc), insn.CustomGateType, strings.Join(strs, ","))
 		} else if insn.Type == ISubCircuit {
 			strs := make([]string, len(insn.Inputs))
 			for i, x := range insn.Inputs {

@@ -21,6 +21,7 @@ import (
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/field"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ir"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/utils"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/utils/customgates"
 )
 
 // builder implements frontend.API and frontend.Compiler, and builds a circuit
@@ -416,6 +417,29 @@ func (builder *builder) newHint(f solver.Hint, nbOutputs int, inputs []frontend.
 		res[i] = expr.NewLinearExpression(idx, builder.tOne)
 	}
 	return res, nil
+}
+
+func (builder *builder) CustomGate(gateType uint64, inputs ...frontend.Variable) frontend.Variable {
+	f := customgates.GetFunc(gateType)
+	hintInputs := make([]expr.Expression, len(inputs))
+
+	for i, in := range inputs {
+		if t, ok := in.(expr.Expression); ok {
+			assertIsSet(t)
+			hintInputs[i] = t
+		} else {
+			c := builder.field.FromInterface(in)
+			hintInputs[i] = expr.NewConstantExpression(c)
+		}
+	}
+
+	outId := builder.newVariable(1)
+
+	builder.instructions = append(builder.instructions,
+		ir.NewCustomGateInstruction(f, gateType, hintInputs, outId),
+	)
+
+	return expr.NewLinearExpression(outId, builder.tOne)
 }
 
 // assertIsSet panics if the variable is unset

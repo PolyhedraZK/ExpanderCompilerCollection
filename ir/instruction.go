@@ -14,6 +14,7 @@ const (
 	IHint
 	ISubCircuit
 	IGetRandom
+	ICustomGate
 )
 
 // Instruction represents a computation step within a circuit. It can be:
@@ -21,12 +22,14 @@ const (
 //  2. a hint, as in gnark
 //  3. a sub circuit
 //  4. a random value
+//  5. a custom gate
 type Instruction struct {
-	Type         InstructionType
-	HintFunc     solver.Hint
-	SubCircuitId uint64
-	Inputs       []expr.Expression
-	OutputIds    []int
+	Type           InstructionType
+	HintFunc       solver.Hint
+	SubCircuitId   uint64
+	CustomGateType uint64
+	Inputs         []expr.Expression
+	OutputIds      []int
 }
 
 func NewInternalVariableInstruction(e expr.Expression, o int) Instruction {
@@ -59,5 +62,15 @@ func NewGetRandomInstruction(outputId int) Instruction {
 	return Instruction{
 		Type:      IGetRandom,
 		OutputIds: []int{outputId},
+	}
+}
+
+func NewCustomGateInstruction(f solver.Hint, gateType uint64, inputs []expr.Expression, outputId int) Instruction {
+	return Instruction{
+		Type:           ICustomGate,
+		HintFunc:       f,
+		CustomGateType: gateType,
+		Inputs:         inputs,
+		OutputIds:      []int{outputId},
 	}
 }

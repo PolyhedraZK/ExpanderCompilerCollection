@@ -315,7 +315,7 @@ func (isc *inputSolveCtx) worker() {
 				}
 				if insn.Type == IInternalVariable {
 					csc.values[outOffset] = in[0]
-				} else if insn.Type == IHint {
+				} else if insn.Type == IHint || insn.Type == ICustomGate {
 					inB := make([]*big.Int, len(insn.Inputs))
 					outB := make([]*big.Int, len(insn.OutputIds))
 					for i, e := range in {
@@ -334,9 +334,11 @@ func (isc *inputSolveCtx) worker() {
 					for j, x := range outB {
 						csc.values[j+outOffset] = field.FromInterface(x)
 						//fmt.Printf("set %d %d\n", is.CircuitInputIds[i], x)
-						p := inputInsn[insnId].CircuitInputIds[j]
-						if p != -1 {
-							isc.globalInput[p] = x
+						if insn.Type == IHint {
+							p := inputInsn[insnId].CircuitInputIds[j]
+							if p != -1 {
+								isc.globalInput[p] = x
+							}
 						}
 					}
 				} else if insn.Type == ISubCircuit {

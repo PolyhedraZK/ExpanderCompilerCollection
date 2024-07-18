@@ -76,17 +76,18 @@ func adjustCircuitForLayering(rc *RootCircuit, c *Circuit) *Circuit {
 
 	for _, insn := range c.Instructions {
 		newInsn := Instruction{
-			Type:         insn.Type,
-			HintFunc:     insn.HintFunc,
-			SubCircuitId: insn.SubCircuitId,
+			Type:           insn.Type,
+			HintFunc:       insn.HintFunc,
+			SubCircuitId:   insn.SubCircuitId,
+			CustomGateType: insn.CustomGateType,
 		}
 
 		if insn.Type == IInternalVariable {
 			internalVarExpr[insn.OutputIds[0]] = insn.Inputs[0]
 		}
 
-		// for sub circuit insn, we need to convert the input into single variables
-		if insn.Type == ISubCircuit {
+		// for sub circuit and custom gate insn, we need to convert the input into single variables
+		if insn.Type == ISubCircuit || insn.Type == ICustomGate {
 			newInsn.Inputs = convertToSingleVariables(insn.Inputs, false)
 		} else {
 			for _, input := range insn.Inputs {
