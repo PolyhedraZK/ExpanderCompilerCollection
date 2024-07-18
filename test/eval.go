@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/layered"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/utils/customgates"
 )
 
 // check if first output is zero
@@ -63,6 +64,19 @@ func applyCircuit(rc *layered.RootCircuit, circuit *layered.Circuit, cur []*big.
 			coef = randInt()
 		}
 		next[c.Out].Add(next[c.Out], coef)
+	}
+	for _, ct := range circuit.Custom {
+		inB := make([]*big.Int, len(ct.In))
+		outB := []*big.Int{big.NewInt(0)}
+		for i, e := range ct.In {
+			inB[i] = cur[e]
+		}
+		hintFunc := customgates.GetFunc(ct.GateType)
+		err := hintFunc(rc.Field, inB, outB)
+		if err != nil {
+			panic(err)
+		}
+		next[ct.Out].Add(next[ct.Out], outB[0])
 	}
 	for _, sub := range circuit.SubCircuits {
 		sc := rc.Circuits[sub.Id]

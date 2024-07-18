@@ -31,6 +31,7 @@ type Circuit struct {
 	Mul         []GateMul
 	Add         []GateAdd
 	Cst         []GateCst
+	Custom      []GateCustom
 }
 
 // SubCircuit represents a subcircuit that is used within a Circuit.
@@ -77,6 +78,15 @@ type GateCst struct {
 	Coef *big.Int
 }
 
+// GateCustom represents a custom gate within a circuit layer.
+// It takes several inputs, and produces an output value.
+// The output wire must be dedicated to this gate.
+type GateCustom struct {
+	GateType uint64
+	In       []uint64
+	Out      uint64
+}
+
 // Print outputs the entire circuit structure to the console for debugging purposes.
 // It provides a human-readable representation of the circuit's layers, gates, and
 // subcircuits, along with their interconnections.
@@ -96,6 +106,16 @@ func (c *Circuit) Print() {
 	}
 	for _, c := range c.Cst {
 		fmt.Printf("out%d += %s\n", c.Out, c.Coef.String())
+	}
+	for _, c := range c.Custom {
+		fmt.Printf("out%d = custom_gate_%d(", c.Out, c.GateType)
+		for i, in := range c.In {
+			if i > 0 {
+				fmt.Printf(",")
+			}
+			fmt.Printf("in%d", in)
+		}
+		fmt.Printf(")\n")
 	}
 }
 
@@ -122,19 +142,45 @@ func Validate(rc *RootCircuit) error {
 		if c.OutputLen == 0 || (c.OutputLen&(c.OutputLen-1)) != 0 {
 			return fmt.Errorf("circuit %d outputlen %d not power of 2", i, c.OutputLen)
 		}
+		customOutIds := make(map[uint64]bool)
+		for _, ct := range c.Custom {
+			if customOutIds[ct.Out] {
+				return fmt.Errorf("circuit %d custom gate output %d used multiple times", i, ct.Out)
+			}
+			customOutIds[ct.Out] = true
+		}
 		for _, m := range c.Mul {
 			if m.In0 >= c.InputLen || m.In1 >= c.InputLen || m.Out >= c.OutputLen {
 				return fmt.Errorf("circuit %d mul gate (%d, %d, %d) out of range", i, m.In0, m.In1, m.Out)
+			}
+			if customOutIds[m.Out] {
+				return fmt.Errorf("circuit %d mul gate %d output used by custom gate", i, m.Out)
 			}
 		}
 		for _, a := range c.Add {
 			if a.In >= c.InputLen || a.Out >= c.OutputLen {
 				return fmt.Errorf("circuit %d add gate (%d, %d) out of range", i, a.In, a.Out)
 			}
+			if customOutIds[a.Out] {
+				return fmt.Errorf("circuit %d add gate %d output used by custom gate", i, a.Out)
+			}
 		}
 		for _, cs := range c.Cst {
 			if cs.Out >= c.OutputLen {
 				return fmt.Errorf("circuit %d const gate %d out of range", i, cs.Out)
+			}
+			if customOutIds[cs.Out] {
+				return fmt.Errorf("circuit %d const gate %d output used by custom gate", i, cs.Out)
+			}
+		}
+		for _, ct := range c.Custom {
+			if ct.Out >= c.OutputLen {
+				return fmt.Errorf("circuit %d custom gate %d out of range", i, ct.Out)
+			}
+			for _, in := range ct.In {
+				if in >= c.InputLen {
+					return fmt.Errorf("circuit %d custom gate input %d out of range", i, in)
+				}
 			}
 		}
 		for _, s := range c.SubCircuits {
@@ -180,6 +226,12 @@ func computeMasks(rc *RootCircuit) ([][]bool, [][]bool) {
 		}
 		for _, cs := range c.Cst {
 			outputMask[i][cs.Out] = true
+		}
+		for _, ct := range c.Custom {
+			for _, in := range ct.In {
+				inputMask[i][in] = true
+			}
+			outputMask[i][ct.Out] = true
 		}
 		for _, s := range c.SubCircuits {
 			sc := rc.Circuits[s.Id]

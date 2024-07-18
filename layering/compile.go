@@ -67,6 +67,7 @@ type irContext struct {
 
 	internalVariableExpr map[int]expr.Expression
 	isRandomVariable     map[int]bool
+	customGateInsn       map[int]ir.Instruction
 
 	// layer layout contexts
 	lcs    []layerLayoutContext
@@ -200,6 +201,7 @@ func (ctx *compileContext) dfsTopoSort(id uint64) {
 		hintInputsMap:        make(map[int]int),
 		internalVariableExpr: make(map[int]expr.Expression),
 		isRandomVariable:     make(map[int]bool),
+		customGateInsn:       make(map[int]ir.Instruction),
 	}
 }
 
@@ -328,6 +330,18 @@ func (ctx *compileContext) computeMinMaxLayers(ic *irContext) {
 				q0 = append(q0, x)
 				ic.isRandomVariable[x] = true
 			}
+		} else if insn.Type == ir.ICustomGate {
+			usedVar := make(map[int]bool)
+			for _, e := range insn.Inputs {
+				usedVar[e[0].VID0] = true
+			}
+			y := insn.OutputIds[0]
+			for x := range usedVar {
+				addEdge(x, y)
+			}
+			q1 = append(q1, y)
+			layerAdvance[y] = 1
+			ic.customGateInsn[y] = insn
 		}
 	}
 	q0 = append(q0, q1...) // the merged topo order

@@ -10,7 +10,8 @@ import (
 func (rc *RootCircuit) Serialize() []byte {
 	o := utils.OutputBuf{}
 	zero := big.NewInt(0)
-	o.AppendUint64(3626604230490605891)
+	o.AppendUint64(3698661824528533827)
+	o.AppendBigInt(rc.Field)
 	o.AppendUint64(uint64(len(rc.Circuits)))
 	for _, c := range rc.Circuits {
 		o.AppendUint64(c.InputLen)
@@ -58,6 +59,15 @@ func (rc *RootCircuit) Serialize() []byte {
 				o.AppendBigInt(cst.Coef)
 			}
 		}
+		o.AppendUint64(uint64(len(c.Custom)))
+		for _, ct := range c.Custom {
+			o.AppendUint64(ct.GateType)
+			o.AppendUint64(uint64(len(ct.In)))
+			for _, in := range ct.In {
+				o.AppendUint64(in)
+			}
+			o.AppendUint64(ct.Out)
+		}
 		o.AppendUint64(uint64(len(randomCoefIdx)))
 		for _, idx := range randomCoefIdx {
 			o.AppendUint64(uint64(idx))
@@ -67,20 +77,18 @@ func (rc *RootCircuit) Serialize() []byte {
 	for _, l := range rc.Layers {
 		o.AppendUint64(l)
 	}
-	o.AppendBigInt(rc.Field)
 	return o.Bytes()
 }
 
 func DeserializeRootCircuit(buf []byte) *RootCircuit {
-	in := utils.NewInputBuf(buf[:len(buf)-32])
-	inlast := utils.NewInputBuf(buf[len(buf)-32:])
-	if in.ReadUint64() != 3626604230490605891 {
+	in := utils.NewInputBuf(buf)
+	if in.ReadUint64() != 3698661824528533827 {
 		panic("invalid file header")
 	}
 	rc := &RootCircuit{}
+	rc.Field = in.ReadBigInt()
 	nbCircuits := in.ReadUint64()
 	rc.Circuits = make([]*Circuit, nbCircuits)
-	rc.Field = inlast.ReadBigInt()
 	for i := uint64(0); i < nbCircuits; i++ {
 		c := &Circuit{}
 		c.InputLen = in.ReadUint64()
@@ -118,6 +126,17 @@ func DeserializeRootCircuit(buf []byte) *RootCircuit {
 		for j := uint64(0); j < nbCst; j++ {
 			c.Cst[j].Out = in.ReadUint64()
 			c.Cst[j].Coef = in.ReadBigInt()
+		}
+		nbCustom := in.ReadUint64()
+		c.Custom = make([]GateCustom, nbCustom)
+		for j := uint64(0); j < nbCustom; j++ {
+			c.Custom[j].GateType = in.ReadUint64()
+			nbIn := in.ReadUint64()
+			c.Custom[j].In = make([]uint64, nbIn)
+			for k := uint64(0); k < nbIn; k++ {
+				c.Custom[j].In[k] = in.ReadUint64()
+			}
+			c.Custom[j].Out = in.ReadUint64()
 		}
 		nbRandomCoef := in.ReadUint64()
 		randomCoefIdx := make([]int, nbRandomCoef)
