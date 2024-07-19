@@ -31,20 +31,20 @@ func NewPoseidonParams() *PoseidonParams {
 		external_round_constant[i] = make([]uint32, num_full_rounds)
 
 		for j := 0; j < num_full_rounds; j++ {
-			external_round_constant[i][j] = 1234
+			external_round_constant[i][j] = uint32((i + 1) * (j + 1))
 		}
 	}
 
 	internal_round_constant := make([]uint32, num_part_rounds)
 	for i := 0; i < num_part_rounds; i++ {
-		internal_round_constant[i] = 1234
+		internal_round_constant[i] = uint32((i + 1))
 	}
 
 	mds := make([][]uint32, num_states)
 	for i := 0; i < num_states; i++ {
 		mds[i] = make([]uint32, num_states)
 		for j := 0; j < num_states; j++ {
-			mds[i][j] = 1234
+			mds[i][j] = uint32((i + 1) * (j + 1))
 		}
 	}
 
