@@ -17,7 +17,7 @@ func main() {
 	M31CircuitBuild()
 }
 
-const NumRepeat = 100
+const NumRepeat = 120
 
 type MockPoseidonM31Circuit struct {
 	State  [NumRepeat][16]frontend.Variable
@@ -67,7 +67,7 @@ func M31CircuitBuild() {
 	// fmt.Println("Gnark test passed")
 
 	// Ecc test
-	circuit, err := ExpanderCompilerCollection.Compile(m31.ScalarField, &MockPoseidonM31Circuit{}, frontend.WithCompressThreshold(4))
+	circuit, err := ExpanderCompilerCollection.Compile(m31.ScalarField, &MockPoseidonM31Circuit{}, frontend.WithCompressThreshold(32))
 	if err != nil {
 		panic(err)
 	}
