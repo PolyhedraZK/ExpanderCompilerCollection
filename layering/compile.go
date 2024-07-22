@@ -270,6 +270,15 @@ func (ctx *compileContext) computeMinMaxLayers(ic *irContext) {
 				if term.Coeff.IsZero() {
 					continue
 				}
+				// special check for custom insn
+				if term.VID0 != 0 && term.VID1 == 0 {
+					if customInsn, ok := ic.customGateInsn[term.VID0]; ok {
+						for _, ci := range customInsn.Inputs {
+							usedVar[ci[0].VID0] = true
+						}
+						continue
+					}
+				}
 				if term.VID0 != 0 {
 					usedVar[term.VID0] = true
 				}

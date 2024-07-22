@@ -51,7 +51,7 @@ type Circuit struct {
 ```
 In this structure, RandomCoefIdx denotes the indices of random gates within the combined arrays of Mul, Add, and Cst.
 
-A unique identifier, the magic number 3698661824528533827 (b'CIRCUIT3'), is prefixed to the serialized RootCircuit data stream to ensure data integrity.
+A unique identifier, the magic number 3770719418566461763 (b'CIRCUIT4'), is prefixed to the serialized RootCircuit data stream to ensure data integrity.
 
 ## Input Solver
 
