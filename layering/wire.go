@@ -295,6 +295,7 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 				GateType: insn.CustomGateType,
 				In:       in,
 				Out:      uint64(pos),
+				Coef:     big.NewInt(1),
 			})
 		}
 		e := ic.internalVariableExpr[x]
@@ -307,6 +308,20 @@ func (ctx *compileContext) connectWires(a_, b_ int) int {
 					Coef: toBigInt(term.Coeff),
 				})
 			} else if term.VID1 == 0 {
+				// special check for custom insn
+				if customInsn, ok := ic.customGateInsn[term.VID0]; ok {
+					in := make([]uint64, len(customInsn.Inputs))
+					for i, e := range customInsn.Inputs {
+						in[i] = uint64(aq.varPos[e[0].VID0])
+					}
+					res.Custom = append(res.Custom, layered.GateCustom{
+						GateType: customInsn.CustomGateType,
+						In:       in,
+						Out:      uint64(pos),
+						Coef:     toBigInt(term.Coeff),
+					})
+					continue
+				}
 				// add
 				res.Add = append(res.Add, layered.GateAdd{
 					In:   uint64(aq.varPos[term.VID0]),
