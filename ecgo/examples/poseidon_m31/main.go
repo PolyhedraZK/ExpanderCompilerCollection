@@ -17,7 +17,7 @@ func main() {
 	M31CircuitBuild()
 }
 
-const NumRepeat = 100
+const NumRepeat = 120
 
 type MockPoseidonM31Circuit struct {
 	State  [NumRepeat][16]frontend.Variable
