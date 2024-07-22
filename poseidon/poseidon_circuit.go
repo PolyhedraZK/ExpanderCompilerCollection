@@ -6,6 +6,7 @@ import (
 
 	"github.com/PolyhedraZK/ExpanderCompilerCollection"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/field/m31"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/utils/customgates"
 	"github.com/consensys/gnark/frontend"
 )
 
@@ -13,6 +14,25 @@ type PoseidonInternalStateVar struct {
 	AfterHalfFullRound    [16]frontend.Variable
 	AfterHalfPartialRound [16]frontend.Variable
 	AfterPartialRound     [16]frontend.Variable
+}
+
+// Suppose we have a x^4 gate, which has id 12345 in the prover
+const GATE_5TH_POWER_TYPE = 12345
+const GATE_4TH_POWER_COST = 20
+
+const GATE_MUL_TYPE = 12346
+const GATE_MUL_COST = 20
+
+func Mul(field *big.Int, inputs []*big.Int, outputs []*big.Int) error {
+	a := big.NewInt(0)
+	a.Mul(inputs[0], big.NewInt(1))
+	outputs[0] = a
+	return nil
+}
+
+func init() {
+	customgates.Register(GATE_5TH_POWER_TYPE, Power5, GATE_4TH_POWER_COST)
+	customgates.Register(GATE_MUL_TYPE, Mul, GATE_MUL_COST)
 }
 
 // Main function of proving poseidon in circuit.
@@ -31,18 +51,6 @@ func PoseidonCircuit(
 	}
 
 	// ============================
-	// RLC of inputs
-	// ============================
-	r := [16]frontend.Variable{}
-	if useRandomness {
-		r[0] = frontend.Variable(1)
-		r[1] = api.(ExpanderCompilerCollection.API).GetRandomValue()
-		for i := 2; i < 16; i++ {
-			r[i] = api.Mul(r[i-1], r[1])
-		}
-	}
-
-	// ============================
 	// Applies the full rounds.
 	// ============================
 	state := input
@@ -54,7 +62,6 @@ func PoseidonCircuit(
 		}
 		// apply affine transform
 		tmp := applyMdsMatrixCircuit(api, state, param.MdsMatrix)
-		// tmp := applyExternalRoundMatrix(api, state)
 		state = tmp[:]
 		// sbox
 		for j := 0; j < param.NumStates; j++ {
@@ -62,91 +69,26 @@ func PoseidonCircuit(
 		}
 	}
 
-	state2, error := api.NewHint(poseidonHint, 16, state[0], state[1], state[2], state[3], state[4], state[5], state[6], state[7], state[8], state[9], state[10], state[11], state[12], state[13], state[14], state[15])
-	if error != nil {
-		log.Println("error in NewHint")
-		panic("")
-	}
-
-	if useRandomness {
-		rlc1 := innerProduct(api, r[:], state2[:])
-		rlc1_rec := innerProduct(api, r[:], state)
-		api.AssertIsEqual(rlc1, rlc1_rec)
-	} else {
-		for i := 0; i < param.NumStates; i++ {
-			api.AssertIsEqual(state[i], state2[i])
-		}
-	}
-
 	// ============================
 	// Applies the first half of partial rounds.
 	// ============================
-	state = state2
 
-	for i := 0; i < param.NumHalfPartialRounds; i++ {
+	for i := 0; i < param.NumPartRounds; i++ {
 		// add round constant
 		state[0] = api.Add(state[0], param.InternalRoundConstant[i])
 		// apply affine transform
 		tmp := applyMdsMatrixCircuit(api, state, param.MdsMatrix)
-		// tmp := applyInternalRoundMatrix(api, state)
 		state = tmp[:]
 		// sbox
 		state[0] = sBoxCircuit(api, state[0])
-	}
-
-	state2, error = api.NewHint(poseidonHint, 16, state[0], state[1], state[2], state[3], state[4], state[5], state[6], state[7], state[8], state[9], state[10], state[11], state[12], state[13], state[14], state[15])
-	if error != nil {
-		log.Println("error in NewHint")
-		panic("")
-	}
-
-	if useRandomness {
-		rlc2 := innerProduct(api, r[:], state2[:])
-		rlc2_rec := innerProduct(api, r[:], state)
-		api.AssertIsEqual(rlc2, rlc2_rec)
-	} else {
-		for i := 0; i < param.NumStates; i++ {
-			api.AssertIsEqual(state[i], state2[i])
-		}
-	}
-
-	// ============================
-	// Applies the second half of partial rounds.
-	// ============================
-	state = state2
-
-	for i := 0; i < param.NumHalfPartialRounds; i++ {
-		// add round constant
-		state[0] = api.Add(state[0], param.InternalRoundConstant[i+param.NumHalfPartialRounds])
-		// apply affine transform
-		tmp := applyMdsMatrixCircuit(api, state, param.MdsMatrix)
-		// tmp := applyInternalRoundMatrix(api, state)
-		state = tmp[:]
-		// sbox
-		state[0] = sBoxCircuit(api, state[0])
-	}
-
-	state2, error = api.NewHint(poseidonHint, 16, state[0], state[1], state[2], state[3], state[4], state[5], state[6], state[7], state[8], state[9], state[10], state[11], state[12], state[13], state[14], state[15])
-	if error != nil {
-		log.Println("error in NewHint")
-		panic("")
-	}
-
-	if useRandomness {
-		rlc3 := innerProduct(api, r[:], state2[:])
-		rlc3_rec := innerProduct(api, r[:], state)
-		api.AssertIsEqual(rlc3, rlc3_rec)
-
-	} else {
-		for i := 0; i < param.NumStates; i++ {
-			api.AssertIsEqual(state[i], state2[i])
+		for j := 1; j < param.NumStates; j++ {
+			state[j] = api.(ExpanderCompilerCollection.API).CustomGate(GATE_MUL_TYPE, state[j])
 		}
 	}
 
 	// ============================
 	// Applies the full rounds.
 	// ============================
-	state = state2
 
 	for i := 0; i < param.NumHalfFullRounds; i++ {
 		// add round constant
@@ -155,7 +97,6 @@ func PoseidonCircuit(
 		}
 		// apply affine transform
 		tmp := applyMdsMatrixCircuit(api, state, param.MdsMatrix)
-		// tmp := applyExternalRoundMatrix(api, state)
 		state = tmp[:]
 		// sbox
 		for j := 0; j < param.NumStates; j++ {
@@ -167,20 +108,7 @@ func PoseidonCircuit(
 }
 
 func accumulate(api frontend.API, a []frontend.Variable) frontend.Variable {
-	a1 := api.Add(a[0], a[1], a[2], a[3])
-	a2 := api.Add(a[4], a[5], a[6], a[7])
-	a3 := api.Add(a[8], a[9], a[10], a[11])
-	a4 := api.Add(a[12], a[13], a[14], a[15])
-
-	return api.Add(a1, a2, a3, a4)
-}
-
-func innerProduct(api frontend.API, a []frontend.Variable, b []frontend.Variable) frontend.Variable {
-	var tmp [16]frontend.Variable
-	for i := 0; i < len(a); i++ {
-		tmp[i] = api.Mul(a[i], b[i])
-	}
-	return accumulate(api, tmp[:])
+	return api.Add(a[0], a[1], a[2:]...)
 }
 
 func applyMdsMatrixCircuit(api frontend.API, x []frontend.Variable, mds [][]uint32) [16]frontend.Variable {
@@ -195,18 +123,16 @@ func applyMdsMatrixCircuit(api frontend.API, x []frontend.Variable, mds [][]uint
 	return res
 }
 
-// S-Box: raise element to the power of 5
-func sBoxCircuit(api frontend.API, input frontend.Variable) frontend.Variable {
-	t2 := api.Mul(input, input)
-	t4 := api.Mul(t2, t2)
-	return api.Mul(t4, input)
+func Power5(field *big.Int, inputs []*big.Int, outputs []*big.Int) error {
+	a := big.NewInt(0)
+	a.Mul(inputs[0], inputs[0])
+	a.Mul(a, a)
+	a.Mul(a, inputs[0])
+	outputs[0] = a
+	return nil
 }
 
-// function to generate intermediate witnesses for poseidon
-func poseidonHint(field *big.Int, input []*big.Int, outputs []*big.Int) error {
-	for i := 0; i < 16; i++ {
-		outputs[i] = big.NewInt(int64(input[i].Uint64()))
-	}
-
-	return nil
+// S-Box: raise element to the power of 5
+func sBoxCircuit(api frontend.API, input frontend.Variable) frontend.Variable {
+	return api.(ExpanderCompilerCollection.API).CustomGate(GATE_5TH_POWER_TYPE, input)
 }
