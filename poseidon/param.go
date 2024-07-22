@@ -23,6 +23,8 @@ type PoseidonParams struct {
 
 // TODOs: the parameters are not secure. use a better way to generate the constants
 func NewPoseidonParams() *PoseidonParams {
+	r := rand.New(rand.NewSource(42))
+
 	num_full_rounds := 8
 	num_part_rounds := 14
 	num_states := 16
@@ -31,13 +33,13 @@ func NewPoseidonParams() *PoseidonParams {
 	for i := 0; i < num_states; i++ {
 		external_round_constant[i] = make([]uint32, num_full_rounds)
 		for j := 0; j < num_full_rounds; j++ {
-			external_round_constant[i][j] = randomM31()
+			external_round_constant[i][j] = randomM31(r)
 		}
 	}
 
 	internal_round_constant := make([]uint32, num_part_rounds)
 	for i := 0; i < num_part_rounds; i++ {
-		internal_round_constant[i] = randomM31()
+		internal_round_constant[i] = randomM31(r)
 	}
 
 	// mds parameters adopted from Plonky3
@@ -66,8 +68,8 @@ func NewPoseidonParams() *PoseidonParams {
 	}
 }
 
-func randomM31() uint32 {
-	t := rand.Uint32() & 0x7FFFFFFF
+func randomM31(r *rand.Rand) uint32 {
+	t := r.Uint32() & 0x7FFFFFFF
 
 	for t == 0x7fffffff {
 		t = rand.Uint32() & 0x7FFFFFFF
