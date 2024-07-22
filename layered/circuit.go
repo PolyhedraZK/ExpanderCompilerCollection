@@ -85,6 +85,7 @@ type GateCustom struct {
 	GateType uint64
 	In       []uint64
 	Out      uint64
+	Coef     *big.Int
 }
 
 // Print outputs the entire circuit structure to the console for debugging purposes.
@@ -108,14 +109,14 @@ func (c *Circuit) Print() {
 		fmt.Printf("out%d += %s\n", c.Out, c.Coef.String())
 	}
 	for _, c := range c.Custom {
-		fmt.Printf("out%d = custom_gate_%d(", c.Out, c.GateType)
+		fmt.Printf("out%d += custom_gate_%d(", c.Out, c.GateType)
 		for i, in := range c.In {
 			if i > 0 {
 				fmt.Printf(",")
 			}
 			fmt.Printf("in%d", in)
 		}
-		fmt.Printf(")\n")
+		fmt.Printf(") * %s\n", c.Coef.String())
 	}
 }
 
@@ -142,35 +143,19 @@ func Validate(rc *RootCircuit) error {
 		if c.OutputLen == 0 || (c.OutputLen&(c.OutputLen-1)) != 0 {
 			return fmt.Errorf("circuit %d outputlen %d not power of 2", i, c.OutputLen)
 		}
-		customOutIds := make(map[uint64]bool)
-		for _, ct := range c.Custom {
-			if customOutIds[ct.Out] {
-				return fmt.Errorf("circuit %d custom gate output %d used multiple times", i, ct.Out)
-			}
-			customOutIds[ct.Out] = true
-		}
 		for _, m := range c.Mul {
 			if m.In0 >= c.InputLen || m.In1 >= c.InputLen || m.Out >= c.OutputLen {
 				return fmt.Errorf("circuit %d mul gate (%d, %d, %d) out of range", i, m.In0, m.In1, m.Out)
-			}
-			if customOutIds[m.Out] {
-				return fmt.Errorf("circuit %d mul gate %d output used by custom gate", i, m.Out)
 			}
 		}
 		for _, a := range c.Add {
 			if a.In >= c.InputLen || a.Out >= c.OutputLen {
 				return fmt.Errorf("circuit %d add gate (%d, %d) out of range", i, a.In, a.Out)
 			}
-			if customOutIds[a.Out] {
-				return fmt.Errorf("circuit %d add gate %d output used by custom gate", i, a.Out)
-			}
 		}
 		for _, cs := range c.Cst {
 			if cs.Out >= c.OutputLen {
 				return fmt.Errorf("circuit %d const gate %d out of range", i, cs.Out)
-			}
-			if customOutIds[cs.Out] {
-				return fmt.Errorf("circuit %d const gate %d output used by custom gate", i, cs.Out)
 			}
 		}
 		for _, ct := range c.Custom {

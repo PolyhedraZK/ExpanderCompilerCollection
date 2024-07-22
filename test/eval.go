@@ -76,7 +76,11 @@ func applyCircuit(rc *layered.RootCircuit, circuit *layered.Circuit, cur []*big.
 		if err != nil {
 			panic(err)
 		}
-		next[ct.Out].Add(next[ct.Out], outB[0])
+		coef := ct.Coef
+		if coef.Cmp(rc.Field) == 0 {
+			coef = randInt()
+		}
+		next[ct.Out].Add(next[ct.Out], tmp.Mul(outB[0], coef))
 	}
 	for _, sub := range circuit.SubCircuits {
 		sc := rc.Circuits[sub.Id]
