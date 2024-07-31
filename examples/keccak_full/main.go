@@ -8,7 +8,7 @@ import (
 	"github.com/PolyhedraZK/ExpanderCompilerCollection"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/builder"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/field/m31"
-	"github.com/PolyhedraZK/ExpanderCompilerCollection/integration"
+	//"github.com/PolyhedraZK/ExpanderCompilerCollection/integration"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/test"
 	"github.com/consensys/gnark/frontend"
 	"github.com/ethereum/go-ethereum/crypto"
