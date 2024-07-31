@@ -394,26 +394,26 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	println("Generating proof...")
-	proof, err := prover.Prove(witnessData)
-	if err != nil {
-		panic(err)
-	}
-	println("proof:", proof[:8])
-	os.WriteFile("proof.txt", proof, 0o644)
+	//println("Generating proof...")
+	//proof, err := prover.Prove(witnessData)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//println("proof:", proof[:8])
+	//os.WriteFile("proof.txt", proof, 0o644)
 
-	println("Verifying proof...")
-	result, err := prover.Verify(witnessData, proof)
-	if err != nil {
-		panic(err)
-	}
-	println("verification result (expecting true):", result)
+	//println("Verifying proof...")
+	//result, err := prover.Verify(witnessData, proof)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//println("verification result (expecting true):", result)
 
-	println("Verify invalid proof...")
-	invalid_proof := make([]byte, len(proof))
-	copy(invalid_proof, proof)
+	//println("Verify invalid proof...")
+	//invalid_proof := make([]byte, len(proof))
+	//copy(invalid_proof, proof)
 	// flip a bit
-	invalid_proof[0] ^= 1
-	result, _ = prover.Verify(witnessData, invalid_proof)
-	println("verification result (expecting false):", result)
+	//invalid_proof[0] ^= 1
+	//result, _ = prover.Verify(witnessData, invalid_proof)
+	//println("verification result (expecting false):", result)
 }
