@@ -383,14 +383,14 @@ func main() {
 	println("Generating witness...")
 	os.WriteFile("witness.txt", wit.Serialize(), 0o644)
 
-	circuit_name := "keccak"
-	circuit_dir := "circuit.txt"
-	max_concurrency := 0
+	//circuit_name := "keccak"
+	//circuit_dir := "circuit.txt"
+	//max_concurrency := 0
 	//prover, err := integration.NewProver(circuit_dir, circuit_name, max_concurrency, true)
 	//if err != nil {
 	//	panic(err)
 	//}
-	_, err := os.ReadFile("witness.txt")
+	_, err = os.ReadFile("witness.txt")
 	if err != nil {
 		panic(err)
 	}
