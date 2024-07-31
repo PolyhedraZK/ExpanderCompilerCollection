@@ -8,7 +8,6 @@ import (
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/builder"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/field/m31"
-	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/integration"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/test"
 	"github.com/consensys/gnark/frontend"
 	"github.com/ethereum/go-ethereum/crypto"
