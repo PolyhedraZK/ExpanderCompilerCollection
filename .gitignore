@@ -1,6 +1,7 @@
 # generated artifact
 *.txt
 __*
+target
 
 # dev IDE
 .idea
