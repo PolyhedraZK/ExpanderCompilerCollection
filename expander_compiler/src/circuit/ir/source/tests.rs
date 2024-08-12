@@ -144,6 +144,8 @@ fn opt_remove_unreachable() {
         let e2 = optroot.eval_unsafe_with_errors(im.map_inputs(&inputs));
         if e1.is_ok() {
             assert_eq!(e2, e1);
+        } else if e1.as_ref().err().unwrap().is_internal() {
+            panic!("{:?}", e1);
         }
     }
 }
@@ -175,6 +177,8 @@ fn opt_remove_unreachable_2() {
         let e2 = optroot.eval_unsafe_with_errors(im.map_inputs(&inputs));
         if e1.is_ok() {
             assert_eq!(e2, e1);
+        } else if e1.as_ref().err().unwrap().is_internal() {
+            panic!("{:?}", e1);
         }
     }
 }

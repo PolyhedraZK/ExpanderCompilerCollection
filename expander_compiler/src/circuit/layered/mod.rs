@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::field::Field;
+use crate::{field::Field, utils::error::Error};
 
 use super::config::Config;
 
@@ -8,6 +8,7 @@ use super::config::Config;
 mod tests;
 
 pub mod serde;
+pub mod stats;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Coef<C: Config> {
@@ -58,111 +59,114 @@ pub struct Circuit<C: Config> {
 }
 
 impl<C: Config> Circuit<C> {
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> Result<(), Error> {
         for (i, seg) in self.segments.iter().enumerate() {
             if seg.num_inputs == 0 || (seg.num_inputs & (seg.num_inputs - 1)) != 0 {
-                return Err(format!(
+                return Err(Error::InternalError(format!(
                     "segment {} inputlen {} not power of 2",
                     i, seg.num_inputs
-                ));
+                )));
             }
             if seg.num_outputs == 0 || (seg.num_outputs & (seg.num_outputs - 1)) != 0 {
-                return Err(format!(
+                return Err(Error::InternalError(format!(
                     "segment {} outputlen {} not power of 2",
                     i, seg.num_outputs
-                ));
+                )));
             }
             for m in seg.gate_muls.iter() {
                 if m.inputs[0] >= seg.num_inputs
                     || m.inputs[1] >= seg.num_inputs
                     || m.output >= seg.num_outputs
                 {
-                    return Err(format!(
+                    return Err(Error::InternalError(format!(
                         "segment {} mul gate ({}, {}, {}) out of range",
                         i, m.inputs[0], m.inputs[1], m.output
-                    ));
+                    )));
                 }
             }
             for a in seg.gate_adds.iter() {
                 if a.inputs[0] >= seg.num_inputs || a.output >= seg.num_outputs {
-                    return Err(format!(
+                    return Err(Error::InternalError(format!(
                         "segment {} add gate ({}, {}) out of range",
                         i, a.inputs[0], a.output
-                    ));
+                    )));
                 }
             }
             for cs in seg.gate_consts.iter() {
                 if cs.output >= seg.num_outputs {
-                    return Err(format!(
+                    return Err(Error::InternalError(format!(
                         "segment {} const gate {} out of range",
                         i, cs.output
-                    ));
+                    )));
                 }
             }
             for (sub_id, allocs) in seg.child_segs.iter() {
                 if *sub_id >= i {
-                    return Err(format!("segment {} subcircuit {} out of range", i, sub_id));
+                    return Err(Error::InternalError(format!(
+                        "segment {} subcircuit {} out of range",
+                        i, sub_id
+                    )));
                 }
                 let subc = &self.segments[*sub_id];
                 for a in allocs.iter() {
                     if a.input_offset % subc.num_inputs != 0 {
-                        return Err(format!(
+                        return Err(Error::InternalError(format!(
                             "segment {} subcircuit {} input offset {} not aligned to {}",
                             i, sub_id, a.input_offset, subc.num_inputs
-                        ));
+                        )));
                     }
                     if a.input_offset + subc.num_inputs > seg.num_inputs {
-                        return Err(format!(
+                        return Err(Error::InternalError(format!(
                             "segment {} subcircuit {} input offset {} out of range",
                             i, sub_id, a.input_offset
-                        ));
+                        )));
                     }
                     if a.output_offset % subc.num_outputs != 0 {
-                        return Err(format!(
+                        return Err(Error::InternalError(format!(
                             "segment {} subcircuit {} output offset {} not aligned to {}",
                             i, sub_id, a.output_offset, subc.num_outputs
-                        ));
+                        )));
                     }
                     if a.output_offset + subc.num_outputs > seg.num_outputs {
-                        return Err(format!(
+                        return Err(Error::InternalError(format!(
                             "segment {} subcircuit {} output offset {} out of range",
                             i, sub_id, a.output_offset
-                        ));
+                        )));
                     }
                 }
             }
         }
         for x in self.layer_ids.iter() {
             if *x >= self.segments.len() {
-                return Err(format!("layer id {} out of range", x));
+                return Err(Error::InternalError(format!("layer id {} out of range", x)));
             }
         }
         if self.layer_ids.len() == 0 {
-            return Err("empty layer".to_string());
+            return Err(Error::InternalError("empty layer".to_string()));
         }
         for i in 1..self.layer_ids.len() {
             let cur = &self.segments[self.layer_ids[i]];
             let prev = &self.segments[self.layer_ids[i - 1]];
             if cur.num_inputs != prev.num_outputs {
-                return Err(format!(
+                return Err(Error::InternalError(format!(
                     "segment {} inputlen {} not equal to segment {} outputlen {}",
                     self.layer_ids[i],
                     cur.num_inputs,
                     self.layer_ids[i - 1],
                     prev.num_outputs
-                ));
+                )));
             }
         }
         let (input_mask, output_mask) = self.compute_masks();
         for i in 1..self.layer_ids.len() {
             for j in 0..self.segments[self.layer_ids[i]].num_inputs {
                 if input_mask[self.layer_ids[i]][j] && !output_mask[self.layer_ids[i - 1]][j] {
-                    return Err(format!(
+                    return Err(Error::InternalError(format!(
                         "circuit {} input {} not initialized by circuit {} output",
                         self.layer_ids[i],
                         j,
                         self.layer_ids[i - 1]
-                    ));
+                    )));
                 }
             }
         }

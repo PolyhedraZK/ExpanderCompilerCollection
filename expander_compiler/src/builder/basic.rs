@@ -10,7 +10,7 @@ use crate::{
         },
     },
     field::Field,
-    utils::pool::Pool,
+    utils::{error::Error, pool::Pool},
 };
 
 /*
@@ -110,7 +110,7 @@ pub trait InsnTransformAndExecute<
     fn transform_in_to_out(
         &mut self,
         in_insn: &IrcIn::Instruction,
-    ) -> Result<IrcOut::Instruction, String>;
+    ) -> Result<IrcOut::Instruction, Error>;
     fn execute_out<'b>(
         &mut self,
         out_insn: &IrcOut::Instruction,
@@ -120,7 +120,7 @@ pub trait InsnTransformAndExecute<
     fn transform_in_con_to_out(
         &mut self,
         in_con: &IrcIn::Constraint,
-    ) -> Result<IrcOut::Constraint, String>;
+    ) -> Result<IrcOut::Constraint, Error>;
 }
 
 impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
@@ -138,8 +138,7 @@ impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
             in_to_out: vec![0],
             out_insns: Vec::new(),
         };
-        res.mid_vars
-            .add(&Expression::new_const(C::CircuitField::one()));
+        res.mid_vars.add(&Expression::invalid());
         res.mid_to_out.push(None);
         res
     }
@@ -326,7 +325,7 @@ where
         &mut self,
         in_insn: &IrcIn::Instruction,
         root: &'b RootBuilder<'a, C, IrcIn, IrcOut>,
-    ) -> Result<(), String>
+    ) -> Result<(), Error>
     where
         'a: 'b,
     {
@@ -341,7 +340,7 @@ where
         Ok(())
     }
 
-    fn process_con(&mut self, in_con: &IrcIn::Constraint) -> Result<(), String> {
+    fn process_con(&mut self, in_con: &IrcIn::Constraint) -> Result<(), Error> {
         let in_mapped = in_con.replace_var(|x| self.in_to_out[x]);
         let out_con = self.transform_in_con_to_out(&in_mapped)?;
         self.assert(out_con.typ(), out_con.var());
@@ -535,7 +534,7 @@ pub fn process_circuit<
     root: &'b mut RootBuilder<'a, C, IrcIn, IrcOut>,
     circuit_id: usize,
     circuit: &'a ir::common::Circuit<IrcIn>,
-) -> Result<(ir::common::Circuit<IrcOut>, Builder<'a, C, IrcIn, IrcOut>), String>
+) -> Result<(ir::common::Circuit<IrcOut>, Builder<'a, C, IrcIn, IrcOut>), Error>
 where
     Builder<'a, C, IrcIn, IrcOut>: InsnTransformAndExecute<'a, C, IrcIn, IrcOut>,
 {
@@ -583,7 +582,7 @@ pub fn process_root_circuit<
     IrcOut: IrConfig<Config = C> + 'a,
 >(
     rc: &'a ir::common::RootCircuit<IrcIn>,
-) -> Result<ir::common::RootCircuit<IrcOut>, String>
+) -> Result<ir::common::RootCircuit<IrcOut>, Error>
 where
     Builder<'a, C, IrcIn, IrcOut>: InsnTransformAndExecute<'a, C, IrcIn, IrcOut>,
 {

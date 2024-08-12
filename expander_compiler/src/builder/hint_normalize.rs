@@ -3,6 +3,7 @@ use core::panic;
 use crate::circuit::ir::common::RawConstraint;
 use crate::circuit::ir::expr;
 use crate::field::Field;
+use crate::utils::error::Error;
 use crate::{
     circuit::{
         config::Config,
@@ -88,7 +89,7 @@ impl<'a, C: Config> Builder<'a, C> {
 }
 
 impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Builder<'a, C> {
-    fn transform_in_to_out(&mut self, in_insn: &InsnIn<C>) -> Result<InsnOut<C>, String> {
+    fn transform_in_to_out(&mut self, in_insn: &InsnIn<C>) -> Result<InsnOut<C>, Error> {
         use ir::source::Instruction::*;
         Ok(match in_insn {
             LinComb(lcs) => InsnOut::LinComb(lcs.clone()),
@@ -96,7 +97,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
             Div { x, y, checked } => match self.constant_value(*y) {
                 Some(yv) => {
                     if yv.is_zero() {
-                        return Err("division by zero constant".to_string());
+                        return Err(Error::UserError("division by zero constant".to_string()));
                     }
                     let y = self.push_const(yv.inv().unwrap());
                     InsnOut::Mul(vec![*x, y])
@@ -263,7 +264,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
     fn transform_in_con_to_out(
         &mut self,
         in_con: &ir::source::Constraint,
-    ) -> Result<RawConstraint, String> {
+    ) -> Result<RawConstraint, Error> {
         match in_con.typ {
             ir::source::ConstraintType::Zero => Ok(in_con.var),
             ir::source::ConstraintType::Bool => Ok(self.bool_cond(in_con.var)),
@@ -321,17 +322,20 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
 
 pub fn process<C: Config>(
     rc: &ir::common::RootCircuit<IrcIn<C>>,
-) -> Result<ir::common::RootCircuit<IrcOut<C>>, String> {
+) -> Result<ir::common::RootCircuit<IrcOut<C>>, Error> {
     process_root_circuit(rc)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::circuit::{
-        config::{Config, M31Config as C},
-        ir::{self, common::rand_gen::*},
-    };
     use crate::field::Field;
+    use crate::{
+        circuit::{
+            config::{Config, M31Config as C},
+            ir::{self, common::rand_gen::*},
+        },
+        utils::error::Error,
+    };
 
     type CField = <C as Config>::CircuitField;
 
@@ -392,19 +396,27 @@ mod tests {
             config.seed = i + 200000;
             let root = ir::common::RootCircuit::<super::IrcIn<C>>::random(&config);
             assert_eq!(root.validate(), Ok(()));
-            if let Ok(root_processed) = super::process(&root) {
-                assert_eq!(root_processed.validate(), Ok(()));
-                assert_eq!(root.input_size(), root_processed.input_size());
-                for _ in 0..5 {
-                    let inputs: Vec<CField> = (0..root.input_size())
-                        .map(|_| CField::random_unsafe())
-                        .collect();
-                    let e1 = root.eval_unsafe_with_errors(inputs.clone());
-                    let e2 = root_processed.eval_unsafe_with_errors(inputs);
-                    if e1.is_ok() {
-                        assert_eq!(e2, e1);
+            match super::process(&root) {
+                Ok(root_processed) => {
+                    assert_eq!(root_processed.validate(), Ok(()));
+                    assert_eq!(root.input_size(), root_processed.input_size());
+                    for _ in 0..5 {
+                        let inputs: Vec<CField> = (0..root.input_size())
+                            .map(|_| CField::random_unsafe())
+                            .collect();
+                        let e1 = root.eval_unsafe_with_errors(inputs.clone());
+                        let e2 = root_processed.eval_unsafe_with_errors(inputs);
+                        if e1.is_ok() {
+                            assert_eq!(e2, e1);
+                        }
                     }
                 }
+                Err(e) => match e {
+                    Error::UserError(_) => {}
+                    Error::InternalError(e) => {
+                        panic!("{:?}", e);
+                    }
+                },
             }
         }
     }
@@ -426,19 +438,27 @@ mod tests {
             config.seed = i + 300000;
             let root = ir::common::RootCircuit::<super::IrcIn<C>>::random(&config);
             assert_eq!(root.validate(), Ok(()));
-            if let Ok(root_processed) = super::process(&root) {
-                assert_eq!(root_processed.validate(), Ok(()));
-                assert_eq!(root.input_size(), root_processed.input_size());
-                for _ in 0..5 {
-                    let inputs: Vec<CField> = (0..root.input_size())
-                        .map(|_| CField::random_unsafe())
-                        .collect();
-                    let e1 = root.eval_unsafe_with_errors(inputs.clone());
-                    let e2 = root_processed.eval_unsafe_with_errors(inputs);
-                    if e1.is_ok() {
-                        assert_eq!(e2, e1);
+            match super::process(&root) {
+                Ok(root_processed) => {
+                    assert_eq!(root_processed.validate(), Ok(()));
+                    assert_eq!(root.input_size(), root_processed.input_size());
+                    for _ in 0..5 {
+                        let inputs: Vec<CField> = (0..root.input_size())
+                            .map(|_| CField::random_unsafe())
+                            .collect();
+                        let e1 = root.eval_unsafe_with_errors(inputs.clone());
+                        let e2 = root_processed.eval_unsafe_with_errors(inputs);
+                        if e1.is_ok() {
+                            assert_eq!(e2, e1);
+                        }
                     }
                 }
+                Err(e) => match e {
+                    Error::UserError(_) => {}
+                    Error::InternalError(e) => {
+                        panic!("{:?}", e);
+                    }
+                },
             }
         }
     }

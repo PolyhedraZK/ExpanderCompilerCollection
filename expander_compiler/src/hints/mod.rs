@@ -2,7 +2,10 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 use rand::RngCore;
 
-use crate::field::{Field, U256};
+use crate::{
+    field::{Field, U256},
+    utils::error::Error,
+};
 
 pub enum BuiltinHintIds {
     Identity = 0xccc000000000,
@@ -76,17 +79,19 @@ fn validate_builtin_hint(
     hint_id: BuiltinHintIds,
     num_inputs: usize,
     num_outputs: usize,
-) -> Result<(), String> {
+) -> Result<(), Error> {
     match hint_id {
         BuiltinHintIds::Identity => {
             if num_inputs != num_outputs {
-                return Err(
+                return Err(Error::InternalError(
                     "identity hint requires exactly the same number of inputs and outputs"
                         .to_string(),
-                );
+                ));
             }
             if num_inputs == 0 {
-                return Err("identity hint requires at least 1 input".to_string());
+                return Err(Error::InternalError(
+                    "identity hint requires at least 1 input".to_string(),
+                ));
             }
         }
         BuiltinHintIds::Div
@@ -107,33 +112,45 @@ fn validate_builtin_hint(
         | BuiltinHintIds::Lesser
         | BuiltinHintIds::Greater => {
             if num_inputs != 2 {
-                return Err("binary op requires exactly 2 inputs".to_string());
+                return Err(Error::InternalError(
+                    "binary op requires exactly 2 inputs".to_string(),
+                ));
             }
             if num_outputs != 1 {
-                return Err("binary op requires exactly 1 output".to_string());
+                return Err(Error::InternalError(
+                    "binary op requires exactly 1 output".to_string(),
+                ));
             }
         }
         BuiltinHintIds::Select => {
             if num_inputs != 3 {
-                return Err("select requires exactly 3 inputs".to_string());
+                return Err(Error::InternalError(
+                    "select requires exactly 3 inputs".to_string(),
+                ));
             }
             if num_outputs != 1 {
-                return Err("select requires exactly 1 output".to_string());
+                return Err(Error::InternalError(
+                    "select requires exactly 1 output".to_string(),
+                ));
             }
         }
     }
     Ok(())
 }
 
-pub fn validate_hint(hint_id: usize, num_inputs: usize, num_outputs: usize) -> Result<(), String> {
+pub fn validate_hint(hint_id: usize, num_inputs: usize, num_outputs: usize) -> Result<(), Error> {
     match BuiltinHintIds::from_usize(hint_id) {
         Some(hint_id) => validate_builtin_hint(hint_id, num_inputs, num_outputs),
         None => {
             if num_outputs == 0 {
-                return Err("custom hint requires at least 1 output".to_string());
+                return Err(Error::InternalError(
+                    "custom hint requires at least 1 output".to_string(),
+                ));
             }
             if num_inputs == 0 {
-                return Err("custom hint requires at least 1 input".to_string());
+                return Err(Error::InternalError(
+                    "custom hint requires at least 1 input".to_string(),
+                ));
             }
             Ok(())
         }

@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::circuit::{config::Config, layered::Coef};
 use crate::field::Field;
+use crate::utils::error::Error;
 
 use super::common::EvalResult;
 use super::expr::{Term, VarSpec};
@@ -112,7 +113,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             expr: Expression::from_terms(vec![Term::new_linear(k, x), Term::new_const(b)]),
         }
     }
-    fn validate(&self) -> Result<(), String> {
+    fn validate(&self) -> Result<(), Error> {
         Ok(())
     }
     fn eval_unsafe(&self, values: &[C::CircuitField]) -> EvalResult<C> {

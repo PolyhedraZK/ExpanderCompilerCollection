@@ -9,6 +9,8 @@ opt-level = 3
 [dependencies]
 rand.workspace = true
 uint.workspace = true
+chrono.workspace = true
+halo2curves.workspace = true
 
 [workspace]
 members = [
@@ -18,3 +20,7 @@ members = [
 [workspace.dependencies]
 rand = "0.8.5"
 uint = "0.9.5"
+chrono = "0.4"
+halo2curves = { git = "https://github.com/PolyhedraZK/halo2curves", default-features = false, features = [
+    "bits",
+] }

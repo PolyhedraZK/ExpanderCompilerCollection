@@ -87,7 +87,7 @@ func (rc *RootCircuit) evalSub(circuitId uint64, inputs []constraint.Element) ([
 				hint_inputs = append(hint_inputs, rc.Field.ToBigInt(values[x]))
 			}
 			hint_outputs := make([]*big.Int, insn.NumOutputs)
-			err := callHint(insn.ExtraId, rc.Field.ToBigInt(insn.Const), hint_inputs, hint_outputs)
+			err := callHint(insn.ExtraId, rc.Field.Field(), hint_inputs, hint_outputs)
 			if err != nil {
 				return nil, err
 			}
