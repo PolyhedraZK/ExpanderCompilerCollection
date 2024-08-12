@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/field/bn254"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/field/gf2"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/field/m31"
 	"github.com/consensys/gnark/constraint"
 )
@@ -21,6 +22,9 @@ func GetFieldFromOrder(x *big.Int) Field {
 	}
 	if x.Cmp(m31.ScalarField) == 0 {
 		return &m31.Field{}
+	}
+	if x.Cmp(gf2.ScalarField) == 0 {
+		return &gf2.Field{}
 	}
 	panic(fmt.Sprintf("unknown field %v", x))
 }
