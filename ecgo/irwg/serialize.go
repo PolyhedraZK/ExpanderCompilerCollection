@@ -57,6 +57,7 @@ func serializeRootCircuit(o *utils.OutputBuf, c *RootCircuit, field field.Field)
 
 func SerializeRootCircuit(c *RootCircuit) []byte {
 	o := &utils.OutputBuf{}
+	o.AppendUint64(field.GetFieldId(c.Field))
 	serializeRootCircuit(o, c, c.Field)
 	return o.Bytes()
 }

@@ -1,5 +1,6 @@
 use crate::circuit::{config::Config, layered::Coef};
 use crate::field::Field;
+use crate::utils::error::Error;
 
 use super::{
     common::{self, EvalResult, IrConfig, RawConstraint},
@@ -95,13 +96,15 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
     fn from_kx_plus_b(x: usize, k: C::CircuitField, b: C::CircuitField) -> Self {
         Instruction::LinComb(expr::LinComb::from_kx_plus_b(x, k, b))
     }
-    fn validate(&self) -> Result<(), String> {
+    fn validate(&self) -> Result<(), Error> {
         match self {
             Instruction::Mul(inputs) => {
                 if inputs.len() >= 2 {
                     Ok(())
                 } else {
-                    Err("mul instruction must have at least 2 inputs".to_string())
+                    Err(Error::InternalError(
+                        "mul instruction must have at least 2 inputs".to_string(),
+                    ))
                 }
             }
             _ => Ok(()),

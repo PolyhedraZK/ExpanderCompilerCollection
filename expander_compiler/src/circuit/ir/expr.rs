@@ -196,6 +196,9 @@ impl<C: Config> Expression<C> {
         assert!(terms.windows(2).all(|w| w[0].vars < w[1].vars));
         Expression { terms }
     }
+    pub fn invalid() -> Self {
+        Expression { terms: vec![] }
+    }
     pub fn get_vars<R: std::iter::FromIterator<usize>>(&self) -> R {
         self.iter()
             .flat_map(|term| match term.vars {

@@ -5,6 +5,7 @@ use crate::circuit::ir::common::{Instruction, RawConstraint};
 use crate::circuit::ir::expr::Expression;
 use crate::circuit::{config::Config, ir, layered::Coef};
 use crate::field::Field;
+use crate::utils::error::Error;
 
 use super::basic::{
     process_circuit, to_really_single, try_get_really_single_id, ConstraintStatus,
@@ -18,11 +19,11 @@ type InsnOut<C> = ir::hint_less::Instruction<C>;
 type Builder<'a, C> = super::basic::Builder<'a, C, IrcIn<C>, IrcOut<C>>;
 
 impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Builder<'a, C> {
-    fn transform_in_to_out(&mut self, in_insn: &InsnIn<C>) -> Result<InsnOut<C>, String> {
+    fn transform_in_to_out(&mut self, in_insn: &InsnIn<C>) -> Result<InsnOut<C>, Error> {
         Ok(in_insn.clone())
     }
 
-    fn transform_in_con_to_out(&mut self, in_con: &RawConstraint) -> Result<RawConstraint, String> {
+    fn transform_in_con_to_out(&mut self, in_con: &RawConstraint) -> Result<RawConstraint, Error> {
         Ok(in_con.clone())
     }
 
@@ -60,7 +61,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
 }
 
 impl<'a, C: Config> Builder<'a, C> {
-    fn export_for_layering(&mut self) -> ir::dest::CircuitRelaxed<C> {
+    fn export_for_layering(&mut self) -> Result<ir::dest::CircuitRelaxed<C>, Error> {
         let mut last_subc_o_mid_id = 0;
         let mut out_var_max = self.in_circuit.get_num_inputs_all();
         let mut out_insn_id = 0;
@@ -165,23 +166,31 @@ impl<'a, C: Config> Builder<'a, C> {
             match status {
                 ConstraintStatus::Marked => {}
                 ConstraintStatus::Asserted => {
+                    if let Some(v) = expr.constant_value() {
+                        if v.is_zero() {
+                            continue;
+                        }
+                        return Err(Error::UserError(
+                            "non-zero constant in constraint".to_string(),
+                        ));
+                    }
                     constraints.push(try_get_really_single_id(&mut self.mid_vars, expr).unwrap());
                 }
             }
         }
-        ir::dest::CircuitRelaxed {
+        Ok(ir::dest::CircuitRelaxed {
             outputs: fin_outputs,
             instructions: fin_insns,
             constraints,
             num_inputs: self.in_circuit.num_inputs,
             num_hint_inputs: self.in_circuit.num_hint_inputs,
-        }
+        })
     }
 }
 
 pub fn process<'a, C: Config>(
     rc: &'a ir::common::RootCircuit<IrcIn<C>>,
-) -> Result<ir::dest::RootCircuitRelaxed<C>, String> {
+) -> Result<ir::dest::RootCircuitRelaxed<C>, Error> {
     let mut root: RootBuilder<'a, C, IrcIn<C>, IrcOut<C>> = RootBuilder {
         builders: HashMap::new(),
         rc,
@@ -197,7 +206,7 @@ pub fn process<'a, C: Config>(
     let mut out_circuits = HashMap::new();
     for &circuit_id in order.iter().rev() {
         let builder = root.builders.get_mut(&circuit_id).unwrap();
-        out_circuits.insert(circuit_id, builder.export_for_layering());
+        out_circuits.insert(circuit_id, builder.export_for_layering()?);
     }
     Ok(ir::dest::RootCircuitRelaxed {
         circuits: out_circuits,
@@ -208,15 +217,18 @@ pub fn process<'a, C: Config>(
 mod tests {
     use std::vec;
 
-    use crate::circuit::{
-        config::{Config, M31Config as C},
-        ir::{
-            self,
-            common::rand_gen::*,
-            expr::{Expression, Term},
-        },
-    };
     use crate::field::Field;
+    use crate::{
+        circuit::{
+            config::{Config, M31Config as C},
+            ir::{
+                self,
+                common::rand_gen::*,
+                expr::{Expression, Term},
+            },
+        },
+        utils::error::Error,
+    };
 
     type CField = <C as Config>::CircuitField;
 
@@ -306,16 +318,28 @@ mod tests {
             config.seed = i + 100000;
             let root = ir::common::RootCircuit::<super::IrcIn<C>>::random(&config);
             assert_eq!(root.validate(), Ok(()));
-            let root_processed = super::process(&root).unwrap();
-            assert_eq!(root_processed.validate(), Ok(()));
-            assert_eq!(root.input_size(), root_processed.input_size());
-            let inputs: Vec<CField> = (0..root.input_size())
-                .map(|_| CField::random_unsafe())
-                .collect();
-            let (out1, cond1) = root.eval_unsafe(inputs.clone());
-            let (out2, cond2) = root_processed.eval_unsafe(inputs);
-            assert_eq!(out1, out2);
-            assert_eq!(cond1, cond2);
+            match super::process(&root) {
+                Ok(root_processed) => {
+                    assert_eq!(root_processed.validate(), Ok(()));
+                    assert_eq!(root.input_size(), root_processed.input_size());
+                    for _ in 0..5 {
+                        let inputs: Vec<CField> = (0..root.input_size())
+                            .map(|_| CField::random_unsafe())
+                            .collect();
+                        let e1 = root.eval_unsafe_with_errors(inputs.clone());
+                        let e2 = root_processed.eval_unsafe_with_errors(inputs);
+                        if e1.is_ok() {
+                            assert_eq!(e2, e1);
+                        }
+                    }
+                }
+                Err(e) => match e {
+                    Error::UserError(_) => {}
+                    Error::InternalError(e) => {
+                        panic!("{:?}", e);
+                    }
+                },
+            }
         }
     }
 
@@ -336,16 +360,28 @@ mod tests {
             config.seed = i + 200000;
             let root = ir::common::RootCircuit::<super::IrcIn<C>>::random(&config);
             assert_eq!(root.validate(), Ok(()));
-            let root_processed = super::process(&root).unwrap();
-            assert_eq!(root_processed.validate(), Ok(()));
-            assert_eq!(root.input_size(), root_processed.input_size());
-            let inputs: Vec<CField> = (0..root.input_size())
-                .map(|_| CField::random_unsafe())
-                .collect();
-            let (out1, cond1) = root.eval_unsafe(inputs.clone());
-            let (out2, cond2) = root_processed.eval_unsafe(inputs);
-            assert_eq!(out1, out2);
-            assert_eq!(cond1, cond2);
+            match super::process(&root) {
+                Ok(root_processed) => {
+                    assert_eq!(root_processed.validate(), Ok(()));
+                    assert_eq!(root.input_size(), root_processed.input_size());
+                    for _ in 0..5 {
+                        let inputs: Vec<CField> = (0..root.input_size())
+                            .map(|_| CField::random_unsafe())
+                            .collect();
+                        let e1 = root.eval_unsafe_with_errors(inputs.clone());
+                        let e2 = root_processed.eval_unsafe_with_errors(inputs);
+                        if e1.is_ok() {
+                            assert_eq!(e2, e1);
+                        }
+                    }
+                }
+                Err(e) => match e {
+                    Error::UserError(_) => {}
+                    Error::InternalError(e) => {
+                        panic!("{:?}", e);
+                    }
+                },
+            }
         }
     }
 }

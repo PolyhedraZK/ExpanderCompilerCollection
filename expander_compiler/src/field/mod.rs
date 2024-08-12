@@ -9,6 +9,8 @@ use uint::construct_uint;
 
 use crate::utils::serde::Serde;
 
+pub mod bn254;
+pub mod gf2;
 pub mod m31;
 
 construct_uint! {

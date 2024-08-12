@@ -2,6 +2,7 @@ use crate::{
     circuit::{config::Config, layered::Coef},
     field::{Field, U256},
     hints::{self, circom_shift_l_impl, circom_shift_r_impl},
+    utils::error::Error,
 };
 
 use super::{
@@ -245,13 +246,15 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
     fn from_kx_plus_b(x: usize, k: C::CircuitField, b: C::CircuitField) -> Self {
         Instruction::LinComb(expr::LinComb::from_kx_plus_b(x, k, b))
     }
-    fn validate(&self) -> Result<(), String> {
+    fn validate(&self) -> Result<(), Error> {
         match self {
             Instruction::Mul(inputs) => {
                 if inputs.len() >= 2 {
                     Ok(())
                 } else {
-                    Err("mul instruction must have at least 2 inputs".to_string())
+                    Err(Error::InternalError(
+                        "mul instruction must have at least 2 inputs".to_string(),
+                    ))
                 }
             }
             Instruction::Hint {
@@ -263,7 +266,9 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 if inputs.len() >= 1 {
                     Ok(())
                 } else {
-                    Err("hint instruction must have at least 1 input".to_string())
+                    Err(Error::InternalError(
+                        "hint instruction must have at least 1 input".to_string(),
+                    ))
                 }
             }
             _ => Ok(()),
@@ -286,7 +291,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                     if x.is_zero() && !checked {
                         EvalResult::Value(C::CircuitField::zero())
                     } else {
-                        EvalResult::Error("division by zero".to_string())
+                        EvalResult::Error(Error::UserError("division by zero".to_string()))
                     }
                 } else {
                     EvalResult::Value(x * y.inv().unwrap())
@@ -296,10 +301,10 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 let x = values[*x];
                 let y = values[*y];
                 if !x.is_zero() && x != C::CircuitField::one() {
-                    return EvalResult::Error("invalid bool value".to_string());
+                    return EvalResult::Error(Error::UserError("invalid bool value".to_string()));
                 }
                 if !y.is_zero() && y != C::CircuitField::one() {
-                    return EvalResult::Error("invalid bool value".to_string());
+                    return EvalResult::Error(Error::UserError("invalid bool value".to_string()));
                 }
                 match op {
                     BoolBinOpType::Xor => {
@@ -355,11 +360,11 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
 }
 
 impl UnconstrainedBinOpType {
-    pub fn eval<F: Field>(&self, x: &F, y: &F) -> Result<F, String> {
+    pub fn eval<F: Field>(&self, x: &F, y: &F) -> Result<F, Error> {
         match self {
             UnconstrainedBinOpType::Div => {
                 if y.is_zero() {
-                    Err("division by zero".to_string())
+                    Err(Error::UserError("division by zero".to_string()))
                 } else {
                     Ok(*x * y.inv().unwrap())
                 }
@@ -379,14 +384,14 @@ impl UnconstrainedBinOpType {
             }
             UnconstrainedBinOpType::IntDiv => binop_on_u256(x, y, |x, y| {
                 if y.is_zero() {
-                    Err("division by zero".to_string())
+                    Err(Error::UserError("division by zero".to_string()))
                 } else {
                     Ok(x / y)
                 }
             }),
             UnconstrainedBinOpType::Mod => binop_on_u256(x, y, |x, y| {
                 if y.is_zero() {
-                    Err("division by zero".to_string())
+                    Err(Error::UserError("division by zero".to_string()))
                 } else {
                     Ok(x % y)
                 }
@@ -428,11 +433,11 @@ impl UnconstrainedBinOpType {
     }
 }
 
-fn binop_on_u256<F: Field, T: Into<F>, G: Fn(U256, U256) -> Result<T, String>>(
+fn binop_on_u256<F: Field, T: Into<F>, G: Fn(U256, U256) -> Result<T, Error>>(
     x: &F,
     y: &F,
     f: G,
-) -> Result<F, String> {
+) -> Result<F, Error> {
     let x: U256 = (*x).into();
     let y: U256 = (*y).into();
     match f(x, y) {

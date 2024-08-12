@@ -7,11 +7,15 @@ use std::{
 use crate::{
     circuit::config::Config,
     field::Field,
-    utils::misc::{topo_order, topo_order_and_is_dag},
+    utils::{
+        error::Error,
+        misc::{topo_order, topo_order_and_is_dag},
+    },
 };
 
 pub mod opt;
 pub mod serde;
+pub mod stats;
 
 #[cfg(test)]
 pub mod rand_gen;
@@ -33,7 +37,7 @@ pub trait Instruction<C: Config>: Debug + Clone + Hash + PartialEq + Eq {
     fn sub_circuit_call(sub_circuit_id: usize, inputs: Vec<usize>, num_outputs: usize) -> Self;
     fn replace_vars<F: Fn(usize) -> usize>(&self, f: F) -> Self;
     fn from_kx_plus_b(x: usize, k: C::CircuitField, b: C::CircuitField) -> Self;
-    fn validate(&self) -> Result<(), String>;
+    fn validate(&self) -> Result<(), Error>;
     fn eval_unsafe(&self, values: &[C::CircuitField]) -> EvalResult<'_, C>;
 }
 
@@ -41,7 +45,7 @@ pub enum EvalResult<'a, C: Config> {
     Value(C::CircuitField),
     Values(Vec<C::CircuitField>),
     SubCircuitCall(usize, &'a Vec<usize>),
-    Error(String),
+    Error(Error),
 }
 
 pub trait Constraint<C: Config>: Debug + Clone + Hash + PartialEq + Eq {
@@ -104,15 +108,20 @@ impl<Irc: IrConfig> Circuit<Irc> {
         }
     }
 
-    fn validate_variable_references(&self) -> Result<(), String> {
+    fn validate_variable_references(&self) -> Result<(), Error> {
         if !Irc::HAS_HINT_INPUT && self.num_hint_inputs != 0 {
-            return Err("hint input is not allowed".to_string());
+            return Err(Error::InternalError(
+                "hint input is not allowed".to_string(),
+            ));
         }
         let mut cur_var_max = self.get_num_inputs_all();
         for insn in self.instructions.iter() {
             for term in insn.inputs() {
                 if term > cur_var_max || term == 0 {
-                    return Err(format!("invalid variable reference: {}", term));
+                    return Err(Error::InternalError(format!(
+                        "invalid variable reference: {}",
+                        term
+                    )));
                 }
             }
             insn.validate()?;
@@ -122,7 +131,10 @@ impl<Irc: IrConfig> Circuit<Irc> {
                     let mut set = HashSet::new();
                     for &input in inputs.iter() {
                         if !set.insert(input) {
-                            return Err(format!("duplicate sub circuit input: {}", input));
+                            return Err(Error::InternalError(format!(
+                                "duplicate sub circuit input: {}",
+                                input
+                            )));
                         }
                     }
                 }
@@ -130,30 +142,39 @@ impl<Irc: IrConfig> Circuit<Irc> {
         }
         for c in self.constraints.iter() {
             if c.var() > cur_var_max || c.var() == 0 {
-                return Err(format!(
+                return Err(Error::InternalError(format!(
                     "invalid constraint variable reference: {}",
                     c.var()
-                ));
+                )));
             }
         }
         if !Irc::ALLOW_DUPLICATE_CONSTRAINTS {
             let mut set = HashSet::new();
             for c in self.constraints.iter() {
                 if !set.insert(c.var()) {
-                    return Err(format!("duplicate constraint: {}", c.var()));
+                    return Err(Error::InternalError(format!(
+                        "duplicate constraint: {}",
+                        c.var()
+                    )));
                 }
             }
         }
         for &output in self.outputs.iter() {
             if output > cur_var_max || output == 0 {
-                return Err(format!("invalid output variable reference: {}", output));
+                return Err(Error::InternalError(format!(
+                    "invalid output variable reference: {}",
+                    output
+                )));
             }
         }
         if !Irc::ALLOW_DUPLICATE_OUTPUTS {
             let mut set = HashSet::new();
             for &output in self.outputs.iter() {
                 if !set.insert(output) {
-                    return Err(format!("duplicate output: {}", output));
+                    return Err(Error::InternalError(format!(
+                        "duplicate output: {}",
+                        output
+                    )));
                 }
             }
         }
@@ -189,11 +210,11 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
         edges
     }
 
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> Result<(), Error> {
         // tests of this function are in for_layering
         // check if 0 circuit exists
         if !self.circuits.contains_key(&0) {
-            return Err("root circuit not found".to_string());
+            return Err(Error::InternalError("root circuit not found".to_string()));
         }
         // check if all variable references are valid
         for circuit in self.circuits.values() {
@@ -204,23 +225,26 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
             for insn in circuit.instructions.iter() {
                 if let Some((sub_circuit_id, inputs, num_outputs)) = insn.as_sub_circuit_call() {
                     if !self.circuits.contains_key(&sub_circuit_id) {
-                        return Err(format!("sub circuit {} not found", sub_circuit_id));
+                        return Err(Error::InternalError(format!(
+                            "sub circuit {} not found",
+                            sub_circuit_id
+                        )));
                     }
                     if inputs.len() != self.circuits[&sub_circuit_id].num_inputs {
-                        return Err(format!(
+                        return Err(Error::InternalError(format!(
                             "sub circuit {} expects {} inputs, got {}",
                             sub_circuit_id,
                             self.circuits[&sub_circuit_id].num_inputs,
                             inputs.len()
-                        ));
+                        )));
                     }
                     if num_outputs != self.circuits[&sub_circuit_id].outputs.len() {
-                        return Err(format!(
+                        return Err(Error::InternalError(format!(
                             "sub circuit {} expects {} outputs, got {}",
                             sub_circuit_id,
                             self.circuits[&sub_circuit_id].outputs.len(),
                             num_outputs
-                        ));
+                        )));
                     }
                 }
             }
@@ -228,7 +252,7 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
         let s_edges = self.sub_circuit_graph_edges();
         let (order, is_dag) = topo_order_and_is_dag(&self.sub_circuit_graph_vertices(), &s_edges);
         if !is_dag {
-            return Err("circuit is not a DAG".to_string());
+            return Err(Error::InternalError("circuit is not a DAG".to_string()));
         }
         // check if root circuit has constraint
         let mut has_constraint: HashSet<usize> = HashSet::new();
@@ -248,7 +272,9 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
             }
         }
         if !has_constraint.contains(&0) {
-            return Err("root circuit should have constraints".to_string());
+            return Err(Error::UserError(
+                "root circuit should have constraints".to_string(),
+            ));
         }
         Ok(())
     }
@@ -284,7 +310,7 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
     pub fn eval_unsafe_with_errors(
         &self,
         inputs: Vec<<Irc::Config as Config>::CircuitField>,
-    ) -> Result<(Vec<<Irc::Config as Config>::CircuitField>, bool), String> {
+    ) -> Result<(Vec<<Irc::Config as Config>::CircuitField>, bool), Error> {
         assert_eq!(inputs.len(), self.input_size());
         let (root_input, hint_input) = inputs.split_at(self.circuits[&0].num_inputs);
         let (res, rem, cond) =
@@ -311,7 +337,7 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
             &'a [<Irc::Config as Config>::CircuitField],
             bool,
         ),
-        String,
+        Error,
     > {
         let mut values = vec![<Irc::Config as Config>::CircuitField::zero(); 1];
         values.extend(inputs);

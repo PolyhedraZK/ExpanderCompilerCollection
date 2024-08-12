@@ -31,7 +31,8 @@ where
                 e.to_string()
             )
         })?;
-    let (ir_witness_gen, layered) = expander_compiler::compile::compile(&ir_source)?;
+    let (ir_witness_gen, layered) =
+        expander_compiler::compile::compile(&ir_source).map_err(|e| e.to_string())?;
     let mut ir_wg_s: Vec<u8> = Vec::new();
     ir_witness_gen.serialize_into(&mut ir_wg_s).map_err(|e| {
         format!(
@@ -49,6 +50,8 @@ where
 fn compile_inner(ir_source: Vec<u8>, config_id: u64) -> Result<(Vec<u8>, Vec<u8>), String> {
     match config_id {
         1 => compile_inner_with_config::<config::M31Config>(ir_source),
+        2 => compile_inner_with_config::<config::BN254Config>(ir_source),
+        3 => compile_inner_with_config::<config::GF2Config>(ir_source),
         _ => Err(format!("unknown config id: {}", config_id)),
     }
 }
