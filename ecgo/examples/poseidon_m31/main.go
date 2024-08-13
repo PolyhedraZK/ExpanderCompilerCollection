@@ -22,14 +22,14 @@ const NumRepeat = 100
 type MockPoseidonM31Circuit struct {
 	State  [NumRepeat][16]frontend.Variable
 	Digest [NumRepeat]frontend.Variable `gnark:",public"`
+	Params *poseidon.PoseidonParams
 }
 
 func (c *MockPoseidonM31Circuit) Define(api frontend.API) (err error) {
 	// Define the circuit
-	param := poseidon.NewPoseidonParams()
 	engine := m31.Field{}
 	for i := 0; i < NumRepeat; i++ {
-		digest := poseidon.PoseidonCircuit(api, engine, param, c.State[i][:], true)
+		digest := poseidon.PoseidonCircuit(api, engine, c.Params, c.State[i][:], true)
 		api.AssertIsEqual(digest, c.Digest[i])
 	}
 
@@ -57,17 +57,15 @@ func M31CircuitBuild() {
 	assignment := &MockPoseidonM31Circuit{
 		State:  stateVars,
 		Digest: outputVars,
+		Params: param,
 	}
 
-	// Gnark test disabled as it does not support randomness
-	// err := test.IsSolved(&MockPoseidonCircuit{}, assignment, m31.ScalarField)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// fmt.Println("Gnark test passed")
-
 	// Ecc test
-	circuit, err := ecgo.Compile(m31.ScalarField, &MockPoseidonM31Circuit{}, frontend.WithCompressThreshold(4))
+	circuit, err := ecgo.Compile(m31.ScalarField, &MockPoseidonM31Circuit{
+		State:  stateVars,
+		Digest: outputVars,
+		Params: param,
+	}, frontend.WithCompressThreshold(32))
 	if err != nil {
 		panic(err)
 	}
