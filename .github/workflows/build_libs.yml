@@ -1,0 +1,34 @@
+name: build-libs
+
+on:
+  push:
+    branches:
+      - rust_rewrite
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "expander_compiler -> expander_compiler/target"
+      - name: Build
+        run: cargo build --release --manifest-path=expander_compiler/ec_go_lib/Cargo.toml
+      - name: Push built libs to another branch
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          mkdir output
+          cp -r expander_compiler/target/release/*.a output/
+
+          git fetch
+          git checkout rust-built-libs-template
+          git checkout -b rust-built-libs
+          cp output/libec_go_lib.a go_libs/lib/
+          git add go_libs/lib/libec_go_lib.a
+          git commit -m "Add built libs"
+          git push -f --set-upstream origin rust-built-libs
