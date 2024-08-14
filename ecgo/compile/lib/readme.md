@@ -1,1 +1,0 @@
-Build `ec_go_lib` and copy `libec_go_lib.a` here.
