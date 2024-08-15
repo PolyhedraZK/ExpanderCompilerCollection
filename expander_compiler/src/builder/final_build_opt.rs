@@ -1,0 +1,779 @@
+use std::collections::{BinaryHeap, HashMap};
+
+use crate::{
+    circuit::{
+        config::Config,
+        costs::{cost_of_compress, cost_of_multiply, cost_of_possible_references},
+        ir::{
+            common::Instruction,
+            dest::{
+                CircuitRelaxed as OutCircuit, Instruction as OutInstruction,
+                RootCircuitRelaxed as OutRootCircuit,
+            },
+            expr::{Expression, LinComb, Term, VarSpec},
+            hint_less::{
+                Circuit as InCircuit, Instruction as InInstruction, RootCircuit as InRootCircuit,
+            },
+        },
+        layered::Coef,
+    },
+    field::Field,
+    utils::{error::Error, pool::Pool},
+};
+
+use super::basic::LinMeta;
+
+struct RootBuilder<C: Config> {
+    builders: HashMap<usize, Builder<C>>,
+    out_circuits: HashMap<usize, OutCircuit<C>>,
+}
+
+struct Builder<C: Config> {
+    // in_var ref counts
+    in_var_ref_counts: Vec<InVarRefCounts>,
+
+    // in_var mapped to expression of mid_vars
+    in_var_exprs: Vec<Expression<C>>,
+
+    // pool of stripped mid_vars
+    // for internal variables, the expression is actual expression
+    // for in_vars, the expression is a fake expression with only one term
+    stripped_mid_vars: Pool<Expression<C>>,
+    // mid_var i = k*(expr)+b
+    mid_var_coefs: Vec<MidVarCoef<C>>,
+    // expected layer of mid_var, input==0
+    mid_var_layer: Vec<usize>,
+
+    // (effective mid_var id, insn)
+    out_insns: Vec<(usize, OutInstruction<C>)>,
+
+    output_layer: usize,
+}
+
+#[derive(Debug, Clone)]
+struct MidVarCoef<C: Config> {
+    k: C::CircuitField,
+    kinv: C::CircuitField,
+    b: C::CircuitField,
+}
+
+#[derive(Debug, Clone, Default)]
+struct InVarRefCounts {
+    add: usize,
+    mul: usize,
+    single: usize,
+}
+
+impl<C: Config> Default for MidVarCoef<C> {
+    fn default() -> Self {
+        MidVarCoef {
+            k: C::CircuitField::one(),
+            kinv: C::CircuitField::one(),
+            b: C::CircuitField::zero(),
+        }
+    }
+}
+
+impl<C: Config> Builder<C> {
+    fn new() -> Self {
+        let mut res = Builder {
+            in_var_ref_counts: vec![InVarRefCounts::default()],
+            in_var_exprs: vec![Expression::default()],
+            stripped_mid_vars: Pool::new(),
+            mid_var_coefs: vec![MidVarCoef::default()],
+            mid_var_layer: vec![0],
+            out_insns: Vec::new(),
+            output_layer: 0,
+        };
+        res.stripped_mid_vars.add(&Expression::invalid());
+        res
+    }
+
+    fn new_var(&mut self, layer: usize) -> usize {
+        let id = self.stripped_mid_vars.len();
+        assert_eq!(
+            self.stripped_mid_vars
+                .add(&Expression::new_linear(C::CircuitField::one(), id)),
+            id
+        );
+        self.mid_var_coefs.push(MidVarCoef::default());
+        self.mid_var_layer.push(layer);
+        id
+    }
+
+    fn add_in_vars(&mut self, n: usize, layer: usize) {
+        let start = self.stripped_mid_vars.len();
+        for i in 0..n {
+            self.new_var(layer);
+            self.in_var_exprs
+                .push(Expression::new_linear(C::CircuitField::one(), start + i));
+        }
+    }
+
+    fn add_const(&mut self, c: C::CircuitField) {
+        self.in_var_exprs.push(Expression::new_const(c));
+    }
+
+    fn to_single(&mut self, expr: Expression<C>) -> Expression<C> {
+        let (e, coef, constant) = strip_constants(&expr);
+        if e.len() == 1 && e.degree() <= 1 {
+            return expr.clone();
+        }
+        let idx = self.stripped_mid_vars.add(&e);
+        if idx == self.mid_var_coefs.len() {
+            self.mid_var_coefs.push(MidVarCoef {
+                k: coef,
+                kinv: coef.inv().unwrap(),
+                b: constant,
+            });
+            self.mid_var_layer.push(self.layer_of_expr(&e) + 1);
+            return Expression::new_linear(C::CircuitField::one(), idx);
+        }
+        return unstrip_constants_single(idx, coef, constant, &self.mid_var_coefs[idx]);
+    }
+
+    fn to_really_single(&mut self, e: Expression<C>) -> usize {
+        if e.len() == 1 && e.degree() == 1 && e[0].coef == C::CircuitField::one() {
+            match e[0].vars {
+                VarSpec::Linear(v) => return v,
+                _ => unreachable!(),
+            }
+        }
+        let (es, coef, constant) = strip_constants(&e);
+        let idx = self.stripped_mid_vars.add(&es);
+        if idx == self.mid_var_coefs.len() {
+            self.mid_var_coefs.push(MidVarCoef {
+                k: coef,
+                kinv: coef.inv().unwrap(),
+                b: constant,
+            });
+            self.mid_var_layer.push(self.layer_of_expr(&e) + 1);
+            return idx;
+        }
+        if coef == self.mid_var_coefs[idx].k && constant == self.mid_var_coefs[idx].b {
+            return idx;
+        }
+        let idx = self.stripped_mid_vars.add(&e);
+        self.mid_var_coefs.push(MidVarCoef {
+            k: C::CircuitField::one(),
+            kinv: C::CircuitField::one(),
+            b: C::CircuitField::zero(),
+        });
+        self.mid_var_layer.push(self.layer_of_expr(&e) + 1);
+        idx
+    }
+
+    fn layer_of_varspec(&self, vs: &VarSpec) -> usize {
+        match vs {
+            VarSpec::Linear(v) => self.mid_var_layer[*v],
+            VarSpec::Quad(x, y) => self.mid_var_layer[*x].max(self.mid_var_layer[*y]),
+            VarSpec::Const => 0,
+        }
+    }
+
+    fn layer_of_expr(&self, e: &Expression<C>) -> usize {
+        e.iter()
+            .map(|term| self.layer_of_varspec(&term.vars))
+            .max()
+            .unwrap()
+    }
+
+    fn lin_comb(&mut self, lcs: &LinComb<C>) -> Expression<C> {
+        let mut vars: Vec<Expression<C>> = lcs
+            .terms
+            .iter()
+            .map(|lc| self.in_var_exprs[lc.var].clone())
+            .collect();
+        if !lcs.constant.is_zero() {
+            vars.push(Expression::new_const(lcs.constant));
+        }
+        self.lin_comb_inner(vars, |i| {
+            if i < lcs.terms.len() {
+                lcs.terms[i].coef
+            } else {
+                C::CircuitField::one()
+            }
+        })
+    }
+
+    fn lin_comb_inner<F: Fn(usize) -> C::CircuitField>(
+        &mut self,
+        vars: Vec<Expression<C>>,
+        var_coef: F,
+    ) -> Expression<C> {
+        if vars.len() == 0 {
+            return Expression::default();
+        }
+        if vars.len() == 1 {
+            return vars[0].mul_constant(var_coef(0));
+        }
+        let mut heap: BinaryHeap<LinMeta> = BinaryHeap::new();
+        for l_id in 0..vars.len() {
+            if var_coef(l_id).is_zero() {
+                continue;
+            }
+            heap.push(LinMeta {
+                l_id,
+                t_id: 0,
+                vars: vars[l_id][0].vars,
+            });
+        }
+        let mut res: Vec<Term<C>> = Vec::new();
+        while let Some(lm) = heap.peek() {
+            let l_id = lm.l_id;
+            let t_id = lm.t_id;
+            let var = &vars[l_id];
+            if t_id == var.len() - 1 {
+                heap.pop();
+            } else {
+                let mut lm = heap.peek_mut().unwrap();
+                lm.t_id = t_id + 1;
+                lm.vars = var[t_id + 1].vars;
+            }
+            let t = &var[t_id];
+            let new_coef = t.coef * var_coef(l_id);
+            if new_coef.is_zero() {
+                continue;
+            }
+            if res.len() != 0 && res.last().unwrap().vars == t.vars {
+                res.last_mut().unwrap().coef += new_coef;
+                if res.last().unwrap().coef.is_zero() {
+                    res.pop();
+                }
+            } else {
+                res.push(t.clone());
+                res.last_mut().unwrap().coef = new_coef;
+            }
+        }
+        if res.len() == 0 {
+            Expression::default()
+        } else {
+            //Expression::from_terms_sorted(res)
+            self.layered_add(res)
+        }
+    }
+
+    fn layered_add(&mut self, mut terms: Vec<Term<C>>) -> Expression<C> {
+        if terms.len() <= 1 {
+            return Expression::from_terms(terms);
+        }
+        terms.sort_by(|a, b| {
+            let la = self.layer_of_varspec(&a.vars);
+            let lb = self.layer_of_varspec(&b.vars);
+            if la != lb {
+                la.cmp(&lb)
+            } else {
+                a.vars.cmp(&b.vars)
+            }
+        });
+        let mut cur_terms = Vec::new();
+        let mut last_layer = -1;
+        for term in terms.iter() {
+            let layer = self.layer_of_varspec(&term.vars) as isize;
+            if layer != last_layer && last_layer != -1 {
+                cur_terms = self.to_single(Expression::from_terms(cur_terms)).to_terms();
+            }
+            cur_terms.push(term.clone());
+            last_layer = layer;
+        }
+        Expression::from_terms(cur_terms)
+    }
+
+    fn mul_vec(&mut self, vars: &Vec<usize>) -> Expression<C> {
+        assert!(vars.len() >= 2);
+        let mut exprs: Vec<Expression<C>> =
+            vars.iter().map(|&v| self.in_var_exprs[v].clone()).collect();
+        while exprs.len() > 1 {
+            let mut exprs_pos: Vec<usize> = (0..exprs.len()).collect();
+            exprs_pos.sort_by(|a, b| {
+                let la = self.layer_of_expr(&exprs[*a]);
+                let lb = self.layer_of_expr(&exprs[*b]);
+                if la != lb {
+                    la.cmp(&lb)
+                } else {
+                    let la = exprs[*a].len();
+                    let lb = exprs[*b].len();
+                    if la != lb {
+                        la.cmp(&lb)
+                    } else {
+                        exprs[*a].cmp(&exprs[*b])
+                    }
+                }
+            });
+            let pos1 = exprs_pos[0];
+            let pos2 = exprs_pos[1];
+            let mut expr1 = exprs.swap_remove(pos1);
+            let mut expr2 = exprs.swap_remove(pos2 - (pos2 > pos1) as usize);
+            if expr1.len() > expr2.len() {
+                std::mem::swap(&mut expr1, &mut expr2);
+            }
+            let deg1 = expr1.degree();
+            let deg2 = expr2.degree();
+            if deg1 == 0 {
+                exprs.push(expr2.mul_constant(expr1.constant_value().unwrap()));
+                continue;
+            }
+            if deg2 == 0 {
+                exprs.push(expr1.mul_constant(expr2.constant_value().unwrap()));
+                continue;
+            }
+            if deg1 == 2 {
+                if deg2 == 2 {
+                    exprs.push(self.to_single(expr2));
+                } else {
+                    exprs.push(expr2);
+                }
+                exprs.push(self.to_single(expr1));
+                continue;
+            }
+            if deg2 == 2 {
+                exprs.push(expr1);
+                exprs.push(self.to_single(expr2));
+                continue;
+            }
+            let dcnt1 = expr1.count_of_degrees();
+            let dcnt2 = expr2.count_of_degrees();
+            assert!(dcnt1[2] == 0);
+            assert!(dcnt2[2] == 0);
+            let cost_direct = cost_of_multiply::<C>(dcnt1[0], dcnt1[1], dcnt2[0], dcnt2[1]);
+            let cost_compress_v1 =
+                cost_of_multiply::<C>(0, 1, dcnt2[0], dcnt2[1]) + cost_of_compress::<C>(&dcnt1);
+            let cost_compress_v2 =
+                cost_of_multiply::<C>(dcnt1[0], dcnt1[1], 0, 1) + cost_of_compress::<C>(&dcnt2);
+            let cost_compress_both = cost_of_multiply::<C>(0, 1, 0, 1)
+                + cost_of_compress::<C>(&dcnt1)
+                + cost_of_compress::<C>(&dcnt2);
+            if cost_compress_v1
+                .min(cost_compress_v2)
+                .min(cost_compress_both)
+                < cost_direct
+            {
+                if cost_compress_v1 < cost_compress_v2.max(cost_compress_both) {
+                    exprs.push(self.to_single(expr1));
+                    exprs.push(expr2);
+                } else {
+                    exprs.push(expr1);
+                    exprs.push(self.to_single(expr2));
+                }
+                continue;
+            }
+            let mut vars: Vec<Expression<C>> = Vec::new();
+            for x1 in expr1.iter() {
+                vars.push(Expression::from_terms(
+                    expr2.iter().map(|x2| x1.mul(x2)).collect(),
+                ));
+            }
+            exprs.push(self.lin_comb_inner(vars, |_| C::CircuitField::one()));
+        }
+        exprs.remove(0)
+    }
+
+    fn add_and_check_if_should_make_single(&mut self, e: Expression<C>) {
+        let ref_count = self.in_var_ref_counts[self.in_var_exprs.len()].clone();
+        let degree_count = e.count_of_degrees();
+        let mut should_compress = ref_count.single > 0;
+        let cost_no_compress =
+            cost_of_possible_references::<C>(&degree_count, ref_count.add, ref_count.mul);
+        let cost_compress = cost_of_compress::<C>(&degree_count)
+            + cost_of_possible_references::<C>(&[0, 1, 0], ref_count.add, ref_count.mul);
+        should_compress |= cost_compress < cost_no_compress;
+        should_compress &= e.degree() > 0;
+        if should_compress {
+            let es = self.to_single(e);
+            self.in_var_exprs.push(es);
+        } else {
+            self.in_var_exprs.push(e);
+        }
+    }
+}
+
+fn strip_constants<C: Config>(
+    expr: &Expression<C>,
+) -> (Expression<C>, C::CircuitField, C::CircuitField) {
+    let mut e = Vec::new();
+    let mut cst = C::CircuitField::zero();
+    for term in expr.iter() {
+        if term.vars == VarSpec::Const {
+            cst = term.coef;
+        } else {
+            e.push(term.clone());
+        }
+    }
+    if e.len() == 0 {
+        return (Expression::default(), C::CircuitField::one(), cst);
+    }
+    let v = e[0].coef;
+    let vi = v.inv().unwrap();
+    for term in e.iter_mut() {
+        term.coef = term.coef * vi;
+    }
+    (Expression::from_terms_sorted(e), v, cst)
+}
+
+fn unstrip_constants_single<C: Config>(
+    vid: usize,
+    coef: C::CircuitField,
+    constant: C::CircuitField,
+    mid_var_coef: &MidVarCoef<C>,
+) -> Expression<C> {
+    assert_ne!(vid, 0);
+    // u=k1x+b1, v=k2x+b2
+    // x=(u-b1)*k1inv
+    // v=k2*(u-b1)*k1inv+b2
+    let new_coef = mid_var_coef.kinv * coef;
+    let new_constant = constant - mid_var_coef.b * new_coef;
+    let mut e = vec![Term::new_linear(new_coef, vid)];
+    if !new_constant.is_zero() {
+        e.push(Term::new_const(new_constant));
+    }
+    Expression::from_terms(e)
+}
+
+fn process_circuit<C: Config>(
+    root: &mut RootBuilder<C>,
+    circuit: &InCircuit<C>,
+) -> Result<(OutCircuit<C>, Builder<C>), Error> {
+    let mut builder = Builder::new();
+
+    // initialize in_var_ref_counts
+    for _ in 0..circuit.get_num_inputs_all() {
+        builder.in_var_ref_counts.push(InVarRefCounts::default());
+    }
+    for insn in circuit.instructions.iter() {
+        match insn {
+            InInstruction::LinComb(lc) => {
+                for term in lc.terms.iter() {
+                    builder.in_var_ref_counts[term.var].add += 1;
+                }
+            }
+            InInstruction::Mul(vars) => {
+                for var in vars {
+                    builder.in_var_ref_counts[*var].mul += 1;
+                }
+            }
+            InInstruction::ConstantOrRandom(_) => {}
+            InInstruction::SubCircuitCall { inputs, .. } => {
+                for input in inputs {
+                    builder.in_var_ref_counts[*input].single += 1;
+                }
+            }
+        }
+        for _ in 0..insn.num_outputs() {
+            builder.in_var_ref_counts.push(InVarRefCounts::default());
+        }
+    }
+    for out in circuit.outputs.iter() {
+        builder.in_var_ref_counts[*out].single += 1;
+    }
+    for con in circuit.constraints.iter() {
+        builder.in_var_ref_counts[*con].single += 1;
+    }
+
+    // add inputs
+    builder.add_in_vars(circuit.get_num_inputs_all(), 0);
+
+    // process insns
+    for insn in circuit.instructions.iter() {
+        match insn {
+            InInstruction::LinComb(lc) => {
+                let e = builder.lin_comb(lc);
+                builder.add_and_check_if_should_make_single(e);
+            }
+            InInstruction::Mul(vars) => {
+                let e = builder.mul_vec(vars);
+                builder.add_and_check_if_should_make_single(e);
+            }
+            InInstruction::ConstantOrRandom(coef) => match coef {
+                Coef::Constant(c) => {
+                    builder.add_const(*c);
+                }
+                Coef::Random => {
+                    builder.out_insns.push((
+                        builder.stripped_mid_vars.len(),
+                        OutInstruction::ConstantOrRandom {
+                            value: Coef::Random,
+                        },
+                    ));
+                    builder.add_in_vars(1, 1);
+                }
+            },
+            InInstruction::SubCircuitCall {
+                sub_circuit_id,
+                inputs,
+                num_outputs,
+            } => {
+                let sub_builder = root.builders.get(sub_circuit_id).unwrap();
+                let single_inputs: Vec<usize> = inputs
+                    .iter()
+                    .map(|&var| builder.to_really_single(builder.in_var_exprs[var].clone()))
+                    .collect();
+                let max_input_layer = single_inputs
+                    .iter()
+                    .map(|&var| builder.mid_var_layer[var])
+                    .max()
+                    .unwrap_or(1);
+                builder.out_insns.push((
+                    builder.stripped_mid_vars.len(),
+                    OutInstruction::SubCircuitCall {
+                        sub_circuit_id: *sub_circuit_id,
+                        inputs: single_inputs,
+                        num_outputs: *num_outputs,
+                    },
+                ));
+                builder.add_in_vars(*num_outputs, max_input_layer + sub_builder.output_layer);
+            }
+        }
+    }
+
+    // constraints and outputs
+    let mut constraints: Vec<usize> = Vec::new();
+    for con in circuit.constraints.iter() {
+        let e = builder.in_var_exprs[*con].clone();
+        if let Some(c) = e.constant_value() {
+            if c.is_zero() {
+                continue;
+            }
+            return Err(Error::UserError("constraint is not zero".to_string()));
+        }
+        constraints.push(builder.to_really_single(e));
+    }
+    let outputs: Vec<usize> = circuit
+        .outputs
+        .iter()
+        .map(|&o| builder.to_really_single(builder.in_var_exprs[o].clone()))
+        .collect();
+    builder.output_layer = outputs
+        .iter()
+        .map(|&var| builder.mid_var_layer[var])
+        .max()
+        .unwrap_or(0);
+
+    let mut instructions: Vec<OutInstruction<C>> = Vec::new();
+    let mut oinsn_id = 0;
+    for mid_var_id in circuit.get_num_inputs_all() + 1..builder.stripped_mid_vars.len() {
+        while oinsn_id < builder.out_insns.len() && builder.out_insns[oinsn_id].0 == mid_var_id {
+            instructions.push(builder.out_insns[oinsn_id].1.clone());
+            oinsn_id += 1;
+        }
+        let expr = builder.stripped_mid_vars.get(mid_var_id);
+        let non_iv = *expr == Expression::new_linear(C::CircuitField::one(), mid_var_id);
+        if non_iv {
+            continue;
+        }
+        let e2 = expr.mul_constant(builder.mid_var_coefs[mid_var_id].k);
+        let constant = builder.mid_var_coefs[mid_var_id].b;
+        let e3 = if constant.is_zero() {
+            e2
+        } else {
+            let mut terms = e2.to_terms();
+            terms.push(Term::new_const(constant));
+            Expression::from_terms(terms)
+        };
+        instructions.push(OutInstruction::InternalVariable { expr: e3 });
+    }
+    while oinsn_id < builder.out_insns.len() {
+        instructions.push(builder.out_insns[oinsn_id].1.clone());
+        oinsn_id += 1;
+    }
+
+    Ok((
+        OutCircuit {
+            constraints,
+            outputs,
+            instructions,
+            num_inputs: circuit.num_inputs,
+            num_hint_inputs: circuit.num_hint_inputs,
+        },
+        builder,
+    ))
+}
+
+pub fn process<C: Config>(rc: &InRootCircuit<C>) -> Result<OutRootCircuit<C>, Error> {
+    let mut root: RootBuilder<C> = RootBuilder {
+        builders: HashMap::new(),
+        out_circuits: HashMap::new(),
+    };
+    let order = rc.topo_order();
+    for &circuit_id in order.iter().rev() {
+        let (new_circuit, final_builder) =
+            process_circuit(&mut root, rc.circuits.get(&circuit_id).unwrap())?;
+        root.out_circuits.insert(circuit_id, new_circuit);
+        root.builders.insert(circuit_id, final_builder);
+    }
+    Ok(OutRootCircuit {
+        circuits: root.out_circuits,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::vec;
+
+    use crate::field::Field;
+    use crate::{
+        circuit::{
+            config::{Config, M31Config as C},
+            ir::{
+                self,
+                common::rand_gen::*,
+                expr::{Expression, Term},
+            },
+        },
+        utils::error::Error,
+    };
+
+    type CField = <C as Config>::CircuitField;
+
+    #[test]
+    fn simple_add() {
+        let mut root = super::InRootCircuit::<C>::default();
+        root.circuits.insert(
+            0,
+            super::InCircuit::<C> {
+                instructions: vec![ir::hint_less::Instruction::LinComb(ir::expr::LinComb {
+                    terms: vec![
+                        ir::expr::LinCombTerm {
+                            coef: CField::one(),
+                            var: 1,
+                        },
+                        ir::expr::LinCombTerm {
+                            coef: CField::from(2),
+                            var: 2,
+                        },
+                    ],
+                    constant: CField::from(3),
+                })],
+                constraints: vec![3],
+                outputs: vec![],
+                num_inputs: 2,
+                num_hint_inputs: 0,
+            },
+        );
+        assert_eq!(root.validate(), Ok(()));
+        let root_processed = super::process(&root).unwrap();
+        assert_eq!(root_processed.validate(), Ok(()));
+        let c0 = &root_processed.circuits[&0];
+        assert_eq!(
+            c0.instructions[0],
+            ir::dest::Instruction::InternalVariable {
+                expr: Expression::from_terms(vec![
+                    Term::new_linear(CField::one(), 1),
+                    Term::new_linear(CField::from(2), 2),
+                    Term::new_const(CField::from(3))
+                ])
+            }
+        );
+        assert_eq!(c0.constraints, vec![3]);
+    }
+
+    #[test]
+    fn simple_mul() {
+        let mut root = super::InRootCircuit::<C>::default();
+        root.circuits.insert(
+            0,
+            super::InCircuit::<C> {
+                instructions: vec![ir::hint_less::Instruction::Mul(vec![1, 2, 3, 4])],
+                constraints: vec![5],
+                outputs: vec![5],
+                num_inputs: 4,
+                num_hint_inputs: 0,
+            },
+        );
+        assert_eq!(root.validate(), Ok(()));
+        let root_processed = super::process(&root).unwrap();
+        assert_eq!(root_processed.validate(), Ok(()));
+        let root_fin = root_processed.adjust_for_layering();
+        assert_eq!(root_fin.validate(), Ok(()));
+        let (out, _) = root_fin.eval_unsafe(vec![
+            CField::from(2),
+            CField::from(3),
+            CField::from(5),
+            CField::from(7),
+        ]);
+        assert_eq!(out, vec![CField::from(2 * 3 * 5 * 7)]);
+    }
+
+    #[test]
+    fn random_circuits_1() {
+        let mut config = RandomCircuitConfig {
+            seed: 0,
+            num_circuits: RandomRange { min: 1, max: 10 },
+            num_inputs: RandomRange { min: 1, max: 10 },
+            num_hint_inputs: RandomRange { min: 0, max: 10 },
+            num_instructions: RandomRange { min: 1, max: 10 },
+            num_constraints: RandomRange { min: 0, max: 10 },
+            num_outputs: RandomRange { min: 1, max: 10 },
+            num_terms: RandomRange { min: 1, max: 5 },
+            sub_circuit_prob: 0.5,
+        };
+        for i in 0..3000 {
+            config.seed = i + 100000;
+            let root = super::InRootCircuit::<C>::random(&config);
+            assert_eq!(root.validate(), Ok(()));
+            match super::process(&root) {
+                Ok(root_processed) => {
+                    assert_eq!(root_processed.validate(), Ok(()));
+                    assert_eq!(root.input_size(), root_processed.input_size());
+                    for _ in 0..5 {
+                        let inputs: Vec<CField> = (0..root.input_size())
+                            .map(|_| CField::random_unsafe())
+                            .collect();
+                        let e1 = root.eval_unsafe_with_errors(inputs.clone());
+                        let e2 = root_processed.eval_unsafe_with_errors(inputs);
+                        if e1.is_ok() {
+                            assert_eq!(e2, e1);
+                        }
+                    }
+                }
+                Err(e) => match e {
+                    Error::UserError(_) => {}
+                    Error::InternalError(e) => {
+                        panic!("{:?}", e);
+                    }
+                },
+            }
+        }
+    }
+
+    #[test]
+    fn random_circuits_2() {
+        let mut config = RandomCircuitConfig {
+            seed: 0,
+            num_circuits: RandomRange { min: 1, max: 20 },
+            num_inputs: RandomRange { min: 1, max: 3 },
+            num_hint_inputs: RandomRange { min: 0, max: 2 },
+            num_instructions: RandomRange { min: 30, max: 50 },
+            num_constraints: RandomRange { min: 0, max: 5 },
+            num_outputs: RandomRange { min: 1, max: 3 },
+            num_terms: RandomRange { min: 1, max: 5 },
+            sub_circuit_prob: 0.05,
+        };
+        for i in 0..1000 {
+            config.seed = i + 200000;
+            let root = super::InRootCircuit::<C>::random(&config);
+            assert_eq!(root.validate(), Ok(()));
+            match super::process(&root) {
+                Ok(root_processed) => {
+                    assert_eq!(root_processed.validate(), Ok(()));
+                    assert_eq!(root.input_size(), root_processed.input_size());
+                    for _ in 0..5 {
+                        let inputs: Vec<CField> = (0..root.input_size())
+                            .map(|_| CField::random_unsafe())
+                            .collect();
+                        let e1 = root.eval_unsafe_with_errors(inputs.clone());
+                        let e2 = root_processed.eval_unsafe_with_errors(inputs);
+                        if e1.is_ok() {
+                            assert_eq!(e2, e1);
+                        }
+                    }
+                }
+                Err(e) => match e {
+                    Error::UserError(_) => {}
+                    Error::InternalError(e) => {
+                        panic!("{:?}", e);
+                    }
+                },
+            }
+        }
+    }
+}
