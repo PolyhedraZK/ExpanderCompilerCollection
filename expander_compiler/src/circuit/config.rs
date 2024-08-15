@@ -6,6 +6,12 @@ pub trait Config: Default + Clone + Ord + Debug + Hash + Copy + 'static {
     type CircuitField: Field;
 
     const CONFIG_ID: usize;
+
+    const COST_INPUT: usize = 100;
+    const COST_VARIABLE: usize = 100;
+    const COST_MUL: usize = 10;
+    const COST_ADD: usize = 3;
+    const COST_CONST: usize = 3;
 }
 
 #[derive(Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]

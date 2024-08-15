@@ -95,7 +95,7 @@ pub fn compile<C: Config>(
         (r, im)
     });
 
-    let r_dest_relaxed = builder::final_build::process(&r_hint_less_opt)
+    let r_dest_relaxed = builder::final_build_opt::process(&r_hint_less_opt)
         .map_err(|e| e.prepend("final build failed"))?;
     r_dest_relaxed
         .validate()
@@ -110,7 +110,7 @@ pub fn compile<C: Config>(
     let r_dest = r_dest_relaxed_opt.adjust_for_layering();
     r_dest
         .validate()
-        .map_err(|e| e.prepend("layering circuit invalid"))?;
+        .map_err(|e| e.prepend("dest ir circuit invalid"))?;
 
     let r_dest_opt = optimize_until_fixed_point(&r_dest, &mut hl_im, |r| {
         let (mut r, im) = r.remove_unreachable();
@@ -133,7 +133,8 @@ pub fn compile<C: Config>(
     print_stat("numVariables", lc_stats.num_total_gates, false);
     print_stat("numAdd", lc_stats.num_expanded_add, false);
     print_stat("numCst", lc_stats.num_expanded_cst, false);
-    print_stat("numMul", lc_stats.num_expanded_mul, true);
+    print_stat("numMul", lc_stats.num_expanded_mul, false);
+    print_stat("totalCost", lc_stats.total_cost, true);
 
     hl_im.compose_in_place(&dest_im);
 

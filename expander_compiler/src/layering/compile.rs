@@ -3,8 +3,8 @@ use std::collections::HashSet;
 
 use crate::circuit::{
     config::Config,
-    ir::expr::Expression,
     ir::dest::{Circuit as IrCircuit, Instruction, RootCircuit as IrRootCircuit},
+    ir::expr::Expression,
     layered::{Coef, Segment},
 };
 use crate::utils::pool::Pool;
@@ -74,7 +74,7 @@ pub struct IrContext<'a, C: Config> {
     pub lc_hint: LayerLayoutContext, // hint relayer
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct CombinedConstraint {
     // id of this combined variable
     pub id: usize,
@@ -348,6 +348,9 @@ impl<'a, C: Config> CompileContext<'a, C> {
         }
         for i in 0..ic.sub_circuit_insn_ids.len() {
             let sub_circuit = &self.circuits[&ic.sub_circuit_insn_refs[i].sub_circuit_id];
+            ic.output_layer = ic
+                .output_layer
+                .max(ic.sub_circuit_start_layer[i] + sub_circuit.output_layer);
             for (j, x) in sub_circuit.combined_constraints.iter().enumerate() {
                 if let Some(_) = x {
                     let sl = j + ic.sub_circuit_start_layer[i] + 1;
@@ -427,7 +430,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
         }
 
         // if (the output includes partial output of a sub circuit or the sub circuit has constraints),
-        // and the sub circuit also ends at the output layer, we have to increate output layer
+        // and the sub circuit also ends at the output layer, we have to increase output layer
         'check_next_circuit: for i in 0..ic.sub_circuit_insn_ids.len() {
             let mut count = 0;
             for y in out_edges[nv + nhs + i].iter().cloned() {

@@ -74,10 +74,10 @@ pub enum ConstraintStatus {
     Asserted,
 }
 
-struct LinMeta {
-    l_id: usize,
-    t_id: usize,
-    vars: VarSpec,
+pub struct LinMeta {
+    pub l_id: usize,
+    pub t_id: usize,
+    pub vars: VarSpec,
 }
 
 impl PartialEq for LinMeta {
@@ -177,13 +177,17 @@ impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
         if !lcs.constant.is_zero() {
             vars.push(&cst);
         }
-        let expr = lin_comb_inner(&vars, |i| {
-            if i < lcs.terms.len() {
-                lcs.terms[i].coef
-            } else {
-                C::CircuitField::one()
-            }
-        });
+        let expr = lin_comb_inner(
+            vars,
+            |i| {
+                if i < lcs.terms.len() {
+                    lcs.terms[i].coef
+                } else {
+                    C::CircuitField::one()
+                }
+            },
+            &mut self.mid_vars,
+        );
         self.out_var_exprs.push(expr);
         self.fix_mid_to_out(1);
     }
@@ -430,9 +434,13 @@ fn unstrip_constants_single<C: Config>(
     Expression::from_terms(e)
 }
 
+const COMPRESS_THRESHOLD_ADD: usize = 10;
+const COMPRESS_THRESHOLD_MUL: usize = 40;
+
 fn lin_comb_inner<C: Config, F: Fn(usize) -> C::CircuitField>(
-    vars: &Vec<&Expression<C>>,
+    vars: Vec<&Expression<C>>,
     var_coef: F,
+    mid_vars: &mut Pool<Expression<C>>,
 ) -> Expression<C> {
     if vars.len() == 0 {
         return Expression::default();
@@ -441,8 +449,20 @@ fn lin_comb_inner<C: Config, F: Fn(usize) -> C::CircuitField>(
         return vars[0].mul_constant(var_coef(0));
     }
     let mut heap: BinaryHeap<LinMeta> = BinaryHeap::new();
-    for (l_id, v) in vars.iter().enumerate() {
+    let mut compressed_vars: Vec<Option<Expression<C>>> = vec![None; vars.len()];
+    for l_id in 0..vars.len() {
         if var_coef(l_id).is_zero() {
+            continue;
+        }
+        let v = vars[l_id];
+        if v.len() > COMPRESS_THRESHOLD_ADD {
+            let nv = to_single(mid_vars, v);
+            heap.push(LinMeta {
+                l_id: l_id + vars.len(),
+                t_id: 0,
+                vars: nv[0].vars,
+            });
+            compressed_vars[l_id] = Some(nv);
             continue;
         }
         heap.push(LinMeta {
@@ -455,15 +475,20 @@ fn lin_comb_inner<C: Config, F: Fn(usize) -> C::CircuitField>(
     while let Some(lm) = heap.peek() {
         let l_id = lm.l_id;
         let t_id = lm.t_id;
-        if t_id == vars[l_id].len() - 1 {
+        let var = if l_id < vars.len() {
+            vars[l_id]
+        } else {
+            compressed_vars[l_id - vars.len()].as_ref().unwrap()
+        };
+        if t_id == var.len() - 1 {
             heap.pop();
         } else {
             let mut lm = heap.peek_mut().unwrap();
             lm.t_id = t_id + 1;
-            lm.vars = vars[l_id][t_id + 1].vars;
+            lm.vars = var[t_id + 1].vars;
         }
-        let t = &vars[l_id][t_id];
-        let new_coef = t.coef * var_coef(l_id);
+        let t = &var[t_id];
+        let new_coef = t.coef * var_coef(l_id % vars.len());
         if new_coef.is_zero() {
             continue;
         }
@@ -511,9 +536,20 @@ fn mul_two_expr<C: Config>(
     } else {
         b
     };
-    // TODO: should compress strategy be implemented here?
     if v1.len() > v2.len() {
         std::mem::swap(&mut v1, &mut v2);
+    }
+    // force compression to avoid too large expressions
+    let mut _v1_st2 = None;
+    let mut _v2_st2 = None;
+    if v1.len() > COMPRESS_THRESHOLD_MUL {
+        _v1_st2 = Some(to_single(mid_vars, v1));
+        _v2_st2 = Some(to_single(mid_vars, v2));
+        v1 = _v1_st2.as_ref().unwrap();
+        v2 = _v2_st2.as_ref().unwrap();
+    } else if v1.len() * v2.len() > COMPRESS_THRESHOLD_MUL {
+        _v2_st2 = Some(to_single(mid_vars, v2));
+        v2 = _v2_st2.as_ref().unwrap();
     }
     let mut vars: Vec<Expression<C>> = Vec::new();
     for x1 in v1.iter() {
@@ -521,7 +557,7 @@ fn mul_two_expr<C: Config>(
             v2.iter().map(|x2| x1.mul(x2)).collect(),
         ));
     }
-    lin_comb_inner(&vars.iter().collect(), |_| C::CircuitField::one())
+    lin_comb_inner(vars.iter().collect(), |_| C::CircuitField::one(), mid_vars)
 }
 
 pub fn process_circuit<

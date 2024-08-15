@@ -82,5 +82,5 @@ fn test_bn254() {
 
 #[test]
 fn test_gf2() {
-    do_tests::<GF2Config>(2000000);
+    do_tests::<GF2Config>(3000000);
 }

@@ -237,6 +237,17 @@ impl<C: Config> Expression<C> {
             0
         }
     }
+    pub fn count_of_degrees(&self) -> [usize; 3] {
+        let mut res = [0; 3];
+        for term in self.iter() {
+            match term.vars {
+                VarSpec::Const => res[0] += 1,
+                VarSpec::Linear(_) => res[1] += 1,
+                VarSpec::Quad(_, _) => res[2] += 1,
+            }
+        }
+        res
+    }
     pub fn constant_value(&self) -> Option<C::CircuitField> {
         if self.terms.len() == 1 && self.terms[0].vars == VarSpec::Const {
             Some(self.terms[0].coef)
@@ -256,6 +267,9 @@ impl<C: Config> Expression<C> {
                 })
                 .collect(),
         )
+    }
+    pub fn to_terms(self) -> Vec<Term<C>> {
+        self.terms
     }
 }
 

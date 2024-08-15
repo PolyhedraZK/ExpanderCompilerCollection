@@ -21,6 +21,8 @@ pub struct Stats {
     pub num_total_gates: usize,
     // number of actually used gates used in the final circuit
     pub num_used_gates: usize,
+    // total cost according to some formula
+    pub total_cost: usize,
 }
 
 struct CircuitStats {
@@ -44,6 +46,7 @@ impl<C: Config> Circuit<C> {
             num_expanded_cst: 0,
             num_total_gates: 0,
             num_used_gates: 0,
+            total_cost: 0,
         };
         for i in 0..self.segments.len() {
             let num_self_mul = self.segments[i].gate_muls.len();
@@ -85,6 +88,11 @@ impl<C: Config> Circuit<C> {
                 ar.num_inputs += 1;
             }
         }
+        ar.total_cost = self.segments[self.layer_ids[0]].num_inputs * C::COST_INPUT;
+        ar.total_cost += ar.num_total_gates * C::COST_VARIABLE;
+        ar.total_cost += ar.num_expanded_mul * C::COST_MUL;
+        ar.total_cost += ar.num_expanded_add * C::COST_ADD;
+        ar.total_cost += ar.num_expanded_cst * C::COST_CONST;
         ar
     }
 }
