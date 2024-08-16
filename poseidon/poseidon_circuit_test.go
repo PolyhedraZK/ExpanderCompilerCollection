@@ -1,71 +1,71 @@
 package poseidon
 
 import (
-	"fmt"
 	"testing"
 
+	"github.com/PolyhedraZK/ExpanderCompilerCollection"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/field/m31"
-	"github.com/consensys/gnark-crypto/ecc"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/test"
 	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/frontend"
-	"github.com/consensys/gnark/frontend/cs/r1cs"
-	"github.com/consensys/gnark/test"
 )
 
 type MockPoseidonCircuit struct {
-	State  []frontend.Variable `gnark:",public"`
-	Output frontend.Variable   `gnark:",public"`
+	State  [16]frontend.Variable `gnark:",public"`
+	Output frontend.Variable     `gnark:",public"`
 }
 
 func (c *MockPoseidonCircuit) Define(api frontend.API) (err error) {
-	// Define the circuit
 	param := NewPoseidonParams()
 	engine := m31.Field{}
-	t := PoseidonCircuit(api, engine, param, c.State, false)
+	t := PoseidonCircuit(api, engine, param, c.State[:], false)
 	api.AssertIsEqual(t, c.Output)
 
 	return
 }
 
 func TestPoseidonCircuit(t *testing.T) {
-	assert := test.NewAssert(t)
-
 	param := NewPoseidonParams()
 
-	state := make([]constraint.Element, 16)
-	stateVar := make([]frontend.Variable, 16)
-	var internalStateVars PoseidonInternalStateVar
-
-	for i := 0; i < 16; i++ {
-		state[i] = constraint.Element{uint64(i)}
-		stateVar[i] = frontend.Variable(uint64(i))
-	}
-	internalState, output := PoseidonM31WithInternalStates(param, state, true)
-	outputVar := frontend.Variable(output[0])
-
-	fmt.Println("internal state", internalState)
+	var states [16]constraint.Element
+	var stateVars [16]frontend.Variable
+	var outputVar frontend.Variable
 
 	for j := 0; j < 16; j++ {
-		internalStateVars.AfterHalfFullRound[j] = frontend.Variable(internalState.AfterHalfFullRound[j][0])
-		internalStateVars.AfterHalfPartialRound[j] = frontend.Variable(internalState.AfterHalfPartialRound[j][0])
-		internalStateVars.AfterPartialRound[j] = frontend.Variable(internalState.AfterPartialRound[j][0])
+		states[j] = constraint.Element{uint64(j)}
+		stateVars[j] = frontend.Variable(uint64(j))
+	}
+	output := PoseidonM31(param, states[:])
+	outputVar = frontend.Variable(output[0])
+
+	assignment := &MockPoseidonCircuit{
+		State:  stateVars,
+		Output: outputVar,
 	}
 
-	c := MockPoseidonCircuit{
-		stateVar,
-		outputVar,
+	// Gnark test disabled as it does not support randomness and custom gates
+	// err := test.IsSolved(&MockPoseidonCircuit{}, assignment, m31.ScalarField)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// fmt.Println("Gnark test passed")
+
+	// Ecc test
+	circuit, err := ExpanderCompilerCollection.Compile(m31.ScalarField, &MockPoseidonCircuit{}, frontend.WithCompressThreshold(32))
+	if err != nil {
+		panic(err)
 	}
 
-	w, _ := frontend.NewWitness(&c, m31.ScalarField)
-	fmt.Println("witness", w)
+	layered_circuit := circuit.GetLayeredCircuit()
+	// circuit.GetCircuitIr().Print()
 
-	err := test.IsSolved(&c, &c, m31.ScalarField)
-	assert.NoError(err)
+	inputSolver := circuit.GetInputSolver()
+	witness, err := inputSolver.SolveInputAuto(assignment)
+	if err != nil {
+		panic(err)
+	}
 
-	r1cs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &c)
-	assert.NoError(err)
-	fmt.Println("num constraints:", r1cs.GetNbConstraints())
-	fmt.Println("num coefficients:", r1cs.GetNbCoefficients())
-	i, p, s := r1cs.GetNbVariables()
-	fmt.Println("num variables:", i, p, s)
+	if !test.CheckCircuit(layered_circuit, witness) {
+		panic("verification failed")
+	}
 }
