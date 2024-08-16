@@ -1,5 +1,7 @@
 package poseidon
 
+import "math/rand"
+
 type PoseidonParams struct {
 	// number of full rounds
 	NumFullRounds int
@@ -21,6 +23,8 @@ type PoseidonParams struct {
 
 // TODOs: the parameters are not secure. use a better way to generate the constants
 func NewPoseidonParams() *PoseidonParams {
+	r := rand.New(rand.NewSource(42))
+
 	num_full_rounds := 8
 	num_part_rounds := 14
 	num_states := 16
@@ -31,13 +35,13 @@ func NewPoseidonParams() *PoseidonParams {
 		external_round_constant[i] = make([]uint32, num_full_rounds)
 
 		for j := 0; j < num_full_rounds; j++ {
-			external_round_constant[i][j] = 1234
+			external_round_constant[i][j] = randomM31(r)
 		}
 	}
 
 	internal_round_constant := make([]uint32, num_part_rounds)
 	for i := 0; i < num_part_rounds; i++ {
-		internal_round_constant[i] = 1234
+		internal_round_constant[i] = randomM31(r)
 	}
 
 	mds := make([][]uint32, num_states)
@@ -58,4 +62,14 @@ func NewPoseidonParams() *PoseidonParams {
 		ExternalRoundConstant: external_round_constant,
 		InternalRoundConstant: internal_round_constant,
 	}
+}
+
+func randomM31(r *rand.Rand) uint32 {
+	t := r.Uint32() & 0x7FFFFFFF
+
+	for t == 0x7fffffff {
+		t = rand.Uint32() & 0x7FFFFFFF
+	}
+
+	return t
 }
