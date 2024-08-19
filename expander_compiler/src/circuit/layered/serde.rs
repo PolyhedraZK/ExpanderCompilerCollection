@@ -82,6 +82,7 @@ impl<C: Config> Serde for Segment<C> {
         self.gate_muls.serialize_into(&mut writer)?;
         self.gate_adds.serialize_into(&mut writer)?;
         self.gate_consts.serialize_into(&mut writer)?;
+        0usize.serialize_into(&mut writer)?;
         let mut random_coef_idx = Vec::new();
         for (i, x) in self.gate_muls.iter().enumerate() {
             if x.coef == Coef::Random {
@@ -108,6 +109,7 @@ impl<C: Config> Serde for Segment<C> {
         let mut gate_muls = Vec::<GateMul<C>>::deserialize_from(&mut reader)?;
         let mut gate_adds = Vec::<GateAdd<C>>::deserialize_from(&mut reader)?;
         let mut gate_consts = Vec::<GateConst<C>>::deserialize_from(&mut reader)?;
+        let _ = usize::deserialize_from(&mut reader)?;
         let random_coef_idx = Vec::<usize>::deserialize_from(&mut reader)?;
         for i in random_coef_idx {
             if i < gate_muls.len() {
@@ -129,7 +131,7 @@ impl<C: Config> Serde for Segment<C> {
     }
 }
 
-const MAGIC: usize = 3842777012604389699;
+const MAGIC: usize = 3770719418566461763;
 
 impl<C: Config> Serde for Circuit<C> {
     fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {

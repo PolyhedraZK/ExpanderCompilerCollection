@@ -13,6 +13,7 @@ use crate::{
     },
 };
 
+pub mod display;
 pub mod opt;
 pub mod serde;
 pub mod stats;

@@ -14,6 +14,8 @@ use super::{
 #[cfg(test)]
 pub mod tests;
 
+pub mod display;
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Instruction<C: Config> {
     InternalVariable {
@@ -151,7 +153,7 @@ pub type CircuitRelaxed<C> = common::Circuit<IrcRelaxed<C>>;
 pub type RootCircuitRelaxed<C> = common::RootCircuit<IrcRelaxed<C>>;
 
 impl<C: Config> CircuitRelaxed<C> {
-    fn adjust_for_layering(&self) -> Circuit<C> {
+    fn solve_duplicates(&self) -> Circuit<C> {
         let mut new_id = vec![0];
         let mut new_instructions: Vec<Instruction<C>> = Vec::new();
         let mut insn_of_var = vec![None];
@@ -225,16 +227,98 @@ impl<C: Config> CircuitRelaxed<C> {
             num_hint_inputs: self.num_hint_inputs,
         }
     }
+
+    fn export_constraints(
+        &self,
+        is_root: bool,
+        sub_num_add_outputs: &HashMap<usize, usize>,
+    ) -> (Self, usize) {
+        let mut new_id: Vec<usize> = vec![0; self.get_num_inputs_all() + 1];
+        let mut instructions = Vec::new();
+        let mut new_var_max = self.get_num_inputs_all();
+        let mut add_outputs_sub = Vec::new();
+        for i in 1..=self.get_num_inputs_all() {
+            new_id[i] = i;
+        }
+        for insn in self.instructions.iter() {
+            for _ in 0..insn.num_outputs() {
+                new_var_max += 1;
+                new_id.push(new_var_max);
+            }
+            let new_insn = match insn.replace_vars(|x| new_id[x]) {
+                Instruction::SubCircuitCall {
+                    sub_circuit_id,
+                    inputs,
+                    num_outputs,
+                } => {
+                    let sub_hi = sub_num_add_outputs[&sub_circuit_id];
+                    for _ in 0..sub_hi {
+                        new_var_max += 1;
+                        add_outputs_sub.push(new_var_max);
+                    }
+                    Instruction::SubCircuitCall {
+                        sub_circuit_id,
+                        inputs,
+                        num_outputs: num_outputs + sub_hi,
+                    }
+                }
+                Instruction::InternalVariable { expr } => Instruction::InternalVariable { expr },
+                Instruction::ConstantOrRandom { value } => Instruction::ConstantOrRandom { value },
+            };
+            instructions.push(new_insn);
+        }
+        let mut add_outputs: Vec<usize> = self.constraints.iter().map(|&x| new_id[x]).collect();
+        let mut outputs: Vec<usize> = if is_root {
+            vec![]
+        } else {
+            self.outputs.iter().map(|x| new_id[*x]).collect()
+        };
+        let add = add_outputs.len() + add_outputs_sub.len();
+        outputs.append(&mut add_outputs);
+        outputs.append(&mut add_outputs_sub);
+        (
+            CircuitRelaxed {
+                num_inputs: self.num_inputs,
+                num_hint_inputs: self.num_hint_inputs,
+                instructions,
+                constraints: if is_root { vec![outputs[0]] } else { vec![] },
+                outputs,
+            },
+            add,
+        )
+    }
 }
 
 impl<C: Config> RootCircuitRelaxed<C> {
     pub fn adjust_for_layering(&self) -> RootCircuit<C> {
+        if !C::ENABLE_RANDOM_COMBINATION {
+            return self.export_constraints().solve_duplicates();
+        }
+        self.solve_duplicates()
+    }
+
+    fn solve_duplicates(&self) -> RootCircuit<C> {
         let mut new_circuits = HashMap::new();
         for (id, circuit) in self.circuits.iter() {
-            new_circuits.insert(*id, circuit.adjust_for_layering());
+            new_circuits.insert(*id, circuit.solve_duplicates());
         }
         RootCircuit {
             circuits: new_circuits,
+        }
+    }
+
+    fn export_constraints(&self) -> RootCircuitRelaxed<C> {
+        let mut exported_circuits = HashMap::new();
+        let mut sub_num_add_outputs = HashMap::new();
+        let order = self.topo_order();
+        for id in order.iter().rev() {
+            let circuit = self.circuits.get(id).unwrap();
+            let (c, add) = circuit.export_constraints(*id == 0, &sub_num_add_outputs);
+            exported_circuits.insert(*id, c);
+            sub_num_add_outputs.insert(*id, add);
+        }
+        RootCircuitRelaxed {
+            circuits: exported_circuits,
         }
     }
 }

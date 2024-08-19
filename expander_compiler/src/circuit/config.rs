@@ -7,11 +7,13 @@ pub trait Config: Default + Clone + Ord + Debug + Hash + Copy + 'static {
 
     const CONFIG_ID: usize;
 
-    const COST_INPUT: usize = 100;
+    const COST_INPUT: usize = 1000;
     const COST_VARIABLE: usize = 100;
     const COST_MUL: usize = 10;
     const COST_ADD: usize = 3;
     const COST_CONST: usize = 3;
+
+    const ENABLE_RANDOM_COMBINATION: bool = true;
 }
 
 #[derive(Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -39,4 +41,6 @@ impl Config for GF2Config {
     type CircuitField = crate::field::gf2::GF2;
 
     const CONFIG_ID: usize = 3;
+
+    const ENABLE_RANDOM_COMBINATION: bool = false;
 }

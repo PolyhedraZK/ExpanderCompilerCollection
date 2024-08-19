@@ -3,7 +3,7 @@ use std::collections::{BinaryHeap, HashMap};
 use crate::{
     circuit::{
         config::Config,
-        costs::{cost_of_compress, cost_of_multiply, cost_of_possible_references},
+        costs::{cost_of_compress, cost_of_multiply, cost_of_possible_references, cost_of_relay},
         ir::{
             common::Instruction,
             dest::{
@@ -117,7 +117,7 @@ impl<C: Config> Builder<C> {
     fn to_single(&mut self, expr: Expression<C>) -> Expression<C> {
         let (e, coef, constant) = strip_constants(&expr);
         if e.len() == 1 && e.degree() <= 1 {
-            return expr.clone();
+            return expr;
         }
         let idx = self.stripped_mid_vars.add(&e);
         if idx == self.mid_var_coefs.len() {
@@ -130,6 +130,19 @@ impl<C: Config> Builder<C> {
             return Expression::new_linear(C::CircuitField::one(), idx);
         }
         return unstrip_constants_single(idx, coef, constant, &self.mid_var_coefs[idx]);
+    }
+
+    fn try_to_single(&self, expr: Expression<C>) -> Expression<C> {
+        let (e, coef, constant) = strip_constants(&expr);
+        if e.len() == 1 && e.degree() <= 1 {
+            return expr;
+        }
+        match self.stripped_mid_vars.try_get_idx(&e) {
+            Some(idx) => {
+                return unstrip_constants_single(idx, coef, constant, &self.mid_var_coefs[idx]);
+            }
+            None => expr,
+        }
     }
 
     fn to_really_single(&mut self, e: Expression<C>) -> usize {
@@ -153,13 +166,16 @@ impl<C: Config> Builder<C> {
         if coef == self.mid_var_coefs[idx].k && constant == self.mid_var_coefs[idx].b {
             return idx;
         }
+        let e = self.to_single(e);
         let idx = self.stripped_mid_vars.add(&e);
-        self.mid_var_coefs.push(MidVarCoef {
-            k: C::CircuitField::one(),
-            kinv: C::CircuitField::one(),
-            b: C::CircuitField::zero(),
-        });
-        self.mid_var_layer.push(self.layer_of_expr(&e) + 1);
+        if idx == self.mid_var_coefs.len() {
+            self.mid_var_coefs.push(MidVarCoef {
+                k: C::CircuitField::one(),
+                kinv: C::CircuitField::one(),
+                b: C::CircuitField::zero(),
+            });
+            self.mid_var_layer.push(self.layer_of_expr(&e) + 1);
+        }
         idx
     }
 
@@ -198,14 +214,15 @@ impl<C: Config> Builder<C> {
 
     fn lin_comb_inner<F: Fn(usize) -> C::CircuitField>(
         &mut self,
-        vars: Vec<Expression<C>>,
+        mut vars: Vec<Expression<C>>,
         var_coef: F,
     ) -> Expression<C> {
         if vars.len() == 0 {
             return Expression::default();
         }
+        let vars: Vec<Expression<C>> = vars.drain(..).map(|e| self.try_to_single(e)).collect();
         if vars.len() == 1 {
-            return vars[0].mul_constant(var_coef(0));
+            return self.layered_add(vars[0].mul_constant(var_coef(0)).to_terms());
         }
         let mut heap: BinaryHeap<LinMeta> = BinaryHeap::new();
         for l_id in 0..vars.len() {
@@ -255,7 +272,20 @@ impl<C: Config> Builder<C> {
 
     fn layered_add(&mut self, mut terms: Vec<Term<C>>) -> Expression<C> {
         if terms.len() <= 1 {
-            return Expression::from_terms(terms);
+            return Expression::from_terms_sorted(terms);
+        }
+        let min_layer = terms
+            .iter()
+            .map(|term| self.layer_of_varspec(&term.vars))
+            .min()
+            .unwrap();
+        let max_layer = terms
+            .iter()
+            .map(|term| self.layer_of_varspec(&term.vars))
+            .max()
+            .unwrap();
+        if min_layer == max_layer {
+            return Expression::from_terms_sorted(terms);
         }
         terms.sort_by(|a, b| {
             let la = self.layer_of_varspec(&a.vars);
@@ -281,8 +311,10 @@ impl<C: Config> Builder<C> {
 
     fn mul_vec(&mut self, vars: &Vec<usize>) -> Expression<C> {
         assert!(vars.len() >= 2);
-        let mut exprs: Vec<Expression<C>> =
-            vars.iter().map(|&v| self.in_var_exprs[v].clone()).collect();
+        let mut exprs: Vec<Expression<C>> = vars
+            .iter()
+            .map(|&v| self.try_to_single(self.in_var_exprs[v].clone()))
+            .collect();
         while exprs.len() > 1 {
             let mut exprs_pos: Vec<usize> = (0..exprs.len()).collect();
             exprs_pos.sort_by(|a, b| {
@@ -335,20 +367,38 @@ impl<C: Config> Builder<C> {
             let dcnt2 = expr2.count_of_degrees();
             assert!(dcnt1[2] == 0);
             assert!(dcnt2[2] == 0);
-            let cost_direct = cost_of_multiply::<C>(dcnt1[0], dcnt1[1], dcnt2[0], dcnt2[1]);
-            let cost_compress_v1 =
+            let v1layer = self.layer_of_expr(&expr1);
+            let v2layer = self.layer_of_expr(&expr2);
+            let mut cost_direct = cost_of_multiply::<C>(dcnt1[0], dcnt1[1], dcnt2[0], dcnt2[1]);
+            let mut cost_compress_v1 =
                 cost_of_multiply::<C>(0, 1, dcnt2[0], dcnt2[1]) + cost_of_compress::<C>(&dcnt1);
-            let cost_compress_v2 =
+            let mut cost_compress_v2 =
                 cost_of_multiply::<C>(dcnt1[0], dcnt1[1], 0, 1) + cost_of_compress::<C>(&dcnt2);
             let cost_compress_both = cost_of_multiply::<C>(0, 1, 0, 1)
                 + cost_of_compress::<C>(&dcnt1)
                 + cost_of_compress::<C>(&dcnt2);
-            if cost_compress_v1
-                .min(cost_compress_v2)
-                .min(cost_compress_both)
-                < cost_direct
-            {
-                if cost_compress_v1 < cost_compress_v2.max(cost_compress_both) {
+            let (compress_some, compress_1) = if v1layer == v2layer {
+                (
+                    cost_compress_v1
+                        .min(cost_compress_v2)
+                        .min(cost_compress_both)
+                        < cost_direct,
+                    cost_compress_v1 < cost_compress_v2.min(cost_compress_both),
+                )
+            } else {
+                cost_direct += cost_of_relay::<C>(v1layer, v2layer);
+                cost_compress_v1 += cost_of_relay::<C>(v1layer + 1, v2layer);
+                cost_compress_v2 += cost_of_relay::<C>(v1layer, v2layer + 1);
+                if cost_compress_v1 < cost_direct {
+                    (expr1.len() > 2, true)
+                } else if cost_compress_v2 < cost_direct {
+                    (expr2.len() > 2, false)
+                } else {
+                    (false, false)
+                }
+            };
+            if compress_some {
+                if compress_1 {
                     exprs.push(self.to_single(expr1));
                     exprs.push(expr2);
                 } else {
@@ -378,7 +428,9 @@ impl<C: Config> Builder<C> {
             + cost_of_possible_references::<C>(&[0, 1, 0], ref_count.add, ref_count.mul);
         should_compress |= cost_compress < cost_no_compress;
         should_compress &= e.degree() > 0;
-        if should_compress {
+        if should_compress && false {
+            // Currently, this don't consider the cost of relay, so it's disabled
+            // TODO: fix this
             let es = self.to_single(e);
             self.in_var_exprs.push(es);
         } else {
@@ -710,6 +762,7 @@ mod tests {
             config.seed = i + 100000;
             let root = super::InRootCircuit::<C>::random(&config);
             assert_eq!(root.validate(), Ok(()));
+            let (root, _) = root.remove_unreachable();
             match super::process(&root) {
                 Ok(root_processed) => {
                     assert_eq!(root_processed.validate(), Ok(()));
