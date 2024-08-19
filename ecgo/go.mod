@@ -3,7 +3,7 @@ module github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo
 go 1.21.6
 
 require (
-	github.com/PolyhedraZK/ExpanderCompilerCollection/go_libs v0.0.0-20240814170610-c8796f2e5f95
+	github.com/PolyhedraZK/ExpanderCompilerCollection/go_libs v0.0.0-20240819022151-12ec8fba89d4
 	github.com/consensys/gnark v0.10.0
 	github.com/consensys/gnark-crypto v0.13.0
 )
