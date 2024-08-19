@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-const NHashes = 1
+const NHashes = 8
 
 const CheckBits = 256
 
@@ -203,12 +203,12 @@ func and(api frontend.API, a []frontend.Variable, b []frontend.Variable) []front
 	nbits := len(a)
 	bitsRes := make([]frontend.Variable, nbits)
 	for i := 0; i < nbits; i++ {
-		x := api.(ecgo.API).ToSingleVariable(a[i])
-		y := api.(ecgo.API).ToSingleVariable(b[i])
+		//x := api.(ecgo.API).ToSingleVariable(a[i])
+		//y := api.(ecgo.API).ToSingleVariable(b[i])
 		//fmt.Println(api.(ecgo.API).LayerOf(x))
-		bitsRes[i] = api.Mul(x, y)
+		//bitsRes[i] = api.Mul(x, y)
 		//fmt.Println(bitsRes[i])
-		//bitsRes[i] = api.Mul(a[i], b[i])
+		bitsRes[i] = api.Mul(a[i], b[i])
 		//bitsRes[i] = api.(ecgo.API).ToSingleVariable(bitsRes[i])
 		//fmt.Println(bitsRes[i])
 	}
@@ -247,7 +247,7 @@ func copyOutUnaligned(api frontend.API, s [][]frontend.Variable, rate, outputLen
 }
 
 type keccak256Circuit struct {
-	P   [NHashes][136 * 8]frontend.Variable
+	P   [NHashes][64 * 8]frontend.Variable
 	Out [NHashes][CheckBits]frontend.Variable
 }
 
@@ -259,11 +259,21 @@ func checkKeccak(api frontend.API, P, Out []frontend.Variable) {
 			ss[i][j] = 0
 		}
 	}
+	newP := make([]frontend.Variable, 64*8)
+	copy(newP, P)
+	appendData := make([]byte, 136-64)
+	appendData[0] = 1
+	appendData[135-64] = 0x80
+	for i := 0; i < 136-64; i++ {
+		for j := 0; j < 8; j++ {
+			newP = append(newP, int((appendData[i]>>j)&1))
+		}
+	}
 	p := make([][]frontend.Variable, 17)
 	for i := 0; i < 17; i++ {
 		p[i] = make([]frontend.Variable, 64)
 		for j := 0; j < 64; j++ {
-			p[i][j] = P[i*64+j]
+			p[i][j] = newP[i*64+j]
 		}
 	}
 	ss = xorIn(api, ss, p)
@@ -294,18 +304,14 @@ func main() {
 	os.WriteFile("circuit.txt", c.Serialize(), 0o644)
 
 	for k := 0; k < NHashes; k++ {
-		for i := 0; i < 136*8; i++ {
+		for i := 0; i < 64*8; i++ {
 			circuit.P[k][i] = 0
 		}
 
-		length := rand.Intn(130 + 2)
-		data := make([]byte, length)
+		data := make([]byte, 64)
 		rand.Read(data)
 		hash := crypto.Keccak256Hash(data)
-		data = append(data, 1)
-		data = append(data, make([]byte, 200)...)
-		data[135] = 0x80
-		for i := 0; i < 136; i++ {
+		for i := 0; i < 64; i++ {
 			for j := 0; j < 8; j++ {
 				circuit.P[k][i*8+j] = int((data[i] >> j) & 1)
 			}
@@ -327,7 +333,14 @@ func main() {
 		panic("gg")
 	}
 
-	if !test.CheckCircuit(c, wit) {
+	out := test.EvalCircuit(c, wit)
+	fail := false
+	for i := 0; i <= NHashes*256; i++ {
+		if out[i].Uint64() == 1 {
+			fail = true
+		}
+	}
+	if fail {
 		panic("gg")
 	}
 
@@ -339,10 +352,14 @@ func main() {
 		panic("gg")
 	}
 
-	for i := 0; i < 10; i++ {
-		if !test.CheckCircuit(c, wit) {
-			return
+	out = test.EvalCircuit(c, wit)
+	done := false
+	for i := 0; i <= NHashes*256; i++ {
+		if out[i].Uint64() == 1 {
+			done = true
 		}
 	}
-	panic("should fail, but it succeed, please check the code, or you are just too lucky")
+	if !done {
+		panic("should fail")
+	}
 }

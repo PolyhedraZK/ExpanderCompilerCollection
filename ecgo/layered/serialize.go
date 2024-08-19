@@ -10,7 +10,7 @@ import (
 func (rc *RootCircuit) Serialize() []byte {
 	o := utils.OutputBuf{}
 	zero := big.NewInt(0)
-	o.AppendUint64(3842777012604389699)
+	o.AppendUint64(3770719418566461763)
 	o.AppendBigInt(rc.Field)
 	o.AppendUint64(uint64(len(rc.Circuits)))
 	for _, c := range rc.Circuits {
@@ -59,6 +59,7 @@ func (rc *RootCircuit) Serialize() []byte {
 				o.AppendBigInt(cst.Coef)
 			}
 		}
+		o.AppendUint64(0)
 		o.AppendUint64(uint64(len(randomCoefIdx)))
 		for _, idx := range randomCoefIdx {
 			o.AppendUint64(uint64(idx))
@@ -73,7 +74,7 @@ func (rc *RootCircuit) Serialize() []byte {
 
 func DeserializeRootCircuit(buf []byte) *RootCircuit {
 	in := utils.NewInputBuf(buf)
-	if in.ReadUint64() != 3842777012604389699 {
+	if in.ReadUint64() != 3770719418566461763 {
 		panic("invalid file header")
 	}
 	rc := &RootCircuit{}
@@ -118,6 +119,7 @@ func DeserializeRootCircuit(buf []byte) *RootCircuit {
 			c.Cst[j].Out = in.ReadUint64()
 			c.Cst[j].Coef = in.ReadBigInt()
 		}
+		in.ReadUint64()
 		nbRandomCoef := in.ReadUint64()
 		randomCoefIdx := make([]int, nbRandomCoef)
 		for j := uint64(0); j < nbRandomCoef; j++ {

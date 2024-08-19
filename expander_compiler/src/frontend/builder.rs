@@ -21,12 +21,12 @@ pub struct RawVariable {
     id: usize,
 }
 
-enum VariableOrValue<F: Field> {
+pub enum VariableOrValue<F: Field> {
     Variable(RawVariable),
     Value(F),
 }
 
-trait ToVariableOrValue<F: Field> {
+pub trait ToVariableOrValue<F: Field> {
     fn to_variable_or_value(self) -> VariableOrValue<F>;
 }
 

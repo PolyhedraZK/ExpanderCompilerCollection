@@ -10,6 +10,8 @@ use super::{
 #[cfg(test)]
 mod tests;
 
+pub mod display;
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Instruction<C: Config> {
     LinComb(expr::LinComb<C>),

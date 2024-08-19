@@ -6,6 +6,9 @@ edition = "2021"
 [profile.test]
 opt-level = 3
 
+[profile.dev]
+opt-level = 3
+
 [dependencies]
 rand.workspace = true
 uint.workspace = true

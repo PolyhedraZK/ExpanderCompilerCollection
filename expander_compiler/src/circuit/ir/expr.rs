@@ -1,4 +1,5 @@
 use std::{
+    fmt,
     io::{Error as IoError, Read, Write},
     ops::{Deref, DerefMut},
 };
@@ -117,6 +118,24 @@ impl<C: Config> Term<C> {
     }
 }
 
+impl<C: Config> fmt::Display for Term<C> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.coef == C::CircuitField::one() {
+            match self.vars {
+                VarSpec::Const => write!(f, "1"),
+                VarSpec::Linear(index) => write!(f, "v{}", index),
+                VarSpec::Quad(index1, index2) => write!(f, "v{}*v{}", index1, index2),
+            }
+        } else {
+            match self.vars {
+                VarSpec::Const => write!(f, "{}", self.coef),
+                VarSpec::Linear(index) => write!(f, "v{}*{}", index, self.coef),
+                VarSpec::Quad(index1, index2) => write!(f, "v{}*v{}*{}", index1, index2, self.coef),
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Expression<C: Config> {
     terms: Vec<Term<C>>,
@@ -140,6 +159,18 @@ impl<C: Config> Default for Expression<C> {
         Expression {
             terms: vec![Term::default()],
         }
+    }
+}
+
+impl<C: Config> fmt::Display for Expression<C> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (i, term) in self.terms.iter().enumerate() {
+            if i > 0 {
+                write!(f, " + ")?;
+            }
+            write!(f, "{}", term)?;
+        }
+        Ok(())
     }
 }
 
@@ -330,6 +361,27 @@ impl<C: Config> LinComb<C> {
             res += values[term.var] * term.coef;
         }
         res
+    }
+}
+
+impl<C: Config> fmt::Display for LinComb<C> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (i, term) in self.terms.iter().enumerate() {
+            if i > 0 {
+                write!(f, " + ")?;
+            }
+            if term.coef == C::CircuitField::one() {
+                write!(f, "v{}", term.var)?;
+            } else {
+                write!(f, "v{}*{}", term.var, term.coef)?;
+            }
+        }
+        if !self.constant.is_zero() {
+            if !self.constant.is_zero() {
+                write!(f, " + {}", self.constant)?;
+            }
+        }
+        Ok(())
     }
 }
 
