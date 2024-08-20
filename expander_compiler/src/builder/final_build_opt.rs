@@ -611,7 +611,9 @@ fn process_circuit<C: Config>(
 
     // constraints and outputs
     let mut constraints: Vec<usize> = Vec::new();
-    for con in circuit.constraints.iter() {
+    let mut cons_keys = circuit.constraints.iter().cloned().collect::<Vec<_>>();
+    cons_keys.sort();
+    for con in cons_keys.iter() {
         let e = builder.in_var_exprs[*con].clone();
         if let Some(c) = e.constant_value() {
             if c.is_zero() {

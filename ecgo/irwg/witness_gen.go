@@ -14,58 +14,109 @@ import (
 )
 
 // Witness represents the solved values of the circuit's inputs.
-type Witness []*big.Int
+type Witness struct {
+	NumWitnesses              int
+	NumInputsPerWitness       int
+	NumPublicInputsPerWitness int
+	Field                     *big.Int
+	Values                    []*big.Int
+}
 
-var tVariable reflect.Type
+var TVariable reflect.Type
 
 func init() {
-	tVariable = reflect.ValueOf(struct{ A frontend.Variable }{}).FieldByName("A").Type()
+	TVariable = reflect.ValueOf(struct{ A frontend.Variable }{}).FieldByName("A").Type()
 }
 
 // GetCircuitVariables reimplements frontend.NewWitness to support fields that are not present in gnark.
-func GetCircuitVariables(assignment frontend.Circuit, field field.Field) []constraint.Element {
-	chValues := make(chan any)
+func GetCircuitVariables(assignment frontend.Circuit, field field.Field) ([]constraint.Element, []constraint.Element) {
+	chPubValues := make(chan any)
+	chSecValues := make(chan any)
 	go func() {
-		defer close(chValues)
-		schema.Walk(assignment, tVariable, func(leaf schema.LeafInfo, tValue reflect.Value) error {
+		schema.Walk(assignment, TVariable, func(leaf schema.LeafInfo, tValue reflect.Value) error {
 			if leaf.Visibility == schema.Public {
-				chValues <- tValue.Interface()
+				chPubValues <- tValue.Interface()
 			}
 			return nil
 		})
-		schema.Walk(assignment, tVariable, func(leaf schema.LeafInfo, tValue reflect.Value) error {
+		close(chPubValues)
+		schema.Walk(assignment, TVariable, func(leaf schema.LeafInfo, tValue reflect.Value) error {
 			if leaf.Visibility == schema.Secret {
-				chValues <- tValue.Interface()
+				chSecValues <- tValue.Interface()
 			}
 			return nil
 		})
+		close(chSecValues)
 	}()
-	res := []constraint.Element{}
-	for v := range chValues {
-		res = append(res, field.FromInterface(v))
+	resPub := []constraint.Element{}
+	for v := range chPubValues {
+		resPub = append(resPub, field.FromInterface(v))
 	}
-	return res
+	resSec := []constraint.Element{}
+	for v := range chSecValues {
+		resSec = append(resSec, field.FromInterface(v))
+	}
+	return resPub, resSec
 }
 
-// SolveInput is the entry point to solve the final input of the given assignment using a specified number of threads.
-func (rc *RootCircuit) SolveInput(assignment frontend.Circuit, _ int) (Witness, error) {
-	vec := GetCircuitVariables(assignment, rc.Field)
-	res, err := rc.eval(vec)
+func (rc *RootCircuit) solveInput(assignment frontend.Circuit) ([]*big.Int, int, int, error) {
+	vecPub, vecSec := GetCircuitVariables(assignment, rc.Field)
+	res, err := rc.eval(vecSec, vecPub)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, err
 	}
-	witness := make(Witness, len(res))
+	witness := make([]*big.Int, len(res)+len(vecPub))
 	for i, x := range res {
 		witness[i] = rc.Field.ToBigInt(x)
 	}
-	return witness, nil
+	for i, x := range vecPub {
+		witness[i+len(res)] = rc.Field.ToBigInt(x)
+	}
+	return witness, len(res), len(vecPub), nil
 }
 
-func (rc *RootCircuit) eval(inputs []constraint.Element) ([]constraint.Element, error) {
-	return rc.evalSub(0, inputs)
+// SolveInput is the entry point to solve the final input of the given assignment using a specified number of threads.
+func (rc *RootCircuit) SolveInput(assignment frontend.Circuit, _ int) (*Witness, error) {
+	witness, lenSec, lenPub, err := rc.solveInput(assignment)
+	if err != nil {
+		return nil, err
+	}
+	return &Witness{
+		NumWitnesses:              1,
+		NumInputsPerWitness:       lenSec,
+		NumPublicInputsPerWitness: lenPub,
+		Field:                     rc.Field.Field(),
+		Values:                    witness,
+	}, nil
 }
 
-func (rc *RootCircuit) evalSub(circuitId uint64, inputs []constraint.Element) ([]constraint.Element, error) {
+func (rc *RootCircuit) SolveInputs(assignments []frontend.Circuit) (*Witness, error) {
+	witnesses := []*big.Int{}
+	witness := []*big.Int{}
+	var err error
+	lenSec := 0
+	lenPub := 0
+	for _, assignment := range assignments {
+		witness, lenSec, lenPub, err = rc.solveInput(assignment)
+		if err != nil {
+			return nil, err
+		}
+		witnesses = append(witnesses, witness...)
+	}
+	return &Witness{
+		NumWitnesses:              len(assignments),
+		NumInputsPerWitness:       lenSec,
+		NumPublicInputsPerWitness: lenPub,
+		Field:                     rc.Field.Field(),
+		Values:                    witnesses,
+	}, nil
+}
+
+func (rc *RootCircuit) eval(inputs []constraint.Element, publicInputs []constraint.Element) ([]constraint.Element, error) {
+	return rc.evalSub(0, inputs, publicInputs)
+}
+
+func (rc *RootCircuit) evalSub(circuitId uint64, inputs []constraint.Element, publicInputs []constraint.Element) ([]constraint.Element, error) {
 	values := append([]constraint.Element{{}}, inputs...)
 	for _, insn := range rc.Circuits[circuitId].Instructions {
 		switch insn.Type {
@@ -97,15 +148,17 @@ func (rc *RootCircuit) evalSub(circuitId uint64, inputs []constraint.Element) ([
 		case ConstantLike:
 			if insn.ExtraId == 0 {
 				values = append(values, insn.Const)
-			} else {
+			} else if insn.ExtraId == 1 {
 				return nil, errors.New("random constant not supported")
+			} else {
+				values = append(values, publicInputs[insn.ExtraId-2])
 			}
 		case SubCircuitCall:
 			sub_inputs := []constraint.Element{}
 			for _, x := range insn.Inputs {
 				sub_inputs = append(sub_inputs, values[x])
 			}
-			sub_outputs, err := rc.evalSub(insn.ExtraId, sub_inputs)
+			sub_outputs, err := rc.evalSub(insn.ExtraId, sub_inputs, publicInputs)
 			if err != nil {
 				return nil, err
 			}
@@ -138,10 +191,15 @@ func callHint(hintId uint64, field *big.Int, inputs []*big.Int, outputs []*big.I
 }
 
 // Serialize converts the Witness into a byte slice for storage or transmission.
-func (w Witness) Serialize() []byte {
+func (w *Witness) Serialize() []byte {
 	o := utils.OutputBuf{}
-	for _, x := range w {
-		o.AppendBigInt(32, x)
+	o.AppendUint64(uint64(w.NumWitnesses))
+	o.AppendUint64(uint64(w.NumInputsPerWitness))
+	o.AppendUint64(uint64(w.NumPublicInputsPerWitness))
+	o.AppendBigInt(32, w.Field)
+	bnlen := field.GetFieldFromOrder(w.Field).SerializedLen()
+	for _, x := range w.Values {
+		o.AppendBigInt(bnlen, x)
 	}
 	return o.Bytes()
 }
