@@ -26,7 +26,7 @@ type Builder<'a, C> = super::basic::Builder<'a, C, IrcIn<C>, IrcOut<C>>;
 
 impl<'a, C: Config> Builder<'a, C> {
     fn push_const(&mut self, c: C::CircuitField) -> usize {
-        self.push_insn(InsnOut::ConstantOrRandom(Coef::Constant(c)))
+        self.push_insn(InsnOut::ConstantLike(Coef::Constant(c)))
             .unwrap()
     }
     fn push_add(&mut self, a: usize, b: usize) -> usize {
@@ -160,7 +160,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
             }
             IsZero(x) => {
                 if let Some(xv) = self.constant_value(*x) {
-                    InsnOut::ConstantOrRandom(Coef::Constant(if xv.is_zero() {
+                    InsnOut::ConstantLike(Coef::Constant(if xv.is_zero() {
                         C::CircuitField::one()
                     } else {
                         C::CircuitField::zero()
@@ -194,9 +194,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                 inputs: inputs.clone(),
                 num_outputs: *num_outputs,
             },
-            ConstantOrRandom(coef) => {
-                ir::hint_normalized::Instruction::ConstantOrRandom(coef.clone())
-            }
+            ConstantLike(coef) => ir::hint_normalized::Instruction::ConstantLike(coef.clone()),
             SubCircuitCall {
                 sub_circuit_id,
                 inputs,
@@ -210,7 +208,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                 let xc = self.constant_value(*x);
                 let yc = self.constant_value(*y);
                 if let (Some(xv), Some(yv)) = (&xc, &yc) {
-                    InsnOut::ConstantOrRandom(Coef::Constant(op.eval(xv, yv)?))
+                    InsnOut::ConstantLike(Coef::Constant(op.eval(xv, yv)?))
                 } else {
                     use ir::source::UnconstrainedBinOpType::*;
                     let op = match op {
@@ -301,11 +299,14 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
             InsnOut::Hint { num_outputs, .. } => {
                 self.add_out_vars(*num_outputs);
             }
-            InsnOut::ConstantOrRandom(coef) => match coef {
+            InsnOut::ConstantLike(coef) => match coef {
                 Coef::Constant(c) => {
                     self.add_const(*c);
                 }
                 Coef::Random => {
+                    self.add_out_vars(1);
+                }
+                Coef::PublicInput(_) => {
                     self.add_out_vars(1);
                 }
             },

@@ -2,7 +2,7 @@ use rand::{Rng, RngCore};
 
 use super::{
     ConstraintType,
-    Instruction::{self, ConstantOrRandom, LinComb, Mul},
+    Instruction::{self, ConstantLike, LinComb, Mul},
     RootCircuit,
 };
 use crate::field::Field;
@@ -22,10 +22,11 @@ impl<C: Config> RandomInstruction for Instruction<C> {
         mut rnd: impl RngCore,
         num_terms: &RandomRange,
         num_vars: usize,
+        num_public_inputs: usize,
     ) -> Self {
         let prob1 = rnd.gen::<f64>();
         if prob1 < 0.1 {
-            ConstantOrRandom(Coef::Constant(C::CircuitField::from(rnd.next_u32())))
+            ConstantLike(Coef::random_no_random(&mut rnd, num_public_inputs))
         } else if prob1 < 0.35 {
             LinComb(expr::LinComb {
                 terms: (0..num_terms.random(&mut rnd))

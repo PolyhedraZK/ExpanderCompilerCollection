@@ -202,24 +202,12 @@ impl fmt::Display for GF2 {
 // Serde
 impl Serde for GF2 {
     fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
-        let mut buf = [0u8; 32];
-        buf[0] = self.v as u8;
-        writer.write_all(&buf)
+        writer.write_all(&[self.v as u8])
     }
 
     fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
-        let mut buf = [0u8; 32];
+        let mut buf = [0u8; 1];
         reader.read_exact(&mut buf)?;
-        for x in buf.iter().skip(1) {
-            if *x != 0 {
-                return Err(IoError::new(
-                    std::io::ErrorKind::InvalidData,
-                    "extra bytes in GF2",
-                ));
-            }
-        }
-        Ok(GF2 {
-            v: (buf[0] & 1) == 1,
-        })
+        Ok(GF2 { v: buf[0] & 1 == 1 })
     }
 }

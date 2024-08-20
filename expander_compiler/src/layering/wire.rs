@@ -330,7 +330,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
                 });
                 continue;
             }
-            if let Some(value) = ic.constant_or_random_variables.get(x) {
+            if let Some(value) = ic.constant_like_variables.get(x) {
                 res.gate_consts.push(GateConst {
                     inputs: [],
                     output: pos,

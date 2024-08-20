@@ -14,6 +14,7 @@ type Field interface {
 	constraint.Field
 	Field() *big.Int
 	FieldBitLen() int
+	SerializedLen() int
 }
 
 func GetFieldFromOrder(x *big.Int) Field {

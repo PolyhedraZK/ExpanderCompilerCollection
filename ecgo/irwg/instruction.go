@@ -9,7 +9,7 @@ const (
 	LinComb
 	Mul
 	Hint
-	ConstantOrRandom
+	ConstantLike
 	SubCircuitCall
 )
 

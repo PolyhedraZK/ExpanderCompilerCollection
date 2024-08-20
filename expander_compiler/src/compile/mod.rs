@@ -107,7 +107,15 @@ pub fn compile<C: Config>(
         (r, im)
     });
 
-    let r_dest = r_dest_relaxed_opt.adjust_for_layering();
+    let r_dest = if C::ENABLE_RANDOM_COMBINATION {
+        r_dest_relaxed_opt.solve_duplicates()
+    } else {
+        let mut r1 = r_dest_relaxed_opt.export_constraints();
+        r1.reassign_duplicate_sub_circuit_outputs();
+        let (r2, im) = r1.remove_unreachable();
+        hl_im.compose_in_place(&im);
+        r2.solve_duplicates()
+    };
     r_dest
         .validate()
         .map_err(|e| e.prepend("dest ir circuit invalid"))?;

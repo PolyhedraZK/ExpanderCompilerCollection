@@ -115,7 +115,7 @@ func (builder *builder) addVar() variable {
 
 func (builder *builder) ceToVariable(x constraint.Element) variable {
 	builder.instructions = append(builder.instructions, irsource.Instruction{
-		Type:    irsource.ConstantOrRandom,
+		Type:    irsource.ConstantLike,
 		ExtraId: 0,
 		Const:   x,
 	})
@@ -251,7 +251,7 @@ func (builder *builder) GetKeyValue(key any) any {
 // The return value cannot be used in hints, since it's unknown at the input solving phase
 func (builder *builder) GetRandomValue() frontend.Variable {
 	builder.instructions = append(builder.instructions, irsource.Instruction{
-		Type:    irsource.ConstantOrRandom,
+		Type:    irsource.ConstantLike,
 		ExtraId: 1,
 	})
 	return builder.addVar()

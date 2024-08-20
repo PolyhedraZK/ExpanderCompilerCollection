@@ -3,22 +3,34 @@ package utils
 import (
 	"encoding/binary"
 	"math/big"
+
+	"github.com/consensys/gnark/constraint"
 )
 
 type OutputBuf struct {
 	buf []byte
 }
 
-func (o *OutputBuf) AppendBigInt(x *big.Int) {
-	zbuf := make([]byte, 32)
+type SimpleField interface {
+	SerializedLen() int
+	ToBigInt(c constraint.Element) *big.Int
+	FromInterface(i interface{}) constraint.Element
+}
+
+func (o *OutputBuf) AppendBigInt(n int, x *big.Int) {
+	zbuf := make([]byte, n)
 	b := x.Bytes()
 	for i := 0; i < len(b); i++ {
 		zbuf[i] = b[len(b)-i-1]
 	}
-	for i := len(b); i < 32; i++ {
+	for i := len(b); i < n; i++ {
 		zbuf[i] = 0
 	}
 	o.buf = append(o.buf, zbuf...)
+}
+
+func (o *OutputBuf) AppendFieldElement(field SimpleField, x constraint.Element) {
+	o.AppendBigInt(field.SerializedLen(), field.ToBigInt(x))
 }
 
 func (o *OutputBuf) AppendUint32(x uint32) {
@@ -79,14 +91,18 @@ func (i *InputBuf) ReadIntSlice() []int {
 	return x
 }
 
-func (i *InputBuf) ReadBigInt() *big.Int {
-	zbuf := make([]byte, 32)
-	for j := 0; j < 32; j++ {
-		zbuf[j] = i.buf[31-j]
+func (i *InputBuf) ReadBigInt(n int) *big.Int {
+	zbuf := make([]byte, n)
+	for j := 0; j < n; j++ {
+		zbuf[j] = i.buf[n-1-j]
 	}
 	x := new(big.Int).SetBytes(zbuf)
-	i.buf = i.buf[32:]
+	i.buf = i.buf[n:]
 	return x
+}
+
+func (i *InputBuf) ReadFieldElement(field SimpleField) constraint.Element {
+	return field.FromInterface(i.ReadBigInt(field.SerializedLen()))
 }
 
 func (i *InputBuf) IsEnd() bool {

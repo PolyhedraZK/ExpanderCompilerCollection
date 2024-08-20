@@ -7,6 +7,9 @@ type CField = <C as Config>::CircuitField;
 #[test]
 fn simple() {
     let circuit: Circuit<C> = Circuit {
+        num_public_inputs: 0,
+        num_actual_outputs: 2,
+        expected_num_output_zeroes: 0,
         segments: vec![
             Segment {
                 num_inputs: 2,
@@ -75,7 +78,7 @@ fn simple() {
     assert!(circuit.validate().is_ok());
     for _ in 0..100 {
         let s: Vec<CField> = (0..4).map(|_| CField::random_unsafe()).collect();
-        let out = circuit.eval_unsafe(s.clone());
+        let (out, _) = circuit.eval_unsafe(s.clone());
         assert_eq!(out.len(), 2);
         assert_eq!(out[0], s[0] * s[1] * s[2] * s[3] * CField::from(8));
         assert_eq!(

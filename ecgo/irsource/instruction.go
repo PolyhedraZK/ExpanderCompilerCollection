@@ -13,7 +13,7 @@ const (
 	IsZero
 	Commit
 	Hint
-	ConstantOrRandom
+	ConstantLike
 	SubCircuitCall
 	UnconstrainedBinOp
 	UnconstrainedSelect

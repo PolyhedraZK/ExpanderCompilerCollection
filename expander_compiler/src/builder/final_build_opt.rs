@@ -38,7 +38,7 @@ struct Builder<C: Config> {
     // pool of stripped mid_vars
     // for internal variables, the expression is actual expression
     // for in_vars, the expression is a fake expression with only one term
-    stripped_mid_vars: Pool<Expression<C>>,
+    stripped_mid_vars: Pool<MidVarKey<C>>,
     // mid_var i = k*(expr)+b
     mid_var_coefs: Vec<MidVarCoef<C>>,
     // expected layer of mid_var, input==0
@@ -48,6 +48,12 @@ struct Builder<C: Config> {
     out_insns: Vec<(usize, OutInstruction<C>)>,
 
     output_layer: usize,
+}
+
+#[derive(Hash, PartialEq, Eq, Clone)]
+struct MidVarKey<C: Config> {
+    expr: Expression<C>,
+    is_force_single: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -85,15 +91,20 @@ impl<C: Config> Builder<C> {
             out_insns: Vec::new(),
             output_layer: 0,
         };
-        res.stripped_mid_vars.add(&Expression::invalid());
+        res.stripped_mid_vars.add(&MidVarKey {
+            expr: Expression::invalid(),
+            is_force_single: false,
+        });
         res
     }
 
     fn new_var(&mut self, layer: usize) -> usize {
         let id = self.stripped_mid_vars.len();
         assert_eq!(
-            self.stripped_mid_vars
-                .add(&Expression::new_linear(C::CircuitField::one(), id)),
+            self.stripped_mid_vars.add(&MidVarKey {
+                expr: Expression::new_linear(C::CircuitField::one(), id),
+                is_force_single: false
+            }),
             id
         );
         self.mid_var_coefs.push(MidVarCoef::default());
@@ -119,7 +130,10 @@ impl<C: Config> Builder<C> {
         if e.len() == 1 && e.degree() <= 1 {
             return expr;
         }
-        let idx = self.stripped_mid_vars.add(&e);
+        let idx = self.stripped_mid_vars.add(&MidVarKey {
+            expr: e.clone(),
+            is_force_single: false,
+        });
         if idx == self.mid_var_coefs.len() {
             self.mid_var_coefs.push(MidVarCoef {
                 k: coef,
@@ -137,7 +151,10 @@ impl<C: Config> Builder<C> {
         if e.len() == 1 && e.degree() <= 1 {
             return expr;
         }
-        match self.stripped_mid_vars.try_get_idx(&e) {
+        match self.stripped_mid_vars.try_get_idx(&MidVarKey {
+            expr: e,
+            is_force_single: false,
+        }) {
             Some(idx) => {
                 return unstrip_constants_single(idx, coef, constant, &self.mid_var_coefs[idx]);
             }
@@ -153,7 +170,10 @@ impl<C: Config> Builder<C> {
             }
         }
         let (es, coef, constant) = strip_constants(&e);
-        let idx = self.stripped_mid_vars.add(&es);
+        let idx = self.stripped_mid_vars.add(&MidVarKey {
+            expr: es,
+            is_force_single: false,
+        });
         if idx == self.mid_var_coefs.len() {
             self.mid_var_coefs.push(MidVarCoef {
                 k: coef,
@@ -167,7 +187,10 @@ impl<C: Config> Builder<C> {
             return idx;
         }
         let e = self.to_single(e);
-        let idx = self.stripped_mid_vars.add(&e);
+        let idx = self.stripped_mid_vars.add(&MidVarKey {
+            expr: e.clone(),
+            is_force_single: true,
+        });
         if idx == self.mid_var_coefs.len() {
             self.mid_var_coefs.push(MidVarCoef {
                 k: C::CircuitField::one(),
@@ -503,7 +526,7 @@ fn process_circuit<C: Config>(
                     builder.in_var_ref_counts[*var].mul += 1;
                 }
             }
-            InInstruction::ConstantOrRandom(_) => {}
+            InInstruction::ConstantLike(_) => {}
             InInstruction::SubCircuitCall { inputs, .. } => {
                 for input in inputs {
                     builder.in_var_ref_counts[*input].single += 1;
@@ -535,15 +558,24 @@ fn process_circuit<C: Config>(
                 let e = builder.mul_vec(vars);
                 builder.add_and_check_if_should_make_single(e);
             }
-            InInstruction::ConstantOrRandom(coef) => match coef {
+            InInstruction::ConstantLike(coef) => match coef {
                 Coef::Constant(c) => {
                     builder.add_const(*c);
                 }
                 Coef::Random => {
                     builder.out_insns.push((
                         builder.stripped_mid_vars.len(),
-                        OutInstruction::ConstantOrRandom {
+                        OutInstruction::ConstantLike {
                             value: Coef::Random,
+                        },
+                    ));
+                    builder.add_in_vars(1, 1);
+                }
+                Coef::PublicInput(i) => {
+                    builder.out_insns.push((
+                        builder.stripped_mid_vars.len(),
+                        OutInstruction::ConstantLike {
+                            value: Coef::PublicInput(*i),
                         },
                     ));
                     builder.add_in_vars(1, 1);
@@ -607,12 +639,12 @@ fn process_circuit<C: Config>(
             instructions.push(builder.out_insns[oinsn_id].1.clone());
             oinsn_id += 1;
         }
-        let expr = builder.stripped_mid_vars.get(mid_var_id);
-        let non_iv = *expr == Expression::new_linear(C::CircuitField::one(), mid_var_id);
+        let mvk = builder.stripped_mid_vars.get(mid_var_id);
+        let non_iv = mvk.expr == Expression::new_linear(C::CircuitField::one(), mid_var_id);
         if non_iv {
             continue;
         }
-        let e2 = expr.mul_constant(builder.mid_var_coefs[mid_var_id].k);
+        let e2 = mvk.expr.mul_constant(builder.mid_var_coefs[mid_var_id].k);
         let constant = builder.mid_var_coefs[mid_var_id].b;
         let e3 = if constant.is_zero() {
             e2
@@ -653,6 +685,8 @@ pub fn process<C: Config>(rc: &InRootCircuit<C>) -> Result<OutRootCircuit<C>, Er
         root.builders.insert(circuit_id, final_builder);
     }
     Ok(OutRootCircuit {
+        num_public_inputs: rc.num_public_inputs,
+        expected_num_output_zeroes: rc.expected_num_output_zeroes,
         circuits: root.out_circuits,
     })
 }
@@ -734,7 +768,7 @@ mod tests {
         assert_eq!(root.validate(), Ok(()));
         let root_processed = super::process(&root).unwrap();
         assert_eq!(root_processed.validate(), Ok(()));
-        let root_fin = root_processed.adjust_for_layering();
+        let root_fin = root_processed.solve_duplicates();
         assert_eq!(root_fin.validate(), Ok(()));
         let (out, _) = root_fin.eval_unsafe(vec![
             CField::from(2),

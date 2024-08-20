@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, hash::Hash};
 
 use crate::{field::Field, utils::error::Error};
 
@@ -14,6 +14,7 @@ pub mod stats;
 pub enum Coef<C: Config> {
     Constant(C::CircuitField),
     Random,
+    PublicInput(usize),
 }
 
 impl<C: Config> Coef<C> {
@@ -21,6 +22,38 @@ impl<C: Config> Coef<C> {
         match self {
             Coef::Constant(c) => c.clone(),
             Coef::Random => C::CircuitField::random_unsafe(),
+            Coef::PublicInput(id) => {
+                // stub implementation
+                let t = id * id % 1000000007;
+                let t = t * id % 1000000007;
+                C::CircuitField::from(t as u32)
+            }
+        }
+    }
+    pub fn validate(&self, num_public_inputs: usize) -> Result<(), Error> {
+        match self {
+            Coef::Constant(_) => Ok(()),
+            Coef::Random => Ok(()),
+            Coef::PublicInput(id) => {
+                if *id >= num_public_inputs {
+                    Err(Error::UserError(format!(
+                        "public input id {} out of range",
+                        id
+                    )))
+                } else {
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    #[cfg(test)]
+    pub fn random_no_random(mut rnd: impl rand::RngCore, num_public_inputs: usize) -> Self {
+        use rand::Rng;
+        if rnd.gen::<f64>() < 0.94 {
+            Coef::Constant(C::CircuitField::from(rnd.next_u32()))
+        } else {
+            Coef::PublicInput(rnd.next_u64() as usize % num_public_inputs)
         }
     }
 }
@@ -54,6 +87,9 @@ pub struct Segment<C: Config> {
 }
 
 pub struct Circuit<C: Config> {
+    pub num_public_inputs: usize,
+    pub num_actual_outputs: usize,
+    pub expected_num_output_zeroes: usize,
     pub segments: Vec<Segment<C>>,
     pub layer_ids: Vec<usize>,
 }
@@ -214,17 +250,27 @@ impl<C: Config> Circuit<C> {
         self.segments[self.layer_ids[0]].num_inputs
     }
 
-    pub fn eval_unsafe(&self, input: Vec<C::CircuitField>) -> Vec<C::CircuitField> {
-        if input.len() != self.input_size() {
+    pub fn eval_unsafe(&self, inputs: Vec<C::CircuitField>) -> (Vec<C::CircuitField>, bool) {
+        if inputs.len() != self.input_size() {
             panic!("input length mismatch");
         }
-        let mut cur = input;
+        let mut cur = inputs;
         for &id in self.layer_ids.iter() {
             let mut next = vec![C::CircuitField::zero(); self.segments[id].num_outputs];
             self.apply_segment_unsafe(&self.segments[id], &cur, &mut next);
             cur = next;
         }
-        cur
+        let mut constraints_satisfied = true;
+        for i in 0..self.expected_num_output_zeroes {
+            if !cur[i].is_zero() {
+                constraints_satisfied = false;
+                break;
+            }
+        }
+        (
+            cur[self.expected_num_output_zeroes..self.num_actual_outputs].to_vec(),
+            constraints_satisfied,
+        )
     }
 
     fn apply_segment_unsafe(
@@ -260,6 +306,7 @@ impl<C: Config> fmt::Display for Coef<C> {
         match self {
             Coef::Constant(c) => write!(f, "{}", c),
             Coef::Random => write!(f, "Random"),
+            Coef::PublicInput(id) => write!(f, "PublicInput({})", id),
         }
     }
 }

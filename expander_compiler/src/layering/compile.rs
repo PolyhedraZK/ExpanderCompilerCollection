@@ -36,6 +36,8 @@ pub struct CompileContext<'a, C: Config> {
 
     // input order
     pub input_order: Vec<usize>,
+
+    pub root_has_constraints: bool,
 }
 
 pub struct IrContext<'a, C: Config> {
@@ -67,7 +69,7 @@ pub struct IrContext<'a, C: Config> {
     pub combined_constraints: Vec<Option<CombinedConstraint>>,
 
     pub internal_variable_expr: HashMap<usize, &'a Expression<C>>,
-    pub constant_or_random_variables: HashMap<usize, Coef<C>>,
+    pub constant_like_variables: HashMap<usize, Coef<C>>,
 
     // layer layout contexts
     pub lcs: Vec<LayerLayoutContext>,
@@ -154,7 +156,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
                 Instruction::InternalVariable { .. } => {
                     nv += 1;
                 }
-                Instruction::ConstantOrRandom { .. } => {
+                Instruction::ConstantLike { .. } => {
                     nv += 1;
                 }
             }
@@ -182,7 +184,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
                 hint_inputs: Pool::new(),
                 combined_constraints: Vec::new(),
                 internal_variable_expr: HashMap::new(),
-                constant_or_random_variables: HashMap::new(),
+                constant_like_variables: HashMap::new(),
                 lcs: Vec::new(),
                 lc_hint: LayerLayoutContext::default(),
             },
@@ -292,10 +294,10 @@ impl<'a, C: Config> CompileContext<'a, C> {
                     });
                     ic.sub_circuit_hint_inputs.push(subhs);
                 }
-                Instruction::ConstantOrRandom { value } => {
+                Instruction::ConstantLike { value } => {
                     ic.min_layer[cur_var_idx] = 1;
                     q0.push(cur_var_idx);
-                    ic.constant_or_random_variables
+                    ic.constant_like_variables
                         .insert(cur_var_idx, value.clone());
                     cur_var_idx += 1;
                 }
@@ -367,14 +369,14 @@ impl<'a, C: Config> CompileContext<'a, C> {
             {
                 first += 1;
             }
-            if first == cc.len() {
-                panic!("unexpected situation");
+            if first != cc.len() {
+                let last = max_occured_layer + 1;
+                for i in first + 1..=last {
+                    cc[i].variables.push(i - 1 - first + n);
+                }
+                cc.truncate(last + 1);
+                self.root_has_constraints = true;
             }
-            let last = max_occured_layer + 1;
-            for i in first + 1..=last {
-                cc[i].variables.push(i - 1 - first + n);
-            }
-            cc.truncate(last + 1);
         }
         let mut cc: Vec<Option<CombinedConstraint>> = cc.into_iter().map(Some).collect();
         for i in 0..cc.len() {
@@ -464,7 +466,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
         }
 
         // adjust minLayer of GetRandomValue variables to a larger value
-        for x in ic.constant_or_random_variables.keys() {
+        for x in ic.constant_like_variables.keys() {
             if ic.max_layer[*x] == ic.output_layer {
                 continue;
             }

@@ -30,7 +30,7 @@ pub enum Instruction<C: Config> {
         inputs: Vec<usize>,
         num_outputs: usize,
     },
-    ConstantOrRandom(Coef<C>),
+    ConstantLike(Coef<C>),
     SubCircuitCall {
         sub_circuit_id: usize,
         inputs: Vec<usize>,
@@ -58,7 +58,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             Instruction::LinComb(lc) => lc.get_vars(),
             Instruction::Mul(inputs) => inputs.clone(),
             Instruction::Hint { inputs, .. } => inputs.clone(),
-            Instruction::ConstantOrRandom(_) => vec![],
+            Instruction::ConstantLike(_) => vec![],
             Instruction::SubCircuitCall { inputs, .. } => inputs.clone(),
         }
     }
@@ -67,7 +67,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             Instruction::LinComb(_) => 1,
             Instruction::Mul(_) => 1,
             Instruction::Hint { num_outputs, .. } => *num_outputs,
-            Instruction::ConstantOrRandom(_) => 1,
+            Instruction::ConstantLike(_) => 1,
             Instruction::SubCircuitCall { num_outputs, .. } => *num_outputs,
         }
     }
@@ -101,7 +101,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 inputs: inputs.iter().map(|i| f(*i)).collect(),
                 num_outputs: *num_outputs,
             },
-            Instruction::ConstantOrRandom(coef) => Instruction::ConstantOrRandom(coef.clone()),
+            Instruction::ConstantLike(coef) => Instruction::ConstantLike(coef.clone()),
             Instruction::SubCircuitCall {
                 sub_circuit_id,
                 inputs,
@@ -116,7 +116,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
     fn from_kx_plus_b(x: usize, k: C::CircuitField, b: C::CircuitField) -> Self {
         Instruction::LinComb(expr::LinComb::from_kx_plus_b(x, k, b))
     }
-    fn validate(&self) -> Result<(), Error> {
+    fn validate(&self, num_public_inputs: usize) -> Result<(), Error> {
         match self {
             Instruction::Mul(inputs) => {
                 if inputs.len() >= 2 {
@@ -141,6 +141,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                     ))
                 }
             }
+            Instruction::ConstantLike(coef) => coef.validate(num_public_inputs),
             _ => Ok(()),
         }
     }
@@ -166,7 +167,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 );
                 EvalResult::Values(outputs)
             }
-            Instruction::ConstantOrRandom(coef) => EvalResult::Value(coef.get_value_unsafe()),
+            Instruction::ConstantLike(coef) => EvalResult::Value(coef.get_value_unsafe()),
             Instruction::SubCircuitCall {
                 sub_circuit_id,
                 inputs,
@@ -206,8 +207,8 @@ impl<C: Config> Circuit<C> {
                 }
                 _ => {
                     instructions.push(match insn.replace_vars(|x| new_id[x]) {
-                        Instruction::ConstantOrRandom(coef) => {
-                            super::hint_less::Instruction::ConstantOrRandom(coef)
+                        Instruction::ConstantLike(coef) => {
+                            super::hint_less::Instruction::ConstantLike(coef)
                         }
                         Instruction::LinComb(lc) => super::hint_less::Instruction::LinComb(lc),
                         Instruction::Mul(inputs) => super::hint_less::Instruction::Mul(inputs),
@@ -289,7 +290,7 @@ impl<C: Config> Circuit<C> {
                         num_outputs: num_outputs + sub_hi,
                     }
                 }
-                Instruction::ConstantOrRandom(coef) => Instruction::ConstantOrRandom(coef),
+                Instruction::ConstantLike(coef) => Instruction::ConstantLike(coef),
                 Instruction::LinComb(lc) => Instruction::LinComb(lc),
                 Instruction::Mul(inputs) => Instruction::Mul(inputs),
             };
@@ -332,7 +333,7 @@ impl<C: Config> Circuit<C> {
             }
         }
         Circuit {
-            num_inputs: new_var_max,
+            num_inputs: im.cur_size(),
             num_hint_inputs: self.num_hint_inputs,
             instructions,
             constraints: self.constraints.iter().map(|x| new_id[*x]).collect(),
@@ -347,7 +348,11 @@ impl<C: Config> RootCircuit<C> {
         for (id, circuit) in self.circuits.iter() {
             circuits.insert(*id, circuit.remove_hints());
         }
-        let removed_root = super::hint_less::RootCircuit { circuits };
+        let removed_root = super::hint_less::RootCircuit {
+            num_public_inputs: self.num_public_inputs,
+            expected_num_output_zeroes: self.expected_num_output_zeroes,
+            circuits,
+        };
         let mut exported_circuits = HashMap::new();
         let mut sub_num_add_outputs = HashMap::new();
         let order = self.topo_order();
@@ -360,6 +365,8 @@ impl<C: Config> RootCircuit<C> {
         (
             removed_root,
             RootCircuit {
+                num_public_inputs: self.num_public_inputs,
+                expected_num_output_zeroes: 0,
                 circuits: exported_circuits,
             },
         )

@@ -635,6 +635,8 @@ where
         root.builders.insert(circuit_id, final_builder);
     }
     Ok(ir::common::RootCircuit {
+        num_public_inputs: rc.num_public_inputs,
+        expected_num_output_zeroes: rc.expected_num_output_zeroes,
         circuits: root.out_circuits,
     })
 }

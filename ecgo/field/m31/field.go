@@ -95,3 +95,7 @@ func (engine *Field) Field() *big.Int {
 func (engine *Field) FieldBitLen() int {
 	return 31
 }
+
+func (engine *Field) SerializedLen() int {
+	return 4
+}

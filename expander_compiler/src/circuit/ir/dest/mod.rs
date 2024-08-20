@@ -26,7 +26,7 @@ pub enum Instruction<C: Config> {
         inputs: Vec<usize>,
         num_outputs: usize,
     },
-    ConstantOrRandom {
+    ConstantLike {
         value: Coef<C>,
     },
 }
@@ -64,14 +64,14 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
         match self {
             Instruction::InternalVariable { expr } => expr.get_vars(),
             Instruction::SubCircuitCall { inputs, .. } => inputs.clone(),
-            Instruction::ConstantOrRandom { .. } => Vec::new(),
+            Instruction::ConstantLike { .. } => Vec::new(),
         }
     }
     fn num_outputs(&self) -> usize {
         match self {
             Instruction::InternalVariable { .. } => 1,
             Instruction::SubCircuitCall { num_outputs, .. } => *num_outputs,
-            Instruction::ConstantOrRandom { .. } => 1,
+            Instruction::ConstantLike { .. } => 1,
         }
     }
     fn as_sub_circuit_call(&self) -> Option<(usize, &Vec<usize>, usize)> {
@@ -105,7 +105,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 inputs: inputs.iter().map(|&i| f(i)).collect(),
                 num_outputs: *num_outputs,
             },
-            Instruction::ConstantOrRandom { value } => Instruction::ConstantOrRandom {
+            Instruction::ConstantLike { value } => Instruction::ConstantLike {
                 value: value.clone(),
             },
         }
@@ -115,8 +115,11 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             expr: Expression::from_terms(vec![Term::new_linear(k, x), Term::new_const(b)]),
         }
     }
-    fn validate(&self) -> Result<(), Error> {
-        Ok(())
+    fn validate(&self, num_public_inputs: usize) -> Result<(), Error> {
+        match self {
+            Instruction::ConstantLike { value } => value.validate(num_public_inputs),
+            _ => Ok(()),
+        }
     }
     fn eval_unsafe(&self, values: &[C::CircuitField]) -> EvalResult<C> {
         match self {
@@ -142,7 +145,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 inputs,
                 ..
             } => EvalResult::SubCircuitCall(*sub_circuit_id, inputs),
-            Instruction::ConstantOrRandom { value } => EvalResult::Value(value.get_value_unsafe()),
+            Instruction::ConstantLike { value } => EvalResult::Value(value.get_value_unsafe()),
         }
     }
 }
@@ -168,9 +171,9 @@ impl<C: Config> CircuitRelaxed<C> {
                     insn_of_var.push(Some(new_instructions.len()));
                     Instruction::InternalVariable { expr: expr }
                 }
-                Instruction::ConstantOrRandom { value } => {
+                Instruction::ConstantLike { value } => {
                     insn_of_var.push(Some(new_instructions.len()));
-                    Instruction::ConstantOrRandom { value: value }
+                    Instruction::ConstantLike { value: value }
                 }
                 Instruction::SubCircuitCall {
                     sub_circuit_id,
@@ -263,7 +266,7 @@ impl<C: Config> CircuitRelaxed<C> {
                     }
                 }
                 Instruction::InternalVariable { expr } => Instruction::InternalVariable { expr },
-                Instruction::ConstantOrRandom { value } => Instruction::ConstantOrRandom { value },
+                Instruction::ConstantLike { value } => Instruction::ConstantLike { value },
             };
             instructions.push(new_insn);
         }
@@ -276,12 +279,15 @@ impl<C: Config> CircuitRelaxed<C> {
         let add = add_outputs.len() + add_outputs_sub.len();
         outputs.append(&mut add_outputs);
         outputs.append(&mut add_outputs_sub);
+        if is_root {
+            outputs.extend(self.outputs.iter().map(|x| new_id[*x]));
+        }
         (
             CircuitRelaxed {
                 num_inputs: self.num_inputs,
                 num_hint_inputs: self.num_hint_inputs,
                 instructions,
-                constraints: if is_root { vec![outputs[0]] } else { vec![] },
+                constraints: vec![],
                 outputs,
             },
             add,
@@ -290,34 +296,32 @@ impl<C: Config> CircuitRelaxed<C> {
 }
 
 impl<C: Config> RootCircuitRelaxed<C> {
-    pub fn adjust_for_layering(&self) -> RootCircuit<C> {
-        if !C::ENABLE_RANDOM_COMBINATION {
-            return self.export_constraints().solve_duplicates();
-        }
-        self.solve_duplicates()
-    }
-
-    fn solve_duplicates(&self) -> RootCircuit<C> {
+    pub fn solve_duplicates(&self) -> RootCircuit<C> {
         let mut new_circuits = HashMap::new();
         for (id, circuit) in self.circuits.iter() {
             new_circuits.insert(*id, circuit.solve_duplicates());
         }
         RootCircuit {
+            num_public_inputs: self.num_public_inputs,
+            expected_num_output_zeroes: self.expected_num_output_zeroes,
             circuits: new_circuits,
         }
     }
 
-    fn export_constraints(&self) -> RootCircuitRelaxed<C> {
+    pub fn export_constraints(&self) -> RootCircuitRelaxed<C> {
         let mut exported_circuits = HashMap::new();
         let mut sub_num_add_outputs = HashMap::new();
         let order = self.topo_order();
         for id in order.iter().rev() {
-            let circuit = self.circuits.get(id).unwrap();
+            let circuit: &common::Circuit<IrcRelaxed<C>> = self.circuits.get(id).unwrap();
             let (c, add) = circuit.export_constraints(*id == 0, &sub_num_add_outputs);
             exported_circuits.insert(*id, c);
             sub_num_add_outputs.insert(*id, add);
         }
+        let expected_zeroes = self.expected_num_output_zeroes + sub_num_add_outputs[&0];
         RootCircuitRelaxed {
+            num_public_inputs: self.num_public_inputs,
+            expected_num_output_zeroes: expected_zeroes,
             circuits: exported_circuits,
         }
     }
