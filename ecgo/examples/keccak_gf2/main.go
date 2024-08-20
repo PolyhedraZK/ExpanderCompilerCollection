@@ -387,6 +387,7 @@ func main() {
 	if err != nil {
 		panic("gg")
 	}
+	os.WriteFile("witness.txt", wit.Serialize(), 0o644)
 	ss := test.CheckCircuitMultiWitness(c, wit)
 	for _, s := range ss {
 		if !s {
