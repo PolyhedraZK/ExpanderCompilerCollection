@@ -3,15 +3,42 @@ package layered
 import (
 	"math/big"
 
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/field"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/utils"
 )
 
+func serializeCoef(o *utils.OutputBuf, bnlen int, coef *big.Int, coefType uint8, publicInputId uint64) {
+	if coefType == 1 {
+		o.AppendUint8(1)
+		o.AppendBigInt(bnlen, coef)
+	} else if coefType == 2 {
+		o.AppendUint8(2)
+	} else {
+		o.AppendUint8(3)
+		o.AppendUint64(publicInputId)
+	}
+}
+
+func deserializeCoef(in *utils.InputBuf, bnlen int) (*big.Int, uint8, uint64) {
+	coefType := in.ReadUint8()
+	if coefType == 1 {
+		return in.ReadBigInt(bnlen), 1, 0
+	} else if coefType == 2 {
+		return big.NewInt(0), 2, 0
+	} else {
+		return big.NewInt(0), 3, in.ReadUint64()
+	}
+}
+
 // Serialize converts a RootCircuit into a byte array for storage or transmission.
 func (rc *RootCircuit) Serialize() []byte {
+	bnlen := field.GetFieldFromOrder(rc.Field).SerializedLen()
 	o := utils.OutputBuf{}
-	zero := big.NewInt(0)
 	o.AppendUint64(3770719418566461763)
-	o.AppendBigInt(rc.Field)
+	o.AppendBigInt(32, rc.Field)
+	o.AppendUint64(uint64(rc.NumPublicInputs))
+	o.AppendUint64(uint64(rc.NumActualOutputs))
+	o.AppendUint64(uint64(rc.ExpectedNumOutputZeroes))
 	o.AppendUint64(uint64(len(rc.Circuits)))
 	for _, c := range rc.Circuits {
 		o.AppendUint64(c.InputLen)
@@ -25,45 +52,25 @@ func (rc *RootCircuit) Serialize() []byte {
 				o.AppendUint64(a.OutputOffset)
 			}
 		}
-		randomCoefIdx := []int{}
 		o.AppendUint64(uint64(len(c.Mul)))
-		for i, m := range c.Mul {
+		for _, m := range c.Mul {
 			o.AppendUint64(m.In0)
 			o.AppendUint64(m.In1)
 			o.AppendUint64(m.Out)
-			if m.Coef.Cmp(rc.Field) == 0 {
-				randomCoefIdx = append(randomCoefIdx, i)
-				o.AppendBigInt(zero)
-			} else {
-				o.AppendBigInt(m.Coef)
-			}
+			serializeCoef(&o, bnlen, m.Coef, m.CoefType, m.PublicInputId)
 		}
 		o.AppendUint64(uint64(len(c.Add)))
-		for i, a := range c.Add {
+		for _, a := range c.Add {
 			o.AppendUint64(a.In)
 			o.AppendUint64(a.Out)
-			if a.Coef.Cmp(rc.Field) == 0 {
-				randomCoefIdx = append(randomCoefIdx, i+len(c.Mul))
-				o.AppendBigInt(zero)
-			} else {
-				o.AppendBigInt(a.Coef)
-			}
+			serializeCoef(&o, bnlen, a.Coef, a.CoefType, a.PublicInputId)
 		}
 		o.AppendUint64(uint64(len(c.Cst)))
-		for i, cst := range c.Cst {
+		for _, cst := range c.Cst {
 			o.AppendUint64(cst.Out)
-			if cst.Coef.Cmp(rc.Field) == 0 {
-				randomCoefIdx = append(randomCoefIdx, i+len(c.Mul)+len(c.Add))
-				o.AppendBigInt(zero)
-			} else {
-				o.AppendBigInt(cst.Coef)
-			}
+			serializeCoef(&o, bnlen, cst.Coef, cst.CoefType, cst.PublicInputId)
 		}
-		o.AppendUint64(0)
-		o.AppendUint64(uint64(len(randomCoefIdx)))
-		for _, idx := range randomCoefIdx {
-			o.AppendUint64(uint64(idx))
-		}
+		o.AppendUint64(0) // custom
 	}
 	o.AppendUint64(uint64(len(rc.Layers)))
 	for _, l := range rc.Layers {
@@ -78,7 +85,11 @@ func DeserializeRootCircuit(buf []byte) *RootCircuit {
 		panic("invalid file header")
 	}
 	rc := &RootCircuit{}
-	rc.Field = in.ReadBigInt()
+	rc.Field = in.ReadBigInt(32)
+	rc.NumPublicInputs = int(in.ReadUint64())
+	rc.NumActualOutputs = int(in.ReadUint64())
+	rc.ExpectedNumOutputZeroes = int(in.ReadUint64())
+	bnlen := field.GetFieldFromOrder(rc.Field).SerializedLen()
 	nbCircuits := in.ReadUint64()
 	rc.Circuits = make([]*Circuit, nbCircuits)
 	for i := uint64(0); i < nbCircuits; i++ {
@@ -104,36 +115,22 @@ func DeserializeRootCircuit(buf []byte) *RootCircuit {
 			c.Mul[j].In0 = in.ReadUint64()
 			c.Mul[j].In1 = in.ReadUint64()
 			c.Mul[j].Out = in.ReadUint64()
-			c.Mul[j].Coef = in.ReadBigInt()
+			c.Mul[j].Coef, c.Mul[j].CoefType, c.Mul[j].PublicInputId = deserializeCoef(in, bnlen)
 		}
 		nbAdd := in.ReadUint64()
 		c.Add = make([]GateAdd, nbAdd)
 		for j := uint64(0); j < nbAdd; j++ {
 			c.Add[j].In = in.ReadUint64()
 			c.Add[j].Out = in.ReadUint64()
-			c.Add[j].Coef = in.ReadBigInt()
+			c.Add[j].Coef, c.Add[j].CoefType, c.Add[j].PublicInputId = deserializeCoef(in, bnlen)
 		}
 		nbCst := in.ReadUint64()
 		c.Cst = make([]GateCst, nbCst)
 		for j := uint64(0); j < nbCst; j++ {
 			c.Cst[j].Out = in.ReadUint64()
-			c.Cst[j].Coef = in.ReadBigInt()
+			c.Cst[j].Coef, c.Cst[j].CoefType, c.Cst[j].PublicInputId = deserializeCoef(in, bnlen)
 		}
-		in.ReadUint64()
-		nbRandomCoef := in.ReadUint64()
-		randomCoefIdx := make([]int, nbRandomCoef)
-		for j := uint64(0); j < nbRandomCoef; j++ {
-			randomCoefIdx[j] = int(in.ReadUint64())
-		}
-		for _, k := range randomCoefIdx {
-			if k < len(c.Mul) {
-				c.Mul[k].Coef = rc.Field
-			} else if k < len(c.Mul)+len(c.Add) {
-				c.Add[k-len(c.Mul)].Coef = rc.Field
-			} else {
-				c.Cst[k-len(c.Mul)-len(c.Add)].Coef = rc.Field
-			}
-		}
+		in.ReadUint64() // custom
 		rc.Circuits[i] = c
 	}
 	nbLayers := in.ReadUint64()

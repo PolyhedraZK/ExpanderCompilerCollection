@@ -295,9 +295,10 @@ func (t *keccak256Circuit) Define(api frontend.API) error {
 func main() {
 	var circuit keccak256Circuit
 
-	cr, _ := ecgo.Compile(gf2.ScalarField, &circuit)
-	//cr.Print()
-	_ = cr
+	cr, err := ecgo.Compile(gf2.ScalarField, &circuit)
+	if err != nil {
+		panic(err)
+	}
 
 	c := cr.GetLayeredCircuit()
 	//c.Print()
@@ -335,7 +336,7 @@ func main() {
 
 	out := test.EvalCircuit(c, wit)
 	fail := false
-	for i := 0; i <= NHashes*256; i++ {
+	for i := 0; i < NHashes*256; i++ {
 		if out[i].Uint64() == 1 {
 			fail = true
 		}
@@ -354,7 +355,7 @@ func main() {
 
 	out = test.EvalCircuit(c, wit)
 	done := false
-	for i := 0; i <= NHashes*256; i++ {
+	for i := 0; i < NHashes*256; i++ {
 		if out[i].Uint64() == 1 {
 			done = true
 		}

@@ -16,7 +16,7 @@ pub mod display;
 pub enum Instruction<C: Config> {
     LinComb(expr::LinComb<C>),
     Mul(Vec<usize>),
-    ConstantOrRandom(Coef<C>),
+    ConstantLike(Coef<C>),
     SubCircuitCall {
         sub_circuit_id: usize,
         inputs: Vec<usize>,
@@ -50,7 +50,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
         match self {
             Instruction::LinComb(lc) => lc.get_vars(),
             Instruction::Mul(inputs) => inputs.clone(),
-            Instruction::ConstantOrRandom(_) => vec![],
+            Instruction::ConstantLike(_) => vec![],
             Instruction::SubCircuitCall { inputs, .. } => inputs.clone(),
         }
     }
@@ -58,7 +58,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
         match self {
             Instruction::LinComb(_) => 1,
             Instruction::Mul(_) => 1,
-            Instruction::ConstantOrRandom(_) => 1,
+            Instruction::ConstantLike(_) => 1,
             Instruction::SubCircuitCall { num_outputs, .. } => *num_outputs,
         }
     }
@@ -83,7 +83,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
         match self {
             Instruction::LinComb(lc) => Instruction::LinComb(lc.replace_vars(f)),
             Instruction::Mul(inputs) => Instruction::Mul(inputs.iter().map(|i| f(*i)).collect()),
-            Instruction::ConstantOrRandom(coef) => Instruction::ConstantOrRandom(coef.clone()),
+            Instruction::ConstantLike(coef) => Instruction::ConstantLike(coef.clone()),
             Instruction::SubCircuitCall {
                 sub_circuit_id,
                 inputs,
@@ -98,7 +98,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
     fn from_kx_plus_b(x: usize, k: C::CircuitField, b: C::CircuitField) -> Self {
         Instruction::LinComb(expr::LinComb::from_kx_plus_b(x, k, b))
     }
-    fn validate(&self) -> Result<(), Error> {
+    fn validate(&self, num_public_inputs: usize) -> Result<(), Error> {
         match self {
             Instruction::Mul(inputs) => {
                 if inputs.len() >= 2 {
@@ -109,6 +109,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                     ))
                 }
             }
+            Instruction::ConstantLike(coef) => coef.validate(num_public_inputs),
             _ => Ok(()),
         }
     }
@@ -122,7 +123,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 }
                 EvalResult::Value(res)
             }
-            Instruction::ConstantOrRandom(coef) => EvalResult::Value(coef.get_value_unsafe()),
+            Instruction::ConstantLike(coef) => EvalResult::Value(coef.get_value_unsafe()),
             Instruction::SubCircuitCall {
                 sub_circuit_id,
                 inputs,

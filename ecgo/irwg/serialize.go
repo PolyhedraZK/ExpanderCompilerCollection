@@ -18,18 +18,25 @@ func serializeInstruction(o *utils.OutputBuf, i *Instruction, field field.Field)
 			o.AppendUint64(uint64(x))
 		}
 		for _, x := range i.LinCombCoef {
-			o.AppendBigInt(field.ToBigInt(x))
+			o.AppendFieldElement(field, x)
 		}
-		o.AppendBigInt(field.ToBigInt(i.Const))
+		o.AppendFieldElement(field, i.Const)
 	case Mul:
 		o.AppendIntSlice(i.Inputs)
 	case Hint:
 		o.AppendUint64(uint64(i.ExtraId))
 		o.AppendIntSlice(i.Inputs)
 		o.AppendUint64(uint64(i.NumOutputs))
-	case ConstantOrRandom:
-		o.AppendBigInt(field.ToBigInt(i.Const))
-		o.AppendUint8(uint8(i.ExtraId))
+	case ConstantLike:
+		if i.ExtraId == 0 {
+			o.AppendUint8(1)
+			o.AppendFieldElement(field, i.Const)
+		} else if i.ExtraId == 1 {
+			o.AppendUint8(2)
+		} else {
+			o.AppendUint8(3)
+			o.AppendUint64(uint64(i.ExtraId) - 2)
+		}
 	case SubCircuitCall:
 		o.AppendUint64(uint64(i.ExtraId))
 		o.AppendIntSlice(i.Inputs)
@@ -58,6 +65,8 @@ func serializeRootCircuit(o *utils.OutputBuf, c *RootCircuit, field field.Field)
 func SerializeRootCircuit(c *RootCircuit) []byte {
 	o := &utils.OutputBuf{}
 	o.AppendUint64(field.GetFieldId(c.Field))
+	o.AppendUint64(uint64(c.NumPublicInputs))
+	o.AppendUint64(uint64(c.ExpectedNumOutputZeroes))
 	serializeRootCircuit(o, c, c.Field)
 	return o.Bytes()
 }
@@ -78,18 +87,25 @@ func deserializeInstruction(field field.Field, i *utils.InputBuf) Instruction {
 		}
 		ins.LinCombCoef = make([]constraint.Element, n)
 		for j := uint64(0); j < n; j++ {
-			ins.LinCombCoef[j] = field.FromInterface(i.ReadBigInt())
+			ins.LinCombCoef[j] = i.ReadFieldElement(field)
 		}
-		ins.Const = field.FromInterface(i.ReadBigInt())
+		ins.Const = i.ReadFieldElement(field)
 	case Mul:
 		ins.Inputs = i.ReadIntSlice()
 	case Hint:
 		ins.ExtraId = i.ReadUint64()
 		ins.Inputs = i.ReadIntSlice()
 		ins.NumOutputs = int(i.ReadUint64())
-	case ConstantOrRandom:
-		ins.Const = field.FromInterface(i.ReadBigInt())
-		ins.ExtraId = uint64(i.ReadUint8())
+	case ConstantLike:
+		typ := i.ReadUint8()
+		if typ == 1 {
+			ins.ExtraId = 0
+			ins.Const = i.ReadFieldElement(field)
+		} else if typ == 2 {
+			ins.ExtraId = 1
+		} else {
+			ins.ExtraId = 2 + i.ReadUint64()
+		}
 	case SubCircuitCall:
 		ins.ExtraId = i.ReadUint64()
 		ins.Inputs = i.ReadIntSlice()
@@ -113,6 +129,8 @@ func deserializeCircuit(field field.Field, i *utils.InputBuf) *Circuit {
 
 func deserializeRootCircuit(field field.Field, i *utils.InputBuf) *RootCircuit {
 	var rc RootCircuit
+	rc.NumPublicInputs = int(i.ReadUint64())
+	rc.ExpectedNumOutputZeroes = int(i.ReadUint64())
 	n := i.ReadUint64()
 	rc.Circuits = make(map[uint64]*Circuit)
 	for j := uint64(0); j < n; j++ {

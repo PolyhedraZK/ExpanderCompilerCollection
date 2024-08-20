@@ -123,3 +123,7 @@ func (engine *Field) Field() *big.Int {
 func (engine *Field) FieldBitLen() int {
 	return fr.Modulus().BitLen()
 }
+
+func (engine *Field) SerializedLen() int {
+	return 32
+}

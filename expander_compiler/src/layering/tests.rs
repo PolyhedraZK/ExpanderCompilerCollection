@@ -21,13 +21,11 @@ pub fn test_input<C: Config>(
 ) {
     let (rc_output, rc_cond) = rc.eval_unsafe(input.clone());
     let lc_input = input_mapping.map_inputs(input);
-    let lc_output = lc.eval_unsafe(lc_input);
+    let (lc_output, lc_cond) = lc.eval_unsafe(lc_input);
     //println!("{:?}", rc_output);
     //println!("{:?}", lc_output);
-    assert_eq!(rc_cond, lc_output[0].is_zero());
-    for (i, x) in rc_output.iter().cloned().enumerate() {
-        assert_eq!(x, lc_output[i + 1]);
-    }
+    assert_eq!(rc_cond, lc_cond);
+    assert_eq!(rc_output, lc_output);
 }
 
 pub fn compile_and_random_test<C: Config>(

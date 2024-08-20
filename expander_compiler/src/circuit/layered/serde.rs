@@ -8,16 +8,35 @@ impl<C: Config> Serde for Coef<C> {
     fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
         Ok(match self {
             Coef::Constant(c) => {
+                1u8.serialize_into(&mut writer)?;
                 c.serialize_into(&mut writer)?;
             }
             Coef::Random => {
-                C::CircuitField::zero().serialize_into(&mut writer)?;
+                2u8.serialize_into(&mut writer)?;
+            }
+            Coef::PublicInput(id) => {
+                3u8.serialize_into(&mut writer)?;
+                id.serialize_into(&mut writer)?;
             }
         })
     }
     fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
-        let c = C::CircuitField::deserialize_from(&mut reader)?;
-        Ok(Coef::Constant(c))
+        let typ = u8::deserialize_from(&mut reader)?;
+        match typ {
+            1 => {
+                let c = C::CircuitField::deserialize_from(&mut reader)?;
+                Ok(Coef::Constant(c))
+            }
+            2 => Ok(Coef::Random),
+            3 => {
+                let id = usize::deserialize_from(&mut reader)?;
+                Ok(Coef::PublicInput(id))
+            }
+            _ => Err(IoError::new(
+                std::io::ErrorKind::InvalidData,
+                "invalid coef type",
+            )),
+        }
     }
 }
 
@@ -83,43 +102,16 @@ impl<C: Config> Serde for Segment<C> {
         self.gate_adds.serialize_into(&mut writer)?;
         self.gate_consts.serialize_into(&mut writer)?;
         0usize.serialize_into(&mut writer)?;
-        let mut random_coef_idx = Vec::new();
-        for (i, x) in self.gate_muls.iter().enumerate() {
-            if x.coef == Coef::Random {
-                random_coef_idx.push(i);
-            }
-        }
-        for (i, x) in self.gate_adds.iter().enumerate() {
-            if x.coef == Coef::Random {
-                random_coef_idx.push(i + self.gate_muls.len());
-            }
-        }
-        for (i, x) in self.gate_consts.iter().enumerate() {
-            if x.coef == Coef::Random {
-                random_coef_idx.push(i + self.gate_muls.len() + self.gate_adds.len());
-            }
-        }
-        random_coef_idx.serialize_into(&mut writer)?;
         Ok(())
     }
     fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
         let num_inputs = usize::deserialize_from(&mut reader)?;
         let num_outputs = usize::deserialize_from(&mut reader)?;
         let child_segs = Vec::<ChildSpec>::deserialize_from(&mut reader)?;
-        let mut gate_muls = Vec::<GateMul<C>>::deserialize_from(&mut reader)?;
-        let mut gate_adds = Vec::<GateAdd<C>>::deserialize_from(&mut reader)?;
-        let mut gate_consts = Vec::<GateConst<C>>::deserialize_from(&mut reader)?;
+        let gate_muls = Vec::<GateMul<C>>::deserialize_from(&mut reader)?;
+        let gate_adds = Vec::<GateAdd<C>>::deserialize_from(&mut reader)?;
+        let gate_consts = Vec::<GateConst<C>>::deserialize_from(&mut reader)?;
         let _ = usize::deserialize_from(&mut reader)?;
-        let random_coef_idx = Vec::<usize>::deserialize_from(&mut reader)?;
-        for i in random_coef_idx {
-            if i < gate_muls.len() {
-                gate_muls[i].coef = Coef::Random;
-            } else if i < gate_muls.len() + gate_adds.len() {
-                gate_adds[i - gate_muls.len()].coef = Coef::Random;
-            } else {
-                gate_consts[i - gate_muls.len() - gate_adds.len()].coef = Coef::Random;
-            }
-        }
         Ok(Segment {
             num_inputs,
             num_outputs,
@@ -137,6 +129,10 @@ impl<C: Config> Serde for Circuit<C> {
     fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
         MAGIC.serialize_into(&mut writer)?;
         C::CircuitField::modulus().serialize_into(&mut writer)?;
+        self.num_public_inputs.serialize_into(&mut writer)?;
+        self.num_actual_outputs.serialize_into(&mut writer)?;
+        self.expected_num_output_zeroes
+            .serialize_into(&mut writer)?;
         self.segments.serialize_into(&mut writer)?;
         self.layer_ids.serialize_into(&mut writer)?;
         Ok(())
@@ -156,9 +152,15 @@ impl<C: Config> Serde for Circuit<C> {
                 "invalid modulus",
             ));
         }
+        let num_public_inputs = usize::deserialize_from(&mut reader)?;
+        let num_actual_outputs = usize::deserialize_from(&mut reader)?;
+        let expected_num_output_zeroes = usize::deserialize_from(&mut reader)?;
         let segments = Vec::<Segment<C>>::deserialize_from(&mut reader)?;
         let layer_ids = Vec::<usize>::deserialize_from(&mut reader)?;
         Ok(Circuit {
+            num_public_inputs,
+            num_actual_outputs,
+            expected_num_output_zeroes,
             segments,
             layer_ids,
         })

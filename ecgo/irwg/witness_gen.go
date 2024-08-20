@@ -94,7 +94,7 @@ func (rc *RootCircuit) evalSub(circuitId uint64, inputs []constraint.Element) ([
 			for _, x := range hint_outputs {
 				values = append(values, rc.Field.FromInterface(x))
 			}
-		case ConstantOrRandom:
+		case ConstantLike:
 			if insn.ExtraId == 0 {
 				values = append(values, insn.Const)
 			} else {
@@ -141,7 +141,7 @@ func callHint(hintId uint64, field *big.Int, inputs []*big.Int, outputs []*big.I
 func (w Witness) Serialize() []byte {
 	o := utils.OutputBuf{}
 	for _, x := range w {
-		o.AppendBigInt(x)
+		o.AppendBigInt(32, x)
 	}
 	return o.Bytes()
 }

@@ -38,7 +38,7 @@ pub trait Instruction<C: Config>: Debug + Clone + Hash + PartialEq + Eq {
     fn sub_circuit_call(sub_circuit_id: usize, inputs: Vec<usize>, num_outputs: usize) -> Self;
     fn replace_vars<F: Fn(usize) -> usize>(&self, f: F) -> Self;
     fn from_kx_plus_b(x: usize, k: C::CircuitField, b: C::CircuitField) -> Self;
-    fn validate(&self) -> Result<(), Error>;
+    fn validate(&self, num_public_inputs: usize) -> Result<(), Error>;
     fn eval_unsafe(&self, values: &[C::CircuitField]) -> EvalResult<'_, C>;
 }
 
@@ -97,6 +97,8 @@ pub struct Circuit<Irc: IrConfig> {
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct RootCircuit<Irc: IrConfig> {
+    pub num_public_inputs: usize,
+    pub expected_num_output_zeroes: usize,
     pub circuits: HashMap<usize, Circuit<Irc>>,
 }
 
@@ -109,7 +111,7 @@ impl<Irc: IrConfig> Circuit<Irc> {
         }
     }
 
-    fn validate_variable_references(&self) -> Result<(), Error> {
+    fn validate_variable_references(&self, num_public_inputs: usize) -> Result<(), Error> {
         if !Irc::HAS_HINT_INPUT && self.num_hint_inputs != 0 {
             return Err(Error::InternalError(
                 "hint input is not allowed".to_string(),
@@ -125,7 +127,7 @@ impl<Irc: IrConfig> Circuit<Irc> {
                     )));
                 }
             }
-            insn.validate()?;
+            insn.validate(num_public_inputs)?;
             cur_var_max += insn.num_outputs();
             if !Irc::ALLOW_DUPLICATE_SUB_CIRCUIT_INPUTS {
                 if let Some((_, inputs, _)) = insn.as_sub_circuit_call() {
@@ -219,7 +221,7 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
         }
         // check if all variable references are valid
         for circuit in self.circuits.values() {
-            circuit.validate_variable_references()?;
+            circuit.validate_variable_references(self.num_public_inputs)?;
         }
         // check if all sub circuit calls are valid and it's a DAG
         for circuit in self.circuits.values() {
@@ -255,26 +257,33 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
         if !is_dag {
             return Err(Error::InternalError("circuit is not a DAG".to_string()));
         }
-        // check if root circuit has constraint
-        let mut has_constraint: HashSet<usize> = HashSet::new();
-        for circuit_id in order.iter().rev() {
-            let circuit = &self.circuits[circuit_id];
-            if !circuit.constraints.is_empty() {
-                has_constraint.insert(*circuit_id);
-                continue;
-            }
-            if let Some(e) = s_edges.get(circuit_id) {
-                for o in e {
-                    if has_constraint.contains(o) {
-                        has_constraint.insert(*circuit_id);
-                        break;
+        // check if root circuit has constraint or output
+        if self.circuits[&0].outputs.is_empty() {
+            let mut has_constraint: HashSet<usize> = HashSet::new();
+            for circuit_id in order.iter().rev() {
+                let circuit = &self.circuits[circuit_id];
+                if !circuit.constraints.is_empty() {
+                    has_constraint.insert(*circuit_id);
+                    continue;
+                }
+                if let Some(e) = s_edges.get(circuit_id) {
+                    for o in e {
+                        if has_constraint.contains(o) {
+                            has_constraint.insert(*circuit_id);
+                            break;
+                        }
                     }
                 }
             }
+            if !has_constraint.contains(&0) {
+                return Err(Error::UserError(
+                    "root circuit should have constraints or outputs".to_string(),
+                ));
+            }
         }
-        if !has_constraint.contains(&0) {
+        if self.expected_num_output_zeroes > self.circuits[&0].outputs.len() {
             return Err(Error::UserError(
-                "root circuit should have constraints".to_string(),
+                "expected_num_output_zeroes should be less than or equal to the number of outputs of the root circuit".to_string(),
             ));
         }
         Ok(())

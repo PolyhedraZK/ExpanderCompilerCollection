@@ -15,9 +15,12 @@ import (
 // through the Circuits array. Field denotes the mathematical field over which
 // the circuit operations are carried out.
 type RootCircuit struct {
-	Circuits []*Circuit
-	Layers   []uint64
-	Field    *big.Int
+	NumPublicInputs         int
+	NumActualOutputs        int
+	ExpectedNumOutputZeroes int
+	Circuits                []*Circuit
+	Layers                  []uint64
+	Field                   *big.Int
 }
 
 // Circuit represents a single segment within a layered circuit.
@@ -55,26 +58,32 @@ type Allocation struct {
 // along with a coefficient. The product of the inputs and the coefficient
 // is added to the output.
 type GateMul struct {
-	In0  uint64
-	In1  uint64
-	Out  uint64
-	Coef *big.Int
+	In0           uint64
+	In1           uint64
+	Out           uint64
+	Coef          *big.Int
+	CoefType      uint8
+	PublicInputId uint64
 }
 
 // GateAdd represents an addition gate within a circuit layer.
 // It specifies the input and output wire indices, and the coefficient
 // to be multiplied with the input before being added to the output.
 type GateAdd struct {
-	In   uint64
-	Out  uint64
-	Coef *big.Int
+	In            uint64
+	Out           uint64
+	Coef          *big.Int
+	CoefType      uint8
+	PublicInputId uint64
 }
 
 // GateCst represents a constant gate within a circuit layer.
 // It directly adds a constant value, defined by Coef, to the output wire.
 type GateCst struct {
-	Out  uint64
-	Coef *big.Int
+	Out           uint64
+	Coef          *big.Int
+	CoefType      uint8
+	PublicInputId uint64
 }
 
 // Print outputs the entire circuit structure to the console for debugging purposes.

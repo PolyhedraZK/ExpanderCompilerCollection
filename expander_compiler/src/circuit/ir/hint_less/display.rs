@@ -15,7 +15,7 @@ impl<C: Config> fmt::Display for Instruction<C> {
                 }
                 Ok(())
             }
-            Instruction::ConstantOrRandom(coef) => write!(f, "{}", coef),
+            Instruction::ConstantLike(coef) => write!(f, "{}", coef),
             Instruction::SubCircuitCall {
                 sub_circuit_id,
                 inputs,

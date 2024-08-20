@@ -2,7 +2,7 @@ use rand::{Rng, RngCore};
 
 use super::{
     Circuit, CircuitRelaxed,
-    Instruction::{self, ConstantOrRandom, InternalVariable, SubCircuitCall},
+    Instruction::{self, ConstantLike, InternalVariable, SubCircuitCall},
     RootCircuit, RootCircuitRelaxed,
 };
 use crate::circuit::{
@@ -24,7 +24,7 @@ fn validate_vars() {
         0,
         Circuit {
             instructions: vec![
-                ConstantOrRandom {
+                ConstantLike {
                     value: Coef::Constant(CField::one()),
                 },
                 InternalVariable {
@@ -57,7 +57,7 @@ fn validate_vars_dup() {
         0,
         Circuit {
             instructions: vec![
-                ConstantOrRandom {
+                ConstantLike {
                     value: Coef::Constant(CField::one()),
                 },
                 InternalVariable {
@@ -251,10 +251,11 @@ impl<C: Config> RandomInstruction for Instruction<C> {
         mut rnd: impl RngCore,
         num_terms: &RandomRange,
         num_vars: usize,
+        num_public_inputs: usize,
     ) -> Self {
         if rnd.gen::<f64>() < 0.3 {
-            ConstantOrRandom {
-                value: Coef::Constant(C::CircuitField::from(rnd.next_u32())),
+            ConstantLike {
+                value: Coef::random_no_random(&mut rnd, num_public_inputs),
             }
         } else {
             let mut terms = Vec::with_capacity(num_terms.random(&mut rnd));
@@ -411,7 +412,7 @@ fn adjust_for_layering() {
                     inputs: vec![2, 2],
                     num_outputs: 1,
                 },
-                ConstantOrRandom {
+                ConstantLike {
                     value: Coef::Constant(CField::one()),
                 },
                 SubCircuitCall {
@@ -437,7 +438,7 @@ fn adjust_for_layering() {
         },
     );
     assert_eq!(root.validate(), Ok(()));
-    let r2 = root.adjust_for_layering();
+    let r2 = root.solve_duplicates();
     assert_eq!(r2.validate(), Ok(()));
     assert_eq!(
         r2.circuits[&0].instructions,
@@ -458,10 +459,10 @@ fn adjust_for_layering() {
                 inputs: vec![3, 4],
                 num_outputs: 1,
             },
-            ConstantOrRandom {
+            ConstantLike {
                 value: Coef::Constant(CField::one()),
             },
-            ConstantOrRandom {
+            ConstantLike {
                 value: Coef::Constant(CField::one()),
             },
             SubCircuitCall {
@@ -505,7 +506,7 @@ fn adjust_for_layering_and_reassign_duplicate_sub_circuit_outputs() {
         let (out3, cond3) = ropt.eval_unsafe(im.map_inputs(&inputs));
         assert_eq!(out1, out3);
         assert_eq!(cond1, cond3);
-        let r2 = ropt.adjust_for_layering();
+        let r2 = ropt.solve_duplicates();
         assert_eq!(r2.validate(), Ok(()));
         let (out4, cond4) = r2.eval_unsafe(im.map_inputs(&inputs));
         assert_eq!(out1, out4);

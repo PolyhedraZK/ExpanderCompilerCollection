@@ -10,6 +10,8 @@ type Circuit struct {
 }
 
 type RootCircuit struct {
-	Circuits map[uint64]*Circuit
-	Field    field.Field
+	NumPublicInputs         int
+	ExpectedNumOutputZeroes int
+	Circuits                map[uint64]*Circuit
+	Field                   field.Field
 }

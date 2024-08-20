@@ -3,7 +3,12 @@ use rand::{Rng, RngCore, SeedableRng};
 use super::*;
 
 pub trait RandomInstruction {
-    fn random_no_sub_circuit(r: impl RngCore, num_terms: &RandomRange, num_vars: usize) -> Self;
+    fn random_no_sub_circuit(
+        r: impl RngCore,
+        num_terms: &RandomRange,
+        num_vars: usize,
+        num_public_inputs: usize,
+    ) -> Self;
 }
 
 pub trait RandomConstraintType {
@@ -49,6 +54,7 @@ where
         let mut root = RootCircuit::<Irc>::default();
         let mut circuit_ids = vec![0];
         let num_circuits = config.num_circuits.random(&mut rnd);
+        root.num_public_inputs = config.num_inputs.random(&mut rnd);
         let mut has_constraint: Vec<bool> = vec![false; num_circuits];
         while circuit_ids.len() < num_circuits {
             let next_id = rnd.next_u64() as usize;
@@ -96,8 +102,12 @@ where
                         continue;
                     }
                 }
-                let insn =
-                    Irc::Instruction::random_no_sub_circuit(&mut rnd, &config.num_terms, num_vars);
+                let insn = Irc::Instruction::random_no_sub_circuit(
+                    &mut rnd,
+                    &config.num_terms,
+                    num_vars,
+                    root.num_public_inputs,
+                );
                 num_vars += insn.num_outputs();
                 instructions.push(insn);
             }

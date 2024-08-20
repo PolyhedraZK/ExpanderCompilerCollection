@@ -48,10 +48,9 @@ impl<C: Config> Serde for Instruction<C> {
                 inputs.serialize_into(&mut writer)?;
                 num_outputs.serialize_into(&mut writer)?;
             }
-            Instruction::ConstantOrRandom(coef) => {
+            Instruction::ConstantLike(coef) => {
                 8u8.serialize_into(&mut writer)?;
                 coef.serialize_into(&mut writer)?;
-                (*coef == Coef::Random).serialize_into(&mut writer)?;
             }
             Instruction::SubCircuitCall {
                 sub_circuit_id,
@@ -116,8 +115,7 @@ impl<C: Config> Serde for Instruction<C> {
             },
             8 => {
                 let coef = Coef::<C>::deserialize_from(&mut reader)?;
-                let is_random = bool::deserialize_from(&mut reader)?;
-                Instruction::ConstantOrRandom(if is_random { Coef::Random } else { coef })
+                Instruction::ConstantLike(coef)
             }
             9 => Instruction::SubCircuitCall {
                 sub_circuit_id: usize::deserialize_from(&mut reader)?,

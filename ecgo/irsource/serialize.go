@@ -17,9 +17,9 @@ func serializeInstruction(o *utils.OutputBuf, i *Instruction, field field.Field)
 			o.AppendUint64(uint64(x))
 		}
 		for _, x := range i.LinCombCoef {
-			o.AppendBigInt(field.ToBigInt(x))
+			o.AppendFieldElement(field, x)
 		}
-		o.AppendBigInt(field.ToBigInt(i.Const))
+		o.AppendFieldElement(field, i.Const)
 	case Mul:
 		o.AppendIntSlice(i.Inputs)
 	case Div:
@@ -38,9 +38,16 @@ func serializeInstruction(o *utils.OutputBuf, i *Instruction, field field.Field)
 		o.AppendUint64(uint64(i.ExtraId))
 		o.AppendIntSlice(i.Inputs)
 		o.AppendUint64(uint64(i.NumOutputs))
-	case ConstantOrRandom:
-		o.AppendBigInt(field.ToBigInt(i.Const))
-		o.AppendUint8(uint8(i.ExtraId))
+	case ConstantLike:
+		if i.ExtraId == 0 {
+			o.AppendUint8(1)
+			o.AppendFieldElement(field, i.Const)
+		} else if i.ExtraId == 1 {
+			o.AppendUint8(2)
+		} else {
+			o.AppendUint8(3)
+			o.AppendUint64(uint64(i.ExtraId) - 2)
+		}
 	case SubCircuitCall:
 		o.AppendUint64(uint64(i.ExtraId))
 		o.AppendIntSlice(i.Inputs)
@@ -67,6 +74,8 @@ func serializeCircuit(o *utils.OutputBuf, c *Circuit, field field.Field) {
 }
 
 func serializeRootCircuit(o *utils.OutputBuf, c *RootCircuit, field field.Field) {
+	o.AppendUint64(uint64(c.NumPublicInputs))
+	o.AppendUint64(uint64(c.ExpectedNumOutputZeroes))
 	o.AppendUint64(uint64(len(c.Circuits)))
 	for k, c := range c.Circuits {
 		o.AppendUint64(uint64(k))

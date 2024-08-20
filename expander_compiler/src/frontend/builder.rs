@@ -58,7 +58,7 @@ impl<C: Config> Builder<C> {
             VariableOrValue::Variable(v) => v,
             VariableOrValue::Value(v) => {
                 self.instructions
-                    .push(SourceInstruction::ConstantOrRandom(Coef::Constant(v)));
+                    .push(SourceInstruction::ConstantLike(Coef::Constant(v)));
                 self.var_max += 1;
                 RawVariable { id: self.var_max }
             }

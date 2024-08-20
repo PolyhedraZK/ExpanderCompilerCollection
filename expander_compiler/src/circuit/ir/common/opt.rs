@@ -389,6 +389,8 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
         }
         (
             RootCircuit {
+                num_public_inputs: self.num_public_inputs,
+                expected_num_output_zeroes: self.expected_num_output_zeroes,
                 circuits: new_circuits,
             },
             InputMapping::new(new_input_size, input_mapping_vec),

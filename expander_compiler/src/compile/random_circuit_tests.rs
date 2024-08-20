@@ -7,6 +7,7 @@ use crate::{
         },
     },
     compile::compile,
+    field::Field,
     utils::error::Error,
 };
 
@@ -20,6 +21,34 @@ fn do_test<C: Config>(mut config: RandomCircuitConfig, seed: RandomRange) {
             Ok((ir_hint_normalized, layered_circuit)) => {
                 assert_eq!(ir_hint_normalized.validate(), Ok(()));
                 assert_eq!(layered_circuit.validate(), Ok(()));
+                assert_eq!(ir_hint_normalized.input_size(), root.input_size());
+                assert_eq!(
+                    layered_circuit.input_size(),
+                    ir_hint_normalized.circuits[&0].outputs.len()
+                );
+                assert_eq!(
+                    layered_circuit.num_actual_outputs - layered_circuit.expected_num_output_zeroes,
+                    root.circuits[&0].outputs.len() - root.expected_num_output_zeroes
+                );
+                for _ in 0..5 {
+                    let input: Vec<C::CircuitField> = (0..root.input_size())
+                        .map(|_| C::CircuitField::random_unsafe())
+                        .collect();
+                    match root.eval_unsafe_with_errors(input.clone()) {
+                        Ok((src_output, src_cond)) => {
+                            let (ir_output, _) = ir_hint_normalized.eval_unsafe(input);
+                            let (lc_output, lc_cond) = layered_circuit.eval_unsafe(ir_output);
+                            assert_eq!(src_cond, lc_cond);
+                            assert_eq!(src_output, lc_output);
+                        }
+                        Err(e) => match e {
+                            Error::UserError(_) => {}
+                            Error::InternalError(e) => {
+                                panic!("{:?}", e);
+                            }
+                        },
+                    }
+                }
             }
             Err(e) => match e {
                 Error::UserError(_) => {}
@@ -80,8 +109,7 @@ fn test_bn254() {
     do_tests::<BN254Config>(2000000);
 }
 
-/*#[test]
+#[test]
 fn test_gf2() {
     do_tests::<GF2Config>(3000000);
-}*/
-// TODO: currently GF2 won't work, since we disabled random combination in the dumb way
+}

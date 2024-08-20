@@ -256,24 +256,12 @@ impl M31 {
 // Serde
 impl Serde for M31 {
     fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
-        let extra_buf = [0u8; 28];
-        writer.write_all(&self.v.to_le_bytes())?;
-        writer.write_all(&extra_buf)
+        writer.write_all(&self.v.to_le_bytes())
     }
 
     fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
         let mut u = [0u8; 4];
-        let mut extra_buf = [0u8; 28];
         reader.read_exact(&mut u)?;
-        reader.read_exact(&mut extra_buf)?;
-        for x in extra_buf.iter() {
-            if *x != 0 {
-                return Err(IoError::new(
-                    std::io::ErrorKind::InvalidData,
-                    "extra bytes in M31",
-                ));
-            }
-        }
         Ok(u32::from_le_bytes(u).into())
     }
 }

@@ -36,7 +36,7 @@ pub enum Instruction<C: Config> {
         inputs: Vec<usize>,
         num_outputs: usize,
     },
-    ConstantOrRandom(Coef<C>),
+    ConstantLike(Coef<C>),
     SubCircuitCall {
         sub_circuit_id: usize,
         inputs: Vec<usize>,
@@ -148,7 +148,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             Instruction::IsZero(x) => vec![*x],
             Instruction::Commit(inputs) => inputs.clone(),
             Instruction::Hint { inputs, .. } => inputs.clone(),
-            Instruction::ConstantOrRandom(_) => vec![],
+            Instruction::ConstantLike(_) => vec![],
             Instruction::SubCircuitCall { inputs, .. } => inputs.clone(),
             Instruction::UnconstrainedBinOp { x, y, .. } => vec![*x, *y],
             Instruction::UnconstrainedSelect {
@@ -167,7 +167,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             Instruction::IsZero(_) => 1,
             Instruction::Commit(_) => 1,
             Instruction::Hint { num_outputs, .. } => *num_outputs,
-            Instruction::ConstantOrRandom(_) => 1,
+            Instruction::ConstantLike(_) => 1,
             Instruction::SubCircuitCall { num_outputs, .. } => *num_outputs,
             Instruction::UnconstrainedBinOp { .. } => 1,
             Instruction::UnconstrainedSelect { .. } => 1,
@@ -217,7 +217,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 inputs: inputs.iter().map(|i| f(*i)).collect(),
                 num_outputs: *num_outputs,
             },
-            Instruction::ConstantOrRandom(coef) => Instruction::ConstantOrRandom(coef.clone()),
+            Instruction::ConstantLike(coef) => Instruction::ConstantLike(coef.clone()),
             Instruction::SubCircuitCall {
                 sub_circuit_id,
                 inputs,
@@ -246,7 +246,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
     fn from_kx_plus_b(x: usize, k: C::CircuitField, b: C::CircuitField) -> Self {
         Instruction::LinComb(expr::LinComb::from_kx_plus_b(x, k, b))
     }
-    fn validate(&self) -> Result<(), Error> {
+    fn validate(&self, num_public_inputs: usize) -> Result<(), Error> {
         match self {
             Instruction::Mul(inputs) => {
                 if inputs.len() >= 2 {
@@ -271,6 +271,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                     ))
                 }
             }
+            Instruction::ConstantLike(coef) => coef.validate(num_public_inputs),
             _ => Ok(()),
         }
     }
@@ -332,7 +333,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 );
                 EvalResult::Values(outputs)
             }
-            Instruction::ConstantOrRandom(coef) => EvalResult::Value(coef.get_value_unsafe()),
+            Instruction::ConstantLike(coef) => EvalResult::Value(coef.get_value_unsafe()),
             Instruction::SubCircuitCall {
                 sub_circuit_id,
                 inputs,

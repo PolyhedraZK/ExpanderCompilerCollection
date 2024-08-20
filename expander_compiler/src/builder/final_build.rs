@@ -41,11 +41,14 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
             InsnOut::Mul(inputs) => {
                 self.add_mul_vec(inputs.clone());
             }
-            InsnOut::ConstantOrRandom(coef) => match coef {
+            InsnOut::ConstantLike(coef) => match coef {
                 Coef::Constant(c) => {
                     self.add_const(*c);
                 }
                 Coef::Random => {
+                    self.add_out_vars(1);
+                }
+                Coef::PublicInput(_) => {
                     self.add_out_vars(1);
                 }
             },
@@ -99,8 +102,8 @@ impl<'a, C: Config> Builder<'a, C> {
                 ir::hint_less::Instruction::LinComb(_) | ir::hint_less::Instruction::Mul(_) => {
                     panic!("unexpected situation");
                 }
-                ir::hint_less::Instruction::ConstantOrRandom(c) => {
-                    fin_insns.push(ir::dest::Instruction::ConstantOrRandom { value: c.clone() });
+                ir::hint_less::Instruction::ConstantLike(c) => {
+                    fin_insns.push(ir::dest::Instruction::ConstantLike { value: c.clone() });
                 }
                 ir::hint_less::Instruction::SubCircuitCall {
                     sub_circuit_id,
@@ -209,6 +212,8 @@ pub fn process<'a, C: Config>(
         out_circuits.insert(circuit_id, builder.export_for_layering()?);
     }
     Ok(ir::dest::RootCircuitRelaxed {
+        num_public_inputs: rc.num_public_inputs,
+        expected_num_output_zeroes: rc.expected_num_output_zeroes,
         circuits: out_circuits,
     })
 }
@@ -290,7 +295,7 @@ mod tests {
         assert_eq!(root.validate(), Ok(()));
         let root_processed = super::process(&root).unwrap();
         assert_eq!(root_processed.validate(), Ok(()));
-        let root_fin = root_processed.adjust_for_layering();
+        let root_fin = root_processed.solve_duplicates();
         assert_eq!(root_fin.validate(), Ok(()));
         let (out, _) = root_fin.eval_unsafe(vec![
             CField::from(2),

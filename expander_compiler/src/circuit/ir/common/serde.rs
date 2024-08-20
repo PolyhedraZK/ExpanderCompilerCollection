@@ -50,6 +50,9 @@ where
 {
     fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
         Irc::Config::CONFIG_ID.serialize_into(&mut writer)?;
+        self.num_public_inputs.serialize_into(&mut writer)?;
+        self.expected_num_output_zeroes
+            .serialize_into(&mut writer)?;
         self.circuits.serialize_into(&mut writer)?;
         Ok(())
     }
@@ -61,7 +64,13 @@ where
                 "config id mismatch",
             ));
         }
+        let num_public_inputs = usize::deserialize_from(&mut reader)?;
+        let expected_num_output_zeroes = usize::deserialize_from(&mut reader)?;
         let circuits = HashMap::<usize, Circuit<Irc>>::deserialize_from(&mut reader)?;
-        Ok(RootCircuit { circuits })
+        Ok(RootCircuit {
+            num_public_inputs,
+            expected_num_output_zeroes,
+            circuits,
+        })
     }
 }

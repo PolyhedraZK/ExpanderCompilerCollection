@@ -20,7 +20,7 @@ impl<C: Config> fmt::Display for Instruction<C> {
                 }
                 write!(f, ")")
             }
-            Instruction::ConstantOrRandom { value } => write!(f, "{}", value),
+            Instruction::ConstantLike { value } => write!(f, "{}", value),
         }
     }
 }
