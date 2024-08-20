@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::circuit::{config::Config, layered::Coef};
 use crate::field::Field;
+use crate::hints;
 use crate::utils::error::Error;
 
 use super::common::EvalResult;
@@ -135,6 +136,11 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                         }
                         VarSpec::Quad(i, j) => {
                             sum += values[*i] * values[*j] * term.coef;
+                        }
+                        VarSpec::Custom { gate_type, inputs } => {
+                            let args: Vec<C::CircuitField> =
+                                inputs.iter().map(|i| values[*i]).collect();
+                            sum += hints::stub_impl(*gate_type, &args, 1)[0] * term.coef;
                         }
                     }
                 }
@@ -324,5 +330,16 @@ impl<C: Config> RootCircuitRelaxed<C> {
             expected_num_output_zeroes: expected_zeroes,
             circuits: exported_circuits,
         }
+    }
+}
+
+impl<C: Config> RootCircuit<C> {
+    pub fn validate_circuit_has_inputs(&self) -> Result<(), Error> {
+        for circuit in self.circuits.values() {
+            if circuit.num_inputs == 0 {
+                return Err(Error::UserError("circuit has no inputs".to_string()));
+            }
+        }
+        Ok(())
     }
 }

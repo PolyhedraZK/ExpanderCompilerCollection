@@ -36,6 +36,10 @@ pub enum Instruction<C: Config> {
         inputs: Vec<usize>,
         num_outputs: usize,
     },
+    CustomGate {
+        gate_type: usize,
+        inputs: Vec<usize>,
+    },
 }
 
 #[derive(Default, Debug, Clone, Hash, PartialEq, Eq)]
@@ -60,6 +64,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             Instruction::Hint { inputs, .. } => inputs.clone(),
             Instruction::ConstantLike(_) => vec![],
             Instruction::SubCircuitCall { inputs, .. } => inputs.clone(),
+            Instruction::CustomGate { inputs, .. } => inputs.clone(),
         }
     }
     fn num_outputs(&self) -> usize {
@@ -69,6 +74,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             Instruction::Hint { num_outputs, .. } => *num_outputs,
             Instruction::ConstantLike(_) => 1,
             Instruction::SubCircuitCall { num_outputs, .. } => *num_outputs,
+            Instruction::CustomGate { .. } => 1,
         }
     }
     fn as_sub_circuit_call(&self) -> Option<(usize, &Vec<usize>, usize)> {
@@ -111,6 +117,10 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 inputs: inputs.iter().map(|i| f(*i)).collect(),
                 num_outputs: *num_outputs,
             },
+            Instruction::CustomGate { gate_type, inputs } => Instruction::CustomGate {
+                gate_type: *gate_type,
+                inputs: inputs.iter().map(|i| f(*i)).collect(),
+            },
         }
     }
     fn from_kx_plus_b(x: usize, k: C::CircuitField, b: C::CircuitField) -> Self {
@@ -142,6 +152,15 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 }
             }
             Instruction::ConstantLike(coef) => coef.validate(num_public_inputs),
+            Instruction::CustomGate { inputs, .. } => {
+                if inputs.len() >= 1 {
+                    Ok(())
+                } else {
+                    Err(Error::InternalError(
+                        "custom gate instruction must have at least 1 input".to_string(),
+                    ))
+                }
+            }
             _ => Ok(()),
         }
     }
@@ -173,6 +192,11 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 inputs,
                 ..
             } => EvalResult::SubCircuitCall(*sub_circuit_id, inputs),
+            Instruction::CustomGate { gate_type, inputs } => {
+                let outputs =
+                    hints::stub_impl(*gate_type, &inputs.iter().map(|i| values[*i]).collect(), 1);
+                EvalResult::Values(outputs)
+            }
         }
     }
 }
@@ -222,6 +246,9 @@ impl<C: Config> Circuit<C> {
                             num_outputs,
                         },
                         Instruction::Hint { .. } => unreachable!(),
+                        Instruction::CustomGate { gate_type, inputs } => {
+                            super::hint_less::Instruction::CustomGate { gate_type, inputs }
+                        }
                     });
                     for _ in 0..insn.num_outputs() {
                         new_var_max += 1;
@@ -293,6 +320,9 @@ impl<C: Config> Circuit<C> {
                 Instruction::ConstantLike(coef) => Instruction::ConstantLike(coef),
                 Instruction::LinComb(lc) => Instruction::LinComb(lc),
                 Instruction::Mul(inputs) => Instruction::Mul(inputs),
+                Instruction::CustomGate { gate_type, inputs } => {
+                    Instruction::CustomGate { gate_type, inputs }
+                }
             };
             instructions.push(new_insn);
         }

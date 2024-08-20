@@ -41,6 +41,9 @@ func serializeInstruction(o *utils.OutputBuf, i *Instruction, field field.Field)
 		o.AppendUint64(uint64(i.ExtraId))
 		o.AppendIntSlice(i.Inputs)
 		o.AppendUint64(uint64(i.NumOutputs))
+	case CustomGate:
+		o.AppendUint64(uint64(i.ExtraId))
+		o.AppendIntSlice(i.Inputs)
 	}
 }
 
@@ -110,6 +113,9 @@ func deserializeInstruction(field field.Field, i *utils.InputBuf) Instruction {
 		ins.ExtraId = i.ReadUint64()
 		ins.Inputs = i.ReadIntSlice()
 		ins.NumOutputs = int(i.ReadUint64())
+	case CustomGate:
+		ins.ExtraId = i.ReadUint64()
+		ins.Inputs = i.ReadIntSlice()
 	}
 	return ins
 }

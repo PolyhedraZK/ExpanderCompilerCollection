@@ -200,6 +200,21 @@ func (builder *builder) newHintForId(id solver.HintID, nbOutputs int, inputs []f
 	return res, nil
 }
 
+func (builder *builder) CustomGate(gateType uint64, inputs ...frontend.Variable) frontend.Variable {
+	hintInputs := builder.toVariables(inputs...)
+
+	builder.instructions = append(builder.instructions,
+		irsource.Instruction{
+			Type:    irsource.CustomGate,
+			ExtraId: gateType,
+			Inputs:  unwrapVariables(hintInputs),
+		},
+	)
+	return builder.addVar()
+}
+
+// assertIsSet
+
 // ToFirstLayer adds a hint to the target variable to bring it to the first layer.
 func (builder *builder) ToFirstLayer(v frontend.Variable) frontend.Variable {
 	// TODO: noop

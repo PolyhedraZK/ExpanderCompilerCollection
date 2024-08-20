@@ -5,7 +5,7 @@ use crate::{
         config::Config,
         input_mapping::EMPTY,
         ir::expr::VarSpec,
-        layered::{Allocation, Coef, GateAdd, GateConst, GateMul, Segment},
+        layered::{Allocation, Coef, GateAdd, GateConst, GateCustom, GateMul, Segment},
     },
     field::Field,
     utils::pool::Pool,
@@ -356,6 +356,14 @@ impl<'a, C: Config> CompileContext<'a, C> {
                         VarSpec::Quad(vid0, vid1) => {
                             res.gate_muls.push(GateMul {
                                 inputs: [aq.var_pos[vid0], aq.var_pos[vid1]],
+                                output: pos,
+                                coef: Coef::Constant(term.coef.clone()),
+                            });
+                        }
+                        VarSpec::Custom { gate_type, inputs } => {
+                            res.gate_customs.push(GateCustom {
+                                gate_type: *gate_type,
+                                inputs: inputs.iter().map(|x| aq.var_pos[x]).collect(),
                                 output: pos,
                                 coef: Coef::Constant(term.coef.clone()),
                             });

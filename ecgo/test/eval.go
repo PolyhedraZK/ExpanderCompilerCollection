@@ -6,6 +6,7 @@ import (
 
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/irwg"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/layered"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/utils/customgates"
 )
 
 // check if first output is zero
@@ -96,6 +97,20 @@ func applyCircuit(rc *layered.RootCircuit, circuit *layered.Circuit, cur []*big.
 	for _, c := range circuit.Cst {
 		coef := sampleCoef(c.Coef, c.CoefType, c.PublicInputId, publicInput)
 		next[c.Out].Add(next[c.Out], coef)
+	}
+	for _, ct := range circuit.Custom {
+		inB := make([]*big.Int, len(ct.In))
+		outB := []*big.Int{big.NewInt(0)}
+		for i, e := range ct.In {
+			inB[i] = cur[e]
+		}
+		hintFunc := customgates.GetFunc(ct.GateType)
+		err := hintFunc(rc.Field, inB, outB)
+		if err != nil {
+			panic(err)
+		}
+		coef := sampleCoef(ct.Coef, ct.CoefType, ct.PublicInputId, publicInput)
+		next[ct.Out].Add(next[ct.Out], tmp.Mul(outB[0], coef))
 	}
 	for _, sub := range circuit.SubCircuits {
 		sc := rc.Circuits[sub.Id]

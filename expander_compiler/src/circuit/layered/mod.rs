@@ -1,6 +1,6 @@
 use std::{fmt, hash::Hash};
 
-use crate::{field::Field, utils::error::Error};
+use crate::{field::Field, hints, utils::error::Error};
 
 use super::config::Config;
 
@@ -69,6 +69,14 @@ pub type GateMul<C> = Gate<C, 2>;
 pub type GateAdd<C> = Gate<C, 1>;
 pub type GateConst<C> = Gate<C, 0>;
 
+#[derive(Debug, Clone)]
+pub struct GateCustom<C: Config> {
+    pub gate_type: usize,
+    pub inputs: Vec<usize>,
+    pub output: usize,
+    pub coef: Coef<C>,
+}
+
 pub struct Allocation {
     pub input_offset: usize,
     pub output_offset: usize,
@@ -84,6 +92,7 @@ pub struct Segment<C: Config> {
     pub gate_muls: Vec<GateMul<C>>,
     pub gate_adds: Vec<GateAdd<C>>,
     pub gate_consts: Vec<GateConst<C>>,
+    pub gate_customs: Vec<GateCustom<C>>,
 }
 
 pub struct Circuit<C: Config> {
@@ -133,6 +142,22 @@ impl<C: Config> Circuit<C> {
                     return Err(Error::InternalError(format!(
                         "segment {} const gate {} out of range",
                         i, cs.output
+                    )));
+                }
+            }
+            for cu in seg.gate_customs.iter() {
+                for &input in cu.inputs.iter() {
+                    if input >= seg.num_inputs {
+                        return Err(Error::InternalError(format!(
+                            "segment {} custom gate {} input out of range",
+                            i, input
+                        )));
+                    }
+                }
+                if cu.output >= seg.num_outputs {
+                    return Err(Error::InternalError(format!(
+                        "segment {} custom gate {} out of range",
+                        i, cu.output
                     )));
                 }
             }
@@ -227,6 +252,12 @@ impl<C: Config> Circuit<C> {
             for cs in seg.gate_consts.iter() {
                 output_mask_seg[cs.output] = true;
             }
+            for cu in seg.gate_customs.iter() {
+                for &input in cu.inputs.iter() {
+                    input_mask_seg[input] = true;
+                }
+                output_mask_seg[cu.output] = true;
+            }
             for (sub_id, allocs) in seg.child_segs.iter() {
                 let subc = &self.segments[*sub_id];
                 for a in allocs.iter() {
@@ -288,6 +319,16 @@ impl<C: Config> Circuit<C> {
         for cs in seg.gate_consts.iter() {
             nxt[cs.output] += cs.coef.get_value_unsafe();
         }
+        for cu in seg.gate_customs.iter() {
+            let mut inputs = Vec::with_capacity(cu.inputs.len());
+            for &input in cu.inputs.iter() {
+                inputs.push(cur[input]);
+            }
+            let outputs = hints::stub_impl(cu.gate_type, &inputs, 1);
+            for (i, &output) in outputs.iter().enumerate() {
+                nxt[cu.output + i] += output * cu.coef.get_value_unsafe();
+            }
+        }
         for (sub_id, allocs) in seg.child_segs.iter() {
             let subc = &self.segments[*sub_id];
             for a in allocs.iter() {
@@ -336,6 +377,16 @@ impl<C: Config> fmt::Display for Segment<C> {
         }
         for cs in self.gate_consts.iter() {
             writeln!(f, "out{} += {}", cs.output, cs.coef)?;
+        }
+        for cu in self.gate_customs.iter() {
+            write!(f, "out{} += custom{}(", cu.output, cu.gate_type)?;
+            for (i, input) in cu.inputs.iter().enumerate() {
+                write!(f, "in{}", input)?;
+                if i < cu.inputs.len() - 1 {
+                    write!(f, ",")?;
+                }
+            }
+            writeln!(f, ") * {}", cu.coef)?;
         }
         Ok(())
     }

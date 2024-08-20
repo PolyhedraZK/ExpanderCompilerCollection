@@ -14,11 +14,15 @@ pub struct Term<C: Config> {
     pub vars: VarSpec,
 }
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum VarSpec {
     Const,
     Linear(usize),
     Quad(usize, usize),
+    Custom {
+        gate_type: usize,
+        inputs: Vec<usize>,
+    },
 }
 
 impl VarSpec {
@@ -31,6 +35,7 @@ impl VarSpec {
                     *self = VarSpec::Quad(*index2, *index1);
                 }
             }
+            VarSpec::Custom { .. } => {}
         }
     }
     fn is_normalized(&self) -> bool {
@@ -38,6 +43,7 @@ impl VarSpec {
             VarSpec::Const => true,
             VarSpec::Linear(_) => true,
             VarSpec::Quad(index1, index2) => index1 >= index2,
+            VarSpec::Custom { .. } => true,
         }
     }
     pub fn mul(a: &Self, b: &Self) -> Self {
@@ -45,12 +51,25 @@ impl VarSpec {
             (VarSpec::Const, VarSpec::Const) => VarSpec::Const,
             (VarSpec::Const, VarSpec::Linear(x)) => VarSpec::Linear(*x),
             (VarSpec::Const, VarSpec::Quad(x, y)) => VarSpec::Quad(*x, *y),
+            (VarSpec::Const, VarSpec::Custom { gate_type, inputs }) => VarSpec::Custom {
+                gate_type: *gate_type,
+                inputs: inputs.clone(),
+            },
             (VarSpec::Linear(x), VarSpec::Const) => VarSpec::Linear(*x),
             (VarSpec::Linear(x), VarSpec::Linear(y)) => VarSpec::Quad(*x, *y),
             (VarSpec::Linear(_), VarSpec::Quad(_, _)) => panic!("invalid multiplication"),
+            (VarSpec::Linear(_), VarSpec::Custom { .. }) => panic!("invalid multiplication"),
             (VarSpec::Quad(x, y), VarSpec::Const) => VarSpec::Quad(*x, *y),
             (VarSpec::Quad(_, _), VarSpec::Linear(_)) => panic!("invalid multiplication"),
             (VarSpec::Quad(_, _), VarSpec::Quad(_, _)) => panic!("invalid multiplication"),
+            (VarSpec::Quad(_, _), VarSpec::Custom { .. }) => panic!("invalid multiplication"),
+            (VarSpec::Custom { .. }, VarSpec::Const) => VarSpec::Custom {
+                gate_type: 0,
+                inputs: vec![],
+            },
+            (VarSpec::Custom { .. }, VarSpec::Linear(_)) => panic!("invalid multiplication"),
+            (VarSpec::Custom { .. }, VarSpec::Quad(_, _)) => panic!("invalid multiplication"),
+            (VarSpec::Custom { .. }, VarSpec::Custom { .. }) => panic!("invalid multiplication"),
         }
     }
 }
@@ -121,16 +140,36 @@ impl<C: Config> Term<C> {
 impl<C: Config> fmt::Display for Term<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.coef == C::CircuitField::one() {
-            match self.vars {
+            match &self.vars {
                 VarSpec::Const => write!(f, "1"),
                 VarSpec::Linear(index) => write!(f, "v{}", index),
                 VarSpec::Quad(index1, index2) => write!(f, "v{}*v{}", index1, index2),
+                VarSpec::Custom { gate_type, inputs } => {
+                    write!(f, "custom{}(", gate_type)?;
+                    for (i, input) in inputs.iter().enumerate() {
+                        if i > 0 {
+                            write!(f, ",")?;
+                        }
+                        write!(f, "v{}", input)?;
+                    }
+                    write!(f, ")")
+                }
             }
         } else {
-            match self.vars {
+            match &self.vars {
                 VarSpec::Const => write!(f, "{}", self.coef),
                 VarSpec::Linear(index) => write!(f, "v{}*{}", index, self.coef),
                 VarSpec::Quad(index1, index2) => write!(f, "v{}*v{}*{}", index1, index2, self.coef),
+                VarSpec::Custom { gate_type, inputs } => {
+                    write!(f, "custom{}(", gate_type)?;
+                    for (i, input) in inputs.iter().enumerate() {
+                        if i > 0 {
+                            write!(f, ",")?;
+                        }
+                        write!(f, "v{}", input)?;
+                    }
+                    write!(f, ")*{}", self.coef)
+                }
             }
         }
     }
@@ -209,6 +248,14 @@ impl<C: Config> Expression<C> {
             terms: vec![Term::new_quad(value, index1, index2)],
         }
     }
+    pub fn new_custom(value: C::CircuitField, gate_type: usize, inputs: Vec<usize>) -> Self {
+        Expression {
+            terms: vec![Term {
+                coef: value,
+                vars: VarSpec::Custom { gate_type, inputs },
+            }],
+        }
+    }
     pub fn from_terms(mut terms: Vec<Term<C>>) -> Self {
         for term in terms.iter_mut() {
             term.normalize();
@@ -232,10 +279,11 @@ impl<C: Config> Expression<C> {
     }
     pub fn get_vars<R: std::iter::FromIterator<usize>>(&self) -> R {
         self.iter()
-            .flat_map(|term| match term.vars {
+            .flat_map(|term| match &term.vars {
                 VarSpec::Const => vec![],
-                VarSpec::Linear(index) => vec![index],
-                VarSpec::Quad(index1, index2) => vec![index1, index2],
+                VarSpec::Linear(index) => vec![*index],
+                VarSpec::Quad(index1, index2) => vec![*index1, *index2],
+                VarSpec::Custom { inputs, .. } => inputs.clone(),
             })
             .collect()
     }
@@ -244,10 +292,14 @@ impl<C: Config> Expression<C> {
             .iter()
             .map(|term| Term {
                 coef: term.coef,
-                vars: match term.vars {
+                vars: match &term.vars {
                     VarSpec::Const => VarSpec::Const,
-                    VarSpec::Linear(index) => VarSpec::Linear(f(index)),
-                    VarSpec::Quad(index1, index2) => VarSpec::Quad(f(index1), f(index2)),
+                    VarSpec::Linear(index) => VarSpec::Linear(f(*index)),
+                    VarSpec::Quad(index1, index2) => VarSpec::Quad(f(*index1), f(*index2)),
+                    VarSpec::Custom { gate_type, inputs } => VarSpec::Custom {
+                        gate_type: *gate_type,
+                        inputs: inputs.iter().cloned().map(&f).collect(),
+                    },
                 },
             })
             .collect();
@@ -260,6 +312,7 @@ impl<C: Config> Expression<C> {
                 VarSpec::Const => {}
                 VarSpec::Linear(_) => has_linear = true,
                 VarSpec::Quad(_, _) => return 2,
+                VarSpec::Custom { .. } => return 2,
             }
         }
         if has_linear {
@@ -275,6 +328,7 @@ impl<C: Config> Expression<C> {
                 VarSpec::Const => res[0] += 1,
                 VarSpec::Linear(_) => res[1] += 1,
                 VarSpec::Quad(_, _) => res[2] += 1,
+                VarSpec::Custom { .. } => res[2] += 1,
             }
         }
         res
@@ -294,7 +348,7 @@ impl<C: Config> Expression<C> {
             self.iter()
                 .map(|term| Term {
                     coef: term.coef * value,
-                    vars: term.vars,
+                    vars: term.vars.clone(),
                 })
                 .collect(),
         )

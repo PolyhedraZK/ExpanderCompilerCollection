@@ -59,18 +59,21 @@ pub fn compile<C: Config>(
         r.reassign_duplicate_sub_circuit_outputs();
         (r, im)
     });
+    r_source_opt
+        .validate()
+        .map_err(|e| e.prepend("source ir circuit invalid"))?;
 
     let r_hint_normalized = builder::hint_normalize::process(&r_source_opt)
         .map_err(|e| e.prepend("hint normalization failed"))?;
-    r_hint_normalized
-        .validate()
-        .map_err(|e| e.prepend("hint normalized circuit invalid"))?;
 
     let r_hint_normalized_opt = optimize_until_fixed_point(&r_hint_normalized, &mut src_im, |r| {
         let (mut r, im) = r.remove_unreachable();
         r.reassign_duplicate_sub_circuit_outputs();
         (r, im)
     });
+    r_hint_normalized_opt
+        .validate()
+        .map_err(|e| e.prepend("hint normalized ir circuit invalid"))?;
     let ho_stats = r_hint_normalized_opt.get_stats();
     print_info("built hint normalized ir");
     print_stat("numInputs", ho_stats.num_inputs, false);
@@ -80,9 +83,6 @@ pub fn compile<C: Config>(
     print_stat("numTerms", ho_stats.num_terms, true);
 
     let (r_hint_less, mut r_hint_exported) = r_hint_normalized_opt.remove_and_export_hints();
-    r_hint_less
-        .validate()
-        .map_err(|e| e.prepend("hint less circuit invalid"))?;
     r_hint_exported
         .validate()
         .map_err(|e| e.prepend("hint exported circuit invalid"))?;
@@ -94,18 +94,21 @@ pub fn compile<C: Config>(
         r.reassign_duplicate_sub_circuit_outputs();
         (r, im)
     });
+    r_hint_less_opt
+        .validate()
+        .map_err(|e| e.prepend("hint less ir circuit invalid"))?;
 
     let r_dest_relaxed = builder::final_build_opt::process(&r_hint_less_opt)
         .map_err(|e| e.prepend("final build failed"))?;
-    r_dest_relaxed
-        .validate()
-        .map_err(|e| e.prepend("final build circuit invalid"))?;
 
     let r_dest_relaxed_opt = optimize_until_fixed_point(&r_dest_relaxed, &mut hl_im, |r| {
         let (mut r, im) = r.remove_unreachable();
         r.reassign_duplicate_sub_circuit_outputs();
         (r, im)
     });
+    r_dest_relaxed_opt
+        .validate()
+        .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
 
     let r_dest = if C::ENABLE_RANDOM_COMBINATION {
         r_dest_relaxed_opt.solve_duplicates()
@@ -116,15 +119,18 @@ pub fn compile<C: Config>(
         hl_im.compose_in_place(&im);
         r2.solve_duplicates()
     };
-    r_dest
-        .validate()
-        .map_err(|e| e.prepend("dest ir circuit invalid"))?;
 
     let r_dest_opt = optimize_until_fixed_point(&r_dest, &mut hl_im, |r| {
         let (mut r, im) = r.remove_unreachable();
         r.reassign_duplicate_sub_circuit_outputs();
         (r, im)
     });
+    r_dest_opt
+        .validate()
+        .map_err(|e| e.prepend("dest ir circuit invalid"))?;
+    r_dest_opt
+        .validate_circuit_has_inputs()
+        .map_err(|e| e.prepend("dest ir circuit invalid"))?;
 
     let (lc, dest_im) = layering::compile(&r_dest_opt);
     lc.validate()
@@ -161,6 +167,9 @@ pub fn compile<C: Config>(
         (r, im)
     });
     r_hint_exported_opt.add_back_removed_inputs(&src_im);
+    r_hint_exported_opt
+        .validate()
+        .map_err(|e| e.prepend("final hint exported circuit invalid"))?;
 
     Ok((r_hint_exported_opt, lc))
 }

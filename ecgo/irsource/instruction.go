@@ -17,6 +17,7 @@ const (
 	SubCircuitCall
 	UnconstrainedBinOp
 	UnconstrainedSelect
+	CustomGate
 )
 
 type Instruction struct {
