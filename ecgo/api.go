@@ -3,7 +3,10 @@
 package ecgo
 
 import (
+	"errors"
+	"fmt"
 	"math/big"
+	"reflect"
 
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/builder"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/compile"
@@ -11,6 +14,8 @@ import (
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/irwg"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/layered"
 	"github.com/consensys/gnark/frontend"
+	"github.com/consensys/gnark/frontend/schema"
+	"github.com/consensys/gnark/logger"
 )
 
 // API encapsulates the ecgo's frontend.API along with two new APIs added to facilitate
@@ -33,16 +38,44 @@ type CompileResult struct {
 // Compile is similar to gnark's frontend.Compile. It compiles the given circuit and returns
 // a pointer to CompileResult along with any error encountered during the compilation process.
 func Compile(field *big.Int, circuit frontend.Circuit, opts ...frontend.CompileOption) (*CompileResult, error) {
-	var root *builder.Root
-	newBuilder_ := func(field *big.Int, config frontend.CompileConfig) (frontend.Builder, error) {
-		if root != nil {
-			panic("newBuilder can only be called once")
+	log := logger.Logger()
+	log.Info().Msg("compiling circuit")
+
+	opt := frontend.CompileConfig{CompressThreshold: 0}
+	for _, o := range opts {
+		if err := o(&opt); err != nil {
+			log.Err(err).Msg("applying compile option")
+			return nil, fmt.Errorf("apply option: %w", err)
 		}
-		root = builder.NewRoot(field, config)
-		return root, nil
 	}
-	// returned R1CS is useless
-	_, err := frontend.Compile(field, newBuilder_, circuit, opts...)
+
+	root := builder.NewRoot(field, opt)
+	schema.Walk(circuit, irwg.TVariable, func(f schema.LeafInfo, tInput reflect.Value) error {
+		if tInput.CanSet() {
+			if f.Visibility == schema.Unset {
+				return errors.New("can't set val " + f.FullName() + " visibility is unset")
+			}
+			if f.Visibility == schema.Secret {
+				tInput.Set(reflect.ValueOf(root.SecretVariable(f)))
+			}
+			return nil
+		}
+		return errors.New("can't set val " + f.FullName())
+	})
+	schema.Walk(circuit, irwg.TVariable, func(f schema.LeafInfo, tInput reflect.Value) error {
+		if tInput.CanSet() {
+			if f.Visibility == schema.Unset {
+				return errors.New("can't set val " + f.FullName() + " visibility is unset")
+			}
+			if f.Visibility == schema.Public {
+				tInput.Set(reflect.ValueOf(root.PublicVariable(f)))
+			}
+			return nil
+		}
+		return errors.New("can't set val " + f.FullName())
+	})
+
+	err := circuit.Define(root)
 	if err != nil {
 		return nil, err
 	}
