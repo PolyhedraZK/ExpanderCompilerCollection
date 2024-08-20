@@ -2,6 +2,8 @@ github.com/PolyhedraZK/ExpanderCompilerCollection/go_libs v0.0.0-20240814170610-
 github.com/PolyhedraZK/ExpanderCompilerCollection/go_libs v0.0.0-20240814170610-c8796f2e5f95/go.mod h1:yVh5rgdARkr8WEFk7dVoiXQnBy0JVdL78Vd1FNcGKLI=
 github.com/PolyhedraZK/ExpanderCompilerCollection/go_libs v0.0.0-20240819022151-12ec8fba89d4 h1:KOPLJmtqGAUO2jHcftghVBGVgV7wHeL46/MMp6kmUog=
 github.com/PolyhedraZK/ExpanderCompilerCollection/go_libs v0.0.0-20240819022151-12ec8fba89d4/go.mod h1:yVh5rgdARkr8WEFk7dVoiXQnBy0JVdL78Vd1FNcGKLI=
+github.com/PolyhedraZK/ExpanderCompilerCollection/go_libs v0.0.0-20240820214445-c12995cb46a4 h1:mNWNiQ2dar6WKfOg+OYlELWXO+RFVuJpKXfe4vz1ErE=
+github.com/PolyhedraZK/ExpanderCompilerCollection/go_libs v0.0.0-20240820214445-c12995cb46a4/go.mod h1:yVh5rgdARkr8WEFk7dVoiXQnBy0JVdL78Vd1FNcGKLI=
 github.com/bits-and-blooms/bitset v1.8.0 h1:FD+XqgOZDUxxZ8hzoBFuV9+cGWY9CslN6d5MS5JVb4c=
 github.com/bits-and-blooms/bitset v1.8.0/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
 github.com/bits-and-blooms/bitset v1.13.0 h1:bAQ9OPNFYbGHV6Nez0tmNI0RiEu7/hxlYJRUA0wFAVE=
