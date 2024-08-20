@@ -78,6 +78,11 @@ impl<C: Config> Serde for Instruction<C> {
                 if_true.serialize_into(&mut writer)?;
                 if_false.serialize_into(&mut writer)?;
             }
+            Instruction::CustomGate { gate_type, inputs } => {
+                12u8.serialize_into(&mut writer)?;
+                gate_type.serialize_into(&mut writer)?;
+                inputs.serialize_into(&mut writer)?;
+            }
         };
         Ok(())
     }
@@ -155,6 +160,10 @@ impl<C: Config> Serde for Instruction<C> {
                 cond: usize::deserialize_from(&mut reader)?,
                 if_true: usize::deserialize_from(&mut reader)?,
                 if_false: usize::deserialize_from(&mut reader)?,
+            },
+            12 => Instruction::CustomGate {
+                gate_type: usize::deserialize_from(&mut reader)?,
+                inputs: Vec::<usize>::deserialize_from(&mut reader)?,
             },
             _ => {
                 return Err(IoError::new(

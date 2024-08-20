@@ -22,6 +22,7 @@ fn simple() {
                 }],
                 gate_adds: vec![],
                 gate_consts: vec![],
+                gate_customs: vec![],
             },
             Segment {
                 num_inputs: 4,
@@ -42,6 +43,7 @@ fn simple() {
                 gate_muls: vec![],
                 gate_adds: vec![],
                 gate_consts: vec![],
+                gate_customs: vec![],
             },
             Segment {
                 num_inputs: 2,
@@ -71,6 +73,7 @@ fn simple() {
                     output: 1,
                     coef: Coef::Constant(CField::from(5)),
                 }],
+                gate_customs: vec![],
             },
         ],
         layer_ids: vec![1, 2],

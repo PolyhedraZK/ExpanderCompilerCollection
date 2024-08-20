@@ -1,5 +1,6 @@
 use crate::circuit::{config::Config, layered::Coef};
 use crate::field::Field;
+use crate::hints;
 use crate::utils::error::Error;
 
 use super::{
@@ -21,6 +22,10 @@ pub enum Instruction<C: Config> {
         sub_circuit_id: usize,
         inputs: Vec<usize>,
         num_outputs: usize,
+    },
+    CustomGate {
+        gate_type: usize,
+        inputs: Vec<usize>,
     },
 }
 
@@ -52,6 +57,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             Instruction::Mul(inputs) => inputs.clone(),
             Instruction::ConstantLike(_) => vec![],
             Instruction::SubCircuitCall { inputs, .. } => inputs.clone(),
+            Instruction::CustomGate { inputs, .. } => inputs.clone(),
         }
     }
     fn num_outputs(&self) -> usize {
@@ -60,6 +66,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             Instruction::Mul(_) => 1,
             Instruction::ConstantLike(_) => 1,
             Instruction::SubCircuitCall { num_outputs, .. } => *num_outputs,
+            Instruction::CustomGate { .. } => 1,
         }
     }
     fn as_sub_circuit_call(&self) -> Option<(usize, &Vec<usize>, usize)> {
@@ -92,6 +99,10 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 sub_circuit_id: *sub_circuit_id,
                 inputs: inputs.iter().map(|i| f(*i)).collect(),
                 num_outputs: *num_outputs,
+            },
+            Instruction::CustomGate { gate_type, inputs } => Instruction::CustomGate {
+                gate_type: *gate_type,
+                inputs: inputs.iter().map(|i| f(*i)).collect(),
             },
         }
     }
@@ -129,6 +140,11 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 inputs,
                 ..
             } => EvalResult::SubCircuitCall(*sub_circuit_id, inputs),
+            Instruction::CustomGate { gate_type, inputs } => {
+                let outputs =
+                    hints::stub_impl(*gate_type, &inputs.iter().map(|i| values[*i]).collect(), 1);
+                EvalResult::Values(outputs)
+            }
         }
     }
 }

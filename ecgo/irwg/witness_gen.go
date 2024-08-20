@@ -7,6 +7,7 @@ import (
 
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/field"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/utils"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/utils/customgates"
 	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/constraint/solver"
 	"github.com/consensys/gnark/frontend"
@@ -163,6 +164,17 @@ func (rc *RootCircuit) evalSub(circuitId uint64, inputs []constraint.Element, pu
 				return nil, err
 			}
 			values = append(values, sub_outputs...)
+		case CustomGate:
+			custom_inputs := []*big.Int{}
+			for _, x := range insn.Inputs {
+				custom_inputs = append(custom_inputs, rc.Field.ToBigInt(values[x]))
+			}
+			custom_outputs := make([]*big.Int, 1)
+			err := customgates.GetFunc(insn.ExtraId)(rc.Field.Field(), custom_inputs, custom_outputs)
+			if err != nil {
+				return nil, err
+			}
+			values = append(values, rc.Field.FromInterface(custom_outputs[0]))
 		}
 	}
 	outputs := []constraint.Element{}

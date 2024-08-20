@@ -70,7 +70,16 @@ func (rc *RootCircuit) Serialize() []byte {
 			o.AppendUint64(cst.Out)
 			serializeCoef(&o, bnlen, cst.Coef, cst.CoefType, cst.PublicInputId)
 		}
-		o.AppendUint64(0) // custom
+		o.AppendUint64(uint64(len(c.Custom)))
+		for _, cu := range c.Custom {
+			o.AppendUint64(cu.GateType)
+			o.AppendUint64(uint64(len(cu.In)))
+			for _, in := range cu.In {
+				o.AppendUint64(in)
+			}
+			o.AppendUint64(cu.Out)
+			serializeCoef(&o, bnlen, cu.Coef, cu.CoefType, cu.PublicInputId)
+		}
 	}
 	o.AppendUint64(uint64(len(rc.Layers)))
 	for _, l := range rc.Layers {
@@ -130,7 +139,18 @@ func DeserializeRootCircuit(buf []byte) *RootCircuit {
 			c.Cst[j].Out = in.ReadUint64()
 			c.Cst[j].Coef, c.Cst[j].CoefType, c.Cst[j].PublicInputId = deserializeCoef(in, bnlen)
 		}
-		in.ReadUint64() // custom
+		nbCustom := in.ReadUint64()
+		c.Custom = make([]GateCustom, nbCustom)
+		for j := uint64(0); j < nbCustom; j++ {
+			c.Custom[j].GateType = in.ReadUint64()
+			nbIn := in.ReadUint64()
+			c.Custom[j].In = make([]uint64, nbIn)
+			for k := uint64(0); k < nbIn; k++ {
+				c.Custom[j].In[k] = in.ReadUint64()
+			}
+			c.Custom[j].Out = in.ReadUint64()
+			c.Custom[j].Coef, c.Custom[j].CoefType, c.Custom[j].PublicInputId = deserializeCoef(in, bnlen)
+		}
 		rc.Circuits[i] = c
 	}
 	nbLayers := in.ReadUint64()

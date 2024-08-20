@@ -56,6 +56,9 @@ func serializeInstruction(o *utils.OutputBuf, i *Instruction, field field.Field)
 		panic("no unconstrained binop in gnark")
 	case UnconstrainedSelect:
 		panic("no unconstrained select in gnark")
+	case CustomGate:
+		o.AppendUint64(uint64(i.ExtraId))
+		o.AppendIntSlice(i.Inputs)
 	}
 }
 

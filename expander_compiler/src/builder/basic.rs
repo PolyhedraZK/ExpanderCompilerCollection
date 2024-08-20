@@ -460,7 +460,7 @@ fn lin_comb_inner<C: Config, F: Fn(usize) -> C::CircuitField>(
             heap.push(LinMeta {
                 l_id: l_id + vars.len(),
                 t_id: 0,
-                vars: nv[0].vars,
+                vars: nv[0].vars.clone(),
             });
             compressed_vars[l_id] = Some(nv);
             continue;
@@ -468,7 +468,7 @@ fn lin_comb_inner<C: Config, F: Fn(usize) -> C::CircuitField>(
         heap.push(LinMeta {
             l_id,
             t_id: 0,
-            vars: v[0].vars,
+            vars: v[0].vars.clone(),
         });
     }
     let mut res: Vec<Term<C>> = Vec::new();
@@ -485,7 +485,7 @@ fn lin_comb_inner<C: Config, F: Fn(usize) -> C::CircuitField>(
         } else {
             let mut lm = heap.peek_mut().unwrap();
             lm.t_id = t_id + 1;
-            lm.vars = var[t_id + 1].vars;
+            lm.vars = var[t_id + 1].vars.clone();
         }
         let t = &var[t_id];
         let new_coef = t.coef * var_coef(l_id % vars.len());

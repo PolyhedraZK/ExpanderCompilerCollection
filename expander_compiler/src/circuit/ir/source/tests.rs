@@ -51,12 +51,21 @@ impl<C: Config> RandomInstruction for Instruction<C> {
                     num_terms.random(&mut rnd).max(1),
                 )
             };
-            super::Instruction::Hint {
-                hint_id,
-                inputs: (0..num_inputs)
-                    .map(|_| rnd.next_u64() as usize % num_vars + 1)
-                    .collect(),
-                num_outputs,
+            if rnd.gen::<f64>() < 0.8 {
+                super::Instruction::Hint {
+                    hint_id,
+                    inputs: (0..num_inputs)
+                        .map(|_| rnd.next_u64() as usize % num_vars + 1)
+                        .collect(),
+                    num_outputs,
+                }
+            } else {
+                super::Instruction::CustomGate {
+                    gate_type: hint_id,
+                    inputs: (0..num_inputs)
+                        .map(|_| rnd.next_u64() as usize % num_vars + 1)
+                        .collect(),
+                }
             }
         } else if prob1 < 0.74 {
             super::Instruction::UnconstrainedSelect {

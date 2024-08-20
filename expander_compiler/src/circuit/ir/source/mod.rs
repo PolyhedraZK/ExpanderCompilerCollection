@@ -52,6 +52,10 @@ pub enum Instruction<C: Config> {
         if_true: usize,
         if_false: usize,
     },
+    CustomGate {
+        gate_type: usize,
+        inputs: Vec<usize>,
+    },
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -156,6 +160,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 if_true,
                 if_false,
             } => vec![*cond, *if_true, *if_false],
+            Instruction::CustomGate { inputs, .. } => inputs.clone(),
         }
     }
     fn num_outputs(&self) -> usize {
@@ -171,6 +176,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             Instruction::SubCircuitCall { num_outputs, .. } => *num_outputs,
             Instruction::UnconstrainedBinOp { .. } => 1,
             Instruction::UnconstrainedSelect { .. } => 1,
+            Instruction::CustomGate { .. } => 1,
         }
     }
     fn as_sub_circuit_call(&self) -> Option<(usize, &Vec<usize>, usize)> {
@@ -241,6 +247,10 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 if_true: f(*if_true),
                 if_false: f(*if_false),
             },
+            Instruction::CustomGate { gate_type, inputs } => Instruction::CustomGate {
+                gate_type: *gate_type,
+                inputs: inputs.iter().map(|i| f(*i)).collect(),
+            },
         }
     }
     fn from_kx_plus_b(x: usize, k: C::CircuitField, b: C::CircuitField) -> Self {
@@ -272,6 +282,15 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 }
             }
             Instruction::ConstantLike(coef) => coef.validate(num_public_inputs),
+            Instruction::CustomGate { inputs, .. } => {
+                if inputs.len() >= 1 {
+                    Ok(())
+                } else {
+                    Err(Error::InternalError(
+                        "custom gate instruction must have at least 1 input".to_string(),
+                    ))
+                }
+            }
             _ => Ok(()),
         }
     }
@@ -356,6 +375,11 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             } else {
                 values[*if_true]
             }),
+            Instruction::CustomGate { gate_type, inputs } => {
+                let outputs =
+                    hints::stub_impl(*gate_type, &inputs.iter().map(|i| values[*i]).collect(), 1);
+                EvalResult::Values(outputs)
+            }
         }
     }
 }

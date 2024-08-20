@@ -93,6 +93,28 @@ impl Serde for ChildSpec {
     }
 }
 
+impl<C: Config> Serde for GateCustom<C> {
+    fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
+        self.gate_type.serialize_into(&mut writer)?;
+        self.inputs.serialize_into(&mut writer)?;
+        self.output.serialize_into(&mut writer)?;
+        self.coef.serialize_into(&mut writer)?;
+        Ok(())
+    }
+    fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
+        let gate_type = usize::deserialize_from(&mut reader)?;
+        let inputs = Vec::<usize>::deserialize_from(&mut reader)?;
+        let output = usize::deserialize_from(&mut reader)?;
+        let coef = Coef::<C>::deserialize_from(&mut reader)?;
+        Ok(GateCustom {
+            gate_type,
+            inputs,
+            output,
+            coef,
+        })
+    }
+}
+
 impl<C: Config> Serde for Segment<C> {
     fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
         self.num_inputs.serialize_into(&mut writer)?;
@@ -101,7 +123,7 @@ impl<C: Config> Serde for Segment<C> {
         self.gate_muls.serialize_into(&mut writer)?;
         self.gate_adds.serialize_into(&mut writer)?;
         self.gate_consts.serialize_into(&mut writer)?;
-        0usize.serialize_into(&mut writer)?;
+        self.gate_customs.serialize_into(&mut writer)?;
         Ok(())
     }
     fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
@@ -111,7 +133,7 @@ impl<C: Config> Serde for Segment<C> {
         let gate_muls = Vec::<GateMul<C>>::deserialize_from(&mut reader)?;
         let gate_adds = Vec::<GateAdd<C>>::deserialize_from(&mut reader)?;
         let gate_consts = Vec::<GateConst<C>>::deserialize_from(&mut reader)?;
-        let _ = usize::deserialize_from(&mut reader)?;
+        let gate_customs = Vec::<GateCustom<C>>::deserialize_from(&mut reader)?;
         Ok(Segment {
             num_inputs,
             num_outputs,
@@ -119,6 +141,7 @@ impl<C: Config> Serde for Segment<C> {
             gate_muls,
             gate_adds,
             gate_consts,
+            gate_customs,
         })
     }
 }

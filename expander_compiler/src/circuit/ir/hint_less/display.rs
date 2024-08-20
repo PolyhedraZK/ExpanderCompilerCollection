@@ -30,6 +30,18 @@ impl<C: Config> fmt::Display for Instruction<C> {
                 }
                 write!(f, ")")
             }
+            Instruction::CustomGate {
+                gate_type, inputs, ..
+            } => {
+                write!(f, "custom{}(", gate_type)?;
+                for (i, input) in inputs.iter().enumerate() {
+                    write!(f, "v{}", input)?;
+                    if i < inputs.len() - 1 {
+                        write!(f, ",")?;
+                    }
+                }
+                write!(f, ")")
+            }
         }
     }
 }

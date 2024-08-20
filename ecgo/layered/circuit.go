@@ -34,6 +34,7 @@ type Circuit struct {
 	Mul         []GateMul
 	Add         []GateAdd
 	Cst         []GateCst
+	Custom      []GateCustom
 }
 
 // SubCircuit represents a subcircuit that is used within a Circuit.
@@ -86,6 +87,18 @@ type GateCst struct {
 	PublicInputId uint64
 }
 
+// GateCustom represents a custom gate within a circuit layer.
+// It takes several inputs, and produces an output value.
+// The output wire must be dedicated to this gate.
+type GateCustom struct {
+	GateType      uint64
+	In            []uint64
+	Out           uint64
+	Coef          *big.Int
+	CoefType      uint8
+	PublicInputId uint64
+}
+
 // Print outputs the entire circuit structure to the console for debugging purposes.
 // It provides a human-readable representation of the circuit's layers, gates, and
 // subcircuits, along with their interconnections.
@@ -105,6 +118,16 @@ func (c *Circuit) Print() {
 	}
 	for _, c := range c.Cst {
 		fmt.Printf("out%d += %s\n", c.Out, c.Coef.String())
+	}
+	for _, c := range c.Custom {
+		fmt.Printf("out%d += custom_gate_%d(", c.Out, c.GateType)
+		for i, in := range c.In {
+			if i > 0 {
+				fmt.Printf(",")
+			}
+			fmt.Printf("in%d", in)
+		}
+		fmt.Printf(") * %s\n", c.Coef.String())
 	}
 }
 

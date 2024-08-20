@@ -59,6 +59,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
             } => {
                 self.sub_circuit_call(*sub_circuit_id, inputs, *num_outputs, root);
             }
+            InsnOut::CustomGate { .. } => self.add_out_vars(1),
         }
     }
 }
@@ -123,6 +124,22 @@ impl<'a, C: Config> Builder<'a, C> {
                         num_outputs: *num_outputs,
                     });
                     last_subc_o_mid_id = i + num_outputs - 1;
+                }
+                ir::hint_less::Instruction::CustomGate { gate_type, inputs } => {
+                    let fin_inputs = inputs
+                        .iter()
+                        .map(|x| {
+                            try_get_really_single_id(&self.mid_vars, &self.out_var_exprs[*x])
+                                .unwrap()
+                        })
+                        .collect();
+                    fin_insns.push(ir::dest::Instruction::InternalVariable {
+                        expr: Expression::new_custom(
+                            C::CircuitField::one(),
+                            *gate_type,
+                            fin_inputs,
+                        ),
+                    });
                 }
             }
             out_var_max += self.out_insns[out_insn_id].num_outputs();

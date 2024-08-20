@@ -207,6 +207,13 @@ impl<C: Config> Builder<C> {
             VarSpec::Linear(v) => self.mid_var_layer[*v],
             VarSpec::Quad(x, y) => self.mid_var_layer[*x].max(self.mid_var_layer[*y]),
             VarSpec::Const => 0,
+            VarSpec::Custom { inputs, .. } => {
+                let mut max_layer = 0;
+                for input in inputs.iter() {
+                    max_layer = max_layer.max(self.mid_var_layer[*input]);
+                }
+                max_layer
+            }
         }
     }
 
@@ -255,7 +262,7 @@ impl<C: Config> Builder<C> {
             heap.push(LinMeta {
                 l_id,
                 t_id: 0,
-                vars: vars[l_id][0].vars,
+                vars: vars[l_id][0].vars.clone(),
             });
         }
         let mut res: Vec<Term<C>> = Vec::new();
@@ -268,7 +275,7 @@ impl<C: Config> Builder<C> {
             } else {
                 let mut lm = heap.peek_mut().unwrap();
                 lm.t_id = t_id + 1;
-                lm.vars = var[t_id + 1].vars;
+                lm.vars = var[t_id + 1].vars.clone();
             }
             let t = &var[t_id];
             let new_coef = t.coef * var_coef(l_id);
@@ -532,6 +539,11 @@ fn process_circuit<C: Config>(
                     builder.in_var_ref_counts[*input].single += 1;
                 }
             }
+            InInstruction::CustomGate { inputs, .. } => {
+                for input in inputs {
+                    builder.in_var_ref_counts[*input].single += 1;
+                }
+            }
         }
         for _ in 0..insn.num_outputs() {
             builder.in_var_ref_counts.push(InVarRefCounts::default());
@@ -560,7 +572,7 @@ fn process_circuit<C: Config>(
             }
             InInstruction::ConstantLike(coef) => match coef {
                 Coef::Constant(c) => {
-                    builder.add_const(*c);
+                    builder.add_const(*c); // TODO: this might not work
                 }
                 Coef::Random => {
                     builder.out_insns.push((
@@ -605,6 +617,17 @@ fn process_circuit<C: Config>(
                     },
                 ));
                 builder.add_in_vars(*num_outputs, max_input_layer + sub_builder.output_layer);
+            }
+            InInstruction::CustomGate { gate_type, inputs } => {
+                let single_inputs: Vec<usize> = inputs
+                    .iter()
+                    .map(|&var| builder.to_really_single(builder.in_var_exprs[var].clone()))
+                    .collect();
+                builder.add_and_check_if_should_make_single(Expression::new_custom(
+                    C::CircuitField::one(),
+                    *gate_type,
+                    single_inputs,
+                ));
             }
         }
     }

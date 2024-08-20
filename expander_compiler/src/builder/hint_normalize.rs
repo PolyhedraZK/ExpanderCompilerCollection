@@ -256,6 +256,10 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                     }
                 }
             }
+            CustomGate { gate_type, inputs } => ir::hint_normalized::Instruction::CustomGate {
+                gate_type: *gate_type,
+                inputs: inputs.clone(),
+            },
         })
     }
 
@@ -316,6 +320,9 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                 num_outputs,
             } => {
                 self.sub_circuit_call(*sub_circuit_id, inputs, *num_outputs, root);
+            }
+            InsnOut::CustomGate { .. } => {
+                self.add_out_vars(1);
             }
         }
     }
