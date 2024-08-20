@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/field"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/irsource"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/schema"
 )
@@ -17,7 +18,7 @@ type Root struct {
 
 	registry *SubCircuitRegistry
 
-	publicVariables []int
+	nbPublicInputs int
 }
 
 // NewRoot returns a new Root instance.
@@ -38,9 +39,12 @@ func NewRoot(fieldorder *big.Int, config frontend.CompileConfig) *Root {
 
 // PublicVariable creates a new public variable for the circuit.
 func (r *Root) PublicVariable(f schema.LeafInfo) frontend.Variable {
-	res := r.SecretVariable(f)
-	r.publicVariables = append(r.publicVariables, res.(variable).id)
-	return res
+	r.instructions = append(r.instructions, irsource.Instruction{
+		Type:    irsource.ConstantLike,
+		ExtraId: 2 + uint64(r.nbPublicInputs),
+	})
+	r.nbPublicInputs++
+	return r.addVar()
 }
 
 // SecretVariable creates a new secret variable for the circuit.

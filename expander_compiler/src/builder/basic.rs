@@ -585,7 +585,10 @@ where
     }
     let mut constraints = Vec::new();
     for (typ, cons) in builder.constraints.iter() {
-        for (expr, status) in cons.iter() {
+        let mut cons_keys = cons.keys().collect::<Vec<_>>();
+        cons_keys.sort();
+        for expr in cons_keys {
+            let status = cons.get(expr).unwrap();
             match status {
                 ConstraintStatus::Marked => {}
                 ConstraintStatus::Asserted => {

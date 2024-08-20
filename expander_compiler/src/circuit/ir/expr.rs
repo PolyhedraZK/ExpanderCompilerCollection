@@ -136,7 +136,7 @@ impl<C: Config> fmt::Display for Term<C> {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Expression<C: Config> {
     terms: Vec<Term<C>>,
 }

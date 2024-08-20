@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math/big"
 	"math/rand"
 	"os"
@@ -248,10 +249,10 @@ func copyOutUnaligned(api frontend.API, s [][]frontend.Variable, rate, outputLen
 
 type keccak256Circuit struct {
 	P   [NHashes][64 * 8]frontend.Variable
-	Out [NHashes][CheckBits]frontend.Variable
+	Out [NHashes][CheckBits]frontend.Variable `gnark:",public"`
 }
 
-func checkKeccak(api frontend.API, P, Out []frontend.Variable) {
+func computeKeccak(api frontend.API, P []frontend.Variable) []frontend.Variable {
 	ss := make([][]frontend.Variable, 25)
 	for i := 0; i < 25; i++ {
 		ss[i] = make([]frontend.Variable, 64)
@@ -279,15 +280,16 @@ func checkKeccak(api frontend.API, P, Out []frontend.Variable) {
 	ss = xorIn(api, ss, p)
 	ss = keccakF(api, ss)
 	out := copyOutUnaligned(api, ss, 136, 32)
-	for i := 0; i < CheckBits; i++ {
-		api.AssertIsEqual(out[i], Out[i])
-	}
+	return out
 }
 
 func (t *keccak256Circuit) Define(api frontend.API) error {
-	f := builder.MemorizedVoidFunc(checkKeccak)
+	f := builder.Memorized1DFunc(computeKeccak)
 	for i := 0; i < NHashes; i++ {
-		f(api, t.P[i][:], t.Out[i][:])
+		out := f(api, t.P[i][:])
+		for j := 0; j < CheckBits; j++ {
+			api.AssertIsEqual(out[j], t.Out[i][j])
+		}
 	}
 	return nil
 }
@@ -303,6 +305,7 @@ func main() {
 	c := cr.GetLayeredCircuit()
 	//c.Print()
 	os.WriteFile("circuit.txt", c.Serialize(), 0o644)
+	c = ecgo.DeserializeLayeredCircuit(c.Serialize())
 
 	for k := 0; k < NHashes; k++ {
 		for i := 0; i < 64*8; i++ {
@@ -329,38 +332,66 @@ func main() {
 		}
 	}
 
-	wit, err := cr.GetInputSolver().SolveInput(&circuit, 8)
+	is := ecgo.DeserializeInputSolver(cr.GetInputSolver().Serialize())
+	wit, err := is.SolveInput(&circuit, 0)
 	if err != nil {
 		panic("gg")
 	}
 
-	out := test.EvalCircuit(c, wit)
-	fail := false
-	for i := 0; i < NHashes*256; i++ {
-		if out[i].Uint64() == 1 {
-			fail = true
-		}
+	if !test.CheckCircuit(c, wit) {
+		panic("should succeed")
 	}
-	if fail {
-		panic("gg")
-	}
+	fmt.Println("test 1 passed")
 
 	for k := 0; k < NHashes; k++ {
 		circuit.P[k][0] = 1 - circuit.P[k][0].(int)
 	}
-	wit, err = cr.GetInputSolver().SolveInput(&circuit, 8)
+	wit, err = is.SolveInput(&circuit, 0)
 	if err != nil {
 		panic("gg")
 	}
 
-	out = test.EvalCircuit(c, wit)
-	done := false
-	for i := 0; i < NHashes*256; i++ {
-		if out[i].Uint64() == 1 {
-			done = true
-		}
-	}
-	if !done {
+	if test.CheckCircuit(c, wit) {
 		panic("should fail")
 	}
+	fmt.Println("test 2 passed")
+
+	assignments := make([]frontend.Circuit, 16)
+	for z := 0; z < 16; z++ {
+		assignment := &keccak256Circuit{}
+		for k := 0; k < NHashes; k++ {
+			for i := 0; i < 64*8; i++ {
+				assignment.P[k][i] = 0
+			}
+			data := make([]byte, 64)
+			rand.Read(data)
+			for i := 0; i < 64; i++ {
+				for j := 0; j < 8; j++ {
+					assignment.P[k][i*8+j] = int((data[i] >> j) & 1)
+				}
+			}
+			outBits := make([]int, 256)
+			hash := crypto.Keccak256Hash(data)
+			for i := 0; i < 32; i++ {
+				for j := 0; j < 8; j++ {
+					outBits[i*8+j] = int((hash[i] >> j) & 1)
+				}
+			}
+			for i := 0; i < CheckBits; i++ {
+				assignment.Out[k][i] = outBits[i]
+			}
+		}
+		assignments[z] = assignment
+	}
+	wit, err = is.SolveInputs(assignments)
+	if err != nil {
+		panic("gg")
+	}
+	ss := test.CheckCircuitMultiWitness(c, wit)
+	for _, s := range ss {
+		if !s {
+			panic("should succeed")
+		}
+	}
+	fmt.Println("test 3 passed")
 }
