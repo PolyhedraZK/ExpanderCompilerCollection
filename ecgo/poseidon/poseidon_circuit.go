@@ -6,6 +6,7 @@ import (
 
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/field/m31"
+	"github.com/consensys/gnark/constraint/solver"
 	"github.com/consensys/gnark/frontend"
 )
 
@@ -209,4 +210,8 @@ func poseidonHint(field *big.Int, input []*big.Int, outputs []*big.Int) error {
 	}
 
 	return nil
+}
+
+func init() {
+	solver.RegisterHint(poseidonHint)
 }
