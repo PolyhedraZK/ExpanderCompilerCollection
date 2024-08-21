@@ -18,8 +18,6 @@ require (
 	github.com/fxamacker/cbor/v2 v2.5.0 // indirect
 	github.com/google/pprof v0.0.0-20240727154555-813a5fbdbec8 // indirect
 	github.com/holiman/uint256 v1.2.4 // indirect
-	github.com/ingonyama-zk/icicle v0.0.0-20230928131117-97f0079e5c71 // indirect
-	github.com/ingonyama-zk/iciclegnark v0.1.0 // indirect
 	github.com/juju/fslock v0.0.0-20160525022230-4d5c94c67b4b // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -28,7 +26,6 @@ require (
 	github.com/rs/zerolog v1.33.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/crypto v0.17.0 // indirect
-	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa // indirect
 	golang.org/x/sys v0.24.0 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
