@@ -3,7 +3,6 @@ module github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo
 go 1.21.6
 
 require (
-	github.com/PolyhedraZK/ExpanderCompilerCollection/go_libs v0.0.0-20240820214955-7b6da4693198
 	github.com/consensys/gnark v0.10.0
 	github.com/consensys/gnark-crypto v0.13.0
 )
@@ -24,7 +23,7 @@ require (
 	github.com/mmcloughlin/addchain v0.4.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rs/zerolog v1.33.0 // indirect
-	github.com/stretchr/testify v1.9.0 // indirect
+	github.com/stretchr/testify v1.9.0
 	golang.org/x/sys v0.24.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
