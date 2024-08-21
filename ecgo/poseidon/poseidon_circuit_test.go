@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/PolyhedraZK/ExpanderCompilerCollection/field/m31"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/field/m31"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/frontend"

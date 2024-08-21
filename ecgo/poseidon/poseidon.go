@@ -2,7 +2,7 @@
 package poseidon
 
 import (
-	"github.com/PolyhedraZK/ExpanderCompilerCollection/field/m31"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/field/m31"
 	"github.com/consensys/gnark/constraint"
 )
 
