@@ -127,9 +127,11 @@ func updateLib(path string) {
 		}
 		panic(err)
 	}
-	localTime := stat.ModTime()
-	if localTime.After(remoteTime) {
-		return
+	if fileExists {
+		localTime := stat.ModTime()
+		if localTime.After(remoteTime) {
+			return
+		}
 	}
 	downloadLib(path)
 }
