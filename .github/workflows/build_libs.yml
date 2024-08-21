@@ -28,6 +28,6 @@ jobs:
           git checkout --orphan rust-built-libs
           git rm --cached -r .
           cp output/libec_go_lib.so ./
-          git add ./libec_go_lib.so
+          git add ./libec_go_lib.so -f
           git commit -m "Add built libs"
           git push -f --set-upstream origin rust-built-libs
