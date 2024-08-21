@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/PolyhedraZK/ExpanderCompilerCollection"
-	"github.com/PolyhedraZK/ExpanderCompilerCollection/field/m31"
-	"github.com/PolyhedraZK/ExpanderCompilerCollection/poseidon"
-	ecc_test "github.com/PolyhedraZK/ExpanderCompilerCollection/test"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/field/m31"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/poseidon"
+	ecc_test "github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/test"
 	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/frontend"
 )
@@ -67,7 +67,7 @@ func M31CircuitBuild() {
 	// fmt.Println("Gnark test passed")
 
 	// Ecc test
-	circuit, err := ExpanderCompilerCollection.Compile(m31.ScalarField, &MockPoseidonM31Circuit{}, frontend.WithCompressThreshold(4))
+	circuit, err := ecgo.Compile(m31.ScalarField, &MockPoseidonM31Circuit{}, frontend.WithCompressThreshold(4))
 	if err != nil {
 		panic(err)
 	}

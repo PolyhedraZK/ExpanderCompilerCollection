@@ -1,4 +1,4 @@
-module github.com/PolyhedraZK/ExpanderCompilerCollection/examples
+module github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/examples
 
 go 1.21.6
 

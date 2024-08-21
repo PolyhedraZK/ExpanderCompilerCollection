@@ -4,8 +4,8 @@ import (
 	"log"
 	"math/big"
 
-	"github.com/PolyhedraZK/ExpanderCompilerCollection"
-	"github.com/PolyhedraZK/ExpanderCompilerCollection/field/m31"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/field/m31"
 	"github.com/consensys/gnark/frontend"
 )
 
@@ -36,7 +36,7 @@ func PoseidonCircuit(
 	r := [16]frontend.Variable{}
 	if useRandomness {
 		r[0] = frontend.Variable(1)
-		r[1] = api.(ExpanderCompilerCollection.API).GetRandomValue()
+		r[1] = api.(ecgo.API).GetRandomValue()
 		for i := 2; i < 16; i++ {
 			r[i] = api.Mul(r[i-1], r[1])
 		}
