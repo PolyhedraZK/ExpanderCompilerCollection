@@ -29,37 +29,24 @@ A gate is considered random if its `Coef` is equivalent to `RootCircuit.Field`.
 
 ### Serialization Process
 
-At its core, `uint64` types are serialized in little-endian format, while `big.Int` types are serialized as 32-byte little-endian sequences.
+At its core, `uint64` types are serialized in little-endian format, while `big.Int` types are serialized as 1/4/32-byte little-endian sequences depending on the particular field.
 
 The serialization of an array begins with a `uint64` that denotes its length, followed by the serialized representation of its elements.
 
-In the serialized form, `Coef` values are constrained to be less than `RootCircuit.Field`. Random gates are represented using additional arrays.
+A unique identifier, the magic number 3770719418566461763 (b'CIRCUIT4'), is prefixed to the serialized RootCircuit data stream to ensure data integrity.
 
-The `Circuit` structure, when serialized, is represented as follows:
-
-```go
-type Circuit struct {
-    InputLen      uint64
-    OutputLen     uint64
-    SubCircuits   []SubCircuit
-    Mul           []GateMul
-    Add           []GateAdd
-    Cst           []GateCst
-    RandomCoefIdx []uint64
-}
-```
-In this structure, RandomCoefIdx denotes the indices of random gates within the combined arrays of Mul, Add, and Cst.
-
-A unique identifier, the magic number 3626604230490605891 (b'CIRCUIT2'), is prefixed to the serialized RootCircuit data stream to ensure data integrity.
+Refer [Go implementation](../ecgo/layered/serialize.go) and [Rust implementation](../expander_compiler/src/circuit/layered/serde.rs) for details.
 
 ## Input Solver
 
-The input solver is an intermediary form of the circuit that facilitates witness generation. It is defined in `ir/input_solver.go`.
+The input solver (`irwg.RootCircuit`) is an intermediary form of the circuit that facilitates witness generation.
 
-For Go-specific implementations, serialization is performed using the gob package.
+Refer [Go implementation](../ecgo/irwg/serialize.go), [Rust implementation for circuit](../expander_compiler/src/circuit/ir/common/serde.rs) and [Rust implementation for instruction](../expander_compiler/src/circuit/ir/hint_normalized/serde.rs) for details.
 
 ## Witness Serialization
 
 The witness, an array of `big.Int`, serves as the input for the layered circuit. It is also defined in `ir/input_solver.go`.
 
-The serialization process for the witness is straightforward. Given the known array length, the `big.Int` array is serialized as a sequence of 32-byte little-endian values.
+One witness file contains one or multiple witnesses, stored in a compact form.
+
+Refer [Go implementation](../ecgo/irwg/witness_gen.go) for details.
