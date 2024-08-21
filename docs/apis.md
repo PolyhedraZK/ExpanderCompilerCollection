@@ -7,16 +7,16 @@ This document offers a comprehensive guide to the core APIs provided by the comp
 To integrate the compiler into your Go project, add the following import statement to your code:
 
 ```go
-import "github.com/PolyhedraZK/ExpanderCompilerCollection"
+import "github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo"
 ```
 
 ### Compile Function
 
-The `ExpanderCompilerCollection.Compile` method is the primary interface to the compiler. It takes a `frontend.Circuit` as input and returns a `CompileResult`.
+The `ecgo.Compile` method is the primary interface to the compiler. It takes a `frontend.Circuit` as input and returns a `CompileResult`.
 
 ### CompileResult Structure
 
-The `ExpanderCompilerCollection.CompileResult` structure encapsulates the results of the compilation process, which includes both the layered circuit and the intermediate representation (IR).
+The `ecgo.CompileResult` structure encapsulates the results of the compilation process, which includes both the layered circuit and the intermediate representation (IR).
 
 The `CompileResult` provides three methods for accessing the data:
 
@@ -26,7 +26,7 @@ The `CompileResult` provides three methods for accessing the data:
 
 ### Builder API
 
-The `ExpanderCompilerCollection.API` serves as the interface for the builder API. It extends the `frontend.API` interface from gnark, offering additional features such as support for sub-circuits and utility functions.
+The `ecgo.API` serves as the interface for the builder API. It extends the `frontend.API` interface from gnark, offering additional features such as support for sub-circuits and utility functions.
 
 ## Sub-Circuit API
 
@@ -52,19 +52,17 @@ One key requirement for `SubCircuitFunc` is determinism. This means that for any
 
 ```go
 type API interface {
-	ToSingleVariable(frontend.Variable) frontend.Variable
 	Output(frontend.Variable)
-	LayerOf(frontend.Variable) int
-	ToFirstLayer(frontend.Variable) frontend.Variable
 	GetRandomValue() frontend.Variable
+	CustomGate(gateType uint64, inputs ...frontend.Variable) frontend.Variable
 }
 ```
 
-- `ToSingleVariable`: This method transforms an expression into a single base variable. If the input expression is already a single variable, it is returned as is. Otherwise, an internal variable or gate is created to encapsulate the expression.
 - `Output`: This method appends a variable to the circuit's output. It is typically used to designate certain variables as public outputs of the circuit.
-- `LayerOf`: This method estimates the layer in which a variable will appear in the compiled layered circuit. The term "estimate" is used because subsequent compilation optimizations may modify the exact layer placement initially determined during the Builder phase.
-- `ToFirstLayer`: This method employs a hint to pull a variable back to the first layer.
 - `GetRandomValue`: This method retrieves a random value directly, a more efficient approach than generating pseudo-random numbers using a hash function. This direct access to random numbers is facilitated by the Libra proving process.
+- `CustomGate`: This method is similar to Gnark's `NewHint` in that it essentially calls a hint function to compute a result. In the resulting layered circuit, it will be compiled into a custom gate of the specified gate type. Unlike `NewHint`, it requires pre-registering the hint function and other parameters. For specific details, see [the example](../ecgo/examples/custom_gate/main.go).
+
+Several other APIs exist for old pure Golang Expander Compiler compability, but they are no-op now.
 
 ## Builder Extensions
 

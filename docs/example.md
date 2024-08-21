@@ -48,8 +48,8 @@ import (
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/frontend"
 
-	"github.com/PolyhedraZK/ExpanderCompilerCollection"
-	"github.com/PolyhedraZK/ExpanderCompilerCollection/test"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/test"
 )
 
 type Circuit struct {
@@ -65,7 +65,7 @@ func (circuit *Circuit) Define(api frontend.API) error {
 func main() {
 	assignment := &Circuit{X: 1, Y: 1}
 
-	circuit, _ := ExpanderCompilerCollection.Compile(ecc.BN254.ScalarField(), &Circuit{})
+	circuit, _ := ecgo.Compile(ecc.BN254.ScalarField(), &Circuit{})
 	c := circuit.GetLayeredCircuit()
 	os.WriteFile("circuit.txt", c.Serialize(), 0o644)
 	inputSolver := circuit.GetInputSolver()
@@ -79,8 +79,8 @@ func main() {
 
 Please note that the Prover's implementation resides in [Expander](https://github.com/PolyhedraZK/Expander). As such, the `CheckCircuit` function in this context merely evaluates the circuit once to confirm its correctness. To generate and verify the actual proof, supply `circuit.txt` and `witness.txt` to Expander.
 
-In contrast to gnark, where the prover handles a portion of the witness generation, our compiler employs an `InputSolver` to perform this task. The `InputSolver` also supports serialization and deserialization. For more information, please consult the examples in [MIMC](../examples/mimc) and [MIMC Deserialize](../examples/mimc_deserialize).
+In contrast to gnark, where the prover handles a portion of the witness generation, our compiler employs an `InputSolver` to perform this task. The `InputSolver` also supports serialization and deserialization. For more information, please consult the examples in [MIMC](../ecgo/examples/mimc) and [MIMC Deserialize](../ecgo/examples/mimc_deserialize).
 
 For additional features, please refer to [APIs](./apis.md).
 
-For more examples, please visit [examples](../examples).
+For more examples, please visit [examples](../ecgo/examples).
