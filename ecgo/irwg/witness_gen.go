@@ -78,6 +78,10 @@ func (rc *RootCircuit) solveInput(assignment frontend.Circuit) ([]*big.Int, int,
 
 // SolveInput is the entry point to solve the final input of the given assignment using a specified number of threads.
 func (rc *RootCircuit) SolveInput(assignment frontend.Circuit, _ int) (*Witness, error) {
+	return rc.SolveInputAuto(assignment)
+}
+
+func (rc *RootCircuit) SolveInputAuto(assignment frontend.Circuit) (*Witness, error) {
 	witness, lenSec, lenPub, err := rc.solveInput(assignment)
 	if err != nil {
 		return nil, err

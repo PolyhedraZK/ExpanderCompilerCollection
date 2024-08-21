@@ -14,7 +14,7 @@ func CheckCircuit(rc *layered.RootCircuit, witness *irwg.Witness) bool {
 	if witness.NumWitnesses != 1 {
 		panic("expected 1 witness, if you need to check multiple witnesses, use CheckCircuitMultiWitness")
 	}
-	out := EvalCircuit(rc, witness.Values[:witness.NumInputsPerWitness], witness.Values[witness.NumInputsPerWitness:])
+	out := evalCircuit(rc, witness.Values[:witness.NumInputsPerWitness], witness.Values[witness.NumInputsPerWitness:])
 	for i := 0; i < rc.ExpectedNumOutputZeroes; i++ {
 		if out[i].Cmp(big.NewInt(0)) != 0 {
 			return false
@@ -31,7 +31,7 @@ func CheckCircuitMultiWitness(rc *layered.RootCircuit, witness *irwg.Witness) []
 	a := witness.NumInputsPerWitness
 	b := witness.NumPublicInputsPerWitness
 	for i := 0; i < witness.NumWitnesses; i++ {
-		out := EvalCircuit(rc, witness.Values[i*(a+b):i*(a+b)+a], witness.Values[i*(a+b)+a:i*(a+b)+a+b])
+		out := evalCircuit(rc, witness.Values[i*(a+b):i*(a+b)+a], witness.Values[i*(a+b)+a:i*(a+b)+a+b])
 		res[i] = true
 		for j := 0; j < rc.ExpectedNumOutputZeroes; j++ {
 			if out[j].Cmp(big.NewInt(0)) != 0 {
@@ -43,7 +43,15 @@ func CheckCircuitMultiWitness(rc *layered.RootCircuit, witness *irwg.Witness) []
 	return res
 }
 
-func EvalCircuit(rc *layered.RootCircuit, input []*big.Int, publicInput []*big.Int) []*big.Int {
+func EvalCircuit(rc *layered.RootCircuit, witness *irwg.Witness) []*big.Int {
+	if witness.NumWitnesses != 1 {
+		panic("expected 1 witness, if you need to check multiple witnesses, use CheckCircuitMultiWitness")
+	}
+	out := evalCircuit(rc, witness.Values[:witness.NumInputsPerWitness], witness.Values[witness.NumInputsPerWitness:])
+	return out
+}
+
+func evalCircuit(rc *layered.RootCircuit, input []*big.Int, publicInput []*big.Int) []*big.Int {
 	if len(input) != int(rc.Circuits[rc.Layers[0]].InputLen) {
 		panic("input length mismatch")
 	}
