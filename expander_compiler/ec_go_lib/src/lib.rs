@@ -7,6 +7,8 @@ use expander_compiler::{
     utils::serde::Serde,
 };
 
+const ABI_VERSION: c_ulong = 2;
+
 #[repr(C)]
 pub struct ByteArray {
     data: *mut c_uchar,
@@ -128,4 +130,9 @@ pub extern "C" fn compile(ir_source: ByteArray, config_id: c_ulong) -> CompileRe
     let ir_source = unsafe { slice::from_raw_parts(ir_source.data, ir_source.length as usize) };
     let result = compile_inner(ir_source.to_vec(), config_id);
     to_compile_result(result)
+}
+
+#[no_mangle]
+pub extern "C" fn abi_version() -> c_ulong {
+    ABI_VERSION
 }
