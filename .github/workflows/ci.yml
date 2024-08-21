@@ -1,17 +1,20 @@
-name: Build libs
+name: ci
 
 on:
   push:
     branches:
       - rust_rewrite
 
+env:
+  RUSTFLAGS: "-Dwarnings"
+  RUST_BACKTRACE: 1
+
 jobs:
-  build:
+  build-rust:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-  
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -26,8 +29,8 @@ jobs:
           name: build-${{ matrix.os }}
           path: expander_compiler/target/release/libec_go_lib.*
 
-  upload:
-    needs: build
+  upload-rust:
+    needs: build-rust
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -50,3 +53,41 @@ jobs:
           git add ./libec_go_lib.* -f
           git commit -m "Add built libs"
           git push -f --set-upstream origin rust-built-libs
+
+  test-rust:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: styfle/cancel-workflow-action@0.11.0
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "expander_compiler -> expander_compiler/target"
+      - run: cargo test --manifest-path=expander_compiler/Cargo.toml
+
+  test-go:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    needs: build-rust
+    steps:
+      - uses: styfle/cancel-workflow-action@0.11.0
+      - uses: actions/checkout@v4
+      - name: Setup Go 1.21.x
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21.x'
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+          pattern: build-${{ matrix.os }}
+          merge-multiple: true
+      - run: |
+          cp artifacts/libec_go_lib.* ecgo/compile/wrapper/
+          cd ecgo
+          go test ./test/
