@@ -1,4 +1,4 @@
-name: build-libs
+name: Build libs
 
 on:
   push:
@@ -7,8 +7,11 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+  
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -17,17 +20,33 @@ jobs:
           workspaces: "expander_compiler -> expander_compiler/target"
       - name: Build
         run: cargo build --release --manifest-path=expander_compiler/ec_go_lib/Cargo.toml
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.os }}
+          path: expander_compiler/target/release/libec_go_lib.*
+
+  upload:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+          pattern: build-*
+          merge-multiple: true
+
       - name: Push built libs to another branch
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-          mkdir output
-          cp -r expander_compiler/target/release/*.so output/
-
           git checkout --orphan rust-built-libs
+          cp artifacts/libec_go_lib.* ./
+          rm ./libec_go_lib.d
           git rm --cached -r .
-          cp output/libec_go_lib.so ./
-          git add ./libec_go_lib.so -f
+          git add ./libec_go_lib.* -f
           git commit -m "Add built libs"
           git push -f --set-upstream origin rust-built-libs
