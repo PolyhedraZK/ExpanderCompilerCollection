@@ -79,10 +79,24 @@ func getUrl(url string) ([]byte, error) {
 	return body, nil
 }
 
+func getLibName() string {
+	switch runtime.GOOS {
+	case "darwin":
+		if runtime.GOARCH == "arm64" {
+			return "libec_go_lib.dylib"
+		}
+	case "linux":
+		if runtime.GOARCH == "amd64" {
+			return "libec_go_lib.so"
+		}
+	}
+	panic(fmt.Sprintf("unsupported platform %s %s", runtime.GOOS, runtime.GOARCH))
+}
+
 func downloadLib(path string) {
 	log := logger.Logger()
 	log.Info().Msg("Downloading rust libs ...")
-	err := downloadFile("https://github.com/PolyhedraZK/ExpanderCompilerCollection/raw/rust-built-libs/libec_go_lib.so", path)
+	err := downloadFile("https://github.com/PolyhedraZK/ExpanderCompilerCollection/raw/rust-built-libs/"+getLibName(), path)
 	if err != nil {
 		os.Remove(path)
 		panic(err)
@@ -143,11 +157,11 @@ func initCompilePtr() {
 		return
 	}
 	curDir := currentFileDirectory()
-	soPath := filepath.Join(curDir, "libec_go_lib.so")
+	soPath := filepath.Join(curDir, getLibName())
 	updateLib(soPath)
 	handle := C.dlopen(C.CString(soPath), C.RTLD_LAZY)
 	if handle == nil {
-		panic("failed to load libec_go_lib.so")
+		panic("failed to load libec_go_lib")
 	}
 	compilePtr = C.dlsym(handle, C.CString("compile"))
 	if compilePtr == nil {
