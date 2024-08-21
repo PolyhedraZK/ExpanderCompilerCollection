@@ -23,12 +23,11 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
           mkdir output
-          cp -r expander_compiler/target/release/*.a output/
+          cp -r expander_compiler/target/release/*.so output/
 
-          git fetch
-          git checkout rust-built-libs-template
-          git checkout -b rust-built-libs
-          cp output/libec_go_lib.a go_libs/lib/
-          git add go_libs/lib/libec_go_lib.a
+          git checkout --orphan rust-built-libs
+          git rm --cached -r .
+          cp output/libec_go_lib.so ./
+          git add ./libec_go_lib.so
           git commit -m "Add built libs"
           git push -f --set-upstream origin rust-built-libs
