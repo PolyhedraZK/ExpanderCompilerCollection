@@ -1,4 +1,5 @@
 #!/bin/sh
+cd "$(dirname "$0")"
 cd expander_compiler/ec_go_lib
 cargo build --release
 cd ..

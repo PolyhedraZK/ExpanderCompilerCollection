@@ -7,10 +7,11 @@ use super::config::Config;
 #[cfg(test)]
 mod tests;
 
+pub mod opt;
 pub mod serde;
 pub mod stats;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Coef<C: Config> {
     Constant(C::CircuitField),
     Random,
@@ -30,6 +31,7 @@ impl<C: Config> Coef<C> {
             }
         }
     }
+
     pub fn validate(&self, num_public_inputs: usize) -> Result<(), Error> {
         match self {
             Coef::Constant(_) => Ok(()),
@@ -47,6 +49,27 @@ impl<C: Config> Coef<C> {
         }
     }
 
+    pub fn is_constant(&self) -> bool {
+        match self {
+            Coef::Constant(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn add_constant(&self, c: C::CircuitField) -> Self {
+        match self {
+            Coef::Constant(x) => Coef::Constant(*x + c),
+            _ => panic!("add_constant called on non-constant"),
+        }
+    }
+
+    pub fn get_constant(&self) -> Option<C::CircuitField> {
+        match self {
+            Coef::Constant(x) => Some(x.clone()),
+            _ => None,
+        }
+    }
+
     #[cfg(test)]
     pub fn random_no_random(mut rnd: impl rand::RngCore, num_public_inputs: usize) -> Self {
         use rand::Rng;
@@ -58,7 +81,7 @@ impl<C: Config> Coef<C> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub struct Gate<C: Config, const INPUT_NUM: usize> {
     pub inputs: [usize; INPUT_NUM],
     pub output: usize,
@@ -69,7 +92,7 @@ pub type GateMul<C> = Gate<C, 2>;
 pub type GateAdd<C> = Gate<C, 1>;
 pub type GateConst<C> = Gate<C, 0>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub struct GateCustom<C: Config> {
     pub gate_type: usize,
     pub inputs: Vec<usize>,
@@ -77,6 +100,7 @@ pub struct GateCustom<C: Config> {
     pub coef: Coef<C>,
 }
 
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub struct Allocation {
     pub input_offset: usize,
     pub output_offset: usize,
@@ -84,7 +108,7 @@ pub struct Allocation {
 
 pub type ChildSpec = (usize, Vec<Allocation>);
 
-#[derive(Default)]
+#[derive(Default, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub struct Segment<C: Config> {
     pub num_inputs: usize,
     pub num_outputs: usize,
@@ -95,6 +119,7 @@ pub struct Segment<C: Config> {
     pub gate_customs: Vec<GateCustom<C>>,
 }
 
+#[derive(Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub struct Circuit<C: Config> {
     pub num_public_inputs: usize,
     pub num_actual_outputs: usize,
