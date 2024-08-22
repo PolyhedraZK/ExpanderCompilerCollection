@@ -132,9 +132,25 @@ pub fn compile<C: Config>(
         .validate_circuit_has_inputs()
         .map_err(|e| e.prepend("dest ir circuit invalid"))?;
 
-    let (lc, dest_im) = layering::compile(&r_dest_opt);
+    let (mut lc, dest_im) = layering::compile(&r_dest_opt);
     lc.validate()
         .map_err(|e| e.prepend("layered circuit invalid"))?;
+
+    lc.dedup_gates();
+    loop {
+        let lc1 = lc.expand_small_segments();
+        let lc2 = if lc1.segments.len() <= 100 {
+            lc1.find_common_parts()
+        } else {
+            lc1
+        };
+        if lc2 == lc {
+            break;
+        }
+        lc = lc2;
+    }
+    lc.validate()
+        .map_err(|e| e.prepend("layered circuit invalid1"))?;
 
     // TODO: optimize lc
 

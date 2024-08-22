@@ -2,7 +2,7 @@
 *.txt
 __*
 target
-libec_go_lib.so
+libec_go_lib.*
 
 # dev IDE
 .idea
