@@ -114,6 +114,7 @@ func (ctx *compileContext) prepareLayerLayoutContext(ic *irContext) {
 		for j, x := range insn.Inputs {
 			inputIds[j] = x[0].VID0
 		}
+		inputIds = append(inputIds, ic.subCircuitHintInputs[i]...)
 		ic.lcs[inputLayer].req = append(ic.lcs[inputLayer].req, placementReq{insnId, inputIds, len(insn.Inputs)})
 
 		for _, x := range insn.OutputIds {
