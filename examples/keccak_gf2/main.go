@@ -144,6 +144,11 @@ func keccakF(api frontend.API, a [][]frontend.Variable) [][]frontend.Variable {
 		b[14] = rotateLeft(a[22], 39)
 		b[17] = rotateLeft(a[23], 8)
 		b[20] = rotateLeft(a[24], 14)
+		for j := 0; j < len(a); j++ {
+			for k := 0; k < len(a[j]); k++ {
+				b[j][k] = api.(ExpanderCompilerCollection.API).ToSingleVariable(b[j][k])
+			}
+		}
 
 		/*Xi state*/
 
@@ -176,12 +181,18 @@ func keccakF(api frontend.API, a [][]frontend.Variable) [][]frontend.Variable {
 		a[22] = xor(api, b[22], and(api, not(api, b[2]), b[7]))
 		a[23] = xor(api, b[23], and(api, not(api, b[3]), b[8]))
 		a[24] = xor(api, b[24], and(api, not(api, b[4]), b[9]))
+		//fmt.Printf("=== %v\n", a[24][3])
 
 		///*Last step*/
 
 		for j := 0; j < len(a[0]); j++ {
 			if rcs[i][j] == 1 {
 				a[0][j] = api.Sub(1, a[0][j])
+			}
+		}
+		for j := 0; j < len(a); j++ {
+			for k := 0; k < len(a[j]); k++ {
+				a[j][k] = api.(ExpanderCompilerCollection.API).ToSingleVariable(a[j][k])
 			}
 		}
 	}
@@ -208,6 +219,8 @@ func and(api frontend.API, a []frontend.Variable, b []frontend.Variable) []front
 		//fmt.Println(api.(ExpanderCompilerCollection.API).LayerOf(x))
 		//bitsRes[i] = api.Mul(x, y)
 		//fmt.Println(bitsRes[i])
+		//a[i] = api.(ExpanderCompilerCollection.API).ToSingleVariable(a[i])
+		//b[i] = api.(ExpanderCompilerCollection.API).ToSingleVariable(b[i])
 		bitsRes[i] = api.Mul(a[i], b[i])
 		//bitsRes[i] = api.(ExpanderCompilerCollection.API).ToSingleVariable(bitsRes[i])
 		//fmt.Println(bitsRes[i])
