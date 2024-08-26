@@ -458,8 +458,8 @@ impl<C: Config> Builder<C> {
             + cost_of_possible_references::<C>(&[0, 1, 0], ref_count.add, ref_count.mul);
         should_compress |= cost_compress < cost_no_compress;
         should_compress &= e.degree() > 0;
-        if should_compress && false {
-            // Currently, this don't consider the cost of relay, so it's disabled
+        if should_compress {
+            // Currently, this don't consider the cost of relay, so it's not good in some cases
             // TODO: fix this
             let es = self.to_single(e);
             self.in_var_exprs.push(es);
