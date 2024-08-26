@@ -42,5 +42,9 @@ impl Config for GF2Config {
 
     const CONFIG_ID: usize = 3;
 
+    // temporary fix for Keccak_GF2
+    // TODO: measure actual costs
+    const COST_MUL: usize = 200;
+
     const ENABLE_RANDOM_COMBINATION: bool = false;
 }
