@@ -406,4 +406,65 @@ impl<C: Config> RootCircuit<C> {
         let c0 = self.circuits.get(&0).unwrap().add_back_removed_inputs(im);
         self.circuits.insert(0, c0);
     }
+
+    pub fn eval_with_public_inputs(
+        &self,
+        inputs: Vec<C::CircuitField>,
+        public_inputs: &[C::CircuitField],
+    ) -> Result<Vec<C::CircuitField>, Error> {
+        assert_eq!(inputs.len(), self.input_size());
+        self.eval_sub_with_public_inputs(&self.circuits[&0], inputs, public_inputs)
+    }
+
+    fn eval_sub_with_public_inputs(
+        &self,
+        circuit: &Circuit<C>,
+        inputs: Vec<C::CircuitField>,
+        public_inputs: &[C::CircuitField],
+    ) -> Result<Vec<C::CircuitField>, Error> {
+        let mut values = vec![C::CircuitField::zero(); 1];
+        values.extend(inputs);
+        for insn in circuit.instructions.iter() {
+            if let Instruction::ConstantLike(coef) = insn {
+                match coef {
+                    Coef::Constant(c) => {
+                        values.push(*c);
+                    }
+                    Coef::PublicInput(i) => {
+                        values.push(public_inputs[*i]);
+                    }
+                    Coef::Random => {
+                        return Err(Error::UserError(
+                            "random coef occured in witness solver".to_string(),
+                        ));
+                    }
+                }
+                continue;
+            }
+            match insn.eval_unsafe(&values) {
+                EvalResult::Value(v) => {
+                    values.push(v);
+                }
+                EvalResult::Values(mut vs) => {
+                    values.append(&mut vs);
+                }
+                EvalResult::SubCircuitCall(sub_circuit_id, inputs) => {
+                    let res = self.eval_sub_with_public_inputs(
+                        &self.circuits[&sub_circuit_id],
+                        inputs.iter().map(|&i| values[i]).collect(),
+                        public_inputs,
+                    )?;
+                    values.extend(res);
+                }
+                EvalResult::Error(e) => {
+                    return Err(e);
+                }
+            }
+        }
+        let mut res = Vec::new();
+        for &o in circuit.outputs.iter() {
+            res.push(values[o]);
+        }
+        Ok(res)
+    }
 }
