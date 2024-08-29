@@ -5,9 +5,9 @@ use crate::{
 
 use super::{
     api::BasicAPI,
-    build,
     builder::{RootBuilder, Variable},
     circuit::*,
+    compile,
     variables::DumpLoadTwoVariables,
 };
 
@@ -69,32 +69,26 @@ impl Define<M31Config> for Circuit2<Variable> {
 
 #[test]
 fn test_circuit_eval_simple() {
-    let rc = build(&Circuit2::default());
-    assert_eq!(rc.validate(), Ok(()));
-    let (irw, lc) = crate::compile::compile(&rc).unwrap();
+    let compile_result = compile(&Circuit2::default()).unwrap();
     let assignment = Circuit2::<M31> {
         sum: M31::from(126),
         x: [M31::from(1), M31::from(2)],
     };
-    let mut inputs = Vec::new();
-    let mut public_inputs = Vec::new();
-    assignment.dump_into(&mut inputs, &mut public_inputs);
-    assert_eq!(public_inputs, vec![]);
-    let (wit, _) = irw.eval_unsafe(inputs);
-    let (out, cond) = lc.eval_unsafe(wit);
-    assert_eq!(out, vec![]);
-    assert!(cond);
+    let witness = compile_result
+        .witness_solver
+        .solve_witness(&assignment)
+        .unwrap();
+    let output = compile_result.layered_circuit.run(&witness);
+    assert_eq!(output, vec![true]);
 
     let assignment = Circuit2::<M31> {
         sum: M31::from(127),
         x: [M31::from(1), M31::from(2)],
     };
-    let mut inputs = Vec::new();
-    let mut public_inputs = Vec::new();
-    assignment.dump_into(&mut inputs, &mut public_inputs);
-    assert_eq!(public_inputs, vec![]);
-    let (wit, _) = irw.eval_unsafe(inputs);
-    let (out, cond) = lc.eval_unsafe(wit);
-    assert_eq!(out, vec![]);
-    assert!(!cond);
+    let witness = compile_result
+        .witness_solver
+        .solve_witness(&assignment)
+        .unwrap();
+    let output = compile_result.layered_circuit.run(&witness);
+    assert_eq!(output, vec![false]);
 }
