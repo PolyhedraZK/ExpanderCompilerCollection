@@ -32,6 +32,22 @@ impl<C: Config> Coef<C> {
         }
     }
 
+    pub fn get_value_with_public_inputs(
+        &self,
+        public_inputs: &[C::CircuitField],
+    ) -> C::CircuitField {
+        match self {
+            Coef::Constant(c) => c.clone(),
+            Coef::Random => C::CircuitField::random_unsafe(),
+            Coef::PublicInput(id) => {
+                if *id >= public_inputs.len() {
+                    panic!("public input id {} out of range", id);
+                }
+                public_inputs[*id].clone()
+            }
+        }
+    }
+
     pub fn validate(&self, num_public_inputs: usize) -> Result<(), Error> {
         match self {
             Coef::Constant(_) => Ok(()),
@@ -361,6 +377,79 @@ impl<C: Config> Circuit<C> {
                     subc,
                     &cur[a.input_offset..a.input_offset + subc.num_inputs],
                     &mut nxt[a.output_offset..a.output_offset + subc.num_outputs],
+                );
+            }
+        }
+    }
+
+    pub fn eval_with_public_inputs(
+        &self,
+        inputs: Vec<C::CircuitField>,
+        public_inputs: &[C::CircuitField],
+    ) -> (Vec<C::CircuitField>, bool) {
+        if inputs.len() != self.input_size() {
+            panic!("input length mismatch");
+        }
+        let mut cur = inputs;
+        for &id in self.layer_ids.iter() {
+            let mut next = vec![C::CircuitField::zero(); self.segments[id].num_outputs];
+            self.apply_segment_with_public_inputs(
+                &self.segments[id],
+                &cur,
+                &mut next,
+                public_inputs,
+            );
+            cur = next;
+        }
+        let mut constraints_satisfied = true;
+        for i in 0..self.expected_num_output_zeroes {
+            if !cur[i].is_zero() {
+                constraints_satisfied = false;
+                break;
+            }
+        }
+        (
+            cur[self.expected_num_output_zeroes..self.num_actual_outputs].to_vec(),
+            constraints_satisfied,
+        )
+    }
+
+    fn apply_segment_with_public_inputs(
+        &self,
+        seg: &Segment<C>,
+        cur: &[C::CircuitField],
+        nxt: &mut [C::CircuitField],
+        public_inputs: &[C::CircuitField],
+    ) {
+        for m in seg.gate_muls.iter() {
+            nxt[m.output] += cur[m.inputs[0]]
+                * cur[m.inputs[1]]
+                * m.coef.get_value_with_public_inputs(public_inputs);
+        }
+        for a in seg.gate_adds.iter() {
+            nxt[a.output] += cur[a.inputs[0]] * a.coef.get_value_with_public_inputs(public_inputs);
+        }
+        for cs in seg.gate_consts.iter() {
+            nxt[cs.output] += cs.coef.get_value_with_public_inputs(public_inputs);
+        }
+        for cu in seg.gate_customs.iter() {
+            let mut inputs = Vec::with_capacity(cu.inputs.len());
+            for &input in cu.inputs.iter() {
+                inputs.push(cur[input]);
+            }
+            let outputs = hints::stub_impl(cu.gate_type, &inputs, 1);
+            for (i, &output) in outputs.iter().enumerate() {
+                nxt[cu.output + i] += output * cu.coef.get_value_unsafe();
+            }
+        }
+        for (sub_id, allocs) in seg.child_segs.iter() {
+            let subc = &self.segments[*sub_id];
+            for a in allocs.iter() {
+                self.apply_segment_with_public_inputs(
+                    subc,
+                    &cur[a.input_offset..a.input_offset + subc.num_inputs],
+                    &mut nxt[a.output_offset..a.output_offset + subc.num_outputs],
+                    public_inputs,
                 );
             }
         }
