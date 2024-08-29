@@ -6,6 +6,7 @@ pub struct WitnessSolver<C: Config> {
     pub circuit: ir::hint_normalized::RootCircuit<C>,
 }
 
+#[derive(Debug)]
 pub struct Witness<C: Config> {
     pub num_witnesses: usize,
     pub num_inputs_per_witness: usize,
@@ -17,7 +18,7 @@ impl<C: Config> WitnessSolver<C> {
     fn solve_witness_inner<Cir: internal::DumpLoadTwoVariables<C::CircuitField>>(
         &self,
         assignment: &Cir,
-    ) -> Result<Vec<C::CircuitField>, Error> {
+    ) -> Result<(Vec<C::CircuitField>, usize), Error> {
         assert_eq!(
             assignment.num_vars(),
             (self.circuit.input_size(), self.circuit.num_public_inputs)
@@ -26,18 +27,19 @@ impl<C: Config> WitnessSolver<C> {
         let mut public_vars = Vec::new();
         assignment.dump_into(&mut vars, &mut public_vars);
         let mut a = self.circuit.eval_with_public_inputs(vars, &public_vars)?;
+        let res_len = a.len();
         a.extend(public_vars);
-        Ok(a)
+        Ok((a, res_len))
     }
 
     pub fn solve_witness<Cir: internal::DumpLoadTwoVariables<C::CircuitField>>(
         &self,
         assignment: &Cir,
     ) -> Result<Witness<C>, Error> {
-        let values = self.solve_witness_inner(assignment)?;
+        let (values, num_inputs_per_witness) = self.solve_witness_inner(assignment)?;
         Ok(Witness {
             num_witnesses: 1,
-            num_inputs_per_witness: self.circuit.input_size(),
+            num_inputs_per_witness,
             num_public_inputs_per_witness: self.circuit.num_public_inputs,
             values,
         })
@@ -48,12 +50,15 @@ impl<C: Config> WitnessSolver<C> {
         assignments: &[Cir],
     ) -> Result<Witness<C>, Error> {
         let mut values = Vec::new();
+        let mut num_inputs_per_witness = 0;
         for assignment in assignments {
-            values.extend(self.solve_witness_inner(assignment)?);
+            let (a, num) = self.solve_witness_inner(assignment)?;
+            values.extend(a);
+            num_inputs_per_witness = num;
         }
         Ok(Witness {
             num_witnesses: assignments.len(),
-            num_inputs_per_witness: self.circuit.input_size(),
+            num_inputs_per_witness,
             num_public_inputs_per_witness: self.circuit.num_public_inputs,
             values,
         })
