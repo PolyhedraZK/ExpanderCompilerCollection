@@ -20,7 +20,7 @@ pub trait Config: Default + Clone + Ord + Debug + Hash + Copy + 'static {
 pub struct M31Config {}
 
 impl Config for M31Config {
-    type CircuitField = crate::field::m31::M31;
+    type CircuitField = crate::field::M31;
 
     const CONFIG_ID: usize = 1;
 }
@@ -29,7 +29,7 @@ impl Config for M31Config {
 pub struct BN254Config {}
 
 impl Config for BN254Config {
-    type CircuitField = crate::field::bn254::BN254;
+    type CircuitField = crate::field::BN254;
 
     const CONFIG_ID: usize = 2;
 }
@@ -38,7 +38,7 @@ impl Config for BN254Config {
 pub struct GF2Config {}
 
 impl Config for GF2Config {
-    type CircuitField = crate::field::gf2::GF2;
+    type CircuitField = crate::field::GF2;
 
     const CONFIG_ID: usize = 3;
 

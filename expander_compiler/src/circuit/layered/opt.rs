@@ -676,7 +676,7 @@ impl<C: Config> Circuit<C> {
 #[cfg(test)]
 mod tests {
     use crate::circuit::layered;
-    use crate::field::Field;
+    use crate::field::FieldArith;
     use crate::layering::compile;
     use crate::{
         circuit::{
@@ -738,7 +738,7 @@ mod tests {
             assert_eq!(lc_opt.input_size(), lc.input_size());
             for _ in 0..5 {
                 let input: Vec<<C as Config>::CircuitField> = (0..lc.input_size())
-                    .map(|_| CField::random_unsafe())
+                    .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
                     .collect();
                 let (lc_output, lc_cond) = lc.eval_unsafe(input.clone());
                 let (lc_opt_output, lc_opt_cond) = lc.eval_unsafe(input);
@@ -774,7 +774,7 @@ mod tests {
             assert_eq!(lc_opt.input_size(), lc.input_size());
             for _ in 0..5 {
                 let input: Vec<<C as Config>::CircuitField> = (0..lc.input_size())
-                    .map(|_| CField::random_unsafe())
+                    .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
                     .collect();
                 let (lc_output, lc_cond) = lc.eval_unsafe(input.clone());
                 let (lc_opt_output, lc_opt_cond) = lc_opt.eval_unsafe(input);
@@ -810,7 +810,7 @@ mod tests {
             assert_eq!(lc_opt.input_size(), lc.input_size());
             for _ in 0..5 {
                 let input: Vec<<C as Config>::CircuitField> = (0..lc.input_size())
-                    .map(|_| CField::random_unsafe())
+                    .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
                     .collect();
                 let (lc_output, lc_cond) = lc.eval_unsafe(input.clone());
                 let (lc_opt_output, lc_opt_cond) = lc_opt.eval_unsafe(input);

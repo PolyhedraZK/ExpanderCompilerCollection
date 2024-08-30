@@ -1,6 +1,6 @@
 use std::io::{Error as IoError, Read, Write};
 
-use crate::{field::U256, utils::serde::Serde};
+use crate::{field::{U256, FieldModulus}, utils::serde::Serde};
 
 use super::*;
 

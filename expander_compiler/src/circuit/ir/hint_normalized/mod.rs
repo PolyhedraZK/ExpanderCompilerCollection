@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::field::Field;
+use crate::field::FieldArith;
 use crate::utils::error::Error;
 use crate::{
     circuit::{

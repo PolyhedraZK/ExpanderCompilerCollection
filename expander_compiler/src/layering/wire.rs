@@ -7,7 +7,7 @@ use crate::{
         ir::expr::VarSpec,
         layered::{Allocation, Coef, GateAdd, GateConst, GateCustom, GateMul, Segment},
     },
-    field::Field,
+    field::FieldArith,
     utils::pool::Pool,
 };
 

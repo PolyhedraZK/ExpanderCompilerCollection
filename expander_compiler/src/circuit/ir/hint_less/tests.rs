@@ -9,7 +9,7 @@ use crate::circuit::{
     ir::{common::rand_gen::*, expr},
     layered::Coef,
 };
-use crate::field::Field;
+use crate::field::FieldArith;
 
 type CField = <C as Config>::CircuitField;
 
@@ -61,7 +61,7 @@ fn opt_remove_unreachable() {
         assert_eq!(im.cur_size(), root.input_size());
         assert_eq!(optroot.validate(), Ok(()));
         let inputs: Vec<CField> = (0..root.input_size())
-            .map(|_| CField::random_unsafe())
+            .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
             .collect();
         let (out1, cond1) = root.eval_unsafe(inputs.clone());
         let (out2, cond2) = optroot.eval_unsafe(im.map_inputs(&inputs));
@@ -91,7 +91,7 @@ fn opt_remove_unreachable_2() {
         assert_eq!(im.cur_size(), root.input_size());
         assert_eq!(optroot.validate(), Ok(()));
         let inputs: Vec<CField> = (0..root.input_size())
-            .map(|_| CField::random_unsafe())
+            .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
             .collect();
         let (out1, cond1) = root.eval_unsafe(inputs.clone());
         let (out2, cond2) = optroot.eval_unsafe(im.map_inputs(&inputs));

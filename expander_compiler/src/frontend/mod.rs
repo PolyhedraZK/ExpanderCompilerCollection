@@ -11,7 +11,7 @@ mod witness;
 pub use circuit::declare_circuit;
 pub type API<C> = builder::RootBuilder<C>;
 pub use crate::circuit::config::*;
-pub use crate::field::{bn254::BN254, gf2::GF2, m31::M31, Field};
+pub use crate::field::{Field, BN254, GF2, M31};
 pub use crate::utils::error::Error;
 pub use api::BasicAPI;
 pub use builder::Variable;

@@ -9,7 +9,7 @@ use crate::{
             expr::{Expression, LinComb, Term, VarSpec},
         },
     },
-    field::Field,
+    field::FieldArith,
     utils::{error::Error, pool::Pool},
 };
 

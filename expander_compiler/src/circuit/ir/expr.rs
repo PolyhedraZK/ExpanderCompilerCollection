@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::circuit::config::Config;
-use crate::field::Field;
+use crate::field::{FieldArith, U256};
 use crate::utils::serde::Serde;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -157,9 +157,17 @@ impl<C: Config> fmt::Display for Term<C> {
             }
         } else {
             match &self.vars {
-                VarSpec::Const => write!(f, "{}", self.coef),
-                VarSpec::Linear(index) => write!(f, "v{}*{}", index, self.coef),
-                VarSpec::Quad(index1, index2) => write!(f, "v{}*v{}*{}", index1, index2, self.coef),
+                VarSpec::Const => write!(f, "{}", Into::<U256>::into(self.coef)),
+                VarSpec::Linear(index) => write!(f, "v{}*{}", index, Into::<U256>::into(self.coef)),
+                VarSpec::Quad(index1, index2) => {
+                    write!(
+                        f,
+                        "v{}*v{}*{}",
+                        index1,
+                        index2,
+                        Into::<U256>::into(self.coef)
+                    )
+                }
                 VarSpec::Custom { gate_type, inputs } => {
                     write!(f, "custom{}(", gate_type)?;
                     for (i, input) in inputs.iter().enumerate() {
@@ -168,7 +176,7 @@ impl<C: Config> fmt::Display for Term<C> {
                         }
                         write!(f, "v{}", input)?;
                     }
-                    write!(f, ")*{}", self.coef)
+                    write!(f, ")*{}", Into::<U256>::into(self.coef))
                 }
             }
         }
@@ -427,12 +435,12 @@ impl<C: Config> fmt::Display for LinComb<C> {
             if term.coef == C::CircuitField::one() {
                 write!(f, "v{}", term.var)?;
             } else {
-                write!(f, "v{}*{}", term.var, term.coef)?;
+                write!(f, "v{}*{}", term.var, Into::<U256>::into(term.coef))?;
             }
         }
         if !self.constant.is_zero() {
             if !self.constant.is_zero() {
-                write!(f, " + {}", self.constant)?;
+                write!(f, " + {}", Into::<U256>::into(self.constant))?;
             }
         }
         Ok(())

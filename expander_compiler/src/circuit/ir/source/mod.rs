@@ -1,6 +1,6 @@
 use crate::{
     circuit::{config::Config, layered::Coef},
-    field::{Field, U256},
+    field::{Field, FieldArith, U256},
     hints::{self, circom_shift_l_impl, circom_shift_r_impl},
     utils::error::Error,
 };

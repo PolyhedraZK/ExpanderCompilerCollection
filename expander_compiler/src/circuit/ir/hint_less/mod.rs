@@ -1,5 +1,5 @@
 use crate::circuit::{config::Config, layered::Coef};
-use crate::field::Field;
+use crate::field::FieldArith;
 use crate::hints;
 use crate::utils::error::Error;
 

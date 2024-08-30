@@ -7,7 +7,7 @@ use crate::{
         },
     },
     compile::compile,
-    field::Field,
+    field::FieldArith,
     utils::error::Error,
 };
 
@@ -32,7 +32,7 @@ fn do_test<C: Config>(mut config: RandomCircuitConfig, seed: RandomRange) {
                 );
                 for _ in 0..5 {
                     let input: Vec<C::CircuitField> = (0..root.input_size())
-                        .map(|_| C::CircuitField::random_unsafe())
+                        .map(|_| C::CircuitField::random_unsafe(&mut rand::thread_rng()))
                         .collect();
                     match root.eval_unsafe_with_errors(input.clone()) {
                         Ok((src_output, src_cond)) => {
