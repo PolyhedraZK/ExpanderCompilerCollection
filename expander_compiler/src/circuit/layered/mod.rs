@@ -14,6 +14,7 @@ mod tests;
 pub mod opt;
 pub mod serde;
 pub mod stats;
+pub mod witness;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Coef<C: Config> {
