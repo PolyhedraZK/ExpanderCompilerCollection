@@ -13,7 +13,7 @@ use crate::circuit::{
     },
     layered::Coef,
 };
-use crate::field::Field;
+use crate::field::FieldArith;
 
 type CField = <C as Config>::CircuitField;
 
@@ -201,7 +201,9 @@ fn eval_output() {
     let fn1 = |x: CField, r: &[CField]| fn2(fn2(x, r[1]), r[2]) + r[0] * CField::from(9);
     let fn0 = |x: CField, r: &[CField]| fn1(fn1(x, &r[0..3]), &r[3..]);
     for _ in 0..100 {
-        let inputs: Vec<CField> = (0..7).map(|_| CField::random_unsafe()).collect();
+        let inputs: Vec<CField> = (0..7)
+            .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
+            .collect();
         let (res, cond) = root.eval_unsafe(inputs.clone());
         assert_eq!(res.len(), 1);
         assert_eq!(res[0], fn0(inputs[0], &inputs[1..]));
@@ -299,7 +301,7 @@ fn test_random_generator() {
         assert_eq!(root.validate(), Ok(()));
         root.eval_unsafe(
             (0..root.input_size())
-                .map(|_| CField::random_unsafe())
+                .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
                 .collect(),
         );
     }
@@ -326,7 +328,7 @@ fn opt_remove_unreachable() {
         assert_eq!(im.cur_size(), root.input_size());
         assert_eq!(optroot.validate(), Ok(()));
         let inputs: Vec<CField> = (0..root.input_size())
-            .map(|_| CField::random_unsafe())
+            .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
             .collect();
         let (out1, cond1) = root.eval_unsafe(inputs.clone());
         let (out2, cond2) = optroot.eval_unsafe(im.map_inputs(&inputs));
@@ -356,7 +358,7 @@ fn opt_remove_unreachable_2() {
         assert_eq!(im.cur_size(), root.input_size());
         assert_eq!(optroot.validate(), Ok(()));
         let inputs: Vec<CField> = (0..root.input_size())
-            .map(|_| CField::random_unsafe())
+            .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
             .collect();
         let (out1, cond1) = root.eval_unsafe(inputs.clone());
         let (out2, cond2) = optroot.eval_unsafe(im.map_inputs(&inputs));
@@ -386,7 +388,7 @@ fn opt_remove_unreachable_relaxed() {
         assert_eq!(im.cur_size(), root.input_size());
         assert_eq!(optroot.validate(), Ok(()));
         let inputs: Vec<CField> = (0..root.input_size())
-            .map(|_| CField::random_unsafe())
+            .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
             .collect();
         let (out1, cond1) = root.eval_unsafe(inputs.clone());
         let (out2, cond2) = optroot.eval_unsafe(im.map_inputs(&inputs));
@@ -492,7 +494,7 @@ fn adjust_for_layering_and_reassign_duplicate_sub_circuit_outputs() {
         let root = RootCircuitRelaxed::<C>::random(&config);
         assert_eq!(root.validate(), Ok(()));
         let inputs: Vec<CField> = (0..root.input_size())
-            .map(|_| CField::random_unsafe())
+            .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
             .collect();
         let (out1, cond1) = root.eval_unsafe(inputs.clone());
         let mut roota = root.clone();

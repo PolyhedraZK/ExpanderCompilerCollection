@@ -1,6 +1,10 @@
 use std::{fmt, hash::Hash};
 
-use crate::{field::Field, hints, utils::error::Error};
+use crate::{
+    field::{FieldArith, U256},
+    hints,
+    utils::error::Error,
+};
 
 use super::config::Config;
 
@@ -22,7 +26,7 @@ impl<C: Config> Coef<C> {
     pub fn get_value_unsafe(&self) -> C::CircuitField {
         match self {
             Coef::Constant(c) => c.clone(),
-            Coef::Random => C::CircuitField::random_unsafe(),
+            Coef::Random => C::CircuitField::random_unsafe(&mut rand::thread_rng()),
             Coef::PublicInput(id) => {
                 // stub implementation
                 let t = id * id % 1000000007;
@@ -38,7 +42,7 @@ impl<C: Config> Coef<C> {
     ) -> C::CircuitField {
         match self {
             Coef::Constant(c) => c.clone(),
-            Coef::Random => C::CircuitField::random_unsafe(),
+            Coef::Random => C::CircuitField::random_unsafe(&mut rand::thread_rng()),
             Coef::PublicInput(id) => {
                 if *id >= public_inputs.len() {
                     panic!("public input id {} out of range", id);
@@ -459,7 +463,7 @@ impl<C: Config> Circuit<C> {
 impl<C: Config> fmt::Display for Coef<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Coef::Constant(c) => write!(f, "{}", c),
+            Coef::Constant(c) => write!(f, "{}", Into::<U256>::into(*c)),
             Coef::Random => write!(f, "Random"),
             Coef::PublicInput(id) => write!(f, "PublicInput({})", id),
         }

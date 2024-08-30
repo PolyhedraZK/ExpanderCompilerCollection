@@ -8,7 +8,7 @@ use crate::circuit::{
     layered,
 };
 
-use crate::field::Field;
+use crate::field::FieldArith;
 
 use super::compile;
 type CField = <C as Config>::CircuitField;
@@ -40,7 +40,7 @@ pub fn compile_and_random_test<C: Config>(
     let input_size = rc.input_size();
     for _ in 0..n_tests {
         let input: Vec<C::CircuitField> = (0..input_size)
-            .map(|_| C::CircuitField::random_unsafe())
+            .map(|_| C::CircuitField::random_unsafe(&mut rand::thread_rng()))
             .collect();
         test_input(rc, &lc, &input_mapping, &input);
     }

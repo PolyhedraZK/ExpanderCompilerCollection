@@ -1,6 +1,6 @@
 use crate::{
     circuit::config::M31Config,
-    field::{m31::M31, Field},
+    field::{FieldArith, M31},
 };
 
 use super::{
@@ -21,7 +21,7 @@ declare_circuit!(Circuit1 {
 
 #[test]
 fn test_circuit_declaration() {
-    use crate::field::m31::M31 as F;
+    use crate::field::M31 as F;
     let c = Circuit1::<F> {
         a: F::one(),
         b: [F::one(), F::zero()],

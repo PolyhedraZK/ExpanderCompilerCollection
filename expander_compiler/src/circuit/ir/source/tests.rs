@@ -5,7 +5,7 @@ use super::{
     Instruction::{self, ConstantLike, LinComb, Mul},
     RootCircuit,
 };
-use crate::field::Field;
+use crate::field::FieldArith;
 use crate::{
     circuit::{
         config::{Config, M31Config as C},
@@ -148,7 +148,7 @@ fn opt_remove_unreachable() {
         assert_eq!(im.cur_size(), root.input_size());
         assert_eq!(optroot.validate(), Ok(()));
         let inputs: Vec<CField> = (0..root.input_size())
-            .map(|_| CField::random_unsafe())
+            .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
             .collect();
         let e1 = root.eval_unsafe_with_errors(inputs.clone());
         let e2 = optroot.eval_unsafe_with_errors(im.map_inputs(&inputs));
@@ -181,7 +181,7 @@ fn opt_remove_unreachable_2() {
         assert_eq!(im.cur_size(), root.input_size());
         assert_eq!(optroot.validate(), Ok(()));
         let inputs: Vec<CField> = (0..root.input_size())
-            .map(|_| CField::random_unsafe())
+            .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
             .collect();
         let e1 = root.eval_unsafe_with_errors(inputs.clone());
         let e2 = optroot.eval_unsafe_with_errors(im.map_inputs(&inputs));

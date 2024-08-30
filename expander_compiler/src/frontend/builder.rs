@@ -12,7 +12,7 @@ use crate::{
         },
         layered::Coef,
     },
-    field::{Field, U256},
+    field::{Field, FieldArith, U256},
 };
 
 use super::api::BasicAPI;

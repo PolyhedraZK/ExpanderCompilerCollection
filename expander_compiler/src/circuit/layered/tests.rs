@@ -1,7 +1,7 @@
 use super::{Allocation, Circuit, Coef, GateAdd, GateConst, GateMul, Segment};
 
 use crate::circuit::config::{Config, M31Config as C};
-use crate::field::Field;
+use crate::field::FieldArith;
 type CField = <C as Config>::CircuitField;
 
 #[test]
@@ -80,7 +80,9 @@ fn simple() {
     };
     assert!(circuit.validate().is_ok());
     for _ in 0..100 {
-        let s: Vec<CField> = (0..4).map(|_| CField::random_unsafe()).collect();
+        let s: Vec<CField> = (0..4)
+            .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
+            .collect();
         let (out, _) = circuit.eval_unsafe(s.clone());
         assert_eq!(out.len(), 2);
         assert_eq!(out[0], s[0] * s[1] * s[2] * s[3] * CField::from(8));

@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     circuit::config::Config,
-    field::Field,
+    field::FieldArith,
     utils::{
         error::Error,
         misc::{topo_order, topo_order_and_is_dag},

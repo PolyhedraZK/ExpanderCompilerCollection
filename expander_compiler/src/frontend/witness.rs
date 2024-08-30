@@ -1,4 +1,7 @@
-use crate::{field::U256, utils::serde::Serde};
+use crate::{
+    field::{FieldModulus, U256},
+    utils::serde::Serde,
+};
 
 use super::*;
 

@@ -2,7 +2,7 @@ use core::panic;
 
 use crate::circuit::ir::common::RawConstraint;
 use crate::circuit::ir::expr;
-use crate::field::Field;
+use crate::field::FieldArith;
 use crate::utils::error::Error;
 use crate::{
     circuit::{
@@ -336,7 +336,7 @@ pub fn process<C: Config>(
 
 #[cfg(test)]
 mod tests {
-    use crate::field::Field;
+    use crate::field::FieldArith;
     use crate::{
         circuit::{
             config::{Config, M31Config as C},
@@ -410,7 +410,7 @@ mod tests {
                     assert_eq!(root.input_size(), root_processed.input_size());
                     for _ in 0..5 {
                         let inputs: Vec<CField> = (0..root.input_size())
-                            .map(|_| CField::random_unsafe())
+                            .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
                             .collect();
                         let e1 = root.eval_unsafe_with_errors(inputs.clone());
                         let e2 = root_processed.eval_unsafe_with_errors(inputs);
@@ -452,7 +452,7 @@ mod tests {
                     assert_eq!(root.input_size(), root_processed.input_size());
                     for _ in 0..5 {
                         let inputs: Vec<CField> = (0..root.input_size())
-                            .map(|_| CField::random_unsafe())
+                            .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
                             .collect();
                         let e1 = root.eval_unsafe_with_errors(inputs.clone());
                         let e2 = root_processed.eval_unsafe_with_errors(inputs);
