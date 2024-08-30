@@ -20,6 +20,7 @@ use super::{
 mod tests;
 
 pub mod serde;
+pub mod witness_solver;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Instruction<C: Config> {
