@@ -15,7 +15,7 @@ uint.workspace = true
 chrono.workspace = true
 halo2curves.workspace = true
 tiny-keccak.workspace = true
-#expander-rs.workspace = true
+expander-rs.workspace = true
 arith.workspace = true
 
 [workspace]
@@ -32,3 +32,4 @@ halo2curves = { git = "https://github.com/PolyhedraZK/halo2curves", default-feat
     "bits",
 ] }
 arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "For_ECC" }
+expander-rs = { git = "https://github.com/PolyhedraZK/Expander", branch = "For_ECC" }

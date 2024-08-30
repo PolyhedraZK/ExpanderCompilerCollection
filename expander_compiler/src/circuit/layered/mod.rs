@@ -11,6 +11,7 @@ use super::config::Config;
 #[cfg(test)]
 mod tests;
 
+pub mod export;
 pub mod opt;
 pub mod serde;
 pub mod stats;
@@ -100,6 +101,14 @@ impl<C: Config> Coef<C> {
             Coef::PublicInput(rnd.next_u64() as usize % num_public_inputs)
         }
     }
+
+    pub fn export_to_expander(&self) -> (C::CircuitField, bool) {
+        match self {
+            Coef::Constant(c) => (c.clone(), true),
+            Coef::Random => (C::CircuitField::zero(), false),
+            Coef::PublicInput(_) => panic!("public inputs is not implemented"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Hash)]
@@ -107,6 +116,23 @@ pub struct Gate<C: Config, const INPUT_NUM: usize> {
     pub inputs: [usize; INPUT_NUM],
     pub output: usize,
     pub coef: Coef<C>,
+}
+
+impl<C: Config, const INPUT_NUM: usize> Gate<C, INPUT_NUM> {
+    pub fn export_to_expander<
+        DestConfig: expander_rs::GKRConfig<CircuitField = C::CircuitField>,
+    >(
+        &self,
+    ) -> expander_rs::Gate<DestConfig, INPUT_NUM> {
+        let (c, r) = self.coef.export_to_expander();
+        expander_rs::Gate {
+            i_ids: self.inputs.clone(),
+            o_id: self.output,
+            coef: c,
+            is_random: r,
+            gate_type: 2 - INPUT_NUM, // TODO: check this
+        }
+    }
 }
 
 pub type GateMul<C> = Gate<C, 2>;
