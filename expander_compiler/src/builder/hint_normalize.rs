@@ -107,7 +107,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                         let one = self.push_const(C::CircuitField::one());
                         let inv = self
                             .push_insn(InsnOut::Hint {
-                                hint_id: BuiltinHintIds::Div as usize,
+                                hint_id: BuiltinHintIds::Div as u64 as usize,
                                 inputs: vec![one, *y],
                                 num_outputs: 1,
                             })
@@ -119,7 +119,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                     } else {
                         let div_res = self
                             .push_insn(InsnOut::Hint {
-                                hint_id: BuiltinHintIds::Div as usize,
+                                hint_id: BuiltinHintIds::Div as u64 as usize,
                                 inputs: vec![*x, *y],
                                 num_outputs: 1,
                             })
@@ -169,7 +169,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                     let one = self.push_const(C::CircuitField::one());
                     let inv = self
                         .push_insn(InsnOut::Hint {
-                            hint_id: BuiltinHintIds::Div as usize,
+                            hint_id: BuiltinHintIds::Div as u64 as usize,
                             inputs: vec![one, *x],
                             num_outputs: 1,
                         })
@@ -250,7 +250,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                     }
                 } else {
                     InsnOut::Hint {
-                        hint_id: BuiltinHintIds::Select as usize,
+                        hint_id: BuiltinHintIds::Select as u64 as usize,
                         inputs: vec![*cond, *if_true, *if_false],
                         num_outputs: 1,
                     }
@@ -274,7 +274,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                 let one = self.push_const(C::CircuitField::one());
                 let inv = self
                     .push_insn(InsnOut::Hint {
-                        hint_id: BuiltinHintIds::Div as usize,
+                        hint_id: BuiltinHintIds::Div as u64 as usize,
                         inputs: vec![one, in_con.var],
                         num_outputs: 1,
                     })

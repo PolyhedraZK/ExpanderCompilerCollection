@@ -125,7 +125,7 @@ impl<C: Config> Builder<C> {
         self.in_var_exprs.push(Expression::new_const(c));
     }
 
-    fn to_single(&mut self, expr: Expression<C>) -> Expression<C> {
+    fn make_single(&mut self, expr: Expression<C>) -> Expression<C> {
         let (e, coef, constant) = strip_constants(&expr);
         if e.len() == 1 && e.degree() <= 1 {
             return expr;
@@ -143,10 +143,10 @@ impl<C: Config> Builder<C> {
             self.mid_var_layer.push(self.layer_of_expr(&e) + 1);
             return Expression::new_linear(C::CircuitField::one(), idx);
         }
-        return unstrip_constants_single(idx, coef, constant, &self.mid_var_coefs[idx]);
+        unstrip_constants_single(idx, coef, constant, &self.mid_var_coefs[idx])
     }
 
-    fn try_to_single(&self, expr: Expression<C>) -> Expression<C> {
+    fn try_make_single(&self, expr: Expression<C>) -> Expression<C> {
         let (e, coef, constant) = strip_constants(&expr);
         if e.len() == 1 && e.degree() <= 1 {
             return expr;
@@ -155,14 +155,12 @@ impl<C: Config> Builder<C> {
             expr: e,
             is_force_single: false,
         }) {
-            Some(idx) => {
-                return unstrip_constants_single(idx, coef, constant, &self.mid_var_coefs[idx]);
-            }
+            Some(idx) => unstrip_constants_single(idx, coef, constant, &self.mid_var_coefs[idx]),
             None => expr,
         }
     }
 
-    fn to_really_single(&mut self, e: Expression<C>) -> usize {
+    fn make_really_single(&mut self, e: Expression<C>) -> usize {
         if e.len() == 1 && e.degree() == 1 && e[0].coef == C::CircuitField::one() {
             match e[0].vars {
                 VarSpec::Linear(v) => return v,
@@ -186,7 +184,7 @@ impl<C: Config> Builder<C> {
         if coef == self.mid_var_coefs[idx].k && constant == self.mid_var_coefs[idx].b {
             return idx;
         }
-        let e = self.to_single(e);
+        let e = self.make_single(e);
         let idx = self.stripped_mid_vars.add(&MidVarKey {
             expr: e.clone(),
             is_force_single: true,
@@ -247,22 +245,22 @@ impl<C: Config> Builder<C> {
         mut vars: Vec<Expression<C>>,
         var_coef: F,
     ) -> Expression<C> {
-        if vars.len() == 0 {
+        if vars.is_empty() {
             return Expression::default();
         }
-        let vars: Vec<Expression<C>> = vars.drain(..).map(|e| self.try_to_single(e)).collect();
+        let vars: Vec<Expression<C>> = vars.drain(..).map(|e| self.try_make_single(e)).collect();
         if vars.len() == 1 {
             return self.layered_add(vars[0].mul_constant(var_coef(0)).to_terms());
         }
         let mut heap: BinaryHeap<LinMeta> = BinaryHeap::new();
-        for l_id in 0..vars.len() {
+        for (l_id, var) in vars.iter().enumerate() {
             if var_coef(l_id).is_zero() {
                 continue;
             }
             heap.push(LinMeta {
                 l_id,
                 t_id: 0,
-                vars: vars[l_id][0].vars.clone(),
+                vars: var[0].vars.clone(),
             });
         }
         let mut res: Vec<Term<C>> = Vec::new();
@@ -282,7 +280,7 @@ impl<C: Config> Builder<C> {
             if new_coef.is_zero() {
                 continue;
             }
-            if res.len() != 0 && res.last().unwrap().vars == t.vars {
+            if !res.is_empty() && res.last().unwrap().vars == t.vars {
                 res.last_mut().unwrap().coef += new_coef;
                 if res.last().unwrap().coef.is_zero() {
                     res.pop();
@@ -292,7 +290,7 @@ impl<C: Config> Builder<C> {
                 res.last_mut().unwrap().coef = new_coef;
             }
         }
-        if res.len() == 0 {
+        if res.is_empty() {
             Expression::default()
         } else {
             //Expression::from_terms_sorted(res)
@@ -331,7 +329,9 @@ impl<C: Config> Builder<C> {
         for term in terms.iter() {
             let layer = self.layer_of_varspec(&term.vars) as isize;
             if layer != last_layer && last_layer != -1 {
-                cur_terms = self.to_single(Expression::from_terms(cur_terms)).to_terms();
+                cur_terms = self
+                    .make_single(Expression::from_terms(cur_terms))
+                    .to_terms();
             }
             cur_terms.push(term.clone());
             last_layer = layer;
@@ -339,11 +339,11 @@ impl<C: Config> Builder<C> {
         Expression::from_terms(cur_terms)
     }
 
-    fn mul_vec(&mut self, vars: &Vec<usize>) -> Expression<C> {
+    fn mul_vec(&mut self, vars: &[usize]) -> Expression<C> {
         assert!(vars.len() >= 2);
         let mut exprs: Vec<Expression<C>> = vars
             .iter()
-            .map(|&v| self.try_to_single(self.in_var_exprs[v].clone()))
+            .map(|&v| self.try_make_single(self.in_var_exprs[v].clone()))
             .collect();
         while exprs.len() > 1 {
             let mut exprs_pos: Vec<usize> = (0..exprs.len()).collect();
@@ -381,16 +381,16 @@ impl<C: Config> Builder<C> {
             }
             if deg1 == 2 {
                 if deg2 == 2 {
-                    exprs.push(self.to_single(expr2));
+                    exprs.push(self.make_single(expr2));
                 } else {
                     exprs.push(expr2);
                 }
-                exprs.push(self.to_single(expr1));
+                exprs.push(self.make_single(expr1));
                 continue;
             }
             if deg2 == 2 {
                 exprs.push(expr1);
-                exprs.push(self.to_single(expr2));
+                exprs.push(self.make_single(expr2));
                 continue;
             }
             let dcnt1 = expr1.count_of_degrees();
@@ -429,11 +429,11 @@ impl<C: Config> Builder<C> {
             };
             if compress_some {
                 if compress_1 {
-                    exprs.push(self.to_single(expr1));
+                    exprs.push(self.make_single(expr1));
                     exprs.push(expr2);
                 } else {
                     exprs.push(expr1);
-                    exprs.push(self.to_single(expr2));
+                    exprs.push(self.make_single(expr2));
                 }
                 continue;
             }
@@ -461,7 +461,7 @@ impl<C: Config> Builder<C> {
         if should_compress {
             // Currently, this don't consider the cost of relay, so it's not good in some cases
             // TODO: fix this
-            let es = self.to_single(e);
+            let es = self.make_single(e);
             self.in_var_exprs.push(es);
         } else {
             self.in_var_exprs.push(e);
@@ -481,13 +481,13 @@ fn strip_constants<C: Config>(
             e.push(term.clone());
         }
     }
-    if e.len() == 0 {
+    if e.is_empty() {
         return (Expression::default(), C::CircuitField::one(), cst);
     }
     let v = e[0].coef;
     let vi = v.inv().unwrap();
     for term in e.iter_mut() {
-        term.coef = term.coef * vi;
+        term.coef *= vi;
     }
     (Expression::from_terms_sorted(e), v, cst)
 }
@@ -601,7 +601,7 @@ fn process_circuit<C: Config>(
                 let sub_builder = root.builders.get(sub_circuit_id).unwrap();
                 let single_inputs: Vec<usize> = inputs
                     .iter()
-                    .map(|&var| builder.to_really_single(builder.in_var_exprs[var].clone()))
+                    .map(|&var| builder.make_really_single(builder.in_var_exprs[var].clone()))
                     .collect();
                 let max_input_layer = single_inputs
                     .iter()
@@ -621,7 +621,7 @@ fn process_circuit<C: Config>(
             InInstruction::CustomGate { gate_type, inputs } => {
                 let single_inputs: Vec<usize> = inputs
                     .iter()
-                    .map(|&var| builder.to_really_single(builder.in_var_exprs[var].clone()))
+                    .map(|&var| builder.make_really_single(builder.in_var_exprs[var].clone()))
                     .collect();
                 builder.add_and_check_if_should_make_single(Expression::new_custom(
                     C::CircuitField::one(),
@@ -634,7 +634,7 @@ fn process_circuit<C: Config>(
 
     // constraints and outputs
     let mut constraints: Vec<usize> = Vec::new();
-    let mut cons_keys = circuit.constraints.iter().cloned().collect::<Vec<_>>();
+    let mut cons_keys = circuit.constraints.clone();
     cons_keys.sort();
     for con in cons_keys.iter() {
         let e = builder.in_var_exprs[*con].clone();
@@ -644,12 +644,12 @@ fn process_circuit<C: Config>(
             }
             return Err(Error::UserError("constraint is not zero".to_string()));
         }
-        constraints.push(builder.to_really_single(e));
+        constraints.push(builder.make_really_single(e));
     }
     let outputs: Vec<usize> = circuit
         .outputs
         .iter()
-        .map(|&o| builder.to_really_single(builder.in_var_exprs[o].clone()))
+        .map(|&o| builder.make_really_single(builder.in_var_exprs[o].clone()))
         .collect();
     builder.output_layer = outputs
         .iter()

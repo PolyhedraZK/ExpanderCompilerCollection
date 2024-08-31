@@ -6,7 +6,7 @@ use super::*;
 
 impl<C: Config> Serde for Coef<C> {
     fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
-        Ok(match self {
+        match self {
             Coef::Constant(c) => {
                 1u8.serialize_into(&mut writer)?;
                 c.serialize_into(&mut writer)?;
@@ -18,7 +18,8 @@ impl<C: Config> Serde for Coef<C> {
                 3u8.serialize_into(&mut writer)?;
                 id.serialize_into(&mut writer)?;
             }
-        })
+        };
+        Ok(())
     }
     fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
         let typ = u8::deserialize_from(&mut reader)?;
@@ -42,8 +43,8 @@ impl<C: Config> Serde for Coef<C> {
 
 impl<C: Config, const INPUT_NUM: usize> Serde for Gate<C, INPUT_NUM> {
     fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
-        for i in 0..INPUT_NUM {
-            self.inputs[i].serialize_into(&mut writer)?;
+        for input in &self.inputs {
+            input.serialize_into(&mut writer)?;
         }
         self.output.serialize_into(&mut writer)?;
         self.coef.serialize_into(&mut writer)?;
@@ -51,8 +52,8 @@ impl<C: Config, const INPUT_NUM: usize> Serde for Gate<C, INPUT_NUM> {
     }
     fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
         let mut inputs = [0; INPUT_NUM];
-        for i in 0..INPUT_NUM {
-            inputs[i] = usize::deserialize_from(&mut reader)?;
+        for input in inputs.iter_mut() {
+            *input = usize::deserialize_from(&mut reader)?;
         }
         let output = usize::deserialize_from(&mut reader)?;
         let coef = Coef::deserialize_from(&mut reader)?;

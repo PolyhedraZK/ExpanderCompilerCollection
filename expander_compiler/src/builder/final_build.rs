@@ -24,7 +24,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
     }
 
     fn transform_in_con_to_out(&mut self, in_con: &RawConstraint) -> Result<RawConstraint, Error> {
-        Ok(in_con.clone())
+        Ok(*in_con)
     }
 
     fn execute_out<'b>(
@@ -70,7 +70,7 @@ impl<'a, C: Config> Builder<'a, C> {
         let mut out_var_max = self.in_circuit.get_num_inputs_all();
         let mut out_insn_id = 0;
         let mut fin_insns: Vec<ir::dest::Instruction<C>> = Vec::new();
-        for (expr, status) in self.constraints.entry(()).or_insert(HashMap::new()).iter() {
+        for (expr, status) in self.constraints.entry(()).or_default().iter() {
             match status {
                 ConstraintStatus::Marked => {}
                 ConstraintStatus::Asserted => {
@@ -194,7 +194,7 @@ impl<'a, C: Config> Builder<'a, C> {
                             "non-zero constant in constraint".to_string(),
                         ));
                     }
-                    constraints.push(try_get_really_single_id(&mut self.mid_vars, expr).unwrap());
+                    constraints.push(try_get_really_single_id(&self.mid_vars, expr).unwrap());
                 }
             }
         }

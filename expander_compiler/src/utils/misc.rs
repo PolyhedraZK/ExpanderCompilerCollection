@@ -30,7 +30,7 @@ pub fn topo_order(vertices: &HashSet<usize>, edges: &HashMap<usize, HashSet<usiz
         }
     }
     for from in vertices.iter() {
-        if in_deg[&from] == 0 {
+        if in_deg[from] == 0 {
             queue.push(*from);
         }
     }

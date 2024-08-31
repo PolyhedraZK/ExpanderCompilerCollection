@@ -25,7 +25,7 @@ pub enum Coef<C: Config> {
 impl<C: Config> Coef<C> {
     pub fn get_value_unsafe(&self) -> C::CircuitField {
         match self {
-            Coef::Constant(c) => c.clone(),
+            Coef::Constant(c) => *c,
             Coef::Random => C::CircuitField::random_unsafe(&mut rand::thread_rng()),
             Coef::PublicInput(id) => {
                 // stub implementation
@@ -41,13 +41,13 @@ impl<C: Config> Coef<C> {
         public_inputs: &[C::CircuitField],
     ) -> C::CircuitField {
         match self {
-            Coef::Constant(c) => c.clone(),
+            Coef::Constant(c) => *c,
             Coef::Random => C::CircuitField::random_unsafe(&mut rand::thread_rng()),
             Coef::PublicInput(id) => {
                 if *id >= public_inputs.len() {
                     panic!("public input id {} out of range", id);
                 }
-                public_inputs[*id].clone()
+                public_inputs[*id]
             }
         }
     }
@@ -70,10 +70,7 @@ impl<C: Config> Coef<C> {
     }
 
     pub fn is_constant(&self) -> bool {
-        match self {
-            Coef::Constant(_) => true,
-            _ => false,
-        }
+        matches!(self, Coef::Constant(_))
     }
 
     pub fn add_constant(&self, c: C::CircuitField) -> Self {
@@ -85,7 +82,7 @@ impl<C: Config> Coef<C> {
 
     pub fn get_constant(&self) -> Option<C::CircuitField> {
         match self {
-            Coef::Constant(x) => Some(x.clone()),
+            Coef::Constant(x) => Some(*x),
             _ => None,
         }
     }
@@ -102,14 +99,14 @@ impl<C: Config> Coef<C> {
 
     pub fn export_to_expander(&self) -> (C::CircuitField, bool) {
         match self {
-            Coef::Constant(c) => (c.clone(), true),
+            Coef::Constant(c) => (*c, true),
             Coef::Random => (C::CircuitField::zero(), false),
             Coef::PublicInput(_) => panic!("public inputs is not implemented"),
         }
     }
 }
 
-#[derive(Debug, Clone, Hash)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Gate<C: Config, const INPUT_NUM: usize> {
     pub inputs: [usize; INPUT_NUM],
     pub output: usize,
@@ -124,7 +121,7 @@ impl<C: Config, const INPUT_NUM: usize> Gate<C, INPUT_NUM> {
     ) -> expander_rs::Gate<DestConfig, INPUT_NUM> {
         let (c, r) = self.coef.export_to_expander();
         expander_rs::Gate {
-            i_ids: self.inputs.clone(),
+            i_ids: self.inputs,
             o_id: self.output,
             coef: c,
             is_random: r,
@@ -137,7 +134,7 @@ pub type GateMul<C> = Gate<C, 2>;
 pub type GateAdd<C> = Gate<C, 1>;
 pub type GateConst<C> = Gate<C, 0>;
 
-#[derive(Debug, Clone, Hash)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct GateCustom<C: Config> {
     pub gate_type: usize,
     pub inputs: Vec<usize>,
@@ -272,7 +269,7 @@ impl<C: Config> Circuit<C> {
                 return Err(Error::InternalError(format!("layer id {} out of range", x)));
             }
         }
-        if self.layer_ids.len() == 0 {
+        if self.layer_ids.is_empty() {
             return Err(Error::InternalError("empty layer".to_string()));
         }
         for i in 1..self.layer_ids.len() {
@@ -362,8 +359,8 @@ impl<C: Config> Circuit<C> {
             cur = next;
         }
         let mut constraints_satisfied = true;
-        for i in 0..self.expected_num_output_zeroes {
-            if !cur[i].is_zero() {
+        for out in cur.iter().take(self.expected_num_output_zeroes) {
+            if !out.is_zero() {
                 constraints_satisfied = false;
                 break;
             }
@@ -431,8 +428,8 @@ impl<C: Config> Circuit<C> {
             cur = next;
         }
         let mut constraints_satisfied = true;
-        for i in 0..self.expected_num_output_zeroes {
-            if !cur[i].is_zero() {
+        for out in cur.iter().take(self.expected_num_output_zeroes) {
+            if !out.is_zero() {
                 constraints_satisfied = false;
                 break;
             }

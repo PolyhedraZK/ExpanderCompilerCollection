@@ -109,10 +109,10 @@ impl<'a, C: Config> CompileContext<'a, C> {
         }
         for i in 0..ic.sub_circuit_insn_ids.len() {
             let input_layer = ic.sub_circuit_start_layer[i];
-            for x in ic.sub_circuit_hint_inputs[i].iter().cloned() {
-                ic.lcs[0].vars.add(&x);
+            for x in ic.sub_circuit_hint_inputs[i].iter() {
+                ic.lcs[0].vars.add(x);
                 if input_layer > 0 {
-                    ic.lcs[input_layer].vars.add(&x);
+                    ic.lcs[input_layer].vars.add(x);
                 }
             }
         }
@@ -123,8 +123,8 @@ impl<'a, C: Config> CompileContext<'a, C> {
         }
         for i in 0..ic.sub_circuit_insn_ids.len() {
             if !ic.sub_circuit_hint_inputs[i].is_empty() {
-                for x in ic.sub_circuit_hint_inputs[i].iter().cloned() {
-                    ic.lc_hint.vars.add(&x);
+                for x in ic.sub_circuit_hint_inputs[i].iter() {
+                    ic.lc_hint.vars.add(x);
                 }
             }
         }
@@ -285,7 +285,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
             if sub_layer >= 0 {
                 subs_array(
                     &mut la,
-                    &self.circuits[&insn.sub_circuit_id].lcs[sub_layer as usize]
+                    self.circuits[&insn.sub_circuit_id].lcs[sub_layer as usize]
                         .vars
                         .vec(),
                 );
@@ -295,11 +295,11 @@ impl<'a, C: Config> CompileContext<'a, C> {
             } else {
                 subs_array(
                     &mut la,
-                    &self.circuits[&insn.sub_circuit_id].lc_hint.vars.vec(),
+                    self.circuits[&insn.sub_circuit_id].lc_hint.vars.vec(),
                 );
                 subs_map(
                     &mut la,
-                    &self.circuits[&insn.sub_circuit_id].hint_inputs.map(),
+                    self.circuits[&insn.sub_circuit_id].hint_inputs.map(),
                 );
                 subs_array(
                     &mut la,
@@ -310,7 +310,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
                     ic.sub_circuit_hint_inputs[ic.sub_circuit_loc_map[&x]].clone(),
                 );
             }
-            subs_map(&mut la, &lc.vars.map());
+            subs_map(&mut la, lc.vars.map());
             layouts.insert(x, la);
         }
 
@@ -340,10 +340,10 @@ impl<'a, C: Config> CompileContext<'a, C> {
         for i in (0..lc.parent.len()).rev() {
             let mut s = Vec::new();
             for &x in children_nodes[i].iter() {
-                s.push(mem::replace(&mut placements[x], Vec::new()));
+                s.push(mem::take(&mut placements[x]));
             }
             s.append(&mut children_prev_circuits[i]);
-            placements[i] = merge_layouts(s, mem::replace(&mut children_variables[i], Vec::new()));
+            placements[i] = merge_layouts(s, mem::take(&mut children_variables[i]));
         }
 
         // now placements[0] contains all direct variables
@@ -352,7 +352,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
         // TODO: optimize the merging algorithm
 
         if lc.middle_sub_circuits.is_empty() {
-            self.circuits.insert(req.circuit_id.clone(), ic);
+            self.circuits.insert(req.circuit_id, ic);
             return LayerLayout {
                 circuit_id: req.circuit_id,
                 layer: req.layer,
@@ -389,7 +389,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
             if sizes[i] != sizes[j] {
                 return sizes[j].cmp(&sizes[i]);
             }
-            return i.cmp(&j);
+            i.cmp(&j)
         });
         let mut cur = 0;
         let mut placement_sparse = HashMap::new();
@@ -417,7 +417,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
         }
         let size = next_power_of_two(cur);
 
-        self.circuits.insert(req.circuit_id.clone(), ic);
+        self.circuits.insert(req.circuit_id, ic);
         LayerLayout {
             circuit_id: req.circuit_id,
             layer: req.layer,
@@ -440,7 +440,7 @@ fn merge_layouts(s: Vec<Vec<usize>>, additional: Vec<usize>) -> Vec<usize> {
     for x in s.iter() {
         let m = x.len();
         n += m;
-        if (m & m - 1) != 0 {
+        if m & (m - 1) != 0 {
             panic!("unexpected situation: placement group size should be power of 2");
         }
     }
@@ -448,8 +448,8 @@ fn merge_layouts(s: Vec<Vec<usize>>, additional: Vec<usize>) -> Vec<usize> {
     let mut res = Vec::with_capacity(n);
 
     let mut order = Vec::with_capacity(s.len());
-    for i in 0..s.len() {
-        if !s[i].is_empty() {
+    for (i, s_i) in s.iter().enumerate() {
+        if !s_i.is_empty() {
             order.push(i);
         }
     }
@@ -457,7 +457,7 @@ fn merge_layouts(s: Vec<Vec<usize>>, additional: Vec<usize>) -> Vec<usize> {
         if s[i].len() != s[j].len() {
             return s[j].len().cmp(&s[i].len());
         }
-        return i.cmp(&j);
+        i.cmp(&j)
     });
 
     for x_ in order.iter() {
@@ -502,15 +502,12 @@ fn merge_layouts(s: Vec<Vec<usize>>, additional: Vec<usize>) -> Vec<usize> {
         }
     }
 
-    let pad = next_power_of_two(res.len()) - res.len();
-    for _ in 0..pad {
-        res.push(EMPTY);
-    }
+    res.resize(next_power_of_two(res.len()), EMPTY);
 
     res
 }
 
-fn subs_array(l: &mut Vec<usize>, s: &Vec<usize>) {
+fn subs_array(l: &mut [usize], s: &[usize]) {
     for i in 0..l.len() {
         if l[i] != EMPTY {
             l[i] = s[l[i]];
@@ -518,14 +515,14 @@ fn subs_array(l: &mut Vec<usize>, s: &Vec<usize>) {
     }
 }
 
-pub fn subs_map(l: &mut Vec<usize>, m: &HashMap<usize, usize>) {
-    for i in 0..l.len() {
-        if l[i] != EMPTY {
+pub fn subs_map(l: &mut [usize], m: &HashMap<usize, usize>) {
+    for x in l.iter_mut() {
+        if *x != EMPTY {
             // when a sub circuit thinks it doesn't need some input variable, it won't occur in map
-            if let Some(&v) = m.get(&l[i]) {
-                l[i] = v;
+            if let Some(&v) = m.get(x) {
+                *x = v;
             } else {
-                l[i] = EMPTY;
+                *x = EMPTY;
             }
         }
     }

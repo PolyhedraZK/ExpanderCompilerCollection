@@ -29,5 +29,5 @@ pub fn cost_of_possible_references<C: Config>(
 }
 
 pub fn cost_of_relay<C: Config>(v1_layer: usize, v2_layer: usize) -> usize {
-    (v1_layer as isize - v2_layer as isize).abs() as usize * (C::COST_VARIABLE + C::COST_ADD)
+    (v1_layer as isize - v2_layer as isize).unsigned_abs() * (C::COST_VARIABLE + C::COST_ADD)
 }

@@ -231,7 +231,7 @@ fn compress_identical_terms<C: Config>(terms: &mut Vec<Term<C>>) {
     }
     terms.truncate(i + 1);
     terms.retain(|term| !term.coef.is_zero());
-    if terms.len() == 0 {
+    if terms.is_empty() {
         terms.push(Term::default());
     }
 }
@@ -269,7 +269,7 @@ impl<C: Config> Expression<C> {
         Expression { terms }
     }
     pub fn from_terms_sorted(mut terms: Vec<Term<C>>) -> Self {
-        if terms.len() == 0 {
+        if terms.is_empty() {
             terms.push(Term::default());
         }
         for term in terms.iter() {
@@ -435,9 +435,7 @@ impl<C: Config> fmt::Display for LinComb<C> {
             }
         }
         if !self.constant.is_zero() {
-            if !self.constant.is_zero() {
-                write!(f, " + {}", self.constant.to_u256())?;
-            }
+            write!(f, " + {}", self.constant.to_u256())?;
         }
         Ok(())
     }

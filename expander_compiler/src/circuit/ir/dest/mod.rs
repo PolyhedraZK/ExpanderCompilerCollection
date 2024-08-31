@@ -81,7 +81,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 sub_circuit_id,
                 inputs,
                 num_outputs,
-            } => Some((*sub_circuit_id, &inputs, *num_outputs)),
+            } => Some((*sub_circuit_id, inputs, *num_outputs)),
             _ => None,
         }
     }
@@ -175,11 +175,11 @@ impl<C: Config> CircuitRelaxed<C> {
             let new_insn = match insn.replace_vars(|x| new_id[x]) {
                 Instruction::InternalVariable { expr } => {
                     insn_of_var.push(Some(new_instructions.len()));
-                    Instruction::InternalVariable { expr: expr }
+                    Instruction::InternalVariable { expr }
                 }
                 Instruction::ConstantLike { value } => {
                     insn_of_var.push(Some(new_instructions.len()));
-                    Instruction::ConstantLike { value: value }
+                    Instruction::ConstantLike { value }
                 }
                 Instruction::SubCircuitCall {
                     sub_circuit_id,
@@ -209,9 +209,9 @@ impl<C: Config> CircuitRelaxed<C> {
                         insn_of_var.push(None);
                     }
                     Instruction::SubCircuitCall {
-                        sub_circuit_id: sub_circuit_id,
+                        sub_circuit_id,
                         inputs: new_inputs,
-                        num_outputs: num_outputs,
+                        num_outputs,
                     }
                 }
             };
@@ -246,8 +246,13 @@ impl<C: Config> CircuitRelaxed<C> {
         let mut instructions = Vec::new();
         let mut new_var_max = self.get_num_inputs_all();
         let mut add_outputs_sub = Vec::new();
-        for i in 1..=self.get_num_inputs_all() {
-            new_id[i] = i;
+        for (i, new_id_ptr) in new_id
+            .iter_mut()
+            .enumerate()
+            .take(self.get_num_inputs_all() + 1)
+            .skip(1)
+        {
+            *new_id_ptr = i;
         }
         for insn in self.instructions.iter() {
             for _ in 0..insn.num_outputs() {

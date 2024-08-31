@@ -21,11 +21,11 @@ struct LayoutQuery {
 }
 
 impl LayoutQuery {
-    fn query<'a, F, C: Config>(
+    fn query<F, C: Config>(
         &self,
         layer_layout_pool: &mut Pool<LayerLayout>,
-        circuits: &HashMap<usize, IrContext<'a, C>>,
-        vs: &Vec<usize>,
+        circuits: &HashMap<usize, IrContext<'_, C>>,
+        vs: &[usize],
         f: F,
         cid: usize,
         lid: isize,
@@ -33,7 +33,7 @@ impl LayoutQuery {
     where
         F: Fn(usize) -> usize,
     {
-        if vs.len() == 0 {
+        if vs.is_empty() {
             let subl = LayerLayout {
                 circuit_id: cid,
                 layer: lid,
@@ -96,7 +96,7 @@ impl LayoutQuery {
 }
 
 impl<'a, C: Config> CompileContext<'a, C> {
-    fn layout_query(&self, l: &LayerLayout, s: &Vec<usize>) -> LayoutQuery {
+    fn layout_query(&self, l: &LayerLayout, s: &[usize]) -> LayoutQuery {
         let mut var_pos = HashMap::new();
         match &l.inner {
             LayerLayoutInner::Dense { placement } => {
@@ -133,7 +133,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
         {
             panic!("unexpected situation");
         }
-        let circuit_id = a.circuit_id.clone();
+        let circuit_id = a.circuit_id;
         let ic = self.circuits.remove(&circuit_id).unwrap();
         let cur_layer = a.layer;
         let next_layer = b.layer;
@@ -210,7 +210,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
                     // also for the output layer
                     next_layout = Some(bq.query(
                         &mut self.layer_layout_pool,
-                        &mut self.circuits,
+                        &self.circuits,
                         &insn.outputs,
                         outf,
                         sub_id,
@@ -219,7 +219,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
                 }
             } else if next_layer != -1
                 && next_layer <= input_layer as isize
-                && ic.sub_circuit_hint_inputs[i].len() != 0
+                && !ic.sub_circuit_hint_inputs[i].is_empty()
             {
                 // relay hint input
                 if cur_layer == 0 {
@@ -276,9 +276,11 @@ impl<'a, C: Config> CompileContext<'a, C> {
             }
         }
 
-        let mut res: Segment<C> = Segment::default();
-        res.num_inputs = a.size;
-        res.num_outputs = b.size;
+        let mut res: Segment<C> = Segment {
+            num_inputs: a.size,
+            num_outputs: b.size,
+            ..Default::default()
+        };
 
         // connect sub circuits
         for i in 0..sub_insns.len() {
@@ -343,21 +345,21 @@ impl<'a, C: Config> CompileContext<'a, C> {
                             res.gate_consts.push(GateConst {
                                 inputs: [],
                                 output: pos,
-                                coef: Coef::Constant(term.coef.clone()),
+                                coef: Coef::Constant(term.coef),
                             });
                         }
                         VarSpec::Linear(vid) => {
                             res.gate_adds.push(GateAdd {
                                 inputs: [aq.var_pos[vid]],
                                 output: pos,
-                                coef: Coef::Constant(term.coef.clone()),
+                                coef: Coef::Constant(term.coef),
                             });
                         }
                         VarSpec::Quad(vid0, vid1) => {
                             res.gate_muls.push(GateMul {
                                 inputs: [aq.var_pos[vid0], aq.var_pos[vid1]],
                                 output: pos,
-                                coef: Coef::Constant(term.coef.clone()),
+                                coef: Coef::Constant(term.coef),
                             });
                         }
                         VarSpec::Custom { gate_type, inputs } => {
@@ -365,7 +367,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
                                 gate_type: *gate_type,
                                 inputs: inputs.iter().map(|x| aq.var_pos[x]).collect(),
                                 output: pos,
-                                coef: Coef::Constant(term.coef.clone()),
+                                coef: Coef::Constant(term.coef),
                             });
                         }
                     }
@@ -390,7 +392,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
                 res.gate_adds.push(GateAdd {
                     inputs: [aq.var_pos[v]],
                     output: pos,
-                    coef: coef,
+                    coef,
                 });
             }
             for i in cc.sub_circuit_ids.iter() {
@@ -427,7 +429,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
         let res_id = self.compiled_circuits.len();
         self.compiled_circuits.push(res);
         self.conncected_wires.insert(map_id, res_id);
-        self.circuits.insert(circuit_id.clone(), ic);
+        self.circuits.insert(circuit_id, ic);
 
         res_id
     }
