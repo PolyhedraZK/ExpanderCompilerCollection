@@ -251,7 +251,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
                     for x in used_var.iter() {
                         add_edge(*x, cur_var_idx);
                     }
-                    q1.push(cur_var_idx.clone());
+                    q1.push(cur_var_idx);
                     layer_advance[cur_var_idx] = 1;
                     ic.min_layer[cur_var_idx] = 1;
                     ic.internal_variable_expr.insert(cur_var_idx, expr);
@@ -354,7 +354,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
                 .output_layer
                 .max(ic.sub_circuit_start_layer[i] + sub_circuit.output_layer);
             for (j, x) in sub_circuit.combined_constraints.iter().enumerate() {
-                if let Some(_) = x {
+                if x.is_some() {
                     let sl = j + ic.sub_circuit_start_layer[i] + 1;
                     cc[sl].sub_circuit_ids.push(i);
                 }
@@ -371,16 +371,16 @@ impl<'a, C: Config> CompileContext<'a, C> {
             }
             if first != cc.len() {
                 let last = max_occured_layer + 1;
-                for i in first + 1..=last {
-                    cc[i].variables.push(i - 1 - first + n);
+                for (i, cc_i) in cc.iter_mut().enumerate().take(last + 1).skip(first + 1) {
+                    cc_i.variables.push(i - 1 - first + n);
                 }
                 cc.truncate(last + 1);
                 self.root_has_constraints = true;
             }
         }
         let mut cc: Vec<Option<CombinedConstraint>> = cc.into_iter().map(Some).collect();
-        for i in 0..cc.len() {
-            let x = cc[i].as_mut().unwrap();
+        for (i, cc_i) in cc.iter_mut().enumerate() {
+            let x = cc_i.as_mut().unwrap();
             if !x.variables.is_empty() || !x.sub_circuit_ids.is_empty() {
                 x.id = n;
                 if i + 1 > ic.output_layer {
@@ -390,17 +390,17 @@ impl<'a, C: Config> CompileContext<'a, C> {
                 ic.max_layer.push(i);
                 layer_advance.push(1);
                 out_edges.push(Vec::new());
-                cc[i].as_ref().unwrap().variables.iter().for_each(|&v| {
+                cc_i.as_ref().unwrap().variables.iter().for_each(|&v| {
                     out_edges[v].push(n);
                 });
                 q.push(n);
                 n += 1;
             } else {
-                cc[i] = None;
+                *cc_i = None;
             }
         }
         if circuit_id == 0 {
-            if ic.output_layer + 1 <= cc.len() {
+            if ic.output_layer < cc.len() {
                 ic.output_layer = cc.len() - 1;
             } else {
                 panic!("unexpected situation");
@@ -437,7 +437,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
             let mut count = 0;
             for y in out_edges[nv + nhs + i].iter().cloned() {
                 if ic.min_layer[y] == ic.output_layer {
-                    if let Some(_) = ic.output_order.get(&y) {
+                    if ic.output_order.contains_key(&y) {
                         count += 1;
                     }
                 } else {
@@ -450,7 +450,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
                 .combined_constraints
                 .iter()
             {
-                if let Some(_) = v {
+                if v.is_some() {
                     any_constraint = true;
                 }
             }

@@ -15,10 +15,10 @@ pub trait DumpLoadTwoVariables<T: Sized + Clone> {
 
 impl<F: Field> DumpLoadVariables<F> for F {
     fn dump_into(&self, vars: &mut Vec<F>) {
-        vars.push(self.clone());
+        vars.push(*self);
     }
     fn load_from(&mut self, vars: &mut &[F]) {
-        *self = vars[0].clone();
+        *self = vars[0];
         *vars = &vars[1..];
     }
     fn num_vars(&self) -> usize {

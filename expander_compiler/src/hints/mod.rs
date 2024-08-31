@@ -5,6 +5,7 @@ use rand::RngCore;
 
 use crate::{field::Field, utils::error::Error};
 
+#[repr(u64)]
 pub enum BuiltinHintIds {
     Identity = 0xccc000000000,
     Div,
@@ -27,34 +28,37 @@ pub enum BuiltinHintIds {
     Greater,
 }
 
+#[cfg(not(target_pointer_width = "64"))]
+compile_error!("compilation is only allowed for 64-bit targets");
+
 impl BuiltinHintIds {
     pub fn from_usize(id: usize) -> Option<BuiltinHintIds> {
-        if id < (BuiltinHintIds::Identity as usize) {
+        if id < (BuiltinHintIds::Identity as u64 as usize) {
             return None;
         }
-        if id > (BuiltinHintIds::Identity as usize + 100) {
+        if id > (BuiltinHintIds::Identity as u64 as usize + 100) {
             return None;
         }
         match id {
-            x if x == BuiltinHintIds::Identity as usize => Some(BuiltinHintIds::Identity),
-            x if x == BuiltinHintIds::Div as usize => Some(BuiltinHintIds::Div),
-            x if x == BuiltinHintIds::Eq as usize => Some(BuiltinHintIds::Eq),
-            x if x == BuiltinHintIds::NotEq as usize => Some(BuiltinHintIds::NotEq),
-            x if x == BuiltinHintIds::BoolOr as usize => Some(BuiltinHintIds::BoolOr),
-            x if x == BuiltinHintIds::BoolAnd as usize => Some(BuiltinHintIds::BoolAnd),
-            x if x == BuiltinHintIds::BitOr as usize => Some(BuiltinHintIds::BitOr),
-            x if x == BuiltinHintIds::BitAnd as usize => Some(BuiltinHintIds::BitAnd),
-            x if x == BuiltinHintIds::BitXor as usize => Some(BuiltinHintIds::BitXor),
-            x if x == BuiltinHintIds::Select as usize => Some(BuiltinHintIds::Select),
-            x if x == BuiltinHintIds::Pow as usize => Some(BuiltinHintIds::Pow),
-            x if x == BuiltinHintIds::IntDiv as usize => Some(BuiltinHintIds::IntDiv),
-            x if x == BuiltinHintIds::Mod as usize => Some(BuiltinHintIds::Mod),
-            x if x == BuiltinHintIds::ShiftL as usize => Some(BuiltinHintIds::ShiftL),
-            x if x == BuiltinHintIds::ShiftR as usize => Some(BuiltinHintIds::ShiftR),
-            x if x == BuiltinHintIds::LesserEq as usize => Some(BuiltinHintIds::LesserEq),
-            x if x == BuiltinHintIds::GreaterEq as usize => Some(BuiltinHintIds::GreaterEq),
-            x if x == BuiltinHintIds::Lesser as usize => Some(BuiltinHintIds::Lesser),
-            x if x == BuiltinHintIds::Greater as usize => Some(BuiltinHintIds::Greater),
+            x if x == BuiltinHintIds::Identity as u64 as usize => Some(BuiltinHintIds::Identity),
+            x if x == BuiltinHintIds::Div as u64 as usize => Some(BuiltinHintIds::Div),
+            x if x == BuiltinHintIds::Eq as u64 as usize => Some(BuiltinHintIds::Eq),
+            x if x == BuiltinHintIds::NotEq as u64 as usize => Some(BuiltinHintIds::NotEq),
+            x if x == BuiltinHintIds::BoolOr as u64 as usize => Some(BuiltinHintIds::BoolOr),
+            x if x == BuiltinHintIds::BoolAnd as u64 as usize => Some(BuiltinHintIds::BoolAnd),
+            x if x == BuiltinHintIds::BitOr as u64 as usize => Some(BuiltinHintIds::BitOr),
+            x if x == BuiltinHintIds::BitAnd as u64 as usize => Some(BuiltinHintIds::BitAnd),
+            x if x == BuiltinHintIds::BitXor as u64 as usize => Some(BuiltinHintIds::BitXor),
+            x if x == BuiltinHintIds::Select as u64 as usize => Some(BuiltinHintIds::Select),
+            x if x == BuiltinHintIds::Pow as u64 as usize => Some(BuiltinHintIds::Pow),
+            x if x == BuiltinHintIds::IntDiv as u64 as usize => Some(BuiltinHintIds::IntDiv),
+            x if x == BuiltinHintIds::Mod as u64 as usize => Some(BuiltinHintIds::Mod),
+            x if x == BuiltinHintIds::ShiftL as u64 as usize => Some(BuiltinHintIds::ShiftL),
+            x if x == BuiltinHintIds::ShiftR as u64 as usize => Some(BuiltinHintIds::ShiftR),
+            x if x == BuiltinHintIds::LesserEq as u64 as usize => Some(BuiltinHintIds::LesserEq),
+            x if x == BuiltinHintIds::GreaterEq as u64 as usize => Some(BuiltinHintIds::GreaterEq),
+            x if x == BuiltinHintIds::Lesser as u64 as usize => Some(BuiltinHintIds::Lesser),
+            x if x == BuiltinHintIds::Greater as u64 as usize => Some(BuiltinHintIds::Greater),
             _ => None,
         }
     }
@@ -157,17 +161,11 @@ pub fn validate_hint(hint_id: usize, num_inputs: usize, num_outputs: usize) -> R
 
 fn impl_builtin_hint<F: Field>(
     hint_id: BuiltinHintIds,
-    inputs: &Vec<F>,
+    inputs: &[F],
     num_outputs: usize,
 ) -> Vec<F> {
     match hint_id {
-        BuiltinHintIds::Identity => {
-            let mut outputs = Vec::with_capacity(num_outputs);
-            for i in 0..num_outputs {
-                outputs.push(inputs[i]);
-            }
-            outputs
-        }
+        BuiltinHintIds::Identity => inputs.iter().take(num_outputs).cloned().collect(),
         BuiltinHintIds::Div => binop_hint(inputs, |x, y| match y.inv() {
             Some(inv) => x * inv,
             None => F::zero(),
@@ -198,9 +196,9 @@ fn impl_builtin_hint<F: Field>(
             let mut y: U256 = y.to_u256();
             while y != U256::ZERO {
                 if y & U256::from(1u32) != U256::ZERO {
-                    res = res * t;
+                    res *= t;
                 }
-                y = y >> 1;
+                y >>= 1;
                 t = t * t;
             }
             res
@@ -226,11 +224,11 @@ fn impl_builtin_hint<F: Field>(
     }
 }
 
-fn binop_hint<F: Field, G: Fn(F, F) -> F>(inputs: &Vec<F>, f: G) -> Vec<F> {
+fn binop_hint<F: Field, G: Fn(F, F) -> F>(inputs: &[F], f: G) -> Vec<F> {
     vec![f(inputs[0], inputs[1])]
 }
 
-fn binop_hint_on_u256<F: Field, G: Fn(U256, U256) -> U256>(inputs: &Vec<F>, f: G) -> Vec<F> {
+fn binop_hint_on_u256<F: Field, G: Fn(U256, U256) -> U256>(inputs: &[F], f: G) -> Vec<F> {
     let x_u256: U256 = inputs[0].to_u256();
     let y_u256: U256 = inputs[1].to_u256();
     let z_u256 = f(x_u256, y_u256);
@@ -246,7 +244,7 @@ pub fn stub_impl<F: Field>(hint_id: usize, inputs: &Vec<F>, num_outputs: usize) 
 
 pub fn random_builtin(mut rand: impl RngCore) -> (usize, usize, usize) {
     loop {
-        let hint_id = (rand.next_u64() as usize % 100) + (BuiltinHintIds::Identity as usize);
+        let hint_id = (rand.next_u64() as usize % 100) + (BuiltinHintIds::Identity as u64 as usize);
         if let Some(hint_id) = BuiltinHintIds::from_usize(hint_id) {
             match hint_id {
                 BuiltinHintIds::Identity => {
@@ -299,8 +297,7 @@ pub fn circom_shift_l_impl<F: Field>(x: U256, k: U256) -> U256 {
         let value = x << shift;
         let mask = U256::from(1u32) << u256_bit_length(F::modulus());
         let mask = mask - 1;
-        let value = value & mask;
-        value
+        value & mask
     } else {
         circom_shift_r_impl::<F>(x, F::modulus() - k)
     }
@@ -317,8 +314,7 @@ pub fn circom_shift_r_impl<F: Field>(x: U256, k: U256) -> U256 {
         if shift >= 256 {
             return U256::ZERO;
         }
-        let value = x >> shift;
-        value
+        x >> shift
     } else {
         circom_shift_l_impl::<F>(x, F::modulus() - k)
     }

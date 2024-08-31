@@ -200,8 +200,8 @@ impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
             &self.out_var_exprs[vars[1]],
             &mut self.mid_vars,
         );
-        for i in 2..vars.len() {
-            cur = mul_two_expr(&cur, &self.out_var_exprs[vars[i]], &mut self.mid_vars);
+        for var in vars.iter().skip(2) {
+            cur = mul_two_expr(&cur, &self.out_var_exprs[*var], &mut self.mid_vars);
         }
         self.out_var_exprs.push(cur);
         self.fix_mid_to_out(1);
@@ -285,7 +285,7 @@ impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
     pub fn sub_circuit_call<'b>(
         &mut self,
         _sub_circuit_id: usize,
-        inputs: &Vec<usize>,
+        inputs: &[usize],
         num_outputs: usize,
         _root: Option<&'b RootBuilder<'a, C, IrcIn, IrcOut>>,
     ) where
@@ -358,7 +358,7 @@ fn to_single<C: Config>(mid_vars: &mut Pool<Expression<C>>, expr: &Expression<C>
         return expr.clone();
     }
     let idx = mid_vars.add(&e);
-    return unstrip_constants_single(idx, coef, constant);
+    unstrip_constants_single(idx, coef, constant)
 }
 
 fn to_single_stripped<C: Config>(
@@ -381,7 +381,7 @@ pub fn to_really_single<C: Config>(
         return e.clone();
     }
     let idx = mid_vars.add(e);
-    return Expression::from_terms_sorted(vec![Term::new_linear(C::CircuitField::one(), idx)]);
+    Expression::from_terms_sorted(vec![Term::new_linear(C::CircuitField::one(), idx)])
 }
 
 pub fn try_get_really_single_id<C: Config>(
@@ -392,10 +392,7 @@ pub fn try_get_really_single_id<C: Config>(
         let t: Vec<usize> = e.get_vars();
         return Some(t[0]);
     }
-    match mid_vars.try_get_idx(e) {
-        Some(idx) => Some(idx),
-        None => None,
-    }
+    mid_vars.try_get_idx(e)
 }
 
 fn strip_constants<C: Config>(
@@ -410,13 +407,13 @@ fn strip_constants<C: Config>(
             e.push(term.clone());
         }
     }
-    if e.len() == 0 {
+    if e.is_empty() {
         return (Expression::default(), C::CircuitField::zero(), cst);
     }
     let v = e[0].coef;
     let vi = v.inv().unwrap();
     for term in e.iter_mut() {
-        term.coef = term.coef * vi;
+        term.coef *= vi;
     }
     (Expression::from_terms_sorted(e), v, cst)
 }
@@ -442,7 +439,7 @@ fn lin_comb_inner<C: Config, F: Fn(usize) -> C::CircuitField>(
     var_coef: F,
     mid_vars: &mut Pool<Expression<C>>,
 ) -> Expression<C> {
-    if vars.len() == 0 {
+    if vars.is_empty() {
         return Expression::default();
     }
     if vars.len() == 1 {
@@ -492,7 +489,7 @@ fn lin_comb_inner<C: Config, F: Fn(usize) -> C::CircuitField>(
         if new_coef.is_zero() {
             continue;
         }
-        if res.len() != 0 && res.last().unwrap().vars == t.vars {
+        if !res.is_empty() && res.last().unwrap().vars == t.vars {
             res.last_mut().unwrap().coef += new_coef;
             if res.last().unwrap().coef.is_zero() {
                 res.pop();
@@ -502,7 +499,7 @@ fn lin_comb_inner<C: Config, F: Fn(usize) -> C::CircuitField>(
             res.last_mut().unwrap().coef = new_coef;
         }
     }
-    if res.len() == 0 {
+    if res.is_empty() {
         Expression::default()
     } else {
         Expression::from_terms_sorted(res)
@@ -560,6 +557,9 @@ fn mul_two_expr<C: Config>(
     lin_comb_inner(vars.iter().collect(), |_| C::CircuitField::one(), mid_vars)
 }
 
+pub type ProcessOk<'a, C, IrcIn, IrcOut> =
+    (ir::common::Circuit<IrcOut>, Builder<'a, C, IrcIn, IrcOut>);
+
 pub fn process_circuit<
     'b,
     'a: 'b,
@@ -570,7 +570,7 @@ pub fn process_circuit<
     root: &'b mut RootBuilder<'a, C, IrcIn, IrcOut>,
     circuit_id: usize,
     circuit: &'a ir::common::Circuit<IrcIn>,
-) -> Result<(ir::common::Circuit<IrcOut>, Builder<'a, C, IrcIn, IrcOut>), Error>
+) -> Result<ProcessOk<'a, C, IrcIn, IrcOut>, Error>
 where
     Builder<'a, C, IrcIn, IrcOut>: InsnTransformAndExecute<'a, C, IrcIn, IrcOut>,
 {
@@ -592,17 +592,14 @@ where
             match status {
                 ConstraintStatus::Marked => {}
                 ConstraintStatus::Asserted => {
-                    constraints.push(Constraint::new(
-                        builder.mid_expr_to_out[expr].clone(),
-                        typ.clone(),
-                    ));
+                    constraints.push(Constraint::new(builder.mid_expr_to_out[expr], *typ));
                 }
             }
         }
     }
     let new_circuit = ir::common::Circuit {
         instructions: builder.out_insns.clone(),
-        constraints: constraints,
+        constraints,
         outputs: circuit
             .outputs
             .iter()

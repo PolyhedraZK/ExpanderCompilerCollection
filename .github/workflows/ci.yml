@@ -91,3 +91,13 @@ jobs:
           cp artifacts/libec_go_lib.* ecgo/compile/wrapper/
           cd ecgo
           go test ./test/
+
+  lint:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --all --manifest-path=expander_compiler/Cargo.toml -- --check
+      - run: cargo clippy --manifest-path=expander_compiler/Cargo.toml

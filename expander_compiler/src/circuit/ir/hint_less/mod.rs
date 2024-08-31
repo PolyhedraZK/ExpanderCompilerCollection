@@ -75,7 +75,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 sub_circuit_id,
                 inputs,
                 num_outputs,
-            } => Some((*sub_circuit_id, &inputs, *num_outputs)),
+            } => Some((*sub_circuit_id, inputs, *num_outputs)),
             _ => None,
         }
     }

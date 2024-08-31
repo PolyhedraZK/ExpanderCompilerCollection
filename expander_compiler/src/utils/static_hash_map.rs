@@ -10,7 +10,7 @@ pub struct StaticHashMap {
 const MOD: u64 = 1_000_000_007;
 
 impl StaticHashMap {
-    pub fn new(s: &Vec<usize>) -> Self {
+    pub fn new(s: &[usize]) -> Self {
         if s.len() > (MOD / 1000) as usize {
             panic!("too large");
         }
@@ -27,7 +27,7 @@ impl StaticHashMap {
                 let mut ok = true;
                 for (i, &x) in s.iter().enumerate() {
                     let x = (x as u64) % MOD;
-                    let pos = (x * a + b) % MOD * x % MOD & (m - 1) as u64;
+                    let pos = ((x * a + b) % MOD * x % MOD) & (m - 1);
                     if v[pos as usize] != 0 {
                         ok = false;
                         break;
@@ -51,7 +51,7 @@ impl StaticHashMap {
 
     pub fn get(&self, x: usize) -> usize {
         let x = (x as u64) % MOD;
-        let pos = (x * self.a + self.b) % MOD * x % MOD & self.m as u64;
+        let pos = ((x * self.a + self.b) % MOD * x % MOD) & self.m;
         self.v[pos as usize]
     }
 }

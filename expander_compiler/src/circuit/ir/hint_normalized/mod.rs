@@ -84,7 +84,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 sub_circuit_id,
                 inputs,
                 num_outputs,
-            } => Some((*sub_circuit_id, &inputs, *num_outputs)),
+            } => Some((*sub_circuit_id, inputs, *num_outputs)),
             _ => None,
         }
     }
@@ -144,7 +144,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 num_outputs,
             } => {
                 hints::validate_hint(*hint_id, inputs.len(), *num_outputs)?;
-                if inputs.len() >= 1 {
+                if !inputs.is_empty() {
                     Ok(())
                 } else {
                     Err(Error::InternalError(
@@ -154,7 +154,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             }
             Instruction::ConstantLike(coef) => coef.validate(num_public_inputs),
             Instruction::CustomGate { inputs, .. } => {
-                if inputs.len() >= 1 {
+                if !inputs.is_empty() {
                     Ok(())
                 } else {
                     Err(Error::InternalError(
@@ -211,8 +211,13 @@ impl<C: Config> Circuit<C> {
         let mut instructions = Vec::new();
         let mut cur_var_max = self.num_inputs;
         let mut new_var_max = self.num_inputs;
-        for i in 1..=self.num_inputs {
-            new_id[i] = i;
+        for (i, new_id_ptr) in new_id
+            .iter_mut()
+            .enumerate()
+            .take(self.num_inputs + 1)
+            .skip(1)
+        {
+            *new_id_ptr = i;
         }
         for insn in self.instructions.iter() {
             if let Instruction::Hint { num_outputs, .. } = insn {
@@ -279,8 +284,13 @@ impl<C: Config> Circuit<C> {
         let mut new_var_max = self.num_inputs;
         let mut add_outputs = Vec::new();
         let mut add_outputs_sub = Vec::new();
-        for i in 1..=self.num_inputs {
-            new_id[i] = i;
+        for (i, new_id_ptr) in new_id
+            .iter_mut()
+            .enumerate()
+            .take(self.num_inputs + 1)
+            .skip(1)
+        {
+            *new_id_ptr = i;
         }
         for insn in self.instructions.iter() {
             for _ in 0..insn.num_outputs() {

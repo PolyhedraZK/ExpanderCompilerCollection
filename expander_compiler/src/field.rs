@@ -11,7 +11,7 @@ impl Field for M31 {}
 
 impl<T: Field> Serde for T {
     fn serialize_into<W: std::io::Write>(&self, writer: W) -> Result<(), std::io::Error> {
-        match <Self as FieldSerde>::serialize_into(&self, writer) {
+        match <Self as FieldSerde>::serialize_into(self, writer) {
             Ok(_) => Ok(()),
             Err(e) => match e {
                 FieldSerdeError::IOError(e) => Err(e),

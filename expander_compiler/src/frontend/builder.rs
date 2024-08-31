@@ -37,7 +37,7 @@ pub enum VariableOrValue<F: Field> {
 }
 
 pub trait ToVariableOrValue<F: Field> {
-    fn to_variable_or_value(self) -> VariableOrValue<F>;
+    fn convert_to_variable_or_value(self) -> VariableOrValue<F>;
 }
 
 trait NotVariable {}
@@ -45,19 +45,19 @@ impl NotVariable for u32 {}
 impl NotVariable for U256 {}
 
 impl<F: Field, T: Into<F> + NotVariable> ToVariableOrValue<F> for T {
-    fn to_variable_or_value(self) -> VariableOrValue<F> {
+    fn convert_to_variable_or_value(self) -> VariableOrValue<F> {
         VariableOrValue::Value(self.into())
     }
 }
 
 impl<F: Field> ToVariableOrValue<F> for Variable {
-    fn to_variable_or_value(self) -> VariableOrValue<F> {
+    fn convert_to_variable_or_value(self) -> VariableOrValue<F> {
         VariableOrValue::Variable(self)
     }
 }
 
 impl<F: Field> ToVariableOrValue<F> for &Variable {
-    fn to_variable_or_value(self) -> VariableOrValue<F> {
+    fn convert_to_variable_or_value(self) -> VariableOrValue<F> {
         VariableOrValue::Variable(*self)
     }
 }
@@ -75,7 +75,7 @@ impl<C: Config> Builder<C> {
         )
     }
 
-    pub fn build(self, outputs: &Vec<Variable>) -> source::Circuit<C> {
+    pub fn build(self, outputs: &[Variable]) -> source::Circuit<C> {
         source::Circuit {
             instructions: self.instructions,
             constraints: self.constraints,
@@ -85,8 +85,8 @@ impl<C: Config> Builder<C> {
         }
     }
 
-    fn to_variable<T: ToVariableOrValue<C::CircuitField>>(&mut self, value: T) -> Variable {
-        match value.to_variable_or_value() {
+    fn convert_to_variable<T: ToVariableOrValue<C::CircuitField>>(&mut self, value: T) -> Variable {
+        match value.convert_to_variable_or_value() {
             VariableOrValue::Variable(v) => v,
             VariableOrValue::Value(v) => {
                 self.instructions
@@ -109,8 +109,8 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         x: impl ToVariableOrValue<C::CircuitField>,
         y: impl ToVariableOrValue<C::CircuitField>,
     ) -> Variable {
-        let x = self.to_variable(x);
-        let y = self.to_variable(y);
+        let x = self.convert_to_variable(x);
+        let y = self.convert_to_variable(y);
         self.instructions.push(SourceInstruction::LinComb(LinComb {
             terms: vec![
                 LinCombTerm {
@@ -132,8 +132,8 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         x: impl ToVariableOrValue<C::CircuitField>,
         y: impl ToVariableOrValue<C::CircuitField>,
     ) -> Variable {
-        let x = self.to_variable(x);
-        let y = self.to_variable(y);
+        let x = self.convert_to_variable(x);
+        let y = self.convert_to_variable(y);
         self.instructions.push(SourceInstruction::LinComb(LinComb {
             terms: vec![
                 LinCombTerm {
@@ -151,7 +151,7 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
     }
 
     fn neg(&mut self, x: impl ToVariableOrValue<C::CircuitField>) -> Variable {
-        let x = self.to_variable(x);
+        let x = self.convert_to_variable(x);
         self.instructions.push(SourceInstruction::LinComb(LinComb {
             terms: vec![LinCombTerm {
                 var: x.id,
@@ -167,8 +167,8 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         x: impl ToVariableOrValue<C::CircuitField>,
         y: impl ToVariableOrValue<C::CircuitField>,
     ) -> Variable {
-        let x = self.to_variable(x);
-        let y = self.to_variable(y);
+        let x = self.convert_to_variable(x);
+        let y = self.convert_to_variable(y);
         self.instructions
             .push(SourceInstruction::Mul(vec![x.id, y.id]));
         self.new_var()
@@ -180,12 +180,12 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         y: impl ToVariableOrValue<C::CircuitField>,
         checked: bool,
     ) -> Variable {
-        let x = self.to_variable(x);
-        let y = self.to_variable(y);
+        let x = self.convert_to_variable(x);
+        let y = self.convert_to_variable(y);
         self.instructions.push(SourceInstruction::Div {
             x: x.id,
             y: y.id,
-            checked: checked,
+            checked,
         });
         self.new_var()
     }
@@ -199,8 +199,8 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         x: impl ToVariableOrValue<C::CircuitField>,
         y: impl ToVariableOrValue<C::CircuitField>,
     ) -> Variable {
-        let x = self.to_variable(x);
-        let y = self.to_variable(y);
+        let x = self.convert_to_variable(x);
+        let y = self.convert_to_variable(y);
         self.instructions.push(SourceInstruction::BoolBinOp {
             x: x.id,
             y: y.id,
@@ -214,8 +214,8 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         x: impl ToVariableOrValue<C::CircuitField>,
         y: impl ToVariableOrValue<C::CircuitField>,
     ) -> Variable {
-        let x = self.to_variable(x);
-        let y = self.to_variable(y);
+        let x = self.convert_to_variable(x);
+        let y = self.convert_to_variable(y);
         self.instructions.push(SourceInstruction::BoolBinOp {
             x: x.id,
             y: y.id,
@@ -229,8 +229,8 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         x: impl ToVariableOrValue<C::CircuitField>,
         y: impl ToVariableOrValue<C::CircuitField>,
     ) -> Variable {
-        let x = self.to_variable(x);
-        let y = self.to_variable(y);
+        let x = self.convert_to_variable(x);
+        let y = self.convert_to_variable(y);
         self.instructions.push(SourceInstruction::BoolBinOp {
             x: x.id,
             y: y.id,
@@ -240,13 +240,13 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
     }
 
     fn is_zero(&mut self, x: impl ToVariableOrValue<C::CircuitField>) -> Variable {
-        let x = self.to_variable(x);
+        let x = self.convert_to_variable(x);
         self.instructions.push(SourceInstruction::IsZero(x.id));
         self.new_var()
     }
 
     fn assert_is_zero(&mut self, x: impl ToVariableOrValue<C::CircuitField>) {
-        let x = self.to_variable(x);
+        let x = self.convert_to_variable(x);
         self.constraints.push(SourceConstraint {
             typ: source::ConstraintType::Zero,
             var: x.id,
@@ -254,7 +254,7 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
     }
 
     fn assert_is_non_zero(&mut self, x: impl ToVariableOrValue<C::CircuitField>) {
-        let x = self.to_variable(x);
+        let x = self.convert_to_variable(x);
         self.constraints.push(SourceConstraint {
             typ: source::ConstraintType::NonZero,
             var: x.id,
@@ -262,7 +262,7 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
     }
 
     fn assert_is_bool(&mut self, x: impl ToVariableOrValue<C::CircuitField>) {
-        let x = self.to_variable(x);
+        let x = self.convert_to_variable(x);
         self.constraints.push(SourceConstraint {
             typ: source::ConstraintType::Bool,
             var: x.id,
@@ -420,7 +420,7 @@ impl<C: Config> RootBuilder<C> {
         let mut circuits = self.sub_circuits;
         assert_eq!(self.current_builders.len(), 1);
         for (circuit_id, builder) in self.current_builders {
-            circuits.insert(circuit_id, builder.build(&vec![]));
+            circuits.insert(circuit_id, builder.build(&[]));
         }
         source::RootCircuit {
             circuits,
@@ -433,20 +433,28 @@ impl<C: Config> RootBuilder<C> {
         &mut self.current_builders.last_mut().unwrap().1
     }
 
+    fn actually_call_sub_circuit<F: Fn(&mut Self, &Vec<Variable>) -> Vec<Variable>>(
+        &mut self,
+        circuit_id: usize,
+        n: usize,
+        f: F,
+    ) {
+        let (sub_builder, sub_inputs) = Builder::new(n);
+        self.current_builders.push((circuit_id, sub_builder));
+        let sub_outputs = f(self, &sub_inputs);
+        let (_, sub_builder) = self.current_builders.pop().unwrap();
+        let sub = sub_builder.build(&sub_outputs);
+        self.sub_circuits.insert(circuit_id, sub);
+    }
+
     fn call_sub_circuit<F: Fn(&mut Self, &Vec<Variable>) -> Vec<Variable>>(
         &mut self,
         circuit_id: usize,
-        inputs: &Vec<Variable>,
+        inputs: &[Variable],
         f: F,
     ) -> Vec<Variable> {
         if !self.sub_circuits.contains_key(&circuit_id) {
-            let n = inputs.len();
-            let (sub_builder, sub_inputs) = Builder::new(n);
-            self.current_builders.push((circuit_id, sub_builder));
-            let sub_outputs = f(self, &sub_inputs);
-            let (_, sub_builder) = self.current_builders.pop().unwrap();
-            let sub = sub_builder.build(&sub_outputs);
-            self.sub_circuits.insert(circuit_id, sub);
+            self.actually_call_sub_circuit(circuit_id, inputs.len(), f);
         }
         let sub = self.sub_circuits.get(&circuit_id).unwrap();
         let outputs: Vec<Variable> = (0..sub.outputs.len())
@@ -465,7 +473,7 @@ impl<C: Config> RootBuilder<C> {
     pub fn memorized_simple_call(
         &mut self,
         f: fn(&mut Self, &Vec<Variable>) -> Vec<Variable>,
-        inputs: &Vec<Variable>,
+        inputs: &[Variable],
     ) -> Vec<Variable> {
         let k = format!("simple_{}_{}", f as usize, inputs.len());
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
@@ -475,6 +483,6 @@ impl<C: Config> RootBuilder<C> {
     }
 
     pub fn constant<T: ToVariableOrValue<C::CircuitField>>(&mut self, value: T) -> Variable {
-        self.last_builder().to_variable(value)
+        self.last_builder().convert_to_variable(value)
     }
 }

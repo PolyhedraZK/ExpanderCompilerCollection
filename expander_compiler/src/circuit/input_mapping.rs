@@ -1,4 +1,4 @@
-pub const EMPTY: usize = std::usize::MAX >> 9;
+pub const EMPTY: usize = usize::MAX >> 9;
 
 #[derive(Clone, Debug)]
 pub struct InputMapping {
@@ -30,7 +30,7 @@ impl InputMapping {
         self.mapping[pos]
     }
 
-    pub fn map_inputs<T: Default + Clone>(&self, inputs: &Vec<T>) -> Vec<T> {
+    pub fn map_inputs<T: Default + Clone>(&self, inputs: &[T]) -> Vec<T> {
         assert_eq!(inputs.len(), self.mapping.len());
         let mut new_inputs = vec![T::default(); self.next_size];
         for i in 0..inputs.len() {

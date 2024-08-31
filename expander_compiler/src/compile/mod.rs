@@ -33,7 +33,7 @@ where
 fn print_info(info: &str) {
     print!(
         "\x1b[90m{}\x1b[0m \x1b[32mINF\x1b[0m {} ",
-        chrono::Local::now().format("%H:%M:%S").to_string(),
+        chrono::Local::now().format("%H:%M:%S"),
         info
     );
 }

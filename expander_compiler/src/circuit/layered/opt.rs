@@ -17,29 +17,29 @@ impl<C: Config, const INPUT_NUM: usize> PartialOrd for Gate<C, INPUT_NUM> {
 
 impl<C: Config, const INPUT_NUM: usize> Ord for Gate<C, INPUT_NUM> {
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.output < other.output {
-            return Ordering::Less;
-        } else if self.output > other.output {
-            return Ordering::Greater;
-        }
-        for i in 0..INPUT_NUM {
-            if self.inputs[i] < other.inputs[i] {
+        match self.output.cmp(&other.output) {
+            Ordering::Less => {
                 return Ordering::Less;
-            } else if self.inputs[i] > other.inputs[i] {
+            }
+            Ordering::Greater => {
                 return Ordering::Greater;
             }
+            Ordering::Equal => {}
+        };
+        for i in 0..INPUT_NUM {
+            match self.inputs[i].cmp(&other.inputs[i]) {
+                Ordering::Less => {
+                    return Ordering::Less;
+                }
+                Ordering::Greater => {
+                    return Ordering::Greater;
+                }
+                Ordering::Equal => {}
+            };
         }
         self.coef.cmp(&other.coef)
     }
 }
-
-impl<C: Config, const INPUT_NUM: usize> PartialEq for Gate<C, INPUT_NUM> {
-    fn eq(&self, other: &Self) -> bool {
-        self.inputs == other.inputs && self.output == other.output && self.coef == other.coef
-    }
-}
-
-impl<C: Config, const INPUT_NUM: usize> Eq for Gate<C, INPUT_NUM> {}
 
 impl<C: Config> PartialOrd for GateCustom<C> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -49,42 +49,47 @@ impl<C: Config> PartialOrd for GateCustom<C> {
 
 impl<C: Config> Ord for GateCustom<C> {
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.gate_type < other.gate_type {
-            return Ordering::Less;
-        } else if self.gate_type > other.gate_type {
-            return Ordering::Greater;
-        }
-        if self.output < other.output {
-            return Ordering::Less;
-        } else if self.output > other.output {
-            return Ordering::Greater;
-        }
-        if self.inputs.len() < other.inputs.len() {
-            return Ordering::Less;
-        } else if self.inputs.len() > other.inputs.len() {
-            return Ordering::Greater;
-        }
-        for i in 0..self.inputs.len() {
-            if self.inputs[i] < other.inputs[i] {
+        match self.gate_type.cmp(&other.gate_type) {
+            Ordering::Less => {
                 return Ordering::Less;
-            } else if self.inputs[i] > other.inputs[i] {
+            }
+            Ordering::Greater => {
                 return Ordering::Greater;
             }
+            Ordering::Equal => {}
+        };
+        match self.output.cmp(&other.output) {
+            Ordering::Less => {
+                return Ordering::Less;
+            }
+            Ordering::Greater => {
+                return Ordering::Greater;
+            }
+            Ordering::Equal => {}
+        };
+        match self.inputs.len().cmp(&other.inputs.len()) {
+            Ordering::Less => {
+                return Ordering::Less;
+            }
+            Ordering::Greater => {
+                return Ordering::Greater;
+            }
+            Ordering::Equal => {}
+        };
+        for i in 0..self.inputs.len() {
+            match self.inputs[i].cmp(&other.inputs[i]) {
+                Ordering::Less => {
+                    return Ordering::Less;
+                }
+                Ordering::Greater => {
+                    return Ordering::Greater;
+                }
+                Ordering::Equal => {}
+            };
         }
         self.coef.cmp(&other.coef)
     }
 }
-
-impl<C: Config> PartialEq for GateCustom<C> {
-    fn eq(&self, other: &Self) -> bool {
-        self.gate_type == other.gate_type
-            && self.inputs == other.inputs
-            && self.output == other.output
-            && self.coef == other.coef
-    }
-}
-
-impl<C: Config> Eq for GateCustom<C> {}
 
 trait GateOpt<C: Config>: PartialEq + Ord + Clone {
     fn coef_add(&mut self, coef: Coef<C>);
@@ -107,9 +112,9 @@ impl<C: Config, const INPUT_NUM: usize> GateOpt<C> for Gate<C, INPUT_NUM> {
         self.coef.clone()
     }
     fn add_offset(&self, in_offset: usize, out_offset: usize) -> Self {
-        let mut inputs = self.inputs.clone();
-        for i in 0..INPUT_NUM {
-            inputs[i] += in_offset;
+        let mut inputs = self.inputs;
+        for input in inputs.iter_mut() {
+            *input += in_offset;
         }
         let output = self.output + out_offset;
         let coef = self.coef.clone();
@@ -137,8 +142,8 @@ impl<C: Config> GateOpt<C> for GateCustom<C> {
     }
     fn add_offset(&self, in_offset: usize, out_offset: usize) -> Self {
         let mut inputs = self.inputs.clone();
-        for i in 0..inputs.len() {
-            inputs[i] += in_offset;
+        for input in inputs.iter_mut() {
+            *input += in_offset;
         }
         let output = self.output + out_offset;
         let coef = self.coef.clone();
@@ -222,8 +227,8 @@ impl<C: Config> Segment<C> {
         for gate in self.gate_customs.iter() {
             need_outputs[gate.output] = false;
         }
-        for i in 0..self.num_outputs {
-            if need_outputs[i] {
+        for (i, need) in need_outputs.iter().enumerate() {
+            if *need {
                 self.gate_consts.push(GateConst {
                     inputs: [],
                     output: i,
@@ -381,7 +386,7 @@ impl<C: Config> Circuit<C> {
     fn expand_gates<T: GateOpt<C>, F: Fn(usize) -> bool, G: Fn(&Segment<C>) -> &Vec<T>>(
         &self,
         segment_id: usize,
-        prev_segments: &Vec<Segment<C>>,
+        prev_segments: &[Segment<C>],
         should_expand: F,
         get_gates: G,
     ) -> Vec<T> {
@@ -406,7 +411,7 @@ impl<C: Config> Circuit<C> {
     fn expand_segment<F: Fn(usize) -> bool>(
         &self,
         segment_id: usize,
-        prev_segments: &Vec<Segment<C>>,
+        prev_segments: &[Segment<C>],
         should_expand: F,
     ) -> Segment<C> {
         let segment = &self.segments[segment_id];
@@ -572,15 +577,15 @@ impl<C: Config> Circuit<C> {
             .collect();
         let mut edges = Vec::new();
         //println!("segments: {}", self.segments.len());
-        for i in 0..self.segments.len() {
-            for j in 0..i {
+        for (i, i_gates) in all_gates.iter().enumerate() {
+            for (j, j_gates) in sampled_gates.iter().enumerate().take(i) {
                 let mut common_count = 0;
-                for gate in sampled_gates[j].iter() {
-                    if all_gates[i].contains(gate) {
+                for gate in j_gates.iter() {
+                    if i_gates.contains(gate) {
                         common_count += 1;
                     }
                 }
-                let num_samples = sampled_gates[j].len();
+                let num_samples = j_gates.len();
                 if num_samples >= COMMON_THRESHOLD_VALUE
                     && common_count * 100 >= num_samples * COMMON_THRESHOLD_PERCENT
                 {

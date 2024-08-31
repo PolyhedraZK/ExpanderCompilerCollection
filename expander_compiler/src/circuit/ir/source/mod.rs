@@ -111,7 +111,7 @@ impl<C: Config> common::Constraint<C> for Constraint {
     }
     fn replace_var<F: Fn(usize) -> usize>(&self, f: F) -> Self {
         Constraint {
-            typ: self.typ.clone(),
+            typ: self.typ,
             var: f(self.var),
         }
     }
@@ -187,7 +187,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 sub_circuit_id,
                 inputs,
                 num_outputs,
-            } => Some((*sub_circuit_id, &inputs, *num_outputs)),
+            } => Some((*sub_circuit_id, inputs, *num_outputs)),
             _ => None,
         }
     }
@@ -275,7 +275,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 num_outputs,
             } => {
                 hints::validate_hint(*hint_id, inputs.len(), *num_outputs)?;
-                if inputs.len() >= 1 {
+                if !inputs.is_empty() {
                     Ok(())
                 } else {
                     Err(Error::InternalError(
@@ -285,7 +285,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             }
             Instruction::ConstantLike(coef) => coef.validate(num_public_inputs),
             Instruction::CustomGate { inputs, .. } => {
-                if inputs.len() >= 1 {
+                if !inputs.is_empty() {
                     Ok(())
                 } else {
                     Err(Error::InternalError(
@@ -402,9 +402,9 @@ impl UnconstrainedBinOpType {
                 let mut y = y.to_u256();
                 while y != U256::ZERO {
                     if (y & U256::from(1u64)) == U256::from(1u64) {
-                        res = res * t;
+                        res *= t;
                     }
-                    y = y >> 1;
+                    y >>= 1;
                     t = t * t;
                 }
                 Ok(res)

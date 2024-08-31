@@ -69,9 +69,7 @@ impl<C: Config> Constraint<C> for RawConstraint {
     fn var(&self) -> usize {
         *self
     }
-    fn typ(&self) -> Self::Type {
-        ()
-    }
+    fn typ(&self) -> Self::Type {}
     fn replace_var<F: Fn(usize) -> usize>(&self, f: F) -> Self {
         f(*self)
     }
@@ -193,6 +191,17 @@ impl<Irc: IrConfig> Circuit<Irc> {
     }
 }
 
+pub type EvalOk<Irc> = (
+    Vec<<<Irc as IrConfig>::Config as Config>::CircuitField>,
+    bool,
+);
+
+type EvalSubOk<'a, Irc> = (
+    Vec<<<Irc as IrConfig>::Config as Config>::CircuitField>,
+    &'a [<<Irc as IrConfig>::Config as Config>::CircuitField],
+    bool,
+);
+
 impl<Irc: IrConfig> RootCircuit<Irc> {
     pub fn sub_circuit_graph_vertices(&self) -> HashSet<usize> {
         self.circuits.keys().cloned().collect()
@@ -203,10 +212,7 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
         for (circuit_id, circuit) in self.circuits.iter() {
             for insn in circuit.instructions.iter() {
                 if let Some((sub_circuit_id, _, _)) = insn.as_sub_circuit_call() {
-                    edges
-                        .entry(*circuit_id)
-                        .or_insert(HashSet::new())
-                        .insert(sub_circuit_id);
+                    edges.entry(*circuit_id).or_default().insert(sub_circuit_id);
                 }
             }
         }
@@ -306,7 +312,7 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
             }
             sub_hint_size.insert(*i, hint_size);
         }
-        return self.circuits[&0].num_inputs + sub_hint_size[&0];
+        self.circuits[&0].num_inputs + sub_hint_size[&0]
     }
 
     pub fn topo_order(&self) -> Vec<usize> {
@@ -320,7 +326,7 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
     pub fn eval_unsafe_with_errors(
         &self,
         inputs: Vec<<Irc::Config as Config>::CircuitField>,
-    ) -> Result<(Vec<<Irc::Config as Config>::CircuitField>, bool), Error> {
+    ) -> Result<EvalOk<Irc>, Error> {
         assert_eq!(inputs.len(), self.input_size());
         let (root_input, hint_input) = inputs.split_at(self.circuits[&0].num_inputs);
         let (res, rem, cond) =
@@ -341,14 +347,7 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
         circuit: &Circuit<Irc>,
         inputs: Vec<<Irc::Config as Config>::CircuitField>,
         hint_inputs: &'a [<Irc::Config as Config>::CircuitField],
-    ) -> Result<
-        (
-            Vec<<Irc::Config as Config>::CircuitField>,
-            &'a [<Irc::Config as Config>::CircuitField],
-            bool,
-        ),
-        Error,
-    > {
+    ) -> Result<EvalSubOk<'a, Irc>, Error> {
         let mut values = vec![<Irc::Config as Config>::CircuitField::zero(); 1];
         values.extend(inputs);
         let (cur_hint_input, rem_hint_inputs) = hint_inputs.split_at(circuit.num_hint_inputs);

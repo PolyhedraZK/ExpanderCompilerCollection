@@ -49,7 +49,7 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
         let mut num_vertices = 0;
         for circuit_id in order.iter() {
             let circuit = self.circuits.get(circuit_id).unwrap();
-            let cur_vertices_nums = vec![
+            let cur_vertices_nums = [
                 circuit.get_num_variables() + 1,
                 circuit.instructions.len(),
                 circuit.outputs.len(),
@@ -216,7 +216,7 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
                     typ: Var,
                 }));
             }
-            if circuit.constraints.len() != 0 {
+            if !circuit.constraints.is_empty() {
                 queue.push(vertice_id(&Element {
                     circuit_id: *circuit_id,
                     id: 0,
@@ -240,19 +240,24 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
         while i < queue.len() {
             let cur = queue[i];
             i += 1;
-            for j in edges_start_pos[cur]..edges_start_pos[cur + 1] {
-                let neighbor = edges[j].1;
-                if !visited[neighbor] {
-                    visited[neighbor] = true;
-                    queue.push(neighbor);
+            for (_, neighbor) in edges
+                .iter()
+                .take(edges_start_pos[cur + 1])
+                .skip(edges_start_pos[cur])
+            {
+                if !visited[*neighbor] {
+                    visited[*neighbor] = true;
+                    queue.push(*neighbor);
                 }
             }
-            for j in dual_edges_start_pos[cur]..dual_edges_start_pos[cur + 1] {
-                let req2 = dual_edges[j].1;
-                let neighbor = dual_edges[j].2;
-                if visited[req2] && !visited[neighbor] {
-                    visited[neighbor] = true;
-                    queue.push(neighbor);
+            for (_, req2, neighbor) in dual_edges
+                .iter()
+                .take(dual_edges_start_pos[cur + 1])
+                .skip(dual_edges_start_pos[cur])
+            {
+                if visited[*req2] && !visited[*neighbor] {
+                    visited[*neighbor] = true;
+                    queue.push(*neighbor);
                 }
             }
         }
@@ -278,8 +283,12 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
                     var_map.push(EMPTY);
                 }
             }
-            for i in circuit.num_inputs + 1..=circuit.get_num_inputs_all() {
-                hint_mask.push(var_map[i] != EMPTY);
+            for var in var_map
+                .iter()
+                .take(circuit.get_num_inputs_all() + 1)
+                .skip(circuit.num_inputs + 1)
+            {
+                hint_mask.push(*var != EMPTY);
             }
             for (i, insn) in circuit.instructions.iter().enumerate() {
                 if !is_visited(&Element {
@@ -288,13 +297,12 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
                     typ: Insn,
                 }) {
                     if let Some((sub_circuit_id, _, _)) = insn.as_sub_circuit_call() {
-                        for _ in 0..sub_hint_mask[&sub_circuit_id].len() {
-                            hint_mask.push(false);
-                        }
+                        hint_mask.resize(
+                            sub_hint_mask[&sub_circuit_id].len() + hint_mask.len(),
+                            false,
+                        );
                     }
-                    for _ in 0..insn.num_outputs() {
-                        var_map.push(EMPTY);
-                    }
+                    var_map.resize(var_map.len() + insn.num_outputs(), EMPTY);
                     continue;
                 }
                 if let Some((sub_circuit_id, inputs, num_outputs)) = insn.as_sub_circuit_call() {
@@ -421,11 +429,11 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
                 var_map.push(i);
             }
             for insn in circuit.instructions.iter_mut() {
-                if let Some((sub_circuit_id, _, num_outputs)) = insn.as_sub_circuit_call() {
+                if let Some((sub_circuit_id, _, _)) = insn.as_sub_circuit_call() {
                     let t = var_map.len();
                     let om = out_map.get(&sub_circuit_id).unwrap();
-                    for i in 0..num_outputs {
-                        var_map.push(om[i] + t);
+                    for x in om.iter() {
+                        var_map.push(*x + t);
                     }
                 } else {
                     for _ in 0..insn.num_outputs() {

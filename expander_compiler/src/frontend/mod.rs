@@ -41,8 +41,7 @@ fn build<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + 
     let mut public_vars_ptr = public_input_variables.as_slice();
     circuit.load_from(&mut vars_ptr, &mut public_vars_ptr);
     circuit.define(&mut root_builder);
-    let rc = root_builder.build();
-    rc
+    root_builder.build()
 }
 
 pub struct CompileResult<C: Config> {
