@@ -1,6 +1,8 @@
+use ethnum::U256;
+
 use crate::{
     circuit::{config::Config, layered::Coef},
-    field::{Field, FieldArith, U256},
+    field::{Field, FieldArith},
     hints::{self, circom_shift_l_impl, circom_shift_r_impl},
     utils::error::Error,
 };
@@ -397,9 +399,9 @@ impl UnconstrainedBinOpType {
             UnconstrainedBinOpType::Pow => {
                 let mut t = *x;
                 let mut res = F::one();
-                let mut y: U256 = (*y).into();
-                while !y.is_zero() {
-                    if y.bit(0) {
+                let mut y = y.to_u256();
+                while y != U256::ZERO {
+                    if (y & U256::from(1u64)) == U256::from(1u64) {
                         res = res * t;
                     }
                     y = y >> 1;
@@ -408,14 +410,14 @@ impl UnconstrainedBinOpType {
                 Ok(res)
             }
             UnconstrainedBinOpType::IntDiv => binop_on_u256(x, y, |x, y| {
-                if y.is_zero() {
+                if y == U256::ZERO {
                     Err(Error::UserError("division by zero".to_string()))
                 } else {
                     Ok(x / y)
                 }
             }),
             UnconstrainedBinOpType::Mod => binop_on_u256(x, y, |x, y| {
-                if y.is_zero() {
+                if y == U256::ZERO {
                     Err(Error::UserError("division by zero".to_string()))
                 } else {
                     Ok(x % y)
@@ -428,16 +430,16 @@ impl UnconstrainedBinOpType {
                 binop_on_u256(x, y, |x, y| Ok(circom_shift_r_impl::<F>(x, y)))
             }
             UnconstrainedBinOpType::LesserEq => {
-                binop_on_u256(x, y, |x, y| Ok(F::from((x <= y) as u32)))
+                binop_on_u256(x, y, |x, y| Ok(U256::from((x <= y) as u32)))
             }
             UnconstrainedBinOpType::GreaterEq => {
-                binop_on_u256(x, y, |x, y| Ok(F::from((x >= y) as u32)))
+                binop_on_u256(x, y, |x, y| Ok(U256::from((x >= y) as u32)))
             }
             UnconstrainedBinOpType::Lesser => {
-                binop_on_u256(x, y, |x, y| Ok(F::from((x < y) as u32)))
+                binop_on_u256(x, y, |x, y| Ok(U256::from((x < y) as u32)))
             }
             UnconstrainedBinOpType::Greater => {
-                binop_on_u256(x, y, |x, y| Ok(F::from((x > y) as u32)))
+                binop_on_u256(x, y, |x, y| Ok(U256::from((x > y) as u32)))
             }
             UnconstrainedBinOpType::Eq => Ok(F::from((x == y) as u32)),
             UnconstrainedBinOpType::NotEq => Ok(F::from((x != y) as u32)),
@@ -458,15 +460,15 @@ impl UnconstrainedBinOpType {
     }
 }
 
-fn binop_on_u256<F: Field, T: Into<F>, G: Fn(U256, U256) -> Result<T, Error>>(
+fn binop_on_u256<F: Field, G: Fn(U256, U256) -> Result<U256, Error>>(
     x: &F,
     y: &F,
     f: G,
 ) -> Result<F, Error> {
-    let x: U256 = (*x).into();
-    let y: U256 = (*y).into();
+    let x: U256 = x.to_u256();
+    let y: U256 = y.to_u256();
     match f(x, y) {
-        Ok(res) => Ok(res.into()),
+        Ok(res) => Ok(F::from_u256(res)),
         Err(e) => Err(e),
     }
 }

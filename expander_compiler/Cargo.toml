@@ -11,8 +11,8 @@ opt-level = 3
 
 [dependencies]
 rand.workspace = true
-uint.workspace = true
 chrono.workspace = true
+ethnum.workspace = true
 halo2curves.workspace = true
 tiny-keccak.workspace = true
 expander-rs.workspace = true
@@ -25,8 +25,8 @@ members = [
 
 [workspace.dependencies]
 rand = "0.8.5"
-uint = "0.9.5"
 chrono = "0.4"
+ethnum = "1.5.0"
 tiny-keccak = { version = "2.0", features = ["keccak"] }
 halo2curves = { git = "https://github.com/PolyhedraZK/halo2curves", default-features = false, features = [
     "bits",

@@ -1,4 +1,4 @@
-pub use arith::{Field as FieldArith, FieldForECC as FieldModulus, BN254, GF2, M31, U256};
+pub use arith::{Field as FieldArith, FieldForECC as FieldModulus, BN254, GF2, M31};
 
 use crate::utils::serde::Serde;
 use arith::{FieldForECC, FieldSerde, FieldSerdeError};

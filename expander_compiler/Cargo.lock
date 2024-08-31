@@ -93,15 +93,15 @@ dependencies = [
 [[package]]
 name = "arith"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=For_ECC#79e343218b1e2769fa6eb02677525c8d1bc26d0c"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=For_ECC#deb0a890bea76e94c4c104ad66d08cf7827fd0d3"
 dependencies = [
  "ark-std",
+ "ethnum",
  "halo2curves",
  "log",
  "rand",
  "sha2",
  "thiserror",
- "uint",
 ]
 
 [[package]]
@@ -376,7 +376,6 @@ dependencies = [
  "expander_compiler",
  "libc",
  "rand",
- "uint",
 ]
 
 [[package]]
@@ -424,9 +423,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 
 [[package]]
+name = "ethnum"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b90ca2580b73ab6a1f724b76ca11ab632df820fd6040c336200d2c1df7b3c82c"
+
+[[package]]
 name = "expander-rs"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=For_ECC#79e343218b1e2769fa6eb02677525c8d1bc26d0c"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=For_ECC#deb0a890bea76e94c4c104ad66d08cf7827fd0d3"
 dependencies = [
  "arith",
  "ark-std",
@@ -451,11 +456,11 @@ version = "0.1.0"
 dependencies = [
  "arith",
  "chrono",
+ "ethnum",
  "expander-rs",
  "halo2curves",
  "rand",
  "tiny-keccak",
- "uint",
 ]
 
 [[package]]
@@ -654,12 +659,6 @@ name = "hermit-abi"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d231dfb89cfffdbc30e7fc41579ed6066ad03abda9e567ccafae602b97ec5024"
-
-[[package]]
-name = "hex"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "http"
@@ -1499,18 +1498,6 @@ name = "typenum"
 version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
-
-[[package]]
-name = "uint"
-version = "0.9.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76f64bba2c53b04fcab63c01a7d7427eadc821e3bc48c34dc9ba29c501164b52"
-dependencies = [
- "byteorder",
- "crunchy",
- "hex",
- "static_assertions",
-]
 
 [[package]]
 name = "unicase"
