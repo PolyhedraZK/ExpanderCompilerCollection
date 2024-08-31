@@ -31,5 +31,5 @@ tiny-keccak = { version = "2.0", features = ["keccak"] }
 halo2curves = { git = "https://github.com/PolyhedraZK/halo2curves", default-features = false, features = [
     "bits",
 ] }
-arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "For_ECC" }
-expander-rs = { git = "https://github.com/PolyhedraZK/Expander", branch = "For_ECC" }
+arith = { git = "https://github.com/PolyhedraZK/Expander" }
+expander-rs = { git = "https://github.com/PolyhedraZK/Expander" }

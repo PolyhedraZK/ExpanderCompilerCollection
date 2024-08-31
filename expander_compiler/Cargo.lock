@@ -93,7 +93,7 @@ dependencies = [
 [[package]]
 name = "arith"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=For_ECC#deb0a890bea76e94c4c104ad66d08cf7827fd0d3"
+source = "git+https://github.com/PolyhedraZK/Expander#7670d3d63afa754975d85c2efc05a1b3a685f0a7"
 dependencies = [
  "ark-std",
  "ethnum",
@@ -431,7 +431,7 @@ checksum = "b90ca2580b73ab6a1f724b76ca11ab632df820fd6040c336200d2c1df7b3c82c"
 [[package]]
 name = "expander-rs"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=For_ECC#deb0a890bea76e94c4c104ad66d08cf7827fd0d3"
+source = "git+https://github.com/PolyhedraZK/Expander#7670d3d63afa754975d85c2efc05a1b3a685f0a7"
 dependencies = [
  "arith",
  "ark-std",
