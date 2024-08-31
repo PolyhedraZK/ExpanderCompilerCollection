@@ -33,7 +33,7 @@ impl<C: Config> Serde for Witness<C> {
         let num_witnesses = usize::deserialize_from(&mut reader)?;
         let num_inputs_per_witness = usize::deserialize_from(&mut reader)?;
         let num_public_inputs_per_witness = usize::deserialize_from(&mut reader)?;
-        let modulus = U256::deserialize_from(&mut reader)?;
+        let modulus = ethnum::U256::deserialize_from(&mut reader)?;
         if modulus != C::CircuitField::modulus() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,

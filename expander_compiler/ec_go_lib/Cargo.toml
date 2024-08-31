@@ -8,6 +8,5 @@ crate-type = ["dylib"]
 
 [dependencies]
 rand.workspace = true
-uint.workspace = true
 expander_compiler = {path = "../" }
 libc = "0.2.155"

@@ -3,6 +3,8 @@ use std::{
     hash::{Hash, Hasher},
 };
 
+use ethnum::U256;
+
 use crate::{
     circuit::{
         config::Config,
@@ -12,7 +14,7 @@ use crate::{
         },
         layered::Coef,
     },
-    field::{Field, FieldArith, U256},
+    field::{Field, FieldArith},
 };
 
 use super::api::BasicAPI;

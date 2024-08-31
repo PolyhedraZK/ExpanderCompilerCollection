@@ -4,7 +4,7 @@ use std::{
     io::{Error as IoError, Read, Write},
 };
 
-use crate::field::U256;
+use ethnum::U256;
 pub trait Serde: Sized {
     fn serialize_into<W: Write>(&self, writer: W) -> Result<(), IoError>;
     fn deserialize_from<R: Read>(reader: R) -> Result<Self, IoError>;
@@ -87,14 +87,12 @@ impl<K: Serde + Eq + Hash, V: Serde> Serde for HashMap<K, V> {
 
 impl Serde for U256 {
     fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
-        let mut bytes = [0u8; 32];
-        self.to_little_endian(&mut bytes);
-        writer.write_all(&bytes)
+        writer.write_all(&self.to_le_bytes())
     }
 
     fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
         let mut bytes = [0u8; 32];
         reader.read_exact(&mut bytes)?;
-        Ok(Self::from_little_endian(&mut bytes))
+        Ok(Self::from_le_bytes(bytes))
     }
 }

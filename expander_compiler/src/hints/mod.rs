@@ -1,11 +1,9 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
+use ethnum::U256;
 use rand::RngCore;
 
-use crate::{
-    field::{Field, U256},
-    utils::error::Error,
-};
+use crate::{field::Field, utils::error::Error};
 
 pub enum BuiltinHintIds {
     Identity = 0xccc000000000,
@@ -197,9 +195,9 @@ fn impl_builtin_hint<F: Field>(
         BuiltinHintIds::Pow => binop_hint(inputs, |x, y| {
             let mut t = x;
             let mut res = F::one();
-            let mut y: U256 = y.into();
-            while !y.is_zero() {
-                if y.bit(0) {
+            let mut y: U256 = y.to_u256();
+            while y != U256::ZERO {
+                if y & U256::from(1u32) != U256::ZERO {
                     res = res * t;
                 }
                 y = y >> 1;
@@ -210,13 +208,13 @@ fn impl_builtin_hint<F: Field>(
         BuiltinHintIds::IntDiv => {
             binop_hint_on_u256(
                 inputs,
-                |x, y| if y.is_zero() { U256::zero() } else { x / y },
+                |x, y| if y == U256::ZERO { U256::ZERO } else { x / y },
             )
         }
         BuiltinHintIds::Mod => {
             binop_hint_on_u256(
                 inputs,
-                |x, y| if y.is_zero() { U256::zero() } else { x % y },
+                |x, y| if y == U256::ZERO { U256::ZERO } else { x % y },
             )
         }
         BuiltinHintIds::ShiftL => binop_hint_on_u256(inputs, |x, y| circom_shift_l_impl::<F>(x, y)),
@@ -232,14 +230,11 @@ fn binop_hint<F: Field, G: Fn(F, F) -> F>(inputs: &Vec<F>, f: G) -> Vec<F> {
     vec![f(inputs[0], inputs[1])]
 }
 
-fn binop_hint_on_u256<F: Field, T: Into<F>, G: Fn(U256, U256) -> T>(
-    inputs: &Vec<F>,
-    f: G,
-) -> Vec<F> {
-    let x_u256: U256 = inputs[0].into();
-    let y_u256: U256 = inputs[1].into();
+fn binop_hint_on_u256<F: Field, G: Fn(U256, U256) -> U256>(inputs: &Vec<F>, f: G) -> Vec<F> {
+    let x_u256: U256 = inputs[0].to_u256();
+    let y_u256: U256 = inputs[1].to_u256();
     let z_u256 = f(x_u256, y_u256);
-    vec![z_u256.into()]
+    vec![F::from_u256(z_u256)]
 }
 
 pub fn stub_impl<F: Field>(hint_id: usize, inputs: &Vec<F>, num_outputs: usize) -> Vec<F> {
@@ -286,16 +281,23 @@ pub fn random_builtin(mut rand: impl RngCore) -> (usize, usize, usize) {
     }
 }
 
+pub fn u256_bit_length(x: U256) -> usize {
+    256 - x.leading_zeros() as usize
+}
+
 pub fn circom_shift_l_impl<F: Field>(x: U256, k: U256) -> U256 {
     let top = F::modulus() / 2;
     if k <= top {
-        let shift = if (k >> 64).is_zero() {
+        let shift = if (k >> U256::from(64u32)) == U256::ZERO {
             k.as_u64() as usize
         } else {
-            F::modulus().bits()
+            u256_bit_length(F::modulus())
         };
+        if shift >= 256 {
+            return U256::ZERO;
+        }
         let value = x << shift;
-        let mask = U256::from(1) << F::modulus().bits();
+        let mask = U256::from(1u32) << u256_bit_length(F::modulus());
         let mask = mask - 1;
         let value = value & mask;
         value
@@ -307,11 +309,14 @@ pub fn circom_shift_l_impl<F: Field>(x: U256, k: U256) -> U256 {
 pub fn circom_shift_r_impl<F: Field>(x: U256, k: U256) -> U256 {
     let top = F::modulus() / 2;
     if k <= top {
-        let shift = if (k >> 64).is_zero() {
+        let shift = if (k >> U256::from(64u32)) == U256::ZERO {
             k.as_u64() as usize
         } else {
-            F::modulus().bits()
+            u256_bit_length(F::modulus())
         };
+        if shift >= 256 {
+            return U256::ZERO;
+        }
         let value = x >> shift;
         value
     } else {

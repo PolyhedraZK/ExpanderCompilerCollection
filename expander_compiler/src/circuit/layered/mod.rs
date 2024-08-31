@@ -1,10 +1,8 @@
 use std::{fmt, hash::Hash};
 
-use crate::{
-    field::{FieldArith, U256},
-    hints,
-    utils::error::Error,
-};
+use arith::FieldForECC;
+
+use crate::{field::FieldArith, hints, utils::error::Error};
 
 use super::config::Config;
 
@@ -490,7 +488,7 @@ impl<C: Config> Circuit<C> {
 impl<C: Config> fmt::Display for Coef<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Coef::Constant(c) => write!(f, "{}", Into::<U256>::into(*c)),
+            Coef::Constant(c) => write!(f, "{}", c.to_u256()),
             Coef::Random => write!(f, "Random"),
             Coef::PublicInput(id) => write!(f, "PublicInput({})", id),
         }

@@ -1,6 +1,6 @@
 use std::io::{Error as IoError, Read, Write};
 
-use crate::{field::{U256, FieldModulus}, utils::serde::Serde};
+use crate::{field::FieldModulus, utils::serde::Serde};
 
 use super::*;
 
@@ -168,7 +168,7 @@ impl<C: Config> Serde for Circuit<C> {
                 "invalid magic number",
             ));
         }
-        let modulus = U256::deserialize_from(&mut reader)?;
+        let modulus = ethnum::U256::deserialize_from(&mut reader)?;
         if modulus != C::CircuitField::modulus() {
             return Err(IoError::new(
                 std::io::ErrorKind::InvalidData,
