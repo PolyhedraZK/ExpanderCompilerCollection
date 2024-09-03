@@ -93,8 +93,8 @@ macro_rules! declare_circuit_default {
 #[macro_export]
 macro_rules! declare_circuit {
     ($struct_name:ident { $($field_name:ident : $field_type:tt),* $(,)? }) => {
-        struct $struct_name<T> {
-            $($field_name: $crate::frontend::internal::declare_circuit_field_type!(@type $field_type)),*
+        pub struct $struct_name<T> {
+            pub $($field_name: $crate::frontend::internal::declare_circuit_field_type!(@type $field_type)),*
         }
 
         impl<B: Clone> $crate::frontend::internal::DumpLoadTwoVariables<B> for $struct_name<B> where B: $crate::frontend::internal::DumpLoadVariables<B>{
