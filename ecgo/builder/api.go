@@ -5,9 +5,14 @@ package builder
 import (
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/irsource"
 	"github.com/consensys/gnark/constraint"
+	"github.com/consensys/gnark/constraint/solver"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/std/math/bits"
 )
+
+func init() {
+	solver.RegisterHint(IdentityHint)
+}
 
 // API defines a set of methods for interacting with the circuit builder.
 type API interface {

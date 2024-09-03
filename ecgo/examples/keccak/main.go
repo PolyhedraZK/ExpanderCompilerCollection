@@ -378,6 +378,7 @@ func main() {
 	if !test.CheckCircuit(c, wit) {
 		panic("gg")
 	}
+	os.WriteFile("witness.txt", wit.Serialize(), 0o644)
 
 	for k := 0; k < NHashes; k++ {
 		circuit.P[k][0] = -circuit.P[k][0].(int)

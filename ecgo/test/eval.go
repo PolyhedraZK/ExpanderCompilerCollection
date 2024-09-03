@@ -55,9 +55,10 @@ func evalCircuit(rc *layered.RootCircuit, input []*big.Int, publicInput []*big.I
 	if len(input) != int(rc.Circuits[rc.Layers[0]].InputLen) {
 		panic("input length mismatch")
 	}
-	if len(publicInput) != rc.NumPublicInputs {
+	// Current version of Expander does not support public input
+	/*if len(publicInput) != rc.NumPublicInputs {
 		panic("public input length mismatch")
-	}
+	}*/
 	cur := input
 	// for layer_i, id := range rc.Layers {
 	for _, id := range rc.Layers {
