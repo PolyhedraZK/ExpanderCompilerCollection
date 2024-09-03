@@ -9,10 +9,10 @@ import (
 	"reflect"
 
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/builder"
-	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/compile"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/irsource"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/irwg"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/layered"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/rust"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/schema"
 	"github.com/consensys/gnark/logger"
@@ -82,7 +82,7 @@ func Compile(field *big.Int, circuit frontend.Circuit, opts ...frontend.CompileO
 	rc := root.Finalize()
 	_ = rc
 	//os.WriteFile("p1.txt", irsource.SerializeRootCircuit(rc), 0644)
-	irwg, lc, err := compile.Compile(rc)
+	irwg, lc, err := rust.Compile(rc)
 	if err != nil {
 		return nil, err
 	}

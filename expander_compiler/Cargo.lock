@@ -373,6 +373,8 @@ dependencies = [
 name = "ec_go_lib"
 version = "0.1.0"
 dependencies = [
+ "arith",
+ "expander-rs",
  "expander_compiler",
  "libc",
  "rand",

@@ -1,4 +1,6 @@
+use arith::FieldSerde;
 use libc::{c_uchar, c_ulong, malloc};
+use std::io::Cursor;
 use std::ptr;
 use std::slice;
 
@@ -7,7 +9,7 @@ use expander_compiler::{
     utils::serde::Serde,
 };
 
-const ABI_VERSION: c_ulong = 2;
+const ABI_VERSION: c_ulong = 3;
 
 #[repr(C)]
 pub struct ByteArray {
@@ -130,6 +132,122 @@ pub extern "C" fn compile(ir_source: ByteArray, config_id: c_ulong) -> CompileRe
     let ir_source = unsafe { slice::from_raw_parts(ir_source.data, ir_source.length as usize) };
     let result = compile_inner(ir_source.to_vec(), config_id);
     to_compile_result(result)
+}
+
+fn dump_proof_and_claimed_v<F: arith::Field + arith::FieldSerde>(
+    proof: &expander_rs::Proof,
+    claimed_v: &F,
+) -> Vec<u8> {
+    let mut bytes = Vec::new();
+
+    proof.serialize_into(&mut bytes).unwrap(); // TODO: error propagation
+    claimed_v.serialize_into(&mut bytes).unwrap(); // TODO: error propagation
+
+    bytes
+}
+
+fn load_proof_and_claimed_v<F: arith::Field + arith::FieldSerde>(
+    bytes: &[u8],
+) -> (expander_rs::Proof, F) {
+    let mut cursor = Cursor::new(bytes);
+
+    let proof = expander_rs::Proof::deserialize_from(&mut cursor).unwrap(); // TODO: error propagation
+    let claimed_v = F::deserialize_from(&mut cursor).unwrap(); // TODO: error propagation
+
+    (proof, claimed_v)
+}
+
+fn prove_circuit_file_inner<C: expander_rs::GKRConfig>(
+    circuit_filename: &str,
+    witness: &[u8],
+) -> Vec<u8> {
+    let config = expander_rs::Config::<C>::new(expander_rs::GKRScheme::Vanilla);
+    let mut circuit = expander_rs::Circuit::<C>::load_circuit(circuit_filename);
+    circuit.load_witness_bytes(witness).unwrap();
+    circuit.evaluate();
+    let mut prover = expander_rs::Prover::new(&config);
+    prover.prepare_mem(&circuit);
+    let (claimed_v, proof) = prover.prove(&mut circuit);
+    dump_proof_and_claimed_v(&proof, &claimed_v)
+}
+
+fn verify_circuit_file_inner<C: expander_rs::GKRConfig>(
+    circuit_filename: &str,
+    witness: &[u8],
+    proof_and_claimed_v: &[u8],
+) -> u8 {
+    let config = expander_rs::Config::<C>::new(expander_rs::GKRScheme::Vanilla);
+    let mut circuit = expander_rs::Circuit::<C>::load_circuit(circuit_filename);
+    circuit.load_witness_bytes(witness).unwrap();
+    let (proof, claimed_v) = load_proof_and_claimed_v(proof_and_claimed_v);
+    let verifier = expander_rs::Verifier::new(&config);
+    verifier.verify(&mut circuit, &claimed_v, &proof) as u8
+}
+
+#[no_mangle]
+pub extern "C" fn prove_circuit_file(
+    circuit_filename: ByteArray,
+    witness: ByteArray,
+    config_id: c_ulong,
+) -> ByteArray {
+    let circuit_filename = unsafe {
+        let slice = slice::from_raw_parts(circuit_filename.data, circuit_filename.length as usize);
+        std::str::from_utf8(slice).unwrap()
+    };
+    let witness = unsafe { slice::from_raw_parts(witness.data, witness.length as usize) };
+    let proof = match config_id {
+        1 => prove_circuit_file_inner::<expander_rs::M31ExtConfigSha2>(circuit_filename, witness),
+        2 => prove_circuit_file_inner::<expander_rs::BN254ConfigSha2>(circuit_filename, witness),
+        3 => prove_circuit_file_inner::<expander_rs::GF2ExtConfigSha2>(circuit_filename, witness),
+        _ => panic!("unknown config id: {}", config_id),
+    };
+    let proof_len = proof.len();
+    let proof_ptr = if proof_len > 0 {
+        unsafe {
+            let ptr = malloc(proof_len) as *mut u8;
+            ptr.copy_from(proof.as_ptr(), proof_len);
+            ptr
+        }
+    } else {
+        ptr::null_mut()
+    };
+    ByteArray {
+        data: proof_ptr,
+        length: proof_len as c_ulong,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn verify_circuit_file(
+    circuit_filename: ByteArray,
+    witness: ByteArray,
+    proof: ByteArray,
+    config_id: c_ulong,
+) -> c_uchar {
+    let circuit_filename = unsafe {
+        let slice = slice::from_raw_parts(circuit_filename.data, circuit_filename.length as usize);
+        std::str::from_utf8(slice).unwrap()
+    };
+    let witness = unsafe { slice::from_raw_parts(witness.data, witness.length as usize) };
+    let proof = unsafe { slice::from_raw_parts(proof.data, proof.length as usize) };
+    match config_id {
+        1 => verify_circuit_file_inner::<expander_rs::M31ExtConfigSha2>(
+            circuit_filename,
+            witness,
+            proof,
+        ),
+        2 => verify_circuit_file_inner::<expander_rs::BN254ConfigSha2>(
+            circuit_filename,
+            witness,
+            proof,
+        ),
+        3 => verify_circuit_file_inner::<expander_rs::GF2ExtConfigSha2>(
+            circuit_filename,
+            witness,
+            proof,
+        ),
+        _ => panic!("unknown config id: {}", config_id),
+    }
 }
 
 #[no_mangle]
