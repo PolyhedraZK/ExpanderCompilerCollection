@@ -22,7 +22,7 @@ import (
 	"github.com/consensys/gnark/logger"
 )
 
-const ABI_VERSION = 2
+const ABI_VERSION = 3
 
 func currentFileDirectory() string {
 	_, fileName, _, ok := runtime.Caller(1)
@@ -34,6 +34,8 @@ func currentFileDirectory() string {
 }
 
 var compilePtr unsafe.Pointer = nil
+var proveCircuitFilePtr unsafe.Pointer = nil
+var verifyCircuitFilePtr unsafe.Pointer = nil
 var compilePtrLock sync.Mutex
 
 func downloadFile(url string, filepath string) error {
@@ -163,10 +165,6 @@ func initCompilePtr() {
 	if handle == nil {
 		panic("failed to load libec_go_lib")
 	}
-	compilePtr = C.dlsym(handle, C.CString("compile"))
-	if compilePtr == nil {
-		panic("failed to load compile function")
-	}
 	abiVersionPtr := C.dlsym(handle, C.CString("abi_version"))
 	if abiVersionPtr == nil {
 		panic("failed to load abi_version function")
@@ -174,6 +172,18 @@ func initCompilePtr() {
 	abiVersion := C.abi_version(abiVersionPtr)
 	if abiVersion != ABI_VERSION {
 		panic("abi_version mismatch, please consider update the go package")
+	}
+	compilePtr = C.dlsym(handle, C.CString("compile"))
+	if compilePtr == nil {
+		panic("failed to load compile function")
+	}
+	proveCircuitFilePtr = C.dlsym(handle, C.CString("prove_circuit_file"))
+	if proveCircuitFilePtr == nil {
+		panic("failed to load prove_circuit_file function")
+	}
+	verifyCircuitFilePtr = C.dlsym(handle, C.CString("verify_circuit_file"))
+	if verifyCircuitFilePtr == nil {
+		panic("failed to load verify_circuit_file function")
 	}
 }
 
@@ -198,4 +208,28 @@ func CompileWithRustLib(s []byte, configId uint64) ([]byte, []byte, error) {
 	}
 
 	return irWitnessGen, layered, nil
+}
+
+func ProveCircuitFile(circuitFilename string, witness []byte, configId uint64) []byte {
+	initCompilePtr()
+	bytesFn := []byte(circuitFilename)
+	cf := C.ByteArray{data: (*C.uint8_t)(C.CBytes(bytesFn)), length: C.uint64_t(len(bytesFn))}
+	defer C.free(unsafe.Pointer(cf.data))
+	wi := C.ByteArray{data: (*C.uint8_t)(C.CBytes(witness)), length: C.uint64_t(len(witness))}
+	defer C.free(unsafe.Pointer(wi.data))
+	proof := C.prove_circuit_file(proveCircuitFilePtr, cf, wi, C.uint64_t(configId))
+	defer C.free(unsafe.Pointer(proof.data))
+	return C.GoBytes(unsafe.Pointer(proof.data), C.int(proof.length))
+}
+
+func VerifyCircuitFile(circuitFilename string, witness []byte, proof []byte, configId uint64) bool {
+	initCompilePtr()
+	bytesFn := []byte(circuitFilename)
+	cf := C.ByteArray{data: (*C.uint8_t)(C.CBytes(bytesFn)), length: C.uint64_t(len(bytesFn))}
+	defer C.free(unsafe.Pointer(cf.data))
+	wi := C.ByteArray{data: (*C.uint8_t)(C.CBytes(witness)), length: C.uint64_t(len(witness))}
+	defer C.free(unsafe.Pointer(wi.data))
+	pr := C.ByteArray{data: (*C.uint8_t)(C.CBytes(proof)), length: C.uint64_t(len(proof))}
+	defer C.free(unsafe.Pointer(pr.data))
+	return C.verify_circuit_file(verifyCircuitFilePtr, cf, wi, pr, C.uint64_t(configId)) != 0
 }

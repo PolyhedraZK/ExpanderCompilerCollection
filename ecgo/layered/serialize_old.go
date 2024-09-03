@@ -2,7 +2,9 @@ package layered
 
 import (
 	"math/big"
+	"os"
 
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/field"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/utils"
 )
 
@@ -183,4 +185,24 @@ func DeserializeRootCircuit(buf []byte) *RootCircuit {
 	// In old version of serialized circuit, we don't have some information
 	rc.ExpectedNumOutputZeroes = int(rc.Circuits[rc.Layers[len(rc.Layers)-1]].OutputLen)
 	return rc
+}
+
+func DetectFieldIdFromFile(fn string) uint64 {
+	// Read the first 4 bytes of the file
+	file, err := os.Open(fn)
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+	buf := make([]byte, 40)
+	n, err := file.Read(buf)
+	if err != nil || n != 40 {
+		panic(err)
+	}
+	in := utils.NewInputBuf(buf)
+	if in.ReadUint64() != 3770719418566461763 {
+		panic("invalid file header")
+	}
+	f := in.ReadBigInt(32)
+	return field.GetFieldId(field.GetFieldFromOrder(f))
 }

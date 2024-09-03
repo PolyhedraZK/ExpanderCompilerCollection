@@ -88,9 +88,30 @@ jobs:
           pattern: build-${{ matrix.os }}
           merge-multiple: true
       - run: |
-          cp artifacts/libec_go_lib.* ecgo/compile/wrapper/
+          cp artifacts/libec_go_lib.* ecgo/rust/wrapper/
           cd ecgo
           go test ./test/
+  
+  test-go-keccak-serve:
+    runs-on: 7950x3d
+    needs: build-rust
+    steps:
+      - uses: styfle/cancel-workflow-action@0.11.0
+      - uses: actions/checkout@v4
+      - name: Setup Go 1.21.x
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21.x'
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+          pattern: build-ubuntu-latest
+          merge-multiple: true
+      - run: |
+          cp artifacts/libec_go_lib.* ecgo/rust/wrapper/
+          cd ecgo
+          go run examples/keccak_full/main.go
 
   lint:
     runs-on: macos-latest
