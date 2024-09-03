@@ -148,13 +148,13 @@ fn dump_proof_and_claimed_v<F: arith::Field + arith::FieldSerde>(
 
 fn load_proof_and_claimed_v<F: arith::Field + arith::FieldSerde>(
     bytes: &[u8],
-) -> (expander_rs::Proof, F) {
+) -> Result<(expander_rs::Proof, F), ()> {
     let mut cursor = Cursor::new(bytes);
 
-    let proof = expander_rs::Proof::deserialize_from(&mut cursor).unwrap(); // TODO: error propagation
-    let claimed_v = F::deserialize_from(&mut cursor).unwrap(); // TODO: error propagation
+    let proof = expander_rs::Proof::deserialize_from(&mut cursor).map_err(|_| ())?;
+    let claimed_v = F::deserialize_from(&mut cursor).map_err(|_| ())?;
 
-    (proof, claimed_v)
+    Ok((proof, claimed_v))
 }
 
 fn prove_circuit_file_inner<C: expander_rs::GKRConfig>(
@@ -178,8 +178,18 @@ fn verify_circuit_file_inner<C: expander_rs::GKRConfig>(
 ) -> u8 {
     let config = expander_rs::Config::<C>::new(expander_rs::GKRScheme::Vanilla);
     let mut circuit = expander_rs::Circuit::<C>::load_circuit(circuit_filename);
-    circuit.load_witness_bytes(witness).unwrap();
-    let (proof, claimed_v) = load_proof_and_claimed_v(proof_and_claimed_v);
+    match circuit.load_witness_bytes(witness) {
+        Ok(_) => (),
+        Err(_) => {
+            return 0;
+        }
+    }
+    let (proof, claimed_v) = match load_proof_and_claimed_v(proof_and_claimed_v) {
+        Ok((proof, claimed_v)) => (proof, claimed_v),
+        Err(_) => {
+            return 0;
+        }
+    };
     let verifier = expander_rs::Verifier::new(&config);
     verifier.verify(&mut circuit, &claimed_v, &proof) as u8
 }
