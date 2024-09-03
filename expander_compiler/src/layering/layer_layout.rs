@@ -135,10 +135,11 @@ impl<'a, C: Config> CompileContext<'a, C> {
             let insn = &ic.sub_circuit_insn_refs[i];
             let input_layer = ic.sub_circuit_start_layer[i];
             let output_layer = self.circuits[&insn.sub_circuit_id].output_layer + input_layer;
-            ic.lcs[input_layer].req.push(PlacementRequest {
-                insn_id,
-                input_ids: insn.inputs.clone(),
-            });
+            let mut input_ids = insn.inputs.clone();
+            input_ids.extend(ic.sub_circuit_hint_inputs[i].iter().cloned());
+            ic.lcs[input_layer]
+                .req
+                .push(PlacementRequest { insn_id, input_ids });
 
             for x in insn.outputs.iter().cloned() {
                 ic.lcs[output_layer]
