@@ -113,3 +113,50 @@ fn test_bn254() {
 fn test_gf2() {
     do_tests::<GF2Config>(3000000);
 }
+
+#[test]
+fn deterministic() {
+    let mut config = RandomCircuitConfig {
+        seed: 0,
+        num_circuits: RandomRange { min: 1, max: 10 },
+        num_inputs: RandomRange { min: 1, max: 10 },
+        num_hint_inputs: RandomRange { min: 0, max: 10 },
+        num_instructions: RandomRange { min: 1, max: 10 },
+        num_constraints: RandomRange { min: 0, max: 10 },
+        num_outputs: RandomRange { min: 1, max: 10 },
+        num_terms: RandomRange { min: 1, max: 5 },
+        sub_circuit_prob: 0.5,
+    };
+    for i in 100000..103000 {
+        config.seed = i;
+        let root = IrSourceRoot::<M31Config>::random(&config);
+        assert_eq!(root.validate(), Ok(()));
+        let res = compile(&root);
+        let res2 = compile(&root);
+        match (res, res2) {
+            (
+                Ok((ir_hint_normalized, layered_circuit)),
+                Ok((ir_hint_normalized2, layered_circuit2)),
+            ) => {
+                if layered_circuit != layered_circuit2 {
+                    println!("========================================================");
+                    println!("{}\n", layered_circuit);
+                    println!("========================================================");
+                    println!("{}\n", layered_circuit2);
+                    println!("========================================================");
+                    panic!("gg");
+                }
+                assert_eq!(ir_hint_normalized, ir_hint_normalized2);
+            }
+            (Err(e), Err(e2)) => {
+                assert_eq!(e, e2);
+            }
+            (Ok(_), Err(_)) => {
+                panic!("res is Ok, res2 is Err");
+            }
+            (Err(_), Ok(_)) => {
+                panic!("res is Err, res2 is Ok");
+            }
+        }
+    }
+}

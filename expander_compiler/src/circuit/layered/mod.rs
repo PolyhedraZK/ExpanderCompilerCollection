@@ -150,7 +150,7 @@ pub struct Allocation {
 
 pub type ChildSpec = (usize, Vec<Allocation>);
 
-#[derive(Default, Clone, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub struct Segment<C: Config> {
     pub num_inputs: usize,
     pub num_outputs: usize,
@@ -161,7 +161,7 @@ pub struct Segment<C: Config> {
     pub gate_customs: Vec<GateCustom<C>>,
 }
 
-#[derive(Clone, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub struct Circuit<C: Config> {
     pub num_public_inputs: usize,
     pub num_actual_outputs: usize,
@@ -478,6 +478,16 @@ impl<C: Config> Circuit<C> {
                     public_inputs,
                 );
             }
+        }
+    }
+
+    pub fn sort_everything(&mut self) {
+        for seg in self.segments.iter_mut() {
+            seg.gate_muls.sort();
+            seg.gate_adds.sort();
+            seg.gate_consts.sort();
+            seg.gate_customs.sort();
+            seg.child_segs.sort();
         }
     }
 }
