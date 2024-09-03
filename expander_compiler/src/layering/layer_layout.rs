@@ -323,7 +323,10 @@ impl<'a, C: Config> CompileContext<'a, C> {
             }
         }
         let mut children_prev_circuits: Vec<Vec<Vec<usize>>> = vec![Vec::new(); lc.parent.len()];
-        for (x, layout) in layouts.iter() {
+        let mut layouts_keys: Vec<usize> = layouts.keys().cloned().collect();
+        layouts_keys.sort();
+        for x in layouts_keys.iter() {
+            let layout = layouts.get(x).unwrap();
             let v = layouts_subs_arr.get(x).unwrap();
             if !v.is_empty() {
                 let v = &v[0];

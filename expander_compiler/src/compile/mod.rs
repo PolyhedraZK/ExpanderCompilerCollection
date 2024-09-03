@@ -151,8 +151,7 @@ pub fn compile<C: Config>(
     }
     lc.validate()
         .map_err(|e| e.prepend("layered circuit invalid1"))?;
-
-    // TODO: optimize lc
+    lc.sort_everything(); // for deterministic output
 
     let lc_stats = lc.get_stats();
     print_info("built layered circuit");
