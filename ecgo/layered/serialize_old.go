@@ -3,42 +3,15 @@ package layered
 import (
 	"math/big"
 
-	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/field"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/utils"
 )
 
-func serializeCoef(o *utils.OutputBuf, bnlen int, coef *big.Int, coefType uint8, publicInputId uint64) {
-	if coefType == 1 {
-		o.AppendUint8(1)
-		o.AppendBigInt(bnlen, coef)
-	} else if coefType == 2 {
-		o.AppendUint8(2)
-	} else {
-		o.AppendUint8(3)
-		o.AppendUint64(publicInputId)
-	}
-}
-
-func deserializeCoef(in *utils.InputBuf, bnlen int) (*big.Int, uint8, uint64) {
-	coefType := in.ReadUint8()
-	if coefType == 1 {
-		return in.ReadBigInt(bnlen), 1, 0
-	} else if coefType == 2 {
-		return big.NewInt(0), 2, 0
-	} else {
-		return big.NewInt(0), 3, in.ReadUint64()
-	}
-}
-
 // Serialize converts a RootCircuit into a byte array for storage or transmission.
-func (rc *RootCircuit) _serialize() []byte {
-	bnlen := field.GetFieldFromOrder(rc.Field).SerializedLen()
+func (rc *RootCircuit) Serialize() []byte {
 	o := utils.OutputBuf{}
-	o.AppendUint64(3914834606642317635)
+	zero := big.NewInt(0)
+	o.AppendUint64(3770719418566461763)
 	o.AppendBigInt(32, rc.Field)
-	o.AppendUint64(uint64(rc.NumPublicInputs))
-	o.AppendUint64(uint64(rc.NumActualOutputs))
-	o.AppendUint64(uint64(rc.ExpectedNumOutputZeroes))
 	o.AppendUint64(uint64(len(rc.Circuits)))
 	for _, c := range rc.Circuits {
 		o.AppendUint64(c.InputLen)
@@ -52,33 +25,66 @@ func (rc *RootCircuit) _serialize() []byte {
 				o.AppendUint64(a.OutputOffset)
 			}
 		}
+		randomCoefIdx := []int{}
 		o.AppendUint64(uint64(len(c.Mul)))
-		for _, m := range c.Mul {
+		for i, m := range c.Mul {
 			o.AppendUint64(m.In0)
 			o.AppendUint64(m.In1)
 			o.AppendUint64(m.Out)
-			serializeCoef(&o, bnlen, m.Coef, m.CoefType, m.PublicInputId)
+			if m.CoefType == 2 {
+				randomCoefIdx = append(randomCoefIdx, i)
+				o.AppendBigInt(32, zero)
+			} else if m.CoefType == 1 {
+				o.AppendBigInt(32, m.Coef)
+			} else if m.CoefType == 3 {
+				panic("Public input id not supported in this version")
+			}
 		}
 		o.AppendUint64(uint64(len(c.Add)))
-		for _, a := range c.Add {
+		for i, a := range c.Add {
 			o.AppendUint64(a.In)
 			o.AppendUint64(a.Out)
-			serializeCoef(&o, bnlen, a.Coef, a.CoefType, a.PublicInputId)
+			if a.CoefType == 2 {
+				randomCoefIdx = append(randomCoefIdx, i+len(c.Mul))
+				o.AppendBigInt(32, zero)
+			} else if a.CoefType == 1 {
+				o.AppendBigInt(32, a.Coef)
+			} else if a.CoefType == 3 {
+				panic("Public input id not supported in this version")
+			}
 		}
 		o.AppendUint64(uint64(len(c.Cst)))
-		for _, cst := range c.Cst {
+		for i, cst := range c.Cst {
 			o.AppendUint64(cst.Out)
-			serializeCoef(&o, bnlen, cst.Coef, cst.CoefType, cst.PublicInputId)
+			if cst.CoefType == 2 {
+				randomCoefIdx = append(randomCoefIdx, i+len(c.Mul)+len(c.Add))
+				o.AppendBigInt(32, zero)
+			} else if cst.CoefType == 1 {
+				o.AppendBigInt(32, cst.Coef)
+			} else if cst.CoefType == 3 {
+				panic("Public input id not supported in this version")
+			}
 		}
 		o.AppendUint64(uint64(len(c.Custom)))
-		for _, cu := range c.Custom {
-			o.AppendUint64(cu.GateType)
-			o.AppendUint64(uint64(len(cu.In)))
-			for _, in := range cu.In {
+		for i, ct := range c.Custom {
+			o.AppendUint64(ct.GateType)
+			o.AppendUint64(uint64(len(ct.In)))
+			for _, in := range ct.In {
 				o.AppendUint64(in)
 			}
-			o.AppendUint64(cu.Out)
-			serializeCoef(&o, bnlen, cu.Coef, cu.CoefType, cu.PublicInputId)
+			o.AppendUint64(ct.Out)
+			if ct.CoefType == 2 {
+				randomCoefIdx = append(randomCoefIdx, i+len(c.Mul)+len(c.Add)+len(c.Cst))
+				o.AppendBigInt(32, zero)
+			} else if ct.CoefType == 1 {
+				o.AppendBigInt(32, ct.Coef)
+			} else {
+				panic("Public input id not supported in this version")
+			}
+		}
+		o.AppendUint64(uint64(len(randomCoefIdx)))
+		for _, idx := range randomCoefIdx {
+			o.AppendUint64(uint64(idx))
 		}
 	}
 	o.AppendUint64(uint64(len(rc.Layers)))
@@ -88,17 +94,13 @@ func (rc *RootCircuit) _serialize() []byte {
 	return o.Bytes()
 }
 
-func DeserializeNewCompilerRootCircuit(buf []byte) *RootCircuit {
+func DeserializeRootCircuit(buf []byte) *RootCircuit {
 	in := utils.NewInputBuf(buf)
-	if in.ReadUint64() != 3914834606642317635 {
+	if in.ReadUint64() != 3770719418566461763 {
 		panic("invalid file header")
 	}
 	rc := &RootCircuit{}
 	rc.Field = in.ReadBigInt(32)
-	rc.NumPublicInputs = int(in.ReadUint64())
-	rc.NumActualOutputs = int(in.ReadUint64())
-	rc.ExpectedNumOutputZeroes = int(in.ReadUint64())
-	bnlen := field.GetFieldFromOrder(rc.Field).SerializedLen()
 	nbCircuits := in.ReadUint64()
 	rc.Circuits = make([]*Circuit, nbCircuits)
 	for i := uint64(0); i < nbCircuits; i++ {
@@ -124,20 +126,23 @@ func DeserializeNewCompilerRootCircuit(buf []byte) *RootCircuit {
 			c.Mul[j].In0 = in.ReadUint64()
 			c.Mul[j].In1 = in.ReadUint64()
 			c.Mul[j].Out = in.ReadUint64()
-			c.Mul[j].Coef, c.Mul[j].CoefType, c.Mul[j].PublicInputId = deserializeCoef(in, bnlen)
+			c.Mul[j].Coef = in.ReadBigInt(32)
+			c.Mul[j].CoefType = 1
 		}
 		nbAdd := in.ReadUint64()
 		c.Add = make([]GateAdd, nbAdd)
 		for j := uint64(0); j < nbAdd; j++ {
 			c.Add[j].In = in.ReadUint64()
 			c.Add[j].Out = in.ReadUint64()
-			c.Add[j].Coef, c.Add[j].CoefType, c.Add[j].PublicInputId = deserializeCoef(in, bnlen)
+			c.Add[j].Coef = in.ReadBigInt(32)
+			c.Add[j].CoefType = 1
 		}
 		nbCst := in.ReadUint64()
 		c.Cst = make([]GateCst, nbCst)
 		for j := uint64(0); j < nbCst; j++ {
 			c.Cst[j].Out = in.ReadUint64()
-			c.Cst[j].Coef, c.Cst[j].CoefType, c.Cst[j].PublicInputId = deserializeCoef(in, bnlen)
+			c.Cst[j].Coef = in.ReadBigInt(32)
+			c.Cst[j].CoefType = 1
 		}
 		nbCustom := in.ReadUint64()
 		c.Custom = make([]GateCustom, nbCustom)
@@ -149,7 +154,24 @@ func DeserializeNewCompilerRootCircuit(buf []byte) *RootCircuit {
 				c.Custom[j].In[k] = in.ReadUint64()
 			}
 			c.Custom[j].Out = in.ReadUint64()
-			c.Custom[j].Coef, c.Custom[j].CoefType, c.Custom[j].PublicInputId = deserializeCoef(in, bnlen)
+			c.Custom[j].Coef = in.ReadBigInt(32)
+			c.Custom[j].CoefType = 1
+		}
+		nbRandomCoef := in.ReadUint64()
+		randomCoefIdx := make([]int, nbRandomCoef)
+		for j := uint64(0); j < nbRandomCoef; j++ {
+			randomCoefIdx[j] = int(in.ReadUint64())
+		}
+		for _, k := range randomCoefIdx {
+			if k < len(c.Mul) {
+				c.Mul[k].CoefType = 2
+			} else if k < len(c.Mul)+len(c.Add) {
+				c.Add[k-len(c.Mul)].CoefType = 2
+			} else if k < len(c.Mul)+len(c.Add)+len(c.Cst) {
+				c.Cst[k-len(c.Mul)-len(c.Add)].CoefType = 2
+			} else {
+				c.Custom[k-len(c.Mul)-len(c.Add)-len(c.Cst)].CoefType = 2
+			}
 		}
 		rc.Circuits[i] = c
 	}
@@ -158,8 +180,7 @@ func DeserializeNewCompilerRootCircuit(buf []byte) *RootCircuit {
 	for i := uint64(0); i < nbLayers; i++ {
 		rc.Layers[i] = in.ReadUint64()
 	}
-	if !in.IsEnd() {
-		panic("invalid binary format")
-	}
+	// In old version of serialized circuit, we don't have some information
+	rc.ExpectedNumOutputZeroes = int(rc.Circuits[rc.Layers[len(rc.Layers)-1]].OutputLen)
 	return rc
 }

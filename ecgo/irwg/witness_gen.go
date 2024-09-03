@@ -207,7 +207,7 @@ func callHint(hintId uint64, field *big.Int, inputs []*big.Int, outputs []*big.I
 }
 
 // Serialize converts the Witness into a byte slice for storage or transmission.
-func (w *Witness) Serialize() []byte {
+func (w *Witness) _serialize() []byte {
 	o := utils.OutputBuf{}
 	o.AppendUint64(uint64(w.NumWitnesses))
 	o.AppendUint64(uint64(w.NumInputsPerWitness))
@@ -216,6 +216,18 @@ func (w *Witness) Serialize() []byte {
 	bnlen := field.GetFieldFromOrder(w.Field).SerializedLen()
 	for _, x := range w.Values {
 		o.AppendBigInt(bnlen, x)
+	}
+	return o.Bytes()
+}
+
+// Serialize converts the Witness into a byte slice for storage or transmission.
+func (w *Witness) Serialize() []byte {
+	if w.NumWitnesses != 1 {
+		panic("Current version of serialize only supports single witness")
+	}
+	o := utils.OutputBuf{}
+	for i := 0; i < w.NumInputsPerWitness; i++ {
+		o.AppendBigInt(32, w.Values[i])
 	}
 	return o.Bytes()
 }

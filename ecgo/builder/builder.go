@@ -215,10 +215,19 @@ func (builder *builder) CustomGate(gateType uint64, inputs ...frontend.Variable)
 
 // assertIsSet
 
+// IdentityHint sets output[0] to input[0] and is used to implement ToFirstLayer.
+func IdentityHint(field *big.Int, inputs []*big.Int, outputs []*big.Int) error {
+	a := big.NewInt(0)
+	a.Set(inputs[0])
+	outputs[0] = a
+	return nil
+}
+
 // ToFirstLayer adds a hint to the target variable to bring it to the first layer.
 func (builder *builder) ToFirstLayer(v frontend.Variable) frontend.Variable {
-	// TODO: noop
-	return v
+	x, _ := builder.NewHint(IdentityHint, 1, v)
+	builder.AssertIsEqual(x[0], v)
+	return x[0]
 }
 
 // Defer adds a callback function to the defer list to be processed later.

@@ -147,7 +147,7 @@ impl<C: Config> Serde for Segment<C> {
     }
 }
 
-const MAGIC: usize = 3770719418566461763;
+const MAGIC: usize = 3914834606642317635;
 
 impl<C: Config> Serde for Circuit<C> {
     fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {

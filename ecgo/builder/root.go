@@ -44,7 +44,10 @@ func (r *Root) PublicVariable(f schema.LeafInfo) frontend.Variable {
 		ExtraId: 2 + uint64(r.nbPublicInputs),
 	})
 	r.nbPublicInputs++
-	return r.addVar()
+	// Currently, new version of public input is not support by Expander
+	// So we use a hint to isolate it in witness solver
+	x, _ := r.NewHint(IdentityHint, 1, r.addVar())
+	return x[0]
 }
 
 // SecretVariable creates a new secret variable for the circuit.
