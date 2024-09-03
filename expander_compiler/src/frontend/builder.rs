@@ -15,6 +15,7 @@ use crate::{
         layered::Coef,
     },
     field::{Field, FieldArith},
+    utils::function_id::get_function_id,
 };
 
 use super::api::BasicAPI;
@@ -470,14 +471,15 @@ impl<C: Config> RootBuilder<C> {
         outputs
     }
 
-    pub fn memorized_simple_call(
+    pub fn memorized_simple_call<F: Fn(&mut Self, &Vec<Variable>) -> Vec<Variable> + 'static>(
         &mut self,
-        f: fn(&mut Self, &Vec<Variable>) -> Vec<Variable>,
+        f: F,
         inputs: &[Variable],
     ) -> Vec<Variable> {
-        let k = format!("simple_{}_{}", f as usize, inputs.len());
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        k.hash(&mut hasher);
+        "simple".hash(&mut hasher);
+        inputs.len().hash(&mut hasher);
+        get_function_id::<F>().hash(&mut hasher);
         let circuit_id = hasher.finish() as usize;
         self.call_sub_circuit(circuit_id, inputs, f)
     }
