@@ -99,8 +99,8 @@ impl<C: Config> Coef<C> {
 
     pub fn export_to_expander(&self) -> (C::CircuitField, bool) {
         match self {
-            Coef::Constant(c) => (*c, true),
-            Coef::Random => (C::CircuitField::zero(), false),
+            Coef::Constant(c) => (*c, false),
+            Coef::Random => (C::CircuitField::zero(), true),
             Coef::PublicInput(_) => panic!("public inputs is not implemented"),
         }
     }
