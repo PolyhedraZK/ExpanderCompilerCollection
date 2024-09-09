@@ -3,7 +3,7 @@ module github.com/PolyhedraZK/ExpanderCompilerCollection/examples
 go 1.21.6
 
 require (
-	github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo v0.0.0
+	github.com/PolyhedraZK/ExpanderCompilerCollection v0.0.0
 	github.com/consensys/gnark v0.10.0
 	github.com/consensys/gnark-crypto v0.13.0
 	github.com/ethereum/go-ethereum v1.13.14
@@ -30,4 +30,4 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-replace github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo v0.0.0 => ../
+replace github.com/PolyhedraZK/ExpanderCompilerCollection v0.0.0 => ../../

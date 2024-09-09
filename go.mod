@@ -1,4 +1,4 @@
-module github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo
+module github.com/PolyhedraZK/ExpanderCompilerCollection
 
 go 1.21.6
 
@@ -7,10 +7,7 @@ require (
 	github.com/consensys/gnark-crypto v0.13.0
 )
 
-require (
-	github.com/juju/fslock v0.0.0-20160525022230-4d5c94c67b4b
-	github.com/kr/text v0.2.0 // indirect
-)
+require github.com/kr/text v0.2.0 // indirect
 
 require (
 	github.com/bits-and-blooms/bitset v1.13.0 // indirect
