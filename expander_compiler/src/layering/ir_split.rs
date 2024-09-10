@@ -141,7 +141,11 @@ impl<'a, C: Config> SplitContext<'a, C> {
                         .iter()
                         .map(|x| new_var_layers[var_new_id[*x]])
                         .collect();
-                    let key = (*sub_circuit_id, sub_input_layers.clone(), split_at.clone());
+                    let key = (
+                        *sub_circuit_id,
+                        sub_input_layers.clone(),
+                        split_at.to_owned(),
+                    );
                     if !self.splitted_circuits.contains_key(&key) {
                         self.split_circuit(*sub_circuit_id, sub_input_layers, split_at);
                     }
@@ -211,12 +215,7 @@ impl<'a, C: Config> SplitContext<'a, C> {
         )
     }
 
-    fn split_circuit(
-        &mut self,
-        circuit_id: usize,
-        input_layers: Vec<usize>,
-        split_at: &Vec<usize>,
-    ) {
+    fn split_circuit(&mut self, circuit_id: usize, input_layers: Vec<usize>, split_at: &[usize]) {
         let pre_split_at = split_at;
         let mut split_at_set: HashSet<usize> = split_at.iter().cloned().collect();
         for x in input_layers.iter() {
@@ -256,7 +255,7 @@ impl<'a, C: Config> SplitContext<'a, C> {
                     ));
                     j += 1;
                 }
-                while circuit_id == 0 && add_outputs.len() > 0 {
+                while circuit_id == 0 && !add_outputs.is_empty() {
                     terms.push(Term::new_linear(
                         C::CircuitField::one(),
                         add_outputs[add_outputs.len() - 1],
@@ -267,7 +266,7 @@ impl<'a, C: Config> SplitContext<'a, C> {
                     terms.push(Term::new_random_linear(constraints[k]));
                     k += 1;
                 }
-                if terms.len() > 0 {
+                if !terms.is_empty() {
                     circuit.instructions.push(Instruction::InternalVariable {
                         expr: Expression::from_terms(terms),
                     });
@@ -440,7 +439,7 @@ impl<'a, C: Config> SplitContext<'a, C> {
             });
         }
         self.splitted_circuits.insert(
-            (circuit_id, input_layers, pre_split_at.clone()),
+            (circuit_id, input_layers, pre_split_at.to_owned()),
             SplittedCircuit {
                 segments,
                 outputs: outputs
@@ -468,7 +467,7 @@ pub fn split_to_single_layer<C: Config>(root: &IrRootCircuit<C>) -> IrRootCircui
         outputs: vec![],
     });
     ctx.compute_output_layers(0, vec![0; root.circuits[&0].num_inputs]);
-    ctx.split_circuit(0, vec![0; root.circuits[&0].num_inputs], &vec![0]);
+    ctx.split_circuit(0, vec![0; root.circuits[&0].num_inputs], &[0]);
     let new_circuit0 = ctx.new_circuit0.take().unwrap();
     let mut new_circuits = HashMap::new();
     new_circuits.insert(0, new_circuit0);

@@ -30,7 +30,7 @@ jobs:
           path: expander_compiler/target/release/libec_go_lib.*
 
   upload-rust:
-    needs: build-rust
+    needs: [build-rust, test-rust, lint]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -92,7 +92,7 @@ jobs:
           cd ecgo
           go test ./test/
   
-  test-go-keccak-serve:
+  test-go-keccak-full:
     runs-on: 7950x3d
     needs: build-rust
     steps:
