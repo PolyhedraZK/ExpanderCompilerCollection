@@ -15,10 +15,11 @@ use crate::{
         layered::Coef,
     },
     field::{Field, FieldArith},
+    hints,
     utils::function_id::get_function_id,
 };
 
-use super::api::BasicAPI;
+use super::api::{BasicAPI, UnconstrainedAPI};
 
 pub struct Builder<C: Config> {
     instructions: Vec<SourceInstruction<C>>,
@@ -288,41 +289,108 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
     }
 }
 
+// write macro rules for unconstrained binary op definition
+macro_rules! unconstrained_binary_op {
+    ($name:ident,$op_name:ident) => {
+        fn $name(
+            &mut self,
+            x: impl ToVariableOrValue<<C as Config>::CircuitField>,
+            y: impl ToVariableOrValue<<C as Config>::CircuitField>,
+        ) -> Variable {
+            let x = self.convert_to_variable(x);
+            let y = self.convert_to_variable(y);
+            self.instructions
+                .push(SourceInstruction::UnconstrainedBinOp {
+                    x: x.id,
+                    y: y.id,
+                    op: source::UnconstrainedBinOpType::$op_name,
+                });
+            self.new_var()
+        }
+    };
+}
+
+impl<C: Config> UnconstrainedAPI<C> for Builder<C> {
+    fn unconstrained_identity(
+        &mut self,
+        x: impl ToVariableOrValue<<C as Config>::CircuitField>,
+    ) -> Variable {
+        let x = self.convert_to_variable(x);
+        self.instructions.push(SourceInstruction::Hint {
+            hint_id: hints::BuiltinHintIds::Identity as u64 as usize,
+            inputs: vec![x.id],
+            num_outputs: 1,
+        });
+        self.new_var()
+    }
+    fn unconstrained_add(
+        &mut self,
+        x: impl ToVariableOrValue<<C as Config>::CircuitField>,
+        y: impl ToVariableOrValue<<C as Config>::CircuitField>,
+    ) -> Variable {
+        let x = self.convert_to_variable(x);
+        let y = self.convert_to_variable(y);
+        let z = self.add(x, y);
+        self.unconstrained_identity(z)
+    }
+    fn unconstrained_mul(
+        &mut self,
+        x: impl ToVariableOrValue<<C as Config>::CircuitField>,
+        y: impl ToVariableOrValue<<C as Config>::CircuitField>,
+    ) -> Variable {
+        let x = self.convert_to_variable(x);
+        let y = self.convert_to_variable(y);
+        let z = self.mul(x, y);
+        self.unconstrained_identity(z)
+    }
+    unconstrained_binary_op!(unconstrained_div, Div);
+    unconstrained_binary_op!(unconstrained_pow, Pow);
+    unconstrained_binary_op!(unconstrained_int_div, IntDiv);
+    unconstrained_binary_op!(unconstrained_mod, Mod);
+    unconstrained_binary_op!(unconstrained_shift_l, ShiftL);
+    unconstrained_binary_op!(unconstrained_shift_r, ShiftR);
+    unconstrained_binary_op!(unconstrained_lesser_eq, LesserEq);
+    unconstrained_binary_op!(unconstrained_greater_eq, GreaterEq);
+    unconstrained_binary_op!(unconstrained_lesser, Lesser);
+    unconstrained_binary_op!(unconstrained_greater, Greater);
+    unconstrained_binary_op!(unconstrained_eq, Eq);
+    unconstrained_binary_op!(unconstrained_not_eq, NotEq);
+    unconstrained_binary_op!(unconstrained_bool_or, BoolOr);
+    unconstrained_binary_op!(unconstrained_bool_and, BoolAnd);
+    unconstrained_binary_op!(unconstrained_bit_or, BitOr);
+    unconstrained_binary_op!(unconstrained_bit_and, BitAnd);
+    unconstrained_binary_op!(unconstrained_bit_xor, BitXor);
+}
+
 pub struct RootBuilder<C: Config> {
     num_public_inputs: usize,
     current_builders: Vec<(usize, Builder<C>)>,
     sub_circuits: HashMap<usize, source::Circuit<C>>,
 }
 
-impl<C: Config> BasicAPI<C> for RootBuilder<C> {
-    fn add(
-        &mut self,
-        x: impl ToVariableOrValue<C::CircuitField>,
-        y: impl ToVariableOrValue<C::CircuitField>,
-    ) -> Variable {
-        self.last_builder().add(x, y)
-    }
+macro_rules! root_binary_op {
+    ($name:ident) => {
+        fn $name(
+            &mut self,
+            x: impl ToVariableOrValue<C::CircuitField>,
+            y: impl ToVariableOrValue<C::CircuitField>,
+        ) -> Variable {
+            self.last_builder().$name(x, y)
+        }
+    };
+}
 
-    fn sub(
-        &mut self,
-        x: impl ToVariableOrValue<C::CircuitField>,
-        y: impl ToVariableOrValue<C::CircuitField>,
-    ) -> Variable {
-        self.last_builder().sub(x, y)
-    }
+impl<C: Config> BasicAPI<C> for RootBuilder<C> {
+    root_binary_op!(add);
+    root_binary_op!(sub);
+    root_binary_op!(mul);
+    root_binary_op!(xor);
+    root_binary_op!(or);
+    root_binary_op!(and);
 
     fn neg(&mut self, x: impl ToVariableOrValue<C::CircuitField>) -> Variable {
         self.last_builder().neg(x)
     }
-
-    fn mul(
-        &mut self,
-        x: impl ToVariableOrValue<C::CircuitField>,
-        y: impl ToVariableOrValue<C::CircuitField>,
-    ) -> Variable {
-        self.last_builder().mul(x, y)
-    }
-
     fn div(
         &mut self,
         x: impl ToVariableOrValue<C::CircuitField>,
@@ -334,30 +402,6 @@ impl<C: Config> BasicAPI<C> for RootBuilder<C> {
 
     fn inverse(&mut self, x: impl ToVariableOrValue<C::CircuitField>) -> Variable {
         self.last_builder().inverse(x)
-    }
-
-    fn xor(
-        &mut self,
-        x: impl ToVariableOrValue<C::CircuitField>,
-        y: impl ToVariableOrValue<C::CircuitField>,
-    ) -> Variable {
-        self.last_builder().xor(x, y)
-    }
-
-    fn or(
-        &mut self,
-        x: impl ToVariableOrValue<C::CircuitField>,
-        y: impl ToVariableOrValue<C::CircuitField>,
-    ) -> Variable {
-        self.last_builder().or(x, y)
-    }
-
-    fn and(
-        &mut self,
-        x: impl ToVariableOrValue<C::CircuitField>,
-        y: impl ToVariableOrValue<C::CircuitField>,
-    ) -> Variable {
-        self.last_builder().and(x, y)
     }
 
     fn is_zero(&mut self, x: impl ToVariableOrValue<C::CircuitField>) -> Variable {
@@ -486,4 +530,29 @@ impl<C: Config> RootBuilder<C> {
     pub fn constant<T: ToVariableOrValue<C::CircuitField>>(&mut self, value: T) -> Variable {
         self.last_builder().convert_to_variable(value)
     }
+}
+
+impl<C: Config> UnconstrainedAPI<C> for RootBuilder<C> {
+    fn unconstrained_identity(&mut self, x: impl ToVariableOrValue<C::CircuitField>) -> Variable {
+        self.last_builder().unconstrained_identity(x)
+    }
+    root_binary_op!(unconstrained_add);
+    root_binary_op!(unconstrained_mul);
+    root_binary_op!(unconstrained_div);
+    root_binary_op!(unconstrained_pow);
+    root_binary_op!(unconstrained_int_div);
+    root_binary_op!(unconstrained_mod);
+    root_binary_op!(unconstrained_shift_l);
+    root_binary_op!(unconstrained_shift_r);
+    root_binary_op!(unconstrained_lesser_eq);
+    root_binary_op!(unconstrained_greater_eq);
+    root_binary_op!(unconstrained_lesser);
+    root_binary_op!(unconstrained_greater);
+    root_binary_op!(unconstrained_eq);
+    root_binary_op!(unconstrained_not_eq);
+    root_binary_op!(unconstrained_bool_or);
+    root_binary_op!(unconstrained_bool_and);
+    root_binary_op!(unconstrained_bit_or);
+    root_binary_op!(unconstrained_bit_and);
+    root_binary_op!(unconstrained_bit_xor);
 }
