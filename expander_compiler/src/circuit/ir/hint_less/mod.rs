@@ -47,7 +47,6 @@ impl<C: Config> IrConfig for Irc<C> {
     const ALLOW_DUPLICATE_SUB_CIRCUIT_INPUTS: bool = true;
     const ALLOW_DUPLICATE_CONSTRAINTS: bool = true;
     const ALLOW_DUPLICATE_OUTPUTS: bool = true;
-    const HAS_HINT_INPUT: bool = true;
 }
 
 impl<C: Config> common::Instruction<C> for Instruction<C> {

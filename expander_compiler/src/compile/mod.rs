@@ -110,15 +110,31 @@ pub fn compile<C: Config>(
         .validate()
         .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
 
-    let r_dest = if C::ENABLE_RANDOM_COMBINATION {
-        r_dest_relaxed_opt.solve_duplicates()
+    let r_dest_relaxed_p2 = if C::ENABLE_RANDOM_COMBINATION {
+        r_dest_relaxed_opt
     } else {
         let mut r1 = r_dest_relaxed_opt.export_constraints();
         r1.reassign_duplicate_sub_circuit_outputs();
         let (r2, im) = r1.remove_unreachable();
         hl_im.compose_in_place(&im);
-        r2.solve_duplicates()
+        r2
     };
+    r_dest_relaxed_p2
+        .validate()
+        .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
+
+    let r_dest_relaxed_p3 = layering::ir_split::split_to_single_layer(&r_dest_relaxed_p2);
+    r_dest_relaxed_p3
+        .validate()
+        .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
+
+    let r_dest_relaxed_p3_opt = optimize_until_fixed_point(&r_dest_relaxed_p3, &mut hl_im, |r| {
+        let (mut r, im) = r.remove_unreachable();
+        r.reassign_duplicate_sub_circuit_outputs();
+        (r, im)
+    });
+
+    let r_dest = r_dest_relaxed_p3_opt.solve_duplicates();
 
     let r_dest_opt = optimize_until_fixed_point(&r_dest, &mut hl_im, |r| {
         let (mut r, im) = r.remove_unreachable();

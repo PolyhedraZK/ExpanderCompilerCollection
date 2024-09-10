@@ -33,8 +33,7 @@ fn validate_vars() {
             ],
             constraints: vec![2],
             outputs: vec![4],
-            num_inputs: 1,
-            num_hint_inputs: 1,
+            num_inputs: 2,
         },
     );
     assert!(root.validate().is_err());
@@ -66,8 +65,7 @@ fn validate_vars_dup() {
             ],
             constraints: vec![2],
             outputs: vec![1, 1],
-            num_inputs: 1,
-            num_hint_inputs: 1,
+            num_inputs: 2,
         },
     );
     assert!(root.validate().is_err());
@@ -89,7 +87,6 @@ fn validate_sub_circuit() {
             constraints: vec![4],
             outputs: vec![],
             num_inputs: 2,
-            num_hint_inputs: 0,
         },
     );
     root.circuits.insert(
@@ -99,7 +96,6 @@ fn validate_sub_circuit() {
             constraints: vec![],
             outputs: vec![1, 2],
             num_inputs: 2,
-            num_hint_inputs: 0,
         },
     );
     assert!(root.validate().is_ok());
@@ -138,19 +134,18 @@ fn eval_output() {
             instructions: vec![
                 SubCircuitCall {
                     sub_circuit_id: 1,
-                    inputs: vec![1],
+                    inputs: vec![1, 2, 3, 4],
                     num_outputs: 1,
                 },
                 SubCircuitCall {
                     sub_circuit_id: 1,
-                    inputs: vec![2],
+                    inputs: vec![8, 5, 6, 7],
                     num_outputs: 1,
                 },
             ],
             constraints: vec![1],
-            outputs: vec![3],
-            num_inputs: 1,
-            num_hint_inputs: 0,
+            outputs: vec![9],
+            num_inputs: 7,
         },
     );
     root.circuits.insert(
@@ -159,25 +154,24 @@ fn eval_output() {
             instructions: vec![
                 SubCircuitCall {
                     sub_circuit_id: 2,
-                    inputs: vec![1],
+                    inputs: vec![1, 3],
                     num_outputs: 1,
                 },
                 SubCircuitCall {
                     sub_circuit_id: 2,
-                    inputs: vec![3],
+                    inputs: vec![5, 4],
                     num_outputs: 1,
                 },
                 InternalVariable {
                     expr: Expression::from_terms(vec![
-                        Term::new_linear(CField::one(), 4),
+                        Term::new_linear(CField::one(), 6),
                         Term::new_linear(CField::from(9), 2),
                     ]),
                 },
             ],
             constraints: vec![],
-            outputs: vec![5],
-            num_inputs: 1,
-            num_hint_inputs: 1,
+            outputs: vec![7],
+            num_inputs: 4,
         },
     );
     root.circuits.insert(
@@ -191,8 +185,7 @@ fn eval_output() {
             }],
             constraints: vec![],
             outputs: vec![3],
-            num_inputs: 1,
-            num_hint_inputs: 1,
+            num_inputs: 2,
         },
     );
     assert_eq!(root.validate(), Ok(()));
@@ -219,13 +212,12 @@ fn eval_constraint() {
         Circuit {
             instructions: vec![SubCircuitCall {
                 sub_circuit_id: 1,
-                inputs: vec![],
+                inputs: vec![2],
                 num_outputs: 0,
             }],
             constraints: vec![1],
             outputs: vec![],
-            num_inputs: 1,
-            num_hint_inputs: 0,
+            num_inputs: 2,
         },
     );
     root.circuits.insert(
@@ -234,8 +226,7 @@ fn eval_constraint() {
             instructions: vec![],
             constraints: vec![1],
             outputs: vec![],
-            num_inputs: 0,
-            num_hint_inputs: 1,
+            num_inputs: 1,
         },
     );
     assert_eq!(root.validate(), Ok(()));
@@ -288,7 +279,6 @@ fn test_random_generator() {
         seed: 0,
         num_circuits: RandomRange { min: 1, max: 10 },
         num_inputs: RandomRange { min: 1, max: 10 },
-        num_hint_inputs: RandomRange { min: 0, max: 10 },
         num_instructions: RandomRange { min: 1, max: 10 },
         num_constraints: RandomRange { min: 0, max: 10 },
         num_outputs: RandomRange { min: 1, max: 10 },
@@ -313,7 +303,6 @@ fn opt_remove_unreachable() {
         seed: 0,
         num_circuits: RandomRange { min: 1, max: 10 },
         num_inputs: RandomRange { min: 1, max: 10 },
-        num_hint_inputs: RandomRange { min: 0, max: 10 },
         num_instructions: RandomRange { min: 1, max: 10 },
         num_constraints: RandomRange { min: 0, max: 10 },
         num_outputs: RandomRange { min: 1, max: 10 },
@@ -343,7 +332,6 @@ fn opt_remove_unreachable_2() {
         seed: 0,
         num_circuits: RandomRange { min: 1, max: 20 },
         num_inputs: RandomRange { min: 1, max: 3 },
-        num_hint_inputs: RandomRange { min: 0, max: 2 },
         num_instructions: RandomRange { min: 30, max: 50 },
         num_constraints: RandomRange { min: 0, max: 5 },
         num_outputs: RandomRange { min: 1, max: 3 },
@@ -373,7 +361,6 @@ fn opt_remove_unreachable_relaxed() {
         seed: 0,
         num_circuits: RandomRange { min: 1, max: 10 },
         num_inputs: RandomRange { min: 1, max: 10 },
-        num_hint_inputs: RandomRange { min: 0, max: 10 },
         num_instructions: RandomRange { min: 1, max: 10 },
         num_constraints: RandomRange { min: 0, max: 10 },
         num_outputs: RandomRange { min: 1, max: 10 },
@@ -426,7 +413,6 @@ fn adjust_for_layering() {
             constraints: vec![1],
             outputs: vec![],
             num_inputs: 1,
-            num_hint_inputs: 0,
         },
     );
     root.circuits.insert(
@@ -436,7 +422,6 @@ fn adjust_for_layering() {
             constraints: vec![],
             outputs: vec![1],
             num_inputs: 2,
-            num_hint_inputs: 0,
         },
     );
     assert_eq!(root.validate(), Ok(()));
@@ -482,7 +467,6 @@ fn adjust_for_layering_and_reassign_duplicate_sub_circuit_outputs() {
         seed: 0,
         num_circuits: RandomRange { min: 1, max: 10 },
         num_inputs: RandomRange { min: 1, max: 10 },
-        num_hint_inputs: RandomRange { min: 0, max: 10 },
         num_instructions: RandomRange { min: 1, max: 10 },
         num_constraints: RandomRange { min: 0, max: 10 },
         num_outputs: RandomRange { min: 1, max: 10 },

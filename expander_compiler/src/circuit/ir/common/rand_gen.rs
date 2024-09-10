@@ -36,7 +36,6 @@ pub struct RandomCircuitConfig {
     pub seed: usize,
     pub num_circuits: RandomRange,
     pub num_inputs: RandomRange,
-    pub num_hint_inputs: RandomRange,
     pub num_instructions: RandomRange,
     pub num_constraints: RandomRange,
     pub num_outputs: RandomRange,
@@ -64,16 +63,11 @@ where
         }
         for (i, circuit_id) in circuit_ids.iter().enumerate().rev() {
             let num_inputs = config.num_inputs.random(&mut rnd);
-            let num_hint_inputs = if Irc::HAS_HINT_INPUT {
-                config.num_hint_inputs.random(&mut rnd)
-            } else {
-                0
-            };
             let num_instructions = config.num_instructions.random(&mut rnd);
             let mut num_constraints = config.num_constraints.random(&mut rnd);
             let num_outputs = config.num_outputs.random(&mut rnd);
             let mut instructions = Vec::with_capacity(num_instructions);
-            let mut num_vars = num_inputs + num_hint_inputs;
+            let mut num_vars = num_inputs;
             has_constraint[i] = num_constraints > 0;
             for _ in 0..num_instructions {
                 if rnd.gen::<f64>() < config.sub_circuit_prob && i != num_circuits - 1 {
@@ -145,7 +139,6 @@ where
                     constraints,
                     outputs,
                     num_inputs,
-                    num_hint_inputs,
                 },
             );
         }

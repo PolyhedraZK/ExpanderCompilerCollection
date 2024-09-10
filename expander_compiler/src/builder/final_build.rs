@@ -203,7 +203,6 @@ impl<'a, C: Config> Builder<'a, C> {
             instructions: fin_insns,
             constraints,
             num_inputs: self.in_circuit.num_inputs,
-            num_hint_inputs: self.in_circuit.num_hint_inputs,
         })
     }
 }
@@ -276,7 +275,6 @@ mod tests {
                 constraints: vec![3],
                 outputs: vec![],
                 num_inputs: 2,
-                num_hint_inputs: 0,
             },
         );
         assert_eq!(root.validate(), Ok(()));
@@ -306,7 +304,6 @@ mod tests {
                 constraints: vec![5],
                 outputs: vec![5],
                 num_inputs: 4,
-                num_hint_inputs: 0,
             },
         );
         assert_eq!(root.validate(), Ok(()));
@@ -329,7 +326,6 @@ mod tests {
             seed: 0,
             num_circuits: RandomRange { min: 1, max: 10 },
             num_inputs: RandomRange { min: 1, max: 10 },
-            num_hint_inputs: RandomRange { min: 0, max: 10 },
             num_instructions: RandomRange { min: 1, max: 10 },
             num_constraints: RandomRange { min: 0, max: 10 },
             num_outputs: RandomRange { min: 1, max: 10 },
@@ -371,7 +367,6 @@ mod tests {
             seed: 0,
             num_circuits: RandomRange { min: 1, max: 20 },
             num_inputs: RandomRange { min: 1, max: 3 },
-            num_hint_inputs: RandomRange { min: 0, max: 2 },
             num_instructions: RandomRange { min: 30, max: 50 },
             num_constraints: RandomRange { min: 0, max: 5 },
             num_outputs: RandomRange { min: 1, max: 3 },

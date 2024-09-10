@@ -25,6 +25,7 @@ pub enum VarSpec {
         gate_type: usize,
         inputs: Vec<usize>,
     },
+    RandomLinear(usize), // in this case, coef will be ignored
 }
 
 impl VarSpec {
@@ -38,6 +39,7 @@ impl VarSpec {
                 }
             }
             VarSpec::Custom { .. } => {}
+            VarSpec::RandomLinear(_) => {}
         }
     }
     fn is_normalized(&self) -> bool {
@@ -46,6 +48,7 @@ impl VarSpec {
             VarSpec::Linear(_) => true,
             VarSpec::Quad(index1, index2) => index1 >= index2,
             VarSpec::Custom { .. } => true,
+            VarSpec::RandomLinear(_) => true,
         }
     }
     pub fn mul(a: &Self, b: &Self) -> Self {
@@ -65,13 +68,15 @@ impl VarSpec {
             (VarSpec::Quad(_, _), VarSpec::Linear(_)) => panic!("invalid multiplication"),
             (VarSpec::Quad(_, _), VarSpec::Quad(_, _)) => panic!("invalid multiplication"),
             (VarSpec::Quad(_, _), VarSpec::Custom { .. }) => panic!("invalid multiplication"),
-            (VarSpec::Custom { .. }, VarSpec::Const) => VarSpec::Custom {
-                gate_type: 0,
-                inputs: vec![],
+            (VarSpec::Custom { gate_type, inputs }, VarSpec::Const) => VarSpec::Custom {
+                gate_type: *gate_type,
+                inputs: inputs.clone(),
             },
             (VarSpec::Custom { .. }, VarSpec::Linear(_)) => panic!("invalid multiplication"),
             (VarSpec::Custom { .. }, VarSpec::Quad(_, _)) => panic!("invalid multiplication"),
             (VarSpec::Custom { .. }, VarSpec::Custom { .. }) => panic!("invalid multiplication"),
+            (VarSpec::RandomLinear(_), _) => panic!("unexpected situation: RandomLinear"),
+            (_, VarSpec::RandomLinear(_)) => panic!("unexpected situation: RandomLinear"),
         }
     }
 }
@@ -116,6 +121,12 @@ impl<C: Config> Term<C> {
             },
         }
     }
+    pub fn new_random_linear(index: usize) -> Self {
+        Term {
+            coef: C::CircuitField::one(),
+            vars: VarSpec::RandomLinear(index),
+        }
+    }
     fn normalize(&mut self) {
         self.vars.normalize();
     }
@@ -156,6 +167,7 @@ impl<C: Config> fmt::Display for Term<C> {
                     }
                     write!(f, ")")
                 }
+                VarSpec::RandomLinear(index) => write!(f, "random{}", index),
             }
         } else {
             match &self.vars {
@@ -174,6 +186,7 @@ impl<C: Config> fmt::Display for Term<C> {
                     }
                     write!(f, ")*{}", self.coef.to_u256())
                 }
+                VarSpec::RandomLinear(_) => panic!("unexpected situation: RandomLinear"),
             }
         }
     }
@@ -288,6 +301,7 @@ impl<C: Config> Expression<C> {
                 VarSpec::Linear(index) => vec![*index],
                 VarSpec::Quad(index1, index2) => vec![*index1, *index2],
                 VarSpec::Custom { inputs, .. } => inputs.clone(),
+                VarSpec::RandomLinear(index) => vec![*index],
             })
             .collect()
     }
@@ -304,6 +318,7 @@ impl<C: Config> Expression<C> {
                         gate_type: *gate_type,
                         inputs: inputs.iter().cloned().map(&f).collect(),
                     },
+                    VarSpec::RandomLinear(index) => VarSpec::RandomLinear(f(*index)),
                 },
             })
             .collect();
@@ -317,6 +332,7 @@ impl<C: Config> Expression<C> {
                 VarSpec::Linear(_) => has_linear = true,
                 VarSpec::Quad(_, _) => return 2,
                 VarSpec::Custom { .. } => return 2,
+                VarSpec::RandomLinear(_) => panic!("unexpected situation: RandomLinear"),
             }
         }
         if has_linear {
@@ -333,6 +349,7 @@ impl<C: Config> Expression<C> {
                 VarSpec::Linear(_) => res[1] += 1,
                 VarSpec::Quad(_, _) => res[2] += 1,
                 VarSpec::Custom { .. } => res[2] += 1,
+                VarSpec::RandomLinear(_) => panic!("unexpected situation: RandomLinear"),
             }
         }
         res

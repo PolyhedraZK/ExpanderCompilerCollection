@@ -18,9 +18,6 @@ where
         self.constraints.serialize_into(&mut writer)?;
         self.outputs.serialize_into(&mut writer)?;
         self.num_inputs.serialize_into(&mut writer)?;
-        if Irc::HAS_HINT_INPUT {
-            self.num_hint_inputs.serialize_into(&mut writer)?;
-        }
         Ok(())
     }
     fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
@@ -28,17 +25,11 @@ where
         let constraints = Vec::<Irc::Constraint>::deserialize_from(&mut reader)?;
         let outputs = Vec::<usize>::deserialize_from(&mut reader)?;
         let num_inputs = usize::deserialize_from(&mut reader)?;
-        let num_hint_inputs = if Irc::HAS_HINT_INPUT {
-            usize::deserialize_from(&mut reader)?
-        } else {
-            0
-        };
         Ok(Circuit {
             instructions,
             constraints,
             outputs,
             num_inputs,
-            num_hint_inputs,
         })
     }
 }

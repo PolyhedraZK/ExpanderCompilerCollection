@@ -35,7 +35,7 @@ pub struct PlacementRequest {
 #[derive(Hash, Clone, PartialEq, Eq)]
 pub struct LayerLayout {
     pub circuit_id: usize,
-    pub layer: isize,
+    pub layer: usize,
     pub size: usize,
     pub inner: LayerLayoutInner,
 }
@@ -85,7 +85,7 @@ pub struct SubLayout {
 pub struct LayerReq {
     // TODO: more requirements, e.g. alignment
     pub circuit_id: usize,
-    pub layer: isize, // which layer to solve?
+    pub layer: usize, // which layer to solve?
 }
 
 impl<'a, C: Config> CompileContext<'a, C> {
@@ -107,27 +107,6 @@ impl<'a, C: Config> CompileContext<'a, C> {
                 ic.lcs[j].vars.add(&i);
             }
         }
-        for i in 0..ic.sub_circuit_insn_ids.len() {
-            let input_layer = ic.sub_circuit_start_layer[i];
-            for x in ic.sub_circuit_hint_inputs[i].iter() {
-                ic.lcs[0].vars.add(x);
-                if input_layer > 0 {
-                    ic.lcs[input_layer].vars.add(x);
-                }
-            }
-        }
-
-        // prepare lcHint
-        for i in ic.circuit.num_inputs + 1..=ic.circuit.num_inputs + ic.circuit.num_hint_inputs {
-            ic.lc_hint.vars.add(&i);
-        }
-        for i in 0..ic.sub_circuit_insn_ids.len() {
-            if !ic.sub_circuit_hint_inputs[i].is_empty() {
-                for x in ic.sub_circuit_hint_inputs[i].iter() {
-                    ic.lc_hint.vars.add(x);
-                }
-            }
-        }
 
         // for each sub-circuit, enqueue the placement request in input layer, and mark prev_circuit_insn_id in output layer
         // also push all middle layers to the layer context
@@ -135,8 +114,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
             let insn = &ic.sub_circuit_insn_refs[i];
             let input_layer = ic.sub_circuit_start_layer[i];
             let output_layer = self.circuits[&insn.sub_circuit_id].output_layer + input_layer;
-            let mut input_ids = insn.inputs.clone();
-            input_ids.extend(ic.sub_circuit_hint_inputs[i].iter().cloned());
+            let input_ids = insn.inputs.clone();
             ic.lcs[input_layer]
                 .req
                 .push(PlacementRequest { insn_id, input_ids });
@@ -153,24 +131,6 @@ impl<'a, C: Config> CompileContext<'a, C> {
                 .prev_circuit_subc_pos
                 .insert(insn_id, i);
 
-            // hint input is also considered as output of some relay circuit
-            if !ic.sub_circuit_hint_inputs[i].is_empty() {
-                for x in ic.sub_circuit_hint_inputs[i].iter().cloned() {
-                    ic.lcs[input_layer]
-                        .prev_circuit_insn_ids
-                        .insert(x, insn_id + ic.circuit.instructions.len());
-                }
-                ic.lcs[input_layer].prev_circuit_num_out.insert(
-                    insn_id + ic.circuit.instructions.len(),
-                    ic.sub_circuit_hint_inputs[i].len(),
-                );
-                ic.lcs[input_layer]
-                    .prev_circuit_subc_pos
-                    .insert(insn_id + ic.circuit.instructions.len(), i);
-                for j in 1..input_layer {
-                    ic.lcs[j].middle_sub_circuits.push(i);
-                }
-            }
             for j in input_layer + 1..output_layer {
                 ic.lcs[j].middle_sub_circuits.push(i);
             }
@@ -228,51 +188,23 @@ impl<'a, C: Config> CompileContext<'a, C> {
         if let Some(id) = self.layer_req_to_layout.get(req) {
             return *id;
         }
-        let res = if req.layer >= 0 {
-            self.solve_layer_layout_normal(req)
-        } else {
-            self.solve_layer_layout_hint_relay(req)
-        };
+        let res = self.solve_layer_layout_normal(req);
         let id = self.layer_layout_pool.add(&res);
         self.layer_req_to_layout.insert(req.clone(), id);
         id
     }
 
-    fn solve_layer_layout_hint_relay(&mut self, req: &LayerReq) -> LayerLayout {
-        let ic = &self.circuits[&req.circuit_id];
-        let mut s = Vec::with_capacity(ic.lc_hint.vars.len());
-        for i in 0..ic.lc_hint.vars.len() {
-            s.push(i);
-        }
-        let placement = merge_layouts(vec![], s);
-        LayerLayout {
-            circuit_id: req.circuit_id,
-            layer: -1,
-            size: placement.len(),
-            inner: LayerLayoutInner::Dense { placement },
-        }
-    }
-
     fn solve_layer_layout_normal(&mut self, req: &LayerReq) -> LayerLayout {
         let ic = self.circuits.remove(&req.circuit_id).unwrap();
-        let lc = &ic.lcs[req.layer as usize];
+        let lc = &ic.lcs[req.layer];
 
         // first iterate prev layer circuits, and solve their output layout
         let mut layouts: HashMap<usize, Vec<usize>> = HashMap::new();
         let mut layouts_subs_arr: HashMap<usize, Vec<usize>> = HashMap::new();
-        for &x_ in lc.prev_circuit_num_out.keys() {
-            let subc_pos = lc.prev_circuit_subc_pos[&x_];
-            let (sub_layer, x, insn) = if x_ >= ic.circuit.instructions.len() {
-                let x = x_ - ic.circuit.instructions.len();
-                (-1, x, &ic.sub_circuit_insn_refs[subc_pos])
-            } else {
-                let insn = &ic.sub_circuit_insn_refs[subc_pos];
-                (
-                    self.circuits[&insn.sub_circuit_id].output_layer as isize,
-                    x_,
-                    insn,
-                )
-            };
+        for &x in lc.prev_circuit_num_out.keys() {
+            let subc_pos = lc.prev_circuit_subc_pos[&x];
+            let insn = &ic.sub_circuit_insn_refs[subc_pos];
+            let sub_layer = self.circuits[&insn.sub_circuit_id].output_layer;
             let layout_id = self.solve_layer_layout(&LayerReq {
                 circuit_id: insn.sub_circuit_id,
                 layer: sub_layer,
@@ -283,34 +215,15 @@ impl<'a, C: Config> CompileContext<'a, C> {
             } else {
                 panic!("unexpected situation");
             };
-            if sub_layer >= 0 {
-                subs_array(
-                    &mut la,
-                    self.circuits[&insn.sub_circuit_id].lcs[sub_layer as usize]
-                        .vars
-                        .vec(),
-                );
-                subs_map(&mut la, &self.circuits[&insn.sub_circuit_id].output_order);
-                subs_array(&mut la, &insn.outputs);
-                layouts_subs_arr.insert(x, insn.outputs.clone());
-            } else {
-                subs_array(
-                    &mut la,
-                    self.circuits[&insn.sub_circuit_id].lc_hint.vars.vec(),
-                );
-                subs_map(
-                    &mut la,
-                    self.circuits[&insn.sub_circuit_id].hint_inputs.map(),
-                );
-                subs_array(
-                    &mut la,
-                    &ic.sub_circuit_hint_inputs[ic.sub_circuit_loc_map[&x]],
-                );
-                layouts_subs_arr.insert(
-                    x,
-                    ic.sub_circuit_hint_inputs[ic.sub_circuit_loc_map[&x]].clone(),
-                );
-            }
+            subs_array(
+                &mut la,
+                self.circuits[&insn.sub_circuit_id].lcs[sub_layer]
+                    .vars
+                    .vec(),
+            );
+            subs_map(&mut la, &self.circuits[&insn.sub_circuit_id].output_order);
+            subs_array(&mut la, &insn.outputs);
+            layouts_subs_arr.insert(x, insn.outputs.clone());
             subs_map(&mut la, lc.vars.map());
             layouts.insert(x, la);
         }
@@ -370,11 +283,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
         let mut middle_layouts = Vec::with_capacity(lc.middle_sub_circuits.len());
         for &id in lc.middle_sub_circuits.iter() {
             let start_layer = ic.sub_circuit_start_layer[id];
-            let req_layer = if req.layer < start_layer as isize {
-                -1
-            } else {
-                req.layer - start_layer as isize
-            };
+            let req_layer = req.layer - start_layer;
             middle_layouts.push(self.solve_layer_layout(&LayerReq {
                 circuit_id: ic.sub_circuit_insn_refs[id].sub_circuit_id,
                 layer: req_layer,

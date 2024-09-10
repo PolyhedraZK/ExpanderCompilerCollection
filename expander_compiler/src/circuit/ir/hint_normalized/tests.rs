@@ -45,7 +45,6 @@ fn remove_hints_simple() {
             constraints: vec![1],
             outputs: vec![1],
             num_inputs: 2,
-            num_hint_inputs: 0,
         },
     );
     let (root_hint_less, _) = root.remove_and_export_hints();
@@ -80,7 +79,6 @@ fn export_hints_simple() {
             constraints: vec![1],
             outputs: vec![1],
             num_inputs: 2,
-            num_hint_inputs: 0,
         },
     );
     root.circuits.insert(
@@ -94,7 +92,6 @@ fn export_hints_simple() {
             constraints: vec![],
             outputs: vec![1],
             num_inputs: 1,
-            num_hint_inputs: 0,
         },
     );
     let (rr, re) = root.remove_and_export_hints();
@@ -155,7 +152,6 @@ fn opt_remove_unreachable() {
         seed: 0,
         num_circuits: RandomRange { min: 1, max: 10 },
         num_inputs: RandomRange { min: 1, max: 10 },
-        num_hint_inputs: RandomRange { min: 0, max: 10 },
         num_instructions: RandomRange { min: 1, max: 10 },
         num_constraints: RandomRange { min: 0, max: 10 },
         num_outputs: RandomRange { min: 1, max: 10 },
@@ -185,7 +181,6 @@ fn opt_remove_unreachable_2() {
         seed: 0,
         num_circuits: RandomRange { min: 1, max: 20 },
         num_inputs: RandomRange { min: 1, max: 3 },
-        num_hint_inputs: RandomRange { min: 0, max: 2 },
         num_instructions: RandomRange { min: 30, max: 50 },
         num_constraints: RandomRange { min: 0, max: 5 },
         num_outputs: RandomRange { min: 1, max: 3 },
@@ -215,7 +210,6 @@ fn remove_and_export_random_1() {
         seed: 0,
         num_circuits: RandomRange { min: 1, max: 10 },
         num_inputs: RandomRange { min: 1, max: 10 },
-        num_hint_inputs: RandomRange { min: 0, max: 10 },
         num_instructions: RandomRange { min: 1, max: 10 },
         num_constraints: RandomRange { min: 0, max: 10 },
         num_outputs: RandomRange { min: 1, max: 10 },
@@ -250,7 +244,6 @@ fn remove_and_export_random_2() {
         seed: 0,
         num_circuits: RandomRange { min: 1, max: 20 },
         num_inputs: RandomRange { min: 1, max: 3 },
-        num_hint_inputs: RandomRange { min: 0, max: 2 },
         num_instructions: RandomRange { min: 30, max: 50 },
         num_constraints: RandomRange { min: 0, max: 5 },
         num_outputs: RandomRange { min: 1, max: 3 },

@@ -606,7 +606,6 @@ where
             .map(|x| builder.in_to_out[*x])
             .collect(),
         num_inputs: circuit.num_inputs,
-        num_hint_inputs: circuit.num_hint_inputs,
     };
     Ok((new_circuit, builder))
 }

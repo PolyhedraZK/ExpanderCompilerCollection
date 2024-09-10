@@ -263,12 +263,10 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
         }
         let is_visited = |x: &Element| visited[vertice_id(x)];
         // now we can process each circuit
-        let mut sub_hint_mask: HashMap<usize, Vec<bool>> = HashMap::new();
         let mut new_circuits: HashMap<usize, Circuit<Irc>> = HashMap::new();
         for circuit_id in order.iter().rev() {
             let circuit = self.circuits.get(circuit_id).unwrap();
             let mut var_map: Vec<usize> = vec![EMPTY];
-            let mut hint_mask: Vec<bool> = Vec::new();
             let mut new_instructions: Vec<Irc::Instruction> = Vec::new();
             let mut mapped_var_max: usize = 0;
             for i in 1..=circuit.get_num_inputs_all() {
@@ -283,30 +281,16 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
                     var_map.push(EMPTY);
                 }
             }
-            for var in var_map
-                .iter()
-                .take(circuit.get_num_inputs_all() + 1)
-                .skip(circuit.num_inputs + 1)
-            {
-                hint_mask.push(*var != EMPTY);
-            }
             for (i, insn) in circuit.instructions.iter().enumerate() {
                 if !is_visited(&Element {
                     circuit_id: *circuit_id,
                     id: i,
                     typ: Insn,
                 }) {
-                    if let Some((sub_circuit_id, _, _)) = insn.as_sub_circuit_call() {
-                        hint_mask.resize(
-                            sub_hint_mask[&sub_circuit_id].len() + hint_mask.len(),
-                            false,
-                        );
-                    }
                     var_map.resize(var_map.len() + insn.num_outputs(), EMPTY);
                     continue;
                 }
                 if let Some((sub_circuit_id, inputs, num_outputs)) = insn.as_sub_circuit_call() {
-                    hint_mask.extend(sub_hint_mask[&sub_circuit_id].iter());
                     let mut new_inputs: Vec<usize> = Vec::new();
                     let mut new_num_outputs: usize = 0;
                     for j in 0..inputs.len() {
@@ -369,12 +353,8 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
                     num_inputs: (1..=circuit.num_inputs)
                         .filter(|x| var_map[*x] != EMPTY)
                         .count(),
-                    num_hint_inputs: (circuit.num_inputs + 1..=circuit.get_num_inputs_all())
-                        .filter(|x| var_map[*x] != EMPTY)
-                        .count(),
                 },
             );
-            sub_hint_mask.insert(*circuit_id, hint_mask);
         }
         let mut root_input_mask: Vec<bool> = Vec::new();
         for i in 1..=self.circuits[&0].num_inputs {
@@ -384,7 +364,6 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
                 typ: Var,
             }));
         }
-        root_input_mask.extend(sub_hint_mask[&0].iter());
         let mut input_mapping_vec: Vec<usize> = Vec::new();
         let mut new_input_size: usize = 0;
         for v in root_input_mask.iter() {

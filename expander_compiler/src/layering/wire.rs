@@ -28,7 +28,7 @@ impl LayoutQuery {
         vs: &[usize],
         f: F,
         cid: usize,
-        lid: isize,
+        lid: usize,
     ) -> SubLayout
     where
         F: Fn(usize) -> usize,
@@ -75,11 +75,7 @@ impl LayoutQuery {
                 placement[ps[i] - offset] = f(i);
             }
         }
-        if lid >= 0 {
-            subs_map(&mut placement, circuits[&cid].lcs[lid as usize].vars.map());
-        } else {
-            subs_map(&mut placement, circuits[&cid].lc_hint.vars.map());
-        }
+        subs_map(&mut placement, circuits[&cid].lcs[lid].vars.map());
         let subl = LayerLayout {
             circuit_id: cid,
             layer: lid,
@@ -128,20 +124,14 @@ impl<'a, C: Config> CompileContext<'a, C> {
         }
         let a = self.layer_layout_pool.get(a_).clone();
         let b = self.layer_layout_pool.get(b_).clone();
-        if (a.layer + 1 != b.layer && (a.layer != -1 || b.layer != -1))
-            || a.circuit_id != b.circuit_id
-        {
+        if (a.layer + 1 != b.layer) || a.circuit_id != b.circuit_id {
             panic!("unexpected situation");
         }
         let circuit_id = a.circuit_id;
         let ic = self.circuits.remove(&circuit_id).unwrap();
         let cur_layer = a.layer;
         let next_layer = b.layer;
-        let (cur_lc, next_lc) = if cur_layer >= 0 {
-            (&ic.lcs[cur_layer as usize], &ic.lcs[next_layer as usize])
-        } else {
-            (&ic.lc_hint, &ic.lc_hint)
-        };
+        let (cur_lc, next_lc) = (&ic.lcs[cur_layer], &ic.lcs[next_layer]);
         let aq = self.layout_query(&a, cur_lc.vars.vec());
         let bq = self.layout_query(&b, next_lc.vars.vec());
 
@@ -160,7 +150,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
                 panic!("unexpected situation");
             }
         }
-        if cur_layer + 1 != ic.output_layer as isize {
+        if cur_layer + 1 != ic.output_layer {
             for x in next_lc.vars.vec().iter() {
                 if !bq.var_pos.contains_key(x) {
                     panic!("unexpected situation");
@@ -184,29 +174,21 @@ impl<'a, C: Config> CompileContext<'a, C> {
             let mut cur_layout = None;
             let mut next_layout = None;
             let outf = |x: usize| -> usize { sub_c.circuit.outputs[x] };
-            let hintf = |x: usize| -> usize { *sub_c.hint_inputs.get(x) };
-            if input_layer as isize <= cur_layer && output_layer as isize >= next_layer {
+            if input_layer <= cur_layer && output_layer >= next_layer {
                 // normal
-                if input_layer as isize == cur_layer {
+                if input_layer == cur_layer {
                     // for the input layer, we need to manually query the layout. (other layers are already subLayouts)
-                    let mut vs = insn.inputs.clone();
-                    vs.extend(ic.sub_circuit_hint_inputs[i].iter());
+                    let vs = insn.inputs.clone();
                     cur_layout = Some(aq.query(
                         &mut self.layer_layout_pool,
                         &self.circuits,
                         &vs,
-                        |x| {
-                            if x < insn.inputs.len() {
-                                x + 1
-                            } else {
-                                *sub_c.hint_inputs.get(x - insn.inputs.len())
-                            }
-                        },
+                        |x| x + 1,
                         sub_id,
                         0,
                     ));
                 }
-                if output_layer as isize == next_layer {
+                if output_layer == next_layer {
                     // also for the output layer
                     next_layout = Some(bq.query(
                         &mut self.layer_layout_pool,
@@ -214,42 +196,17 @@ impl<'a, C: Config> CompileContext<'a, C> {
                         &insn.outputs,
                         outf,
                         sub_id,
-                        dep as isize,
+                        dep,
                     ));
                 }
-            } else if next_layer != -1
-                && next_layer <= input_layer as isize
-                && !ic.sub_circuit_hint_inputs[i].is_empty()
-            {
-                // relay hint input
-                if cur_layer == 0 {
-                    cur_layout = Some(aq.query(
-                        &mut self.layer_layout_pool,
-                        &self.circuits,
-                        &ic.sub_circuit_hint_inputs[i],
-                        hintf,
-                        sub_id,
-                        -1,
-                    ));
-                }
-                if next_layer == input_layer as isize {
-                    next_layout = Some(bq.query(
-                        &mut self.layer_layout_pool,
-                        &self.circuits,
-                        &ic.sub_circuit_hint_inputs[i],
-                        hintf,
-                        sub_id,
-                        -1,
-                    ));
-                }
-            } else if cur_layer == output_layer as isize {
+            } else if cur_layer == output_layer {
                 cur_layout = Some(aq.query(
                     &mut self.layer_layout_pool,
                     &self.circuits,
                     &insn.outputs,
                     outf,
                     sub_id,
-                    dep as isize,
+                    dep,
                 ));
                 sub_cur_layout_all.insert(*insn_id, cur_layout.unwrap());
                 continue;
@@ -312,19 +269,19 @@ impl<'a, C: Config> CompileContext<'a, C> {
 
         // connect self variables
         for x in next_lc.vars.vec().iter() {
-            // only consider real variables, except it's hint relay layer
-            if *x >= ic.num_var && cur_layer != -1 {
+            // only consider real variables
+            if *x >= ic.num_var {
                 continue;
             }
             let pos = if let Some(p) = bq.var_pos.get(x) {
                 *p
             } else {
-                assert_eq!(cur_layer + 1, ic.output_layer as isize);
+                assert_eq!(cur_layer + 1, ic.output_layer);
                 //assert!(!ic.output_order.contains_key(x));
                 continue;
             };
             // if it's not the first layer, just relay it
-            if ic.min_layer[*x] as isize != next_layer || cur_layer == -1 {
+            if ic.min_layer[*x] != next_layer {
                 res.gate_adds.push(GateAdd {
                     inputs: [aq.var_pos[x]],
                     output: pos,
@@ -370,17 +327,20 @@ impl<'a, C: Config> CompileContext<'a, C> {
                                 coef: Coef::Constant(term.coef),
                             });
                         }
+                        VarSpec::RandomLinear(vid) => {
+                            res.gate_adds.push(GateAdd {
+                                inputs: [aq.var_pos[vid]],
+                                output: pos,
+                                coef: Coef::Random,
+                            });
+                        }
                     }
                 }
             }
         }
 
         // also combined output variables
-        let cc = if next_layer >= 0 {
-            ic.combined_constraints[next_layer as usize].as_ref()
-        } else {
-            None
-        };
+        let cc = ic.combined_constraints[next_layer].as_ref();
         if let Some(cc) = cc {
             let pos = bq.var_pos[&cc.id];
             for v in cc.variables.iter() {
@@ -400,12 +360,11 @@ impl<'a, C: Config> CompileContext<'a, C> {
                 let insn = &ic.sub_circuit_insn_refs[*i];
                 let input_layer = ic.sub_circuit_start_layer[*i];
                 let vid = self.circuits[&insn.sub_circuit_id].combined_constraints
-                    [cur_layer as usize - input_layer]
+                    [cur_layer - input_layer]
                     .as_ref()
                     .unwrap()
                     .id;
-                let vpid = self.circuits[&insn.sub_circuit_id].lcs
-                    [cur_layer as usize - input_layer]
+                let vpid = self.circuits[&insn.sub_circuit_id].lcs[cur_layer - input_layer]
                     .vars
                     .get_idx(&vid);
                 let layout = self.layer_layout_pool.get(sub_cur_layout_all[&insn_id].id);

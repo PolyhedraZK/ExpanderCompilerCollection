@@ -81,7 +81,6 @@ impl<C: Config> Builder<C> {
             instructions: self.instructions,
             constraints: self.constraints,
             num_inputs: self.num_inputs,
-            num_hint_inputs: 0,
             outputs: outputs.iter().map(|v| v.id).collect(),
         }
     }

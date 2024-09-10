@@ -54,7 +54,6 @@ impl<C: Config> IrConfig for Irc<C> {
     const ALLOW_DUPLICATE_SUB_CIRCUIT_INPUTS: bool = true;
     const ALLOW_DUPLICATE_CONSTRAINTS: bool = true;
     const ALLOW_DUPLICATE_OUTPUTS: bool = true;
-    const HAS_HINT_INPUT: bool = false;
 }
 
 impl<C: Config> common::Instruction<C> for Instruction<C> {
@@ -206,7 +205,31 @@ pub type Circuit<C> = common::Circuit<Irc<C>>;
 pub type RootCircuit<C> = common::RootCircuit<Irc<C>>;
 
 impl<C: Config> Circuit<C> {
-    fn remove_hints(&self) -> super::hint_less::Circuit<C> {
+    fn compute_hint_sizes(
+        &self,
+        sub_hint_sizes: &HashMap<usize, (usize, usize)>,
+    ) -> (usize, usize) {
+        let mut res = 0;
+        let mut res_self = 0;
+        for insn in self.instructions.iter() {
+            match insn {
+                Instruction::Hint { num_outputs, .. } => {
+                    res_self += num_outputs;
+                }
+                Instruction::SubCircuitCall { sub_circuit_id, .. } => {
+                    res += sub_hint_sizes[sub_circuit_id].0;
+                }
+                _ => {}
+            };
+        }
+        (res + res_self, res_self)
+    }
+
+    fn remove_hints(
+        &self,
+        self_id: usize,
+        sub_hint_sizes: &HashMap<usize, (usize, usize)>,
+    ) -> super::hint_less::Circuit<C> {
         let mut new_id: Vec<usize> = vec![0; self.get_num_variables() + 1];
         let mut instructions = Vec::new();
         let mut cur_var_max = self.num_inputs;
@@ -228,8 +251,10 @@ impl<C: Config> Circuit<C> {
             }
             cur_var_max += insn.num_outputs();
         }
-        let num_hint_inputs = new_var_max - self.num_inputs;
         cur_var_max = self.num_inputs;
+        let mut sub_hint_ptr = new_var_max;
+        new_var_max += sub_hint_sizes[&self_id].0 - sub_hint_sizes[&self_id].1;
+        let expected_sub_hint_ptr = new_var_max;
         for insn in self.instructions.iter() {
             match insn {
                 Instruction::Hint { num_outputs, .. } => {
@@ -244,13 +269,19 @@ impl<C: Config> Circuit<C> {
                         Instruction::Mul(inputs) => super::hint_less::Instruction::Mul(inputs),
                         Instruction::SubCircuitCall {
                             sub_circuit_id,
-                            inputs,
+                            mut inputs,
                             num_outputs,
-                        } => super::hint_less::Instruction::SubCircuitCall {
-                            sub_circuit_id,
-                            inputs,
-                            num_outputs,
-                        },
+                        } => {
+                            for _ in 0..sub_hint_sizes[&sub_circuit_id].0 {
+                                sub_hint_ptr += 1;
+                                inputs.push(sub_hint_ptr);
+                            }
+                            super::hint_less::Instruction::SubCircuitCall {
+                                sub_circuit_id,
+                                inputs,
+                                num_outputs,
+                            }
+                        }
                         Instruction::Hint { .. } => unreachable!(),
                         Instruction::CustomGate { gate_type, inputs } => {
                             super::hint_less::Instruction::CustomGate { gate_type, inputs }
@@ -264,21 +295,16 @@ impl<C: Config> Circuit<C> {
                 }
             }
         }
-        assert_eq!(new_var_max, cur_var_max);
+        assert_eq!(sub_hint_ptr, expected_sub_hint_ptr);
         super::hint_less::Circuit {
-            num_inputs: self.num_inputs,
-            num_hint_inputs,
+            num_inputs: self.num_inputs + sub_hint_sizes[&self_id].0,
             instructions,
             constraints: self.constraints.iter().map(|x| new_id[*x]).collect(),
             outputs: self.outputs.iter().map(|x| new_id[*x]).collect(),
         }
     }
 
-    fn export_hints(
-        &self,
-        is_root: bool,
-        sub_num_add_outputs: &HashMap<usize, usize>,
-    ) -> (Self, usize) {
+    fn export_hints(&self, is_root: bool, sub_hint_sizes: &HashMap<usize, (usize, usize)>) -> Self {
         let mut new_id: Vec<usize> = vec![0; self.get_num_inputs_all() + 1];
         let mut instructions = Vec::new();
         let mut new_var_max = self.num_inputs;
@@ -317,7 +343,7 @@ impl<C: Config> Circuit<C> {
                     inputs,
                     num_outputs,
                 } => {
-                    let sub_hi = sub_num_add_outputs[&sub_circuit_id];
+                    let sub_hi = sub_hint_sizes[&sub_circuit_id].0;
                     for _ in 0..sub_hi {
                         new_var_max += 1;
                         add_outputs_sub.push(new_var_max);
@@ -342,19 +368,14 @@ impl<C: Config> Circuit<C> {
         } else {
             self.outputs.iter().map(|x| new_id[*x]).collect()
         };
-        let add = add_outputs.len() + add_outputs_sub.len();
         outputs.append(&mut add_outputs);
         outputs.append(&mut add_outputs_sub);
-        (
-            Circuit {
-                num_inputs: self.num_inputs,
-                num_hint_inputs: self.num_hint_inputs,
-                instructions,
-                constraints: if is_root { vec![1] } else { vec![] },
-                outputs,
-            },
-            add,
-        )
+        Circuit {
+            num_inputs: self.num_inputs,
+            instructions,
+            constraints: if is_root { vec![1] } else { vec![] },
+            outputs,
+        }
     }
 
     fn add_back_removed_inputs(&self, im: &InputMapping) -> Self {
@@ -375,7 +396,6 @@ impl<C: Config> Circuit<C> {
         }
         Circuit {
             num_inputs: im.cur_size(),
-            num_hint_inputs: self.num_hint_inputs,
             instructions,
             constraints: self.constraints.iter().map(|x| new_id[*x]).collect(),
             outputs: self.outputs.iter().map(|x| new_id[*x]).collect(),
@@ -385,9 +405,16 @@ impl<C: Config> Circuit<C> {
 
 impl<C: Config> RootCircuit<C> {
     pub fn remove_and_export_hints(&self) -> (super::hint_less::RootCircuit<C>, Self) {
+        let mut sub_hint_sizes = HashMap::new();
+        let order = self.topo_order();
+        for id in order.iter().rev() {
+            let circuit = self.circuits.get(id).unwrap();
+            let hint_size = circuit.compute_hint_sizes(&sub_hint_sizes);
+            sub_hint_sizes.insert(*id, hint_size);
+        }
         let mut circuits = HashMap::new();
         for (id, circuit) in self.circuits.iter() {
-            circuits.insert(*id, circuit.remove_hints());
+            circuits.insert(*id, circuit.remove_hints(*id, &sub_hint_sizes));
         }
         let removed_root = super::hint_less::RootCircuit {
             num_public_inputs: self.num_public_inputs,
@@ -395,13 +422,11 @@ impl<C: Config> RootCircuit<C> {
             circuits,
         };
         let mut exported_circuits = HashMap::new();
-        let mut sub_num_add_outputs = HashMap::new();
         let order = self.topo_order();
         for id in order.iter().rev() {
             let circuit = self.circuits.get(id).unwrap();
-            let (c, add) = circuit.export_hints(*id == 0, &sub_num_add_outputs);
+            let c = circuit.export_hints(*id == 0, &sub_hint_sizes);
             exported_circuits.insert(*id, c);
-            sub_num_add_outputs.insert(*id, add);
         }
         (
             removed_root,

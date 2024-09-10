@@ -49,10 +49,9 @@ where
         for (circuit_id, circuit) in self.circuits.iter() {
             writeln!(
                 f,
-                "Circuit {} numIn={} numHintIn={} numOut={} numCon={}",
+                "Circuit {} numIn={} numOut={} numCon={}",
                 circuit_id,
                 circuit.num_inputs,
-                circuit.num_hint_inputs,
                 circuit.outputs.len(),
                 circuit.constraints.len()
             )?;
