@@ -135,7 +135,16 @@ func (builder *builder) Inverse(i1 frontend.Variable) frontend.Variable {
 //
 // The result in in little endian (first bit= lsb)
 func (builder *builder) ToBinary(i1 frontend.Variable, n ...int) []frontend.Variable {
-	panic("unimplemented")
+	// TODO: Currently this doesn't support MarkBoolean
+	nbBits := builder.field.FieldBitLen()
+	if len(n) == 1 {
+		nbBits = n[0]
+		if nbBits < 0 {
+			panic("invalid n")
+		}
+	}
+
+	return bits.ToBinary(builder, i1, bits.WithNbDigits(nbBits))
 }
 
 // FromBinary packs the given variables, seen as a fr.Element in little endian, into a single variable.
