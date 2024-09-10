@@ -43,7 +43,6 @@ impl<C: Config> IrConfig for Irc<C> {
     const ALLOW_DUPLICATE_SUB_CIRCUIT_INPUTS: bool = false;
     const ALLOW_DUPLICATE_CONSTRAINTS: bool = true;
     const ALLOW_DUPLICATE_OUTPUTS: bool = false;
-    const HAS_HINT_INPUT: bool = true;
 }
 
 #[derive(Default, Debug, Clone, Hash, PartialEq, Eq)]
@@ -57,7 +56,6 @@ impl<C: Config> IrConfig for IrcRelaxed<C> {
     const ALLOW_DUPLICATE_SUB_CIRCUIT_INPUTS: bool = true;
     const ALLOW_DUPLICATE_CONSTRAINTS: bool = true;
     const ALLOW_DUPLICATE_OUTPUTS: bool = true;
-    const HAS_HINT_INPUT: bool = true;
 }
 
 impl<C: Config> common::Instruction<C> for Instruction<C> {
@@ -141,6 +139,9 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                             let args: Vec<C::CircuitField> =
                                 inputs.iter().map(|i| values[*i]).collect();
                             sum += hints::stub_impl(*gate_type, &args, 1)[0] * term.coef;
+                        }
+                        VarSpec::RandomLinear(i) => {
+                            sum += values[*i] * Coef::<C>::Random.get_value_unsafe();
                         }
                     }
                 }
@@ -233,7 +234,6 @@ impl<C: Config> CircuitRelaxed<C> {
             outputs: new_outputs,
             constraints: new_constraints,
             num_inputs: self.num_inputs,
-            num_hint_inputs: self.num_hint_inputs,
         }
     }
 
@@ -296,7 +296,6 @@ impl<C: Config> CircuitRelaxed<C> {
         (
             CircuitRelaxed {
                 num_inputs: self.num_inputs,
-                num_hint_inputs: self.num_hint_inputs,
                 instructions,
                 constraints: vec![],
                 outputs,

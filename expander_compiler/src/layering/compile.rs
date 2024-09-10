@@ -43,10 +43,8 @@ pub struct CompileContext<'a, C: Config> {
 pub struct IrContext<'a, C: Config> {
     pub circuit: &'a IrCircuit<C>,
 
-    pub num_var: usize,             // number of variables in the circuit
-    pub num_sub_circuits: usize,    // number of sub circuits
-    pub num_hint_inputs: usize,     // number of hint inputs in the circuit itself
-    pub num_hint_inputs_sub: usize, // number of hint inputs in sub circuits (these must be propagated from the global input)
+    pub num_var: usize,          // number of variables in the circuit
+    pub num_sub_circuits: usize, // number of sub circuits
 
     // for each variable, we need to find the min and max layer it should exist.
     // we assume input layer = 0, and output layer is at least 1
@@ -60,10 +58,7 @@ pub struct IrContext<'a, C: Config> {
     pub sub_circuit_loc_map: HashMap<usize, usize>,
     pub sub_circuit_insn_ids: Vec<usize>,
     pub sub_circuit_insn_refs: Vec<SubCircuitInsn<'a>>,
-    pub sub_circuit_hint_inputs: Vec<Vec<usize>>,
     pub sub_circuit_start_layer: Vec<usize>,
-
-    pub hint_inputs: Pool<usize>,
 
     // combined constraints of each layer
     pub combined_constraints: Vec<Option<CombinedConstraint>>,
@@ -73,7 +68,6 @@ pub struct IrContext<'a, C: Config> {
 
     // layer layout contexts
     pub lcs: Vec<LayerLayoutContext>,
-    pub lc_hint: LayerLayoutContext, // hint relayer
 }
 
 #[derive(Default, Clone, Debug)]
@@ -114,7 +108,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
         for i in 0..=self.circuits[&0].output_layer {
             layout_ids.push(self.solve_layer_layout(&LayerReq {
                 circuit_id: 0,
-                layer: i as isize,
+                layer: i,
             }));
         }
         self.layout_ids = layout_ids;
@@ -136,10 +130,8 @@ impl<'a, C: Config> CompileContext<'a, C> {
         }
 
         let circuit: &IrCircuit<C> = &self.rc.circuits[&id];
-        let mut nv = circuit.num_inputs + circuit.num_hint_inputs + 1;
+        let mut nv = circuit.num_inputs + 1;
         let mut ns = 0;
-        let nh = circuit.num_hint_inputs;
-        let mut nhs = 0;
         for insn in circuit.instructions.iter() {
             match insn {
                 Instruction::SubCircuitCall {
@@ -149,8 +141,6 @@ impl<'a, C: Config> CompileContext<'a, C> {
                 } => {
                     self.dfs_topo_sort(*sub_circuit_id);
                     ns += 1;
-                    nhs += self.circuits[sub_circuit_id].num_hint_inputs
-                        + self.circuits[sub_circuit_id].num_hint_inputs_sub;
                     nv += num_outputs;
                 }
                 Instruction::InternalVariable { .. } => {
@@ -170,8 +160,6 @@ impl<'a, C: Config> CompileContext<'a, C> {
                 circuit,
                 num_var: nv,
                 num_sub_circuits: ns,
-                num_hint_inputs: nh,
-                num_hint_inputs_sub: nhs,
                 min_layer: Vec::new(),
                 max_layer: Vec::new(),
                 output_layer: 0,
@@ -179,14 +167,11 @@ impl<'a, C: Config> CompileContext<'a, C> {
                 sub_circuit_loc_map: HashMap::new(),
                 sub_circuit_insn_ids: Vec::new(),
                 sub_circuit_insn_refs: Vec::new(),
-                sub_circuit_hint_inputs: Vec::new(),
                 sub_circuit_start_layer: Vec::new(),
-                hint_inputs: Pool::new(),
                 combined_constraints: Vec::new(),
                 internal_variable_expr: HashMap::new(),
                 constant_like_variables: HashMap::new(),
                 lcs: Vec::new(),
-                lc_hint: LayerLayoutContext::default(),
             },
         );
     }
@@ -194,20 +179,13 @@ impl<'a, C: Config> CompileContext<'a, C> {
     fn compute_min_max_layers(&mut self, circuit_id: usize) {
         // variables
         // 0..nbVariable: normal variables
-        // nbVariable..nbVariable+nbHintInputSub: hint inputs of sub circuits by insn order
         // next nbSubCircuits terms: sub circuit virtual variables (in order to lower the number of edges)
         // next ? terms: random sum of constraints
         let mut ic = self.circuits.remove(&circuit_id).unwrap();
         let nv = ic.num_var;
         let ns = ic.num_sub_circuits;
-        //let nh = ic.num_hint_inputs;
-        let nhs = ic.num_hint_inputs_sub;
-        let mut n = nv + nhs + ns;
+        let mut n = nv + ns;
         let circuit = self.rc.circuits.get(&circuit_id).unwrap();
-        /*println!(
-            "{} {} {} {} {} {:?}",
-            circuit_id, nv, ns, ic.num_hint_inputs, nhs, circuit.instructions
-        );*/
 
         let pre_alloc_size = n + (if n < 1000 { n } else { 1000 });
         ic.min_layer = Vec::with_capacity(pre_alloc_size);
@@ -233,17 +211,15 @@ impl<'a, C: Config> CompileContext<'a, C> {
 
         ic.sub_circuit_insn_ids = Vec::with_capacity(ns);
         ic.sub_circuit_insn_refs = Vec::with_capacity(ns);
-        ic.sub_circuit_hint_inputs = Vec::with_capacity(ns);
 
         // get all input wires and build the graph
         // also computes the topo order
         let mut q0: Vec<usize> = Vec::with_capacity(pre_alloc_size);
         let mut q1: Vec<usize> = Vec::with_capacity(pre_alloc_size);
-        for i in 1..=circuit.num_inputs + circuit.num_hint_inputs {
+        for i in 1..=circuit.num_inputs {
             q0.push(i);
         }
-        let mut hint_input_sub_idx = nv;
-        let mut cur_var_idx = circuit.num_inputs + circuit.num_hint_inputs + 1;
+        let mut cur_var_idx = circuit.num_inputs + 1;
         for (i, insn) in circuit.instructions.iter().enumerate() {
             match insn {
                 Instruction::InternalVariable { expr } => {
@@ -262,19 +238,9 @@ impl<'a, C: Config> CompileContext<'a, C> {
                     inputs,
                     num_outputs,
                 } => {
-                    let k = ic.sub_circuit_insn_ids.len() + nv + nhs;
+                    let k = ic.sub_circuit_insn_ids.len() + nv;
                     for x in inputs.iter() {
                         add_edge(*x, k);
-                    }
-                    let subh = self.circuits[sub_circuit_id].num_hint_inputs
-                        + self.circuits[sub_circuit_id].num_hint_inputs_sub;
-                    let mut subhs = Vec::with_capacity(subh);
-                    for _ in 0..subh {
-                        add_edge(hint_input_sub_idx, k);
-                        q0.push(hint_input_sub_idx);
-                        subhs.push(hint_input_sub_idx);
-                        ic.min_layer[hint_input_sub_idx] = 0;
-                        hint_input_sub_idx += 1;
                     }
                     q1.push(k);
                     layer_advance[k] = self.circuits[sub_circuit_id].output_layer - 1;
@@ -292,7 +258,6 @@ impl<'a, C: Config> CompileContext<'a, C> {
                         inputs,
                         outputs,
                     });
-                    ic.sub_circuit_hint_inputs.push(subhs);
                 }
                 Instruction::ConstantLike { value } => {
                     ic.min_layer[cur_var_idx] = 1;
@@ -307,13 +272,6 @@ impl<'a, C: Config> CompileContext<'a, C> {
         q0.extend_from_slice(&q1); // the merged topo order
         let mut q = q0;
 
-        for i in circuit.num_inputs + 1..=circuit.num_inputs + circuit.num_hint_inputs {
-            ic.hint_inputs.add(&i);
-        }
-        for i in 0..nhs {
-            ic.hint_inputs.add(&(i + nv));
-        }
-
         // compute the min layer (depth) of each variable
         for x in q.iter().cloned() {
             for y in out_edges[x].iter().cloned() {
@@ -325,7 +283,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
         ic.sub_circuit_start_layer = Vec::with_capacity(ns);
         for i in 0..ic.sub_circuit_insn_ids.len() {
             ic.sub_circuit_start_layer
-                .push(ic.min_layer[nv + nhs + i] - layer_advance[nv + nhs + i]);
+                .push(ic.min_layer[nv + i] - layer_advance[nv + i]);
         }
 
         // compute output layer and order
@@ -418,7 +376,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
             }
         }
         for i in 0..ic.sub_circuit_insn_ids.len() {
-            if ic.min_layer[nv + nhs + i] != ic.max_layer[nv + nhs + i] {
+            if ic.min_layer[nv + i] != ic.max_layer[nv + i] {
                 panic!("unexpected situation: sub-circuit virtual variable should have equal min/max layer");
             }
         }
@@ -435,7 +393,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
         // and the sub circuit also ends at the output layer, we have to increase output layer
         'check_next_circuit: for i in 0..ic.sub_circuit_insn_ids.len() {
             let mut count = 0;
-            for y in out_edges[nv + nhs + i].iter().cloned() {
+            for y in out_edges[nv + i].iter().cloned() {
                 if ic.min_layer[y] == ic.output_layer {
                     if ic.output_order.contains_key(&y) {
                         count += 1;
@@ -454,7 +412,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
                     any_constraint = true;
                 }
             }
-            if (count != 0 || any_constraint) && count != out_edges[nv + nhs + i].len() {
+            if (count != 0 || any_constraint) && count != out_edges[nv + i].len() {
                 ic.output_layer += 1;
                 break;
             }

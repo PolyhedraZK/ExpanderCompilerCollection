@@ -28,7 +28,6 @@ pub trait IrConfig: Debug + Clone + Default + Hash + PartialEq + Eq {
     const ALLOW_DUPLICATE_SUB_CIRCUIT_INPUTS: bool;
     const ALLOW_DUPLICATE_CONSTRAINTS: bool;
     const ALLOW_DUPLICATE_OUTPUTS: bool;
-    const HAS_HINT_INPUT: bool;
 }
 
 pub trait Instruction<C: Config>: Debug + Clone + Hash + PartialEq + Eq {
@@ -90,7 +89,6 @@ pub struct Circuit<Irc: IrConfig> {
     pub constraints: Vec<Irc::Constraint>,
     pub outputs: Vec<usize>,
     pub num_inputs: usize,
-    pub num_hint_inputs: usize,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
@@ -102,19 +100,10 @@ pub struct RootCircuit<Irc: IrConfig> {
 
 impl<Irc: IrConfig> Circuit<Irc> {
     pub fn get_num_inputs_all(&self) -> usize {
-        if Irc::HAS_HINT_INPUT {
-            self.num_inputs + self.num_hint_inputs
-        } else {
-            self.num_inputs
-        }
+        self.num_inputs
     }
 
     fn validate_variable_references(&self, num_public_inputs: usize) -> Result<(), Error> {
-        if !Irc::HAS_HINT_INPUT && self.num_hint_inputs != 0 {
-            return Err(Error::InternalError(
-                "hint input is not allowed".to_string(),
-            ));
-        }
         let mut cur_var_max = self.get_num_inputs_all();
         for insn in self.instructions.iter() {
             for term in insn.inputs() {
@@ -193,12 +182,6 @@ impl<Irc: IrConfig> Circuit<Irc> {
 
 pub type EvalOk<Irc> = (
     Vec<<<Irc as IrConfig>::Config as Config>::CircuitField>,
-    bool,
-);
-
-type EvalSubOk<'a, Irc> = (
-    Vec<<<Irc as IrConfig>::Config as Config>::CircuitField>,
-    &'a [<<Irc as IrConfig>::Config as Config>::CircuitField],
     bool,
 );
 
@@ -297,22 +280,7 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
 
     pub fn input_size(&self) -> usize {
         // tests of this function are in for_layering
-        if !Irc::HAS_HINT_INPUT {
-            return self.circuits[&0].num_inputs;
-        }
-        let order = self.topo_order();
-        let mut sub_hint_size: HashMap<usize, usize> = HashMap::new();
-        for i in order.iter().rev() {
-            let circuit = &self.circuits[i];
-            let mut hint_size = circuit.num_hint_inputs;
-            for insn in circuit.instructions.iter() {
-                if let Some((sub_circuit_id, _, _)) = insn.as_sub_circuit_call() {
-                    hint_size += sub_hint_size[&sub_circuit_id];
-                }
-            }
-            sub_hint_size.insert(*i, hint_size);
-        }
-        self.circuits[&0].num_inputs + sub_hint_size[&0]
+        self.circuits[&0].num_inputs
     }
 
     pub fn topo_order(&self) -> Vec<usize> {
@@ -328,11 +296,12 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
         inputs: Vec<<Irc::Config as Config>::CircuitField>,
     ) -> Result<EvalOk<Irc>, Error> {
         assert_eq!(inputs.len(), self.input_size());
-        let (root_input, hint_input) = inputs.split_at(self.circuits[&0].num_inputs);
-        let (res, rem, cond) =
-            self.eval_unsafe_sub(&self.circuits[&0], root_input.to_vec(), hint_input)?;
-        assert_eq!(rem.len(), 0);
-        Ok((res, cond))
+        let (res, mut cond) = self.eval_unsafe_sub(&self.circuits[&0], inputs)?;
+        let (t, res) = res.split_at(self.expected_num_output_zeroes);
+        for x in t {
+            cond &= x.is_zero();
+        }
+        Ok((res.to_vec(), cond))
     }
 
     pub fn eval_unsafe(
@@ -342,18 +311,14 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
         self.eval_unsafe_with_errors(inputs).unwrap()
     }
 
-    fn eval_unsafe_sub<'a>(
+    fn eval_unsafe_sub(
         &self,
         circuit: &Circuit<Irc>,
         inputs: Vec<<Irc::Config as Config>::CircuitField>,
-        hint_inputs: &'a [<Irc::Config as Config>::CircuitField],
-    ) -> Result<EvalSubOk<'a, Irc>, Error> {
+    ) -> Result<EvalOk<Irc>, Error> {
         let mut values = vec![<Irc::Config as Config>::CircuitField::zero(); 1];
         values.extend(inputs);
-        let (cur_hint_input, rem_hint_inputs) = hint_inputs.split_at(circuit.num_hint_inputs);
-        values.extend(cur_hint_input);
         let mut cond = true;
-        let mut hint_inputs = rem_hint_inputs;
         for insn in circuit.instructions.iter() {
             match insn.eval_unsafe(&values) {
                 EvalResult::Value(v) => {
@@ -363,12 +328,10 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
                     values.append(&mut vs);
                 }
                 EvalResult::SubCircuitCall(sub_circuit_id, inputs) => {
-                    let (res, rem, sub_cond) = self.eval_unsafe_sub(
+                    let (res, sub_cond) = self.eval_unsafe_sub(
                         &self.circuits[&sub_circuit_id],
                         inputs.iter().map(|&i| values[i]).collect(),
-                        hint_inputs,
                     )?;
-                    hint_inputs = rem;
                     values.extend(res);
                     cond &= sub_cond;
                 }
@@ -384,6 +347,6 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
         for &o in circuit.outputs.iter() {
             res.push(values[o]);
         }
-        Ok((res, hint_inputs, cond))
+        Ok((res, cond))
     }
 }

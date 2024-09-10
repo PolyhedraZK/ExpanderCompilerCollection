@@ -22,7 +22,6 @@ fn simple_div() {
             }],
             outputs: vec![3],
             num_inputs: 2,
-            num_hint_inputs: 0,
         },
     );
     assert_eq!(root.validate(), Ok(()));
