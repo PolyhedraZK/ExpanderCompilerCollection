@@ -247,3 +247,202 @@ func ValidateInitialized(rc *RootCircuit) error {
 	}
 	return nil
 }
+
+// generate graphviz compatible DOT file for visualizing the circuit layout
+func (rc *RootCircuit) Graphviz() string {
+	var ret string
+	// sanity check
+	if len(rc.Circuits) != len(rc.Layers) {
+		panic("Invalid Circuit: length of Circuits and Layers don't match")
+	}
+
+	// sort Circuit
+	type Pair struct {
+		Circuit *Circuit
+		Layer   uint64
+	}
+
+	// Edges
+	type Edge struct {
+		source      string
+		destination string
+		coef        string
+	}
+
+	// zip circuits and their lables, then sort
+	pairs := make([]Pair, len(rc.Circuits))
+	for i := range rc.Circuits {
+		pairs[i] = Pair{rc.Circuits[i], rc.Layers[i]}
+	}
+	sort.Slice(pairs, func(i, j int) bool {
+		return pairs[i].Layer < pairs[j].Layer
+	})
+
+	// store edges and output them all in the end
+	// key = source
+	// value = destination
+	var edges []Edge
+
+	ret += fmt.Sprintln("digraph G{")
+	ret += fmt.Sprintln("	rankdir=BT;")
+	ret += fmt.Sprintln("	E_0[label=\"mul\" style=filled fillcolor=gold];")
+	ret += fmt.Sprintln("	E_1[label=\"add\" style=filled fillcolor=teal];")
+	ret += fmt.Sprintln("	E_2[label=\"const\" style=filled fillcolor=cornsilk];")
+	ret += fmt.Sprintln("	E_4[label=\"custom\" style=filled fillcolor=purple];")
+
+	for i, p := range pairs {
+		circuit := p.Circuit
+		layer := p.Layer
+
+		// create input layer when i == 0
+		if i == 0 {
+			ret += fmt.Sprintln("	// input layer")
+			ret += fmt.Sprintln("	subgraph cluster_0 {")
+			ret += fmt.Sprintln("		label=\"Input Layer\";")
+
+			// a dictionary of all nodes at the input layer
+			// this doesn't include constant nodes
+			nodes := make(map[uint64]bool)
+
+			// We don't color the nodes for the input layer
+			for _, gate := range circuit.Add {
+				nodes[gate.In] = true
+			}
+			for _, gate := range circuit.Mul {
+				nodes[gate.In0] = true
+				nodes[gate.In1] = true
+			}
+			for _, gate := range circuit.Custom {
+				for _, in := range gate.In {
+					nodes[in] = true
+				}
+			}
+
+			var nodeSlice []uint64
+			for key := range nodes {
+				nodeSlice = append(nodeSlice, key)
+			}
+			sort.Slice(nodeSlice, func(i, j int) bool {
+				return nodeSlice[i] < nodeSlice[j]
+			})
+
+			for _, id := range nodeSlice {
+				ret += fmt.Sprintf("		I_%d;\n", id)
+			}
+			// closing input layer
+			ret += fmt.Sprintln("	}")
+		}
+
+		// draw nodes of the current layer
+		ret += fmt.Sprintln("")
+		ret += fmt.Sprintf("	//Layer %d \n", layer)
+		ret += fmt.Sprintf("	subgraph cluster_%d {\n", layer+1)
+		ret += fmt.Sprintf("		label=\"Layer %d\";\n", layer)
+
+		// nodes stores mapping between out wire to node type
+		// note: we only need to store this for current iteration since
+		// we will output the nodes within the current iteration
+		nodes := make(map[uint64]string)
+
+		// add add edges
+		for _, gate := range circuit.Add {
+			// we don't really need consistency check here since we
+			// first iterate over Add gates
+			nodes[gate.Out] = "add"
+			var src string
+			if i == 0 {
+				src = fmt.Sprintf("I_%d", gate.In)
+			} else {
+				src = fmt.Sprintf("S_%d_%d", pairs[i-1].Layer, gate.In)
+			}
+			edges = append(
+				edges,
+				Edge{src, fmt.Sprintf("S_%d_%d", layer, gate.Out), fmt.Sprintf("%v", gate.Coef)})
+
+		}
+		// adding mul edges
+		for _, gate := range circuit.Mul {
+			v, exists := nodes[gate.Out]
+			if exists && v != "mul" {
+				panic("conflicting gate type.")
+			}
+			nodes[gate.Out] = "mul"
+			var src0, src1 string
+			if i == 0 {
+				src0 = fmt.Sprintf("I_%d", gate.In0)
+				src1 = fmt.Sprintf("I_%d", gate.In1)
+			} else {
+				src0 = fmt.Sprintf("S_%d_%d", pairs[i-1].Layer, gate.In0)
+				src1 = fmt.Sprintf("S_%d_%d", pairs[i-1].Layer, gate.In1)
+			}
+			edges = append(
+				edges,
+				Edge{src0, fmt.Sprintf("S_%d_%d", layer, gate.Out), fmt.Sprintf("%v", gate.Coef)},
+				Edge{src1, fmt.Sprintf("S_%d_%d", layer, gate.Out), fmt.Sprintf("%v", gate.Coef)})
+		}
+		// add custom edges
+		for _, gate := range circuit.Custom {
+			v, exists := nodes[gate.Out]
+			if exists && v != "custom" {
+				panic("conflicting gate type.")
+			}
+			nodes[gate.Out] = "custom"
+			var srcs []string
+			if i == 0 {
+				for _, in := range gate.In {
+					srcs = append(srcs, fmt.Sprintf("I_%d", in))
+				}
+			} else {
+				for _, in := range gate.In {
+					srcs = append(srcs, fmt.Sprintf("S_%d_%d", pairs[i-1].Layer, in))
+				}
+			}
+			for _, src := range srcs {
+				edges = append(
+					edges,
+					Edge{src, fmt.Sprintf("S_%d_%d", layer, gate.Out), fmt.Sprintf("%v", gate.Coef)})
+			}
+
+		}
+		// add const edges
+		for j, gate := range circuit.Cst {
+			src := fmt.Sprintf("C_%d_%d", layer, j)
+			ret += fmt.Sprintf("		%s[label=\"%v\" style=filled fillcolor=cornsilk];\n", src, gate.Coef)
+			edges = append(edges, Edge{src, fmt.Sprintf("S_%d_%d", layer, j), ""})
+		}
+
+		var keys []uint64
+		for key := range nodes {
+			keys = append(keys, key)
+		}
+		sort.Slice(keys, func(i, j int) bool {
+			return keys[i] < keys[j]
+		})
+
+		for _, key := range keys {
+			var fillcolor string
+			if nodes[key] == "add" {
+				fillcolor = "teal"
+			} else if nodes[key] == "mul" {
+				fillcolor = "gold"
+			} else if nodes[key] == "custom" {
+				fillcolor = "purple"
+			} else {
+				panic("unsupported node type")
+			}
+			ret += fmt.Sprintf("		S_%d_%d[ordering=\"in\" style=filled fillcolor=%s];\n",
+				layer, key, fillcolor)
+		}
+
+		// closing the node for current layer
+		ret += fmt.Sprintln("	}")
+	}
+
+	// ploting all the edges
+	for _, e := range edges {
+		ret += fmt.Sprintf("	%s -> %s [label=\"%s\"];\n", e.source, e.destination, e.coef)
+	}
+	ret += fmt.Sprintln("}")
+	return ret
+}
+
