@@ -286,9 +286,9 @@ func (rc *RootCircuit) Graphviz() string {
 	ret += fmt.Sprintln("digraph G{")
 	ret += fmt.Sprintln("	rankdir=BT;")
 	ret += fmt.Sprintln("	E_0[label=\"mul\" style=filled fillcolor=gold];")
-	ret += fmt.Sprintln("	E_1[label=\"add\" style=filled fillcolor=teal];")
+	ret += fmt.Sprintln("	E_1[label=\"add\" style=filled fillcolor=lightskyblue];")
 	ret += fmt.Sprintln("	E_2[label=\"const\" style=filled fillcolor=cornsilk];")
-	ret += fmt.Sprintln("	E_4[label=\"custom\" style=filled fillcolor=purple];")
+	ret += fmt.Sprintln("	E_4[label=\"custom\" style=filled fillcolor=plum];")
 
 	for i, p := range pairs {
 		circuit := p.Circuit
@@ -422,11 +422,11 @@ func (rc *RootCircuit) Graphviz() string {
 		for _, key := range keys {
 			var fillcolor string
 			if nodes[key] == "add" {
-				fillcolor = "teal"
+				fillcolor = "lightskyblue"
 			} else if nodes[key] == "mul" {
 				fillcolor = "gold"
 			} else if nodes[key] == "custom" {
-				fillcolor = "purple"
+				fillcolor = "plum"
 			} else {
 				panic("unsupported node type")
 			}
@@ -445,4 +445,3 @@ func (rc *RootCircuit) Graphviz() string {
 	ret += fmt.Sprintln("}")
 	return ret
 }
-
