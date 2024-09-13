@@ -33,7 +33,11 @@ func BrentKungAdder4Bits(api frontend.API, a, b []frontend.Variable, carryIn fro
 	}
 
 	// Step 2: Prefix computation
-	g10 := or(g[1], and(p[1], g[0]))
+	p1g0 := and(p[1], g[0])
+	p0p1 := and(p[0], p[1])
+	p2p3 := and(p[2], p[3])
+
+	g10 := or(g[1], p1g0)
 	g20 := or(g[2], and(p[2], g10))
 	g30 := or(g[3], and(p[3], g20))
 
@@ -41,9 +45,15 @@ func BrentKungAdder4Bits(api frontend.API, a, b []frontend.Variable, carryIn fro
 	c := make([]frontend.Variable, 5)
 	c[0] = carryIn
 	c[1] = or(g[0], and(p[0], c[0]))
-	c[2] = or(g10, and(and(p[0], p[1]), c[0]))
-	c[3] = or(g20, and(and(and(p[0], p[1]), p[2]), c[0]))
-	c[4] = or(g30, and(and(and(and(p[0], p[1]), p[2]), p[3]), c[0]))
+	c[2] = or(g10, and(p0p1, c[0]))
+	c[3] = or(g20, and(p0p1, and(p[2], c[0])))
+	c[4] = or(g30,
+		and(
+			and(
+				p0p1,
+				p2p3,
+			),
+			c[0]))
 
 	// Step 4: Calculate sum
 	sum := make([]frontend.Variable, 4)

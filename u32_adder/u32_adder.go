@@ -29,8 +29,7 @@ func BrentKungAdder32Bits(api frontend.API, a, b []frontend.Variable, carryIn []
 		copy(sum[start:end], groupSum)
 		if i != 7 {
 			api.AssertIsEqual(carryIn[i+1], groupCarry)
-		}
-		if i == 7 {
+		} else {
 			carry = groupCarry
 		}
 
