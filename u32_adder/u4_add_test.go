@@ -39,7 +39,7 @@ func TestU4Add(t *testing.T) {
 
 	cr, _ := ExpanderCompilerCollection.Compile(gf2.ScalarField, &circuit)
 	c := cr.GetLayeredCircuit()
-	os.WriteFile("circuit.txt", c.Serialize(), 0o644)
+	os.WriteFile("circuit_u4.txt", c.Serialize(), 0o644)
 
 	boolToUint64 := func(b bool) uint64 {
 		if b {
