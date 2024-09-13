@@ -6,26 +6,14 @@ import (
 	"github.com/consensys/gnark/constraint"
 )
 
-type PoseidonInternalState struct {
-	AfterHalfFullRound    [16]constraint.Element
-	AfterHalfPartialRound [16]constraint.Element
-	AfterPartialRound     [16]constraint.Element
-}
-
 func sBox(engine m31.Field, f constraint.Element) constraint.Element {
 	x2 := engine.Mul(f, f)
 	x4 := engine.Mul(x2, x2)
 	return engine.Mul(x4, f)
 }
 
-func PoseidonM31(param *PoseidonParams, input []constraint.Element) constraint.Element {
-	_, output := PoseidonM31WithInternalStates(param, input, false)
-	return output
-}
-
 // Poseidon hash function over M31 field.
-// For convenience, function also outputs an internal state when the hash function is half complete.
-func PoseidonM31WithInternalStates(param *PoseidonParams, input []constraint.Element, withState bool) (PoseidonInternalState, constraint.Element) {
+func PoseidonM31(param *PoseidonParams, input []constraint.Element) constraint.Element {
 	// todo: pad the input if it is too short
 	if len(input) != param.NumStates {
 		panic("input length does not match the number of states in the Poseidon parameters")
@@ -33,7 +21,6 @@ func PoseidonM31WithInternalStates(param *PoseidonParams, input []constraint.Ele
 
 	state := input
 	engine := m31.Field{}
-	internalState := PoseidonInternalState{}
 
 	// Applies the full rounds.
 	for i := 0; i < param.NumHalfFullRounds; i++ {
@@ -48,9 +35,6 @@ func PoseidonM31WithInternalStates(param *PoseidonParams, input []constraint.Ele
 			state[j] = sBox(engine, state[j])
 		}
 	}
-	if withState {
-		copy(internalState.AfterHalfFullRound[:], state)
-	}
 
 	// Applies the first half of partial rounds.
 	for i := 0; i < param.NumHalfPartialRounds; i++ {
@@ -62,10 +46,6 @@ func PoseidonM31WithInternalStates(param *PoseidonParams, input []constraint.Ele
 		state[0] = sBox(engine, state[0])
 	}
 
-	if withState {
-		copy(internalState.AfterHalfPartialRound[:], state)
-	}
-
 	// Applies the second half of partial rounds.
 	for i := 0; i < param.NumHalfPartialRounds; i++ {
 		state[0] = engine.Add(state[0], engine.FromInterface(param.InternalRoundConstant[i+param.NumHalfPartialRounds]))
@@ -74,9 +54,6 @@ func PoseidonM31WithInternalStates(param *PoseidonParams, input []constraint.Ele
 		state = applyMdsMatrix(engine, state, param.MdsMatrix)
 		// applyInternalRoundMatrix(engine, state)
 		state[0] = sBox(engine, state[0])
-	}
-	if withState {
-		copy(internalState.AfterPartialRound[:], state)
 	}
 
 	// Applies the full rounds.
@@ -93,7 +70,7 @@ func PoseidonM31WithInternalStates(param *PoseidonParams, input []constraint.Ele
 		}
 	}
 
-	return internalState, state[0]
+	return state[0]
 }
 
 // we use original poseidon mds method here
