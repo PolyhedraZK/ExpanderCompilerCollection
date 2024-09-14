@@ -8,6 +8,7 @@ package layered
 import (
 	"fmt"
 	"math/big"
+	"sort"
 )
 
 // RootCircuit defines a multi-layered circuit.
@@ -51,6 +52,13 @@ type Allocation struct {
 	OutputOffset uint64
 }
 
+// A generic gate interface
+type Gate interface {
+	InWires() []uint64
+	OutWire() uint64
+	CoefValue() *big.Int
+}
+
 // GateMul represents a multiplication gate within a circuit layer.
 // It specifies two input wire indices and an output wire index,
 // along with a coefficient. The product of the inputs and the coefficient
@@ -62,6 +70,21 @@ type GateMul struct {
 	Coef *big.Int
 }
 
+// Input wires of mul gate
+func (g GateMul) InWires() []uint64 {
+	return []uint64{g.In0, g.In1}
+}
+
+// Output wire of mul gate
+func (g GateMul) OutWire() uint64 {
+	return g.Out
+}
+
+// Coef of mul gate
+func (g GateMul) CoefValue() *big.Int {
+	return g.Coef
+}
+
 // GateAdd represents an addition gate within a circuit layer.
 // It specifies the input and output wire indices, and the coefficient
 // to be multiplied with the input before being added to the output.
@@ -71,11 +94,41 @@ type GateAdd struct {
 	Coef *big.Int
 }
 
+// Input wire of mul gate
+func (g GateAdd) InWires() []uint64 {
+	return []uint64{g.In}
+}
+
+// Output wire of add gate
+func (g GateAdd) OutWire() uint64 {
+	return g.Out
+}
+
+// Coef value of add gate
+func (g GateAdd) CoefValue() *big.Int {
+	return g.Coef
+}
+
 // GateCst represents a constant gate within a circuit layer.
 // It directly adds a constant value, defined by Coef, to the output wire.
 type GateCst struct {
 	Out  uint64
 	Coef *big.Int
+}
+
+// Input wires of const gate
+func (g GateCst) InWires() []uint64 {
+	return []uint64{}
+}
+
+// Output wire of const gate
+func (g GateCst) OutWire() uint64 {
+	return g.Out
+}
+
+// coefficient value of const gate
+func (g GateCst) CoefValue() *big.Int {
+	return g.Coef
 }
 
 // GateCustom represents a custom gate within a circuit layer.
@@ -86,6 +139,21 @@ type GateCustom struct {
 	In       []uint64
 	Out      uint64
 	Coef     *big.Int
+}
+
+// Input wires of customized gate
+func (g GateCustom) InWires() []uint64 {
+	return g.In
+}
+
+// Output wires of customized gate
+func (g GateCustom) OutWire() uint64 {
+	return g.Out
+}
+
+// Coefficient value of customized gate
+func (g GateCustom) CoefValue() *big.Int {
+	return g.Coef
 }
 
 // Print outputs the entire circuit structure to the console for debugging purposes.
@@ -285,6 +353,7 @@ func (rc *RootCircuit) Graphviz() string {
 
 	ret += fmt.Sprintln("digraph G{")
 	ret += fmt.Sprintln("	rankdir=BT;")
+	ret += fmt.Sprintln("	splines=false;")
 	ret += fmt.Sprintln("	E_0[label=\"mul\" style=filled fillcolor=gold];")
 	ret += fmt.Sprintln("	E_1[label=\"add\" style=filled fillcolor=lightskyblue];")
 	ret += fmt.Sprintln("	E_2[label=\"const\" style=filled fillcolor=cornsilk];")
@@ -339,34 +408,32 @@ func (rc *RootCircuit) Graphviz() string {
 		ret += fmt.Sprintf("	subgraph cluster_%d {\n", layer+1)
 		ret += fmt.Sprintf("		label=\"Layer %d\";\n", layer)
 
-		// nodes stores mapping between out wire to node type
-		// note: we only need to store this for current iteration since
-		// we will output the nodes within the current iteration
-		nodes := make(map[uint64]string)
+		// nodes stores mapping between out wire to a list of gates
+		nodes := make(map[uint64][]Gate)
 
 		// add add edges
-		for _, gate := range circuit.Add {
-			// we don't really need consistency check here since we
-			// first iterate over Add gates
-			nodes[gate.Out] = "add"
+		for j, gate := range circuit.Add {
+			nodes[gate.Out] = append(nodes[gate.Out], gate)
 			var src string
 			if i == 0 {
 				src = fmt.Sprintf("I_%d", gate.In)
 			} else {
 				src = fmt.Sprintf("S_%d_%d", pairs[i-1].Layer, gate.In)
 			}
-			edges = append(
-				edges,
-				Edge{src, fmt.Sprintf("S_%d_%d", layer, gate.Out), fmt.Sprintf("%v", gate.Coef)})
-
+			// nodeId of current gate
+			nodeId := fmt.Sprintf("Add_%d_%d", layer, j)
+			// output node id here
+			ret += fmt.Sprintf("		%s[label=\"* %v\" style=filled fillcolor=lightskyblue]; \n",
+				nodeId, gate.Coef)
+			// add two edges, one from input to this add node,
+			// one from this node to the out
+			edges = append(edges,
+				Edge{src, nodeId, ""},
+				Edge{nodeId, fmt.Sprintf("S_%d_%d", layer, gate.Out), ""})
 		}
 		// adding mul edges
-		for _, gate := range circuit.Mul {
-			v, exists := nodes[gate.Out]
-			if exists && v != "mul" {
-				panic("conflicting gate type.")
-			}
-			nodes[gate.Out] = "mul"
+		for j, gate := range circuit.Mul {
+			nodes[gate.Out] = append(nodes[gate.Out], gate)
 			var src0, src1 string
 			if i == 0 {
 				src0 = fmt.Sprintf("I_%d", gate.In0)
@@ -375,18 +442,22 @@ func (rc *RootCircuit) Graphviz() string {
 				src0 = fmt.Sprintf("S_%d_%d", pairs[i-1].Layer, gate.In0)
 				src1 = fmt.Sprintf("S_%d_%d", pairs[i-1].Layer, gate.In1)
 			}
+			// node id of current gate
+			nodeId := fmt.Sprintf("Mul_%d_%d", layer, j)
+			// output current node
+			ret += fmt.Sprintf("		%s[label=\"* %d\" style=filled fillcolor=gold]; \n",
+				nodeId, gate.Coef)
+			// add 3 edges, the edges to mul node, and mul node to output
 			edges = append(
 				edges,
-				Edge{src0, fmt.Sprintf("S_%d_%d", layer, gate.Out), fmt.Sprintf("%v", gate.Coef)},
-				Edge{src1, fmt.Sprintf("S_%d_%d", layer, gate.Out), fmt.Sprintf("%v", gate.Coef)})
+				Edge{src0, nodeId, ""},
+				Edge{src1, nodeId, ""},
+				Edge{nodeId, fmt.Sprintf("S_%d_%d", layer, gate.Out), ""})
 		}
 		// add custom edges
-		for _, gate := range circuit.Custom {
-			v, exists := nodes[gate.Out]
-			if exists && v != "custom" {
-				panic("conflicting gate type.")
-			}
-			nodes[gate.Out] = "custom"
+		for j, gate := range circuit.Custom {
+			nodes[gate.Out] = append(nodes[gate.Out], gate)
+
 			var srcs []string
 			if i == 0 {
 				for _, in := range gate.In {
@@ -397,18 +468,27 @@ func (rc *RootCircuit) Graphviz() string {
 					srcs = append(srcs, fmt.Sprintf("S_%d_%d", pairs[i-1].Layer, in))
 				}
 			}
+			// node id of current gate
+			nodeId := fmt.Sprintf("Cus_%d_%d", layer, j)
+			// output the current node
+			ret += fmt.Sprintf("		%s[label=\"%v:*%d\" style=filled fillcolor=plum]", nodeId, gate.GateType, gate.Coef)
+			// add edges from inputs to this node
 			for _, src := range srcs {
 				edges = append(
 					edges,
-					Edge{src, fmt.Sprintf("S_%d_%d", layer, gate.Out), fmt.Sprintf("%v", gate.Coef)})
+					Edge{src, nodeId, ""})
 			}
+			// add edge from this node to output
+			edges = append(edges,
+				Edge{nodeId, fmt.Sprintf("S_%d_%d", layer, gate.Out), ""})
 
 		}
 		// add const edges
 		for j, gate := range circuit.Cst {
+			nodes[gate.Out] = append(nodes[gate.Out], gate)
 			src := fmt.Sprintf("C_%d_%d", layer, j)
 			ret += fmt.Sprintf("		%s[label=\"%v\" style=filled fillcolor=cornsilk];\n", src, gate.Coef)
-			edges = append(edges, Edge{src, fmt.Sprintf("S_%d_%d", layer, j), ""})
+			edges = append(edges, Edge{src, fmt.Sprintf("S_%d_%d", layer, gate.Out), ""})
 		}
 
 		var keys []uint64
@@ -419,19 +499,9 @@ func (rc *RootCircuit) Graphviz() string {
 			return keys[i] < keys[j]
 		})
 
+		// output S nodes (output wires)
 		for _, key := range keys {
-			var fillcolor string
-			if nodes[key] == "add" {
-				fillcolor = "lightskyblue"
-			} else if nodes[key] == "mul" {
-				fillcolor = "gold"
-			} else if nodes[key] == "custom" {
-				fillcolor = "plum"
-			} else {
-				panic("unsupported node type")
-			}
-			ret += fmt.Sprintf("		S_%d_%d[ordering=\"in\" style=filled fillcolor=%s];\n",
-				layer, key, fillcolor)
+			ret += fmt.Sprintf("		S_%d_%d;\n", layer, key)
 		}
 
 		// closing the node for current layer
