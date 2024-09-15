@@ -21,23 +21,10 @@ func (engine *Field) FromInterface(i interface{}) constraint.Element {
 }
 
 func (engine *Field) ToBigInt(c constraint.Element) *big.Int {
-	// e := ([6]uint64)(c[:])
-	// r := new(big.Int)
-	// e.BigInt(r)
-	// return r
 	return big.NewInt(int64(c[0]))
 }
 
 func (engine *Field) Mul(a, b constraint.Element) constraint.Element {
-	// _a := engine.ToBigInt(a)
-	// _b := engine.ToBigInt(b)
-	// _a_b := _a.Mul(_a, _b)
-	// ab := _a_b.Mod(_a_b, ScalarField)
-	// return constraint.Element{ab.Uint64()}
-
-	// TODO: Mul that doesn't assume a,b reduced (i.e. a[1] = 0, a[2] = 0, etc)
-	// (Although note that the below Add always reduces mod P
-	// so it may be fine to assume we're always multiplying reduced elements)
 	a_b := (a[0] * b[0]) % P
 	return constraint.Element{a_b}
 }
