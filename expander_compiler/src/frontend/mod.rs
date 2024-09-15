@@ -29,6 +29,7 @@ pub mod internal {
 
 pub mod extra {
     pub use super::api::UnconstrainedAPI;
+    pub use crate::utils::serde::Serde;
 }
 
 #[cfg(test)]

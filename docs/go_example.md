@@ -81,6 +81,6 @@ Please note that the Prover's implementation resides in [Expander](https://githu
 
 In contrast to gnark, where the prover handles a portion of the witness generation, our compiler employs an `InputSolver` to perform this task. The `InputSolver` also supports serialization and deserialization. For more information, please consult the examples in [MIMC](../ecgo/examples/mimc) and [MIMC Deserialize](../ecgo/examples/mimc_deserialize).
 
-For additional features, please refer to [APIs](./apis.md).
+For additional features, please refer to [APIs](./go_apis.md).
 
 For more examples, please visit [examples](../ecgo/examples).

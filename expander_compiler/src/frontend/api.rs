@@ -2,7 +2,6 @@ use crate::circuit::config::Config;
 
 use super::builder::{ToVariableOrValue, Variable};
 
-// write a macro rules to generate binary op definition
 macro_rules! binary_op {
     ($name:ident) => {
         fn $name(
