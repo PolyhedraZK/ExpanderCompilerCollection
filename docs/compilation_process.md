@@ -2,13 +2,15 @@
 
 The compilation process, encapsulated within `api.go`, comprises several distinct phases:
 
-1. **Circuit Intermediate Representation (IR) Construction:** The initial phase involves processing the source code with the builder, which constructs the circuit's Intermediate Representation (IR). This builder, similar to gnark's internal builder, extends the `LinearExpression` to support quadratic terms. It maintains a tree structure that mirrors the computational graph of the circuit, serving as the foundation for IR generation.
+1. **Circuit Intermediate Representation (IR) Construction:** The initial phase involves processing the source code with the builder, which constructs the circuit's Intermediate Representation (IR). It maintains a tree structure that mirrors the computational graph of the circuit, serving as the foundation for IR generation.
 
 2. **IR Optimization:** The Intermediate Representation (IR) is a flexible representation of the circuit that allows for various optimizations. These can include merging redundant variables, splitting large variables to enhance efficiency, and performing other transformations that streamline the computational graph without altering its functionality.
 
 3. **Circuit Layering:** The IR undergoes a layering process that transforms it into a layered circuit. This process involves topologically sorting the directed acyclic graph (DAG) of sub-circuit call relationships, determining the necessary layers for each variable, and allocating the variables across these layers. The layering strategy is recursive, giving priority to sub-circuits and ensuring alignment with the Libra protocol's requirements.
 
 4. **Layered Circuit Optimization:** After the circuit is layered, additional optimizations can be applied. These may include expanding sub-circuits based on their frequency of occurrence or the number of variables they contain.
+
+In the old version of compiler, all steps are done in Go, but now only the step 1 is done in Go.
 
 ## Detailed Steps in Compilation
 

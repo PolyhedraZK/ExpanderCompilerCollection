@@ -11,16 +11,20 @@ To incorporate the compiler into your Go project, include the following import s
 import "github.com/PolyhedraZK/ExpanderCompilerCollection"
 ```
 
-The APIs for this library are detailed in [APIs](./docs/apis.md).
+The APIs for this library are detailed in [Go APIs](./docs/go_apis.md).
+
+## New Rust Frontend
+
+We are excited to announce the release of our new Rust frontend, similar to gnark. This frontend allows you to write circuits in Rust, which can then be compiled using the ExpanderCompilerCollection. For more details and usage instructions, please visit [Rust Frontend Documentation](./docs/rust_frontend.md).
 
 ## Example 
 
-Refer to [this example](./docs/example.md) for a practical demonstration of our compiler. In this example, we illustrate how a gnark circuit can be compiled using `ExpanderCompilerCollection`. The output of this example includes a circuit description file `"circuit.txt"` and a corresponding witnesses file `"witness.txt"`. Our prover, [Expander](https://github.com/PolyhedraZK/Expander), utilizes these IRs to generate the actual proof.
+Refer to [this example](./docs/go_example.md) for a practical demonstration of our compiler. In this example, we illustrate how a gnark circuit can be compiled using `ExpanderCompilerCollection`. The output of this example includes a circuit description file `"circuit.txt"` and a corresponding witnesses file `"witness.txt"`. Our prover, [Expander](https://github.com/PolyhedraZK/Expander), utilizes these IRs to generate the actual proof.
 
 Additional examples include:
-- Hash functions like [sha2](./examples/gnark_std_sha2/main.go), [keccak](./examples/keccak/main.go), and [MIMC](./examples/mimc/main.go)
-- A [recursive circuit](./examples/gnark_recursive_proof/main.go)
-- A [mersenne field](./examples/m31_field/main.go)
+- Hash functions like [sha2](./ecgo/examples/gnark_std_sha2/main.go), [keccak](./ecgo/examples/keccak/main.go), and [MIMC](./ecgo/examples/mimc/main.go)
+- A [recursive circuit](./ecgo/examples/gnark_recursive_proof/main.go)
+- A [mersenne field](./ecgo/examples/m31_field/main.go)
 
 ## Deeper Dive in to the tech
 

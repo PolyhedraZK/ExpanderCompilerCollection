@@ -1,3 +1,0 @@
-[submodule "circom_preprocessor/circom"]
-	path = circom_preprocessor/circom
-	url = https://github.com/iden3/circom

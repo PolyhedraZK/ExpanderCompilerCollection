@@ -1,7 +1,8 @@
 # generated artifact
 *.txt
 __*
-circom_preprocessor/target
+target
+libec_go_lib.*
 
 # dev IDE
 .idea
