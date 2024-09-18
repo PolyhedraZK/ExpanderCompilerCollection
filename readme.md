@@ -32,6 +32,9 @@ For a more technical overview of the overall architecture, visit our [Compilatio
 
 For a detailed explanation of the primary compilation artifacts - the layered circuit and the input solver, as well as their respective serialization formats, refer to [Artifact and Serialization](./docs/artifact_and_serialization.md).
 
+## AVX
+We use AVX512 by default, if your CPU doesn't support AVX512, or you encountered illegal instruction error, please clone the library, and run `build-rust-avx2.sh` to build AVX2 libs.
+
 ## Acknowledgement
 
 We extend our gratitude to the following projects, whose prior work has been crucial in bringing this project to fruition:

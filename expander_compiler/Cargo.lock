@@ -93,13 +93,15 @@ dependencies = [
 [[package]]
 name = "arith"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander#7670d3d63afa754975d85c2efc05a1b3a685f0a7"
+source = "git+https://github.com/PolyhedraZK/Expander#373dbd62cfa0cbd94256339088c22fb5b71c6173"
 dependencies = [
  "ark-std",
+ "cfg-if",
  "ethnum",
  "halo2curves",
  "log",
  "rand",
+ "raw-cpuid",
  "sha2",
  "thiserror",
 ]
@@ -433,7 +435,7 @@ checksum = "b90ca2580b73ab6a1f724b76ca11ab632df820fd6040c336200d2c1df7b3c82c"
 [[package]]
 name = "expander-rs"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander#7670d3d63afa754975d85c2efc05a1b3a685f0a7"
+source = "git+https://github.com/PolyhedraZK/Expander#373dbd62cfa0cbd94256339088c22fb5b71c6173"
 dependencies = [
  "arith",
  "ark-std",
@@ -1101,6 +1103,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom",
+]
+
+[[package]]
+name = "raw-cpuid"
+version = "11.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb9ee317cfe3fbd54b36a511efc1edd42e216903c9cd575e686dd68a2ba90d8d"
+dependencies = [
+ "bitflags",
 ]
 
 [[package]]

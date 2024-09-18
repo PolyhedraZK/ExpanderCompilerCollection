@@ -33,3 +33,6 @@ halo2curves = { git = "https://github.com/PolyhedraZK/halo2curves", default-feat
 ] }
 arith = { git = "https://github.com/PolyhedraZK/Expander" }
 expander-rs = { git = "https://github.com/PolyhedraZK/Expander" }
+
+[features]
+avx256 = ["arith/avx256"]
