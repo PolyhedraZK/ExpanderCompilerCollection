@@ -12,3 +12,6 @@ expander-rs.workspace = true
 arith.workspace = true
 expander_compiler = {path = "../" }
 libc = "0.2.155"
+
+[features]
+avx256 = ["arith/avx256", "expander_compiler/avx256"]
