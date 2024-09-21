@@ -67,7 +67,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "expander_compiler -> expander_compiler/target"
-      - run: cargo test --manifest-path=expander_compiler/Cargo.toml
+      - run: cargo test --manifest-path=expander_compiler/Cargo.toml --release
 
   test-go:
     runs-on: ${{ matrix.os }}
