@@ -1,3 +1,7 @@
+---
+sidebar_position: 3
+---
+
 # Compiler APIs
 
 This document offers a comprehensive guide to the core APIs provided by the compiler.
@@ -60,7 +64,7 @@ type API interface {
 
 - `Output`: This method appends a variable to the circuit's output. It is typically used to designate certain variables as public outputs of the circuit.
 - `GetRandomValue`: This method retrieves a random value directly, a more efficient approach than generating pseudo-random numbers using a hash function. This direct access to random numbers is facilitated by the Libra proving process.
-- `CustomGate`: This method is similar to Gnark's `NewHint` in that it essentially calls a hint function to compute a result. In the resulting layered circuit, it will be compiled into a custom gate of the specified gate type. Unlike `NewHint`, it requires pre-registering the hint function and other parameters. For specific details, see [the example](../ecgo/examples/custom_gate/main.go).
+- `CustomGate`: This method is similar to Gnark's `NewHint` in that it essentially calls a hint function to compute a result. In the resulting layered circuit, it will be compiled into a custom gate of the specified gate type. Unlike `NewHint`, it requires pre-registering the hint function and other parameters. For specific details, see [the example](https://github.com/PolyhedraZK/ExpanderCompilerCollection/blob/master/ecgo/examples/custom_gate/main.go).
 
 Several other APIs exist for old pure Golang Expander Compiler compability, but they are no-op now.
 

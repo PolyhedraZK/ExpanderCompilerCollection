@@ -1,4 +1,8 @@
-# Rust Example
+---
+sidebar_position: 2
+---
+
+# Example
 
 Below is an example using the `expander_compiler` library in Rust:
 
@@ -117,4 +121,4 @@ In this example, we demonstrate how to define a simple circuit, compile it using
 
 By following these steps, we can define, compile, and verify a circuit, and serialize the relevant data for later use.
 
-This example can also be found in [this file](../expander_compiler/tests/example.rs).
+This example can also be found in [this file](https://github.com/PolyhedraZK/ExpanderCompilerCollection/blob/master/expander_compiler/tests/example.rs).

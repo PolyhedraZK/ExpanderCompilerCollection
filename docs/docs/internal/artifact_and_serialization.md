@@ -1,3 +1,7 @@
+---
+sidebar_position: 3
+---
+
 # Compilation Artifacts and Serialization
 
 This document provides an in-depth explanation of the primary compilation artifacts - the layered circuit and the input solver, as well as their respective serialization formats.
@@ -35,13 +39,13 @@ The serialization of an array begins with a `uint64` that denotes its length, fo
 
 A unique identifier, the magic number 3770719418566461763 (b'CIRCUIT4'), is prefixed to the serialized RootCircuit data stream to ensure data integrity.
 
-Refer [Go implementation](../ecgo/layered/serialize.go) and [Rust implementation](../expander_compiler/src/circuit/layered/serde.rs) for details.
+Refer [Go implementation](https://github.com/PolyhedraZK/ExpanderCompilerCollection/blob/master/ecgo/layered/serialize.go) and [Rust implementation](https://github.com/PolyhedraZK/ExpanderCompilerCollection/blob/master/expander_compiler/src/circuit/layered/serde.rs) for details.
 
 ## Input Solver
 
-The input solver (`irwg.RootCircuit`) is an intermediary form of the circuit that facilitates witness generation.
+The input solver (`irwg.RootCircuit`), or witness solver, is an intermediary form of the circuit that facilitates witness generation.
 
-Refer [Go implementation](../ecgo/irwg/serialize.go), [Rust implementation for circuit](../expander_compiler/src/circuit/ir/common/serde.rs) and [Rust implementation for instruction](../expander_compiler/src/circuit/ir/hint_normalized/serde.rs) for details.
+Refer [Go implementation](https://github.com/PolyhedraZK/ExpanderCompilerCollection/blob/master/ecgo/irwg/serialize.go), [Rust implementation for circuit](https://github.com/PolyhedraZK/ExpanderCompilerCollection/blob/master/expander_compiler/src/circuit/ir/common/serde.rs) and [Rust implementation for instruction](https://github.com/PolyhedraZK/ExpanderCompilerCollection/blob/master/expander_compiler/src/circuit/ir/hint_normalized/serde.rs) for details.
 
 ## Witness Serialization
 
@@ -49,4 +53,4 @@ The witness, an array of `big.Int`, serves as the input for the layered circuit.
 
 One witness file contains one or multiple witnesses, stored in a compact form.
 
-Refer [Go implementation](../ecgo/irwg/witness_gen.go) for details.
+Refer [Go implementation](https://github.com/PolyhedraZK/ExpanderCompilerCollection/blob/master/ecgo/irwg/witness_gen.go) for details.
