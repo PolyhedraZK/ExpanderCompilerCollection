@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - rust_rewrite
+      - master
 
 env:
   RUSTFLAGS: "-Dwarnings"
