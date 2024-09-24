@@ -3,7 +3,6 @@ name: ci
 on:
   push:
     branches:
-      - rust_rewrite
       - master
 
 env:
@@ -18,7 +17,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "expander_compiler -> expander_compiler/target"
@@ -63,11 +62,22 @@ jobs:
     steps:
       - uses: styfle/cancel-workflow-action@0.11.0
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "expander_compiler -> expander_compiler/target"
       - run: cargo test --manifest-path=expander_compiler/Cargo.toml --release
+
+  test-rust-avx2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: styfle/cancel-workflow-action@0.11.0
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "expander_compiler -> expander_compiler/target"
+      - run: cargo test --manifest-path=expander_compiler/Cargo.toml --release --features avx256
 
   test-go:
     runs-on: ${{ matrix.os }}
@@ -118,7 +128,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
       - run: cargo fmt --all --manifest-path=expander_compiler/Cargo.toml -- --check
