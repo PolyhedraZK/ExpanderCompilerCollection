@@ -45,6 +45,7 @@ pub trait ToVariableOrValue<F: Field> {
 trait NotVariable {}
 impl NotVariable for u32 {}
 impl NotVariable for U256 {}
+impl<F: Field> NotVariable for F {}
 
 impl<F: Field, T: Into<F> + NotVariable> ToVariableOrValue<F> for T {
     fn convert_to_variable_or_value(self) -> VariableOrValue<F> {
