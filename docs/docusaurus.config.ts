@@ -5,7 +5,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 const config: Config = {
   title: 'Expander Compiler Collection',
   tagline: 'Circuit Compiler for Expander',
-  favicon: 'img/favicon.ico',
+  favicon: 'img/favicon.png',
 
   // Set the production url of your site here
   url: 'https://polyhedrazk.github.io/',
@@ -52,8 +52,8 @@ const config: Config = {
     navbar: {
       title: 'Expander Compiler Collection',
       logo: {
-        alt: 'My Site Logo',
-        src: 'img/logo.svg',
+        alt: 'Polyhedra Network',
+        src: 'img/favicon.png',
       },
       items: [
         {
