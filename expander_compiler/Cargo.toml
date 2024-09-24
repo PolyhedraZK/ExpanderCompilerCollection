@@ -35,4 +35,4 @@ arith = { git = "https://github.com/PolyhedraZK/Expander" }
 expander-rs = { git = "https://github.com/PolyhedraZK/Expander" }
 
 [features]
-avx256 = ["arith/avx256"]
+avx256 = ["arith/avx256", "expander-rs/avx256"]

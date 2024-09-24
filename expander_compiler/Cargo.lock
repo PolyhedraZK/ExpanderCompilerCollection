@@ -93,7 +93,7 @@ dependencies = [
 [[package]]
 name = "arith"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander#373dbd62cfa0cbd94256339088c22fb5b71c6173"
+source = "git+https://github.com/PolyhedraZK/Expander#10215e17591602911283c6fb0efafae9f2cc7f48"
 dependencies = [
  "ark-std",
  "cfg-if",
@@ -435,7 +435,7 @@ checksum = "b90ca2580b73ab6a1f724b76ca11ab632df820fd6040c336200d2c1df7b3c82c"
 [[package]]
 name = "expander-rs"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander#373dbd62cfa0cbd94256339088c22fb5b71c6173"
+source = "git+https://github.com/PolyhedraZK/Expander#10215e17591602911283c6fb0efafae9f2cc7f48"
 dependencies = [
  "arith",
  "ark-std",
