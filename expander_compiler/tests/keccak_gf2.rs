@@ -1,9 +1,9 @@
-use expander_compiler::frontend::*;
+use expander_compiler::{circuit::layered::witness, frontend::*};
 use internal::Serde;
 use rand::{thread_rng, Rng};
 use tiny_keccak::Hasher;
 
-const N_HASHES: usize = 8;
+const N_HASHES: usize = 1;
 
 fn rc() -> Vec<u64> {
     vec![
@@ -279,6 +279,12 @@ fn keccak_gf2_main() {
     }
     assert_eq!(res, expected_res);
     println!("test 3 passed");
+
+    let assignments_correct: Vec<Keccak256Circuit<GF2>> =
+        (0..8).map(|i| assignments[i * 2].clone()).collect();
+    let witness = witness_solver
+        .solve_witnesses(&assignments_correct)
+        .unwrap();
 
     let file = std::fs::File::create("circuit.txt").unwrap();
     let writer = std::io::BufWriter::new(file);
