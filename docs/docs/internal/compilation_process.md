@@ -1,6 +1,10 @@
+---
+sidebar_position: 2
+---
+
 # Compilation Process
 
-The compilation process, encapsulated within `api.go`, comprises several distinct phases:
+The compilation process, mainly encapsulated within [compile/mod.rs](https://github.com/PolyhedraZK/ExpanderCompilerCollection/blob/master/expander_compiler/src/compile/mod.rs), comprises several distinct phases:
 
 1. **Circuit Intermediate Representation (IR) Construction:** The initial phase involves processing the source code with the builder, which constructs the circuit's Intermediate Representation (IR). It maintains a tree structure that mirrors the computational graph of the circuit, serving as the foundation for IR generation.
 
@@ -40,7 +44,7 @@ This process effectively eliminates most unnecessary variables and redundant sub
 
 ### Layered Circuit
 
-For detailed information on the format of the layered circuit, please refer to the [artifact and serialization](./artifact_and_serialization.md) documentation.
+For detailed information on the format of the layered circuit, please refer to the [artifact and serialization](./artifact_and_serialization) documentation.
 
 The first element in the circuit's output layer is the Random Combined Assertions, followed by Public Inputs.
 
