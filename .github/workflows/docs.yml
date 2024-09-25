@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - new_docs
+      - master
 
 jobs:
   build:
