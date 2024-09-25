@@ -1,4 +1,8 @@
-# Internal Modules
+---
+sidebar_position: 4
+---
+
+# Rust Internal Modules
 
 The following modules are available:
 
@@ -26,7 +30,7 @@ Contains the main logic for compilation. It sequentially calls various parts to 
 Currently defines some built-in hints. Hints, similar to those in `gnark`, are non-add/mul computations introduced during the witness solving process.
 
 ## layering
-Contains the logic for converting the destination IR into a layered circuit. The architecture of this part is consistent with what is described in [this document](./compilation_process.md).
+Contains the logic for converting the destination IR into a layered circuit. The architecture of this part is consistent with what is described in [this document](./compilation_process).
 
 ## utils
 Various utility functions.

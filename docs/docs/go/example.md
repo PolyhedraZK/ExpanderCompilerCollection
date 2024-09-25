@@ -1,3 +1,7 @@
+---
+sidebar_position: 2
+---
+
 # Example
 
 Consider the following gnark circuit as an example:
@@ -79,8 +83,8 @@ func main() {
 
 Please note that the Prover's implementation resides in [Expander](https://github.com/PolyhedraZK/Expander). As such, the `CheckCircuit` function in this context merely evaluates the circuit once to confirm its correctness. To generate and verify the actual proof, supply `circuit.txt` and `witness.txt` to Expander.
 
-In contrast to gnark, where the prover handles a portion of the witness generation, our compiler employs an `InputSolver` to perform this task. The `InputSolver` also supports serialization and deserialization. For more information, please consult the examples in [MIMC](../ecgo/examples/mimc) and [MIMC Deserialize](../ecgo/examples/mimc_deserialize).
+In contrast to gnark, where the prover handles a portion of the witness generation, our compiler employs an `InputSolver` to perform this task. The `InputSolver` also supports serialization and deserialization. For more information, please consult the examples in [MIMC](https://github.com/PolyhedraZK/ExpanderCompilerCollection/blob/master/ecgo/examples/mimc) and [MIMC Deserialize](https://github.com/PolyhedraZK/ExpanderCompilerCollection/blob/master/ecgo/mimc_deserialize).
 
-For additional features, please refer to [APIs](./go_apis.md).
+For additional features, please refer to [APIs](./apis).
 
-For more examples, please visit [examples](../ecgo/examples).
+For more examples, please visit [examples](https://github.com/PolyhedraZK/ExpanderCompilerCollection/blob/master/ecgo/examples).

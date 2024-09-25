@@ -1,8 +1,12 @@
-# Rust API Documentation
+---
+sidebar_position: 3
+---
+
+# Compiler APIs
 
 For circuit developers, most of the necessary APIs are provided in the `expander_compiler::frontend` module. If you need to perform more advanced development on top of the compiler, you may need to use other components. This document primarily discusses the contents of the `frontend` module.
 
-Introduction of other modules can be found in [rust_internal.md](./rust_internal.md).
+Introduction of other modules can be found in [Rust Internal Modules](../internal/rust_modules).
 
 The following items are defined:
 

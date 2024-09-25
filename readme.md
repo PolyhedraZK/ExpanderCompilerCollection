@@ -3,6 +3,10 @@
 
 Expander is a proof generation backend for the Polyhedra Network. The ExpanderCompilerCollection is a component of the Expander proof system. It transforms circuits written in [gnark](https://github.com/Consensys/gnark) into an intermediate representation (IR) of a layered circuit. This IR can later be used by the [Expander prover](https://github.com/PolyhedraZK/Expander) to generate proofs.
 
+## Documentation
+
+Documentation is available at [Expander Compiler Collection Documentation](https://polyhedrazk.github.io/ExpanderCompilerCollection/).
+
 ## Using this Library
 
 To incorporate the compiler into your Go project, include the following import statement in your code:
@@ -11,29 +15,11 @@ To incorporate the compiler into your Go project, include the following import s
 import "github.com/PolyhedraZK/ExpanderCompilerCollection"
 ```
 
-The APIs for this library are detailed in [Go APIs](./docs/go_apis.md).
-
-## New Rust Frontend
-
-We are excited to announce the release of our new Rust frontend, similar to gnark. This frontend allows you to write circuits in Rust, which can then be compiled using the ExpanderCompilerCollection. For more details and usage instructions, please visit [Rust Frontend Documentation](./docs/rust_frontend.md).
+We also have a [Rust frontend](https://polyhedrazk.github.io/ExpanderCompilerCollection/docs/rust/intro) similar to gnark.
 
 ## Example 
 
 Refer to [this example](./docs/go_example.md) for a practical demonstration of our compiler. In this example, we illustrate how a gnark circuit can be compiled using `ExpanderCompilerCollection`. The output of this example includes a circuit description file `"circuit.txt"` and a corresponding witnesses file `"witness.txt"`. Our prover, [Expander](https://github.com/PolyhedraZK/Expander), utilizes these IRs to generate the actual proof.
-
-Additional examples include:
-- Hash functions like [sha2](./ecgo/examples/gnark_std_sha2/main.go), [keccak](./ecgo/examples/keccak/main.go), and [MIMC](./ecgo/examples/mimc/main.go)
-- A [recursive circuit](./ecgo/examples/gnark_recursive_proof/main.go)
-- A [mersenne field](./ecgo/examples/m31_field/main.go)
-
-## Deeper Dive in to the tech
-
-For a more technical overview of the overall architecture, visit our [Compilation Process](./docs/compilation_process.md) document.
-
-For a detailed explanation of the primary compilation artifacts - the layered circuit and the input solver, as well as their respective serialization formats, refer to [Artifact and Serialization](./docs/artifact_and_serialization.md).
-
-## AVX
-We use AVX512 by default, if your CPU doesn't support AVX512, or you encountered illegal instruction error, please clone the library, and run `build-rust-avx2.sh` to build AVX2 libs.
 
 ## Acknowledgement
 
@@ -41,10 +27,10 @@ We extend our gratitude to the following projects, whose prior work has been cru
 
 [gnark](https://github.com/Consensys/gnark): our frontend language is based on gnark's frontend.
 
-## Future roadmap
+## Future Roadmap
 
-As a compiler collection, we will support more circuit frontend languages in near term.
+As a compiler collection, we will support more circuit frontend languages in the near term.
 
-## Features in progress
+## Features in Progress
 * On-chain verifier generation
 * Extended in-circuit randomness generation
