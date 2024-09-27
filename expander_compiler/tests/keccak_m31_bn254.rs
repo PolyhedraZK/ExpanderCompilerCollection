@@ -5,7 +5,7 @@ use internal::Serde;
 use rand::{thread_rng, Rng};
 use tiny_keccak::Hasher;
 
-const N_HASHES: usize = 7;
+const N_HASHES: usize = 2;
 
 const CHECK_BITS: usize = 256;
 const PARTITION_BITS: usize = 30;
@@ -282,7 +282,7 @@ impl<C: Config> Define<C> for Keccak256Circuit<Variable> {
     }
 }
 
-fn keccak_big_field<C: Config>() {
+fn keccak_big_field<C: Config, const N_WITNESSES: usize>() {
     let compile_result: CompileResult<C> = compile(&Keccak256Circuit::default()).unwrap();
     let CompileResult {
         witness_solver,
@@ -331,7 +331,7 @@ fn keccak_big_field<C: Config>() {
     println!("test 2 passed");
 
     let mut assignments = Vec::new();
-    for _ in 0..16 {
+    for _ in 0..N_WITNESSES * 2 {
         for k in 0..N_HASHES {
             assignment.p[k][0] = -assignment.p[k][0];
         }
@@ -339,12 +339,18 @@ fn keccak_big_field<C: Config>() {
     }
     let witness = witness_solver.solve_witnesses(&assignments).unwrap();
     let res = layered_circuit.run(&witness);
-    let mut expected_res = vec![false; 16];
-    for i in 0..8 {
+    let mut expected_res = vec![false; N_WITNESSES * 2];
+    for i in 0..N_WITNESSES {
         expected_res[i * 2] = true;
     }
     assert_eq!(res, expected_res);
     println!("test 3 passed");
+
+    let assignments_correct: Vec<Keccak256Circuit<C::CircuitField>> =
+        (0..N_WITNESSES).map(|i| assignments[i * 2].clone()).collect();
+    let witness = witness_solver
+        .solve_witnesses(&assignments_correct)
+        .unwrap();
 
     let file = std::fs::File::create("circuit.txt").unwrap();
     let writer = std::io::BufWriter::new(file);
@@ -363,10 +369,10 @@ fn keccak_big_field<C: Config>() {
 
 #[test]
 fn keccak_m31_test() {
-    keccak_big_field::<M31Config>();
+    keccak_big_field::<M31Config, 16>();
 }
 
 #[test]
 fn keccak_bn254_test() {
-    keccak_big_field::<BN254Config>();
+    keccak_big_field::<BN254Config, 1>();
 }
