@@ -11,14 +11,19 @@ import (
 
 // U32AddCircuit defines a 32-bit adder circuit
 type U32AddCircuit struct {
-	A        [32]frontend.Variable `gnark:",public"`
-	B        [32]frontend.Variable `gnark:",public"`
-	CarryIns [8]frontend.Variable  `gnark:",public"`
+	A       [32]frontend.Variable `gnark:",public"`
+	B       [32]frontend.Variable `gnark:",public"`
+	CarryIn frontend.Variable     `gnark:",public"`
+	Sum     [32]frontend.Variable `gnark:",public"`
+	// CarryOut frontend.Variable     `gnark:",public"`
 }
 
 func (c *U32AddCircuit) Define(api frontend.API) error {
-	u32adder.BrentKungAdder32Bits(api, c.A[:], c.B[:], c.CarryIns[:])
-
+	sum, _ := u32adder.BrentKungAdder32Bits(api, c.A[:], c.B[:], c.CarryIn)
+	for i := 0; i < 32; i++ {
+		api.AssertIsEqual(c.Sum[i], sum[i])
+	}
+	// api.AssertIsEqual(c.CarryOut, carryOut)
 	return nil
 }
 

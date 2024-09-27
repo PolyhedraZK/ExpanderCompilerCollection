@@ -1,0 +1,22 @@
+a0,a1,a2,a3, // 4-bit input
+b0,b1,b2,b3, // 4-bit input
+cin,		// 1-bit input
+s0,s1,s2,s3,	// 4-bit output
+cout	// 1-bit output
+
+
+
+s0 		= a0 + b0 + cin
+s0carry = a0*b0 + a0*cin + b0*cin
+s1 		= a1 + b1 + s0carry
+s1carry = a1*b1 + a1*s0carry + b1*s0carry 
+		= a1*b1 + a1*(a0*b0 + a0*cin + b0*cin) + b1*(a0*b0 + a0*cin + b0*cin)
+		= a1*b1 + a1*a0*b0 + a1*a0*cin + a1*b0*cin + b1*a0*b0 + b1*a0*cin + b1*b0*cin
+s2 		= a2 + b2 + s1carry
+s2carry = a2*b2 + a2*s1carry + b2*s1carry
+		= a2*b2 + a2*(a1*b1 + a1*a0*b0 + a1*a0*cin + a1*b0*cin + b1*a0*b0 + b1*a0*cin + b1*b0*cin) + b2*(a1*b1 + a1*a0*b0 + a1*a0*cin + a1*b0*cin + b1*a0*b0 + b1*a0*cin + b1*b0*cin)
+		= a2*b2 + a2*a1*b1 + a2*a1*a0*b0 + a2*a1*a0*cin + a2*a1*b0*cin + a2*b1*a0*b0 + a2*b1*a0*cin + a2*b1*b0*cin + b2*a1*b1 + b2*a1*a0*b0 + b2*a1*a0*cin + b2*a1*b0*cin + b2*b1*a0*b0 + b2*b1*a0*cin + b2*b1*b0*cin
+s3 		= a3 + b3 + s2carry
+s3carry = a3*b3 + a3*s2carry + b3*s2carry
+		= a3*b3 + a3*(a2*b2 + a2*a1*b1 + a2*a1*a0*b0 + a2*a1*a0*cin + a2*a1*b0*cin + a2*b1*a0*b0 + a2*b1*a0*cin + a2*b1*b0*cin + b2*a1*b1 + b2*a1*a0*b0 + b2*a1*a0*cin + b2*a1*b0*cin + b2*b1*a0*b0 + b2*b1*a0*cin + b2*b1*b0*cin) + b3*(a2*b2 + a2*a1*b1 + a2*a1*a0*b0 + a2*a1*a0*cin + a2*a1*b0*cin + a2*b1*a0*b0 + a2*b1*a0*cin + a2*b1*b0*cin + b2*a1*b1 + b2*a1*a0*b0 + b2*a1*a0*cin + b2*a1*b0*cin + b2*b1*a0*b0 + b2*b1*a0*cin + b2*b1*b0*cin)
+		= a3*b3 + a3*a2*b2 + a3*a2*a1*b1 + a3*a2*a1*a0*b0 + a3*a2*a1*a0*cin + a3*a2*a1*b0*cin + a3*a2*b1*a0*b0 + a3*a2*b1*a0*cin + a3*a2*b1*b0*cin + a3*b2*a1*b1 + a3*b2*a1*a0*b0 + a3*b2*a1*a0*cin + a3*b2*a1*b0*cin + a3*b2*b1*a0*b0 + a3*b2*b1*a0*cin + a3*b2*b1*b0*cin + b3*a2*b2 + b3*a2*a1*b1 + b3*a2*a1*a0*b0 + b3*a2*a1*a0*cin + b3*a2*a1*b0*cin + b3*a2*b1*a0*b0 + b3*a2*b1*a0*cin + b3*a2*b1*b0*cin + b3*b2*a1*b1 + b3*b2*a1*a0*b0 + b3*b2*a1*a0*cin + b3*b2*a1*b0*cin + b3*b2*b1*a0*b0 + b3*b2*b1*a0*cin + b3*b2*b1*b0*cin

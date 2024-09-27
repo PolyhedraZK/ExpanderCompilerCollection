@@ -2,16 +2,12 @@ package u32adder
 
 import "github.com/consensys/gnark/frontend"
 
-func BrentKungAdder32Bits(api frontend.API, a, b []frontend.Variable, carryIn []frontend.Variable) ([]frontend.Variable, frontend.Variable) {
+func BrentKungAdder32Bits(api frontend.API, a, b []frontend.Variable, carryIn frontend.Variable) ([]frontend.Variable, frontend.Variable) {
 	if len(a) != 32 || len(b) != 32 {
 		panic("Input slices must be 32 bits long")
 	}
 
-	if len(carryIn) != 8 {
-		panic("CarryIn slice must be 8 bits long")
-	}
-
-	var carry frontend.Variable
+	carry := carryIn
 
 	sum := make([]frontend.Variable, 32)
 
@@ -23,15 +19,11 @@ func BrentKungAdder32Bits(api frontend.API, a, b []frontend.Variable, carryIn []
 			api,
 			a[start:end],
 			b[start:end],
-			carryIn[i],
+			carry,
 		)
 
 		copy(sum[start:end], groupSum)
-		if i != 7 {
-			api.AssertIsEqual(carryIn[i+1], groupCarry)
-		} else {
-			carry = groupCarry
-		}
+		carry = groupCarry
 
 	}
 

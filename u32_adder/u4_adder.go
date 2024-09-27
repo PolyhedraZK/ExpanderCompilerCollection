@@ -63,3 +63,62 @@ func BrentKungAdder4Bits(api frontend.API, a, b []frontend.Variable, carryIn fro
 
 	return sum, c[4]
 }
+
+// NaiveAdder performs 4-bit addition using the Brent-Kung method
+// with gnark frontend operations
+func NaiveAdder4Bits(api frontend.API, a, b []frontend.Variable, carryIn frontend.Variable) ([]frontend.Variable, frontend.Variable) {
+	if len(a) != 4 || len(b) != 4 {
+		panic("Input slices must be 4 bits long")
+	}
+
+	// Helper functions
+	add := func(x ...frontend.Variable) frontend.Variable {
+		result := x[0]
+		for i := 1; i < len(x); i++ {
+			result = api.Add(result, x[i])
+		}
+		return result
+	}
+
+	mul := api.Mul
+
+	// Pre-compute products
+	ab := make([]frontend.Variable, 4)
+	for i := 0; i < 4; i++ {
+		ab[i] = mul(a[i], b[i])
+	}
+
+	// Calculate s0 and s0carry
+	s0 := add(a[0], b[0], carryIn)
+	s0carry := add(
+		ab[0],
+		mul(a[0], carryIn),
+		mul(b[0], carryIn),
+	)
+
+	// Calculate s1 and s1carry
+	s1 := add(a[1], b[1], s0carry)
+	s1carry := add(
+		ab[1],
+		mul(a[1], s0carry),
+		mul(b[1], s0carry),
+	)
+
+	// Calculate s2 and s2carry
+	s2 := add(a[2], b[2], s1carry)
+	s2carry := add(
+		ab[2],
+		mul(a[2], s1carry),
+		mul(b[2], s1carry),
+	)
+
+	// Calculate s3 and s3carry (cout)
+	s3 := add(a[3], b[3], s2carry)
+	cout := add(
+		ab[3],
+		mul(a[3], s2carry),
+		mul(b[3], s2carry),
+	)
+
+	return []frontend.Variable{s0, s1, s2, s3}, cout
+}
