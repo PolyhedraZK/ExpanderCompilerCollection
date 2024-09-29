@@ -163,7 +163,7 @@ func initCompilePtr() {
 	updateLib(soPath)
 	handle := C.dlopen(C.CString(soPath), C.RTLD_LAZY)
 	if handle == nil {
-		panic("failed to load libec_go_lib")
+		panic("failed to load libec_go_lib, you may need to install openmpi")
 	}
 	abiVersionPtr := C.dlsym(handle, C.CString("abi_version"))
 	if abiVersionPtr == nil {
