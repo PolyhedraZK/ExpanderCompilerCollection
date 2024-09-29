@@ -24,6 +24,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "expander_compiler -> expander_compiler/target"
+      - if: ${{ matrix.os == 'macos-latest' }}
+        run: brew install openmpi
+      - if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: apt-get update && apt-get install libopenmpi-dev -y
       - name: Build
         run: cargo build --release --manifest-path=expander_compiler/ec_go_lib/Cargo.toml
       - name: Upload artifact
@@ -44,6 +48,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "expander_compiler -> expander_compiler/target"
+      - if: ${{ matrix.os == 'macos-latest' }}
+        run: brew install openmpi
+      - if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: apt-get update && apt-get install libopenmpi-dev -y
       - run: cargo test --manifest-path=expander_compiler/Cargo.toml 
 
   test-rust-avx512:
@@ -55,7 +63,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "expander_compiler -> expander_compiler/target"
-      - run: cargo test --manifest-path=expander_compiler/Cargo.toml --features avx256
+      - if: ${{ matrix.os == 'macos-latest' }}
+        run: brew install openmpi
+      - if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: apt-get update && apt-get install libopenmpi-dev -y
+      - run: RUSTFLAGS="-C target-cpu=native -C target-feature=+avx512f" cargo test --manifest-path=expander_compiler/Cargo.toml
 
   test-go:
     runs-on: ${{ matrix.os }}
@@ -109,5 +121,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+      - run: brew install openmpi
       - run: cargo fmt --all --manifest-path=expander_compiler/Cargo.toml -- --check
       - run: cargo clippy --manifest-path=expander_compiler/Cargo.toml
