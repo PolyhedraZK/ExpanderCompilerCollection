@@ -282,8 +282,10 @@ fn keccak_gf2_full() {
     let mut expander_circuit = layered_circuit
         .export_to_expander::<expander_rs::GF2ExtConfigSha2>()
         .flatten();
-    let config =
-        expander_rs::Config::<expander_rs::GF2ExtConfigSha2>::new(expander_rs::GKRScheme::Vanilla);
+    let config = expander_rs::Config::<expander_rs::GF2ExtConfigSha2>::new(
+        expander_rs::GKRScheme::Vanilla,
+        expander_rs::MPIConfig::new(),
+    );
 
     // currently we have to manually convert witness to expander simd format
     assert_eq!(

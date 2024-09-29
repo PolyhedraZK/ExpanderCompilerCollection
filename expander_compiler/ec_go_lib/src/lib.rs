@@ -161,7 +161,10 @@ fn prove_circuit_file_inner<C: expander_rs::GKRConfig>(
     circuit_filename: &str,
     witness: &[u8],
 ) -> Vec<u8> {
-    let config = expander_rs::Config::<C>::new(expander_rs::GKRScheme::Vanilla);
+    let config = expander_rs::Config::<C>::new(
+        expander_rs::GKRScheme::Vanilla,
+        expander_rs::MPIConfig::new(),
+    );
     let mut circuit = expander_rs::Circuit::<C>::load_circuit(circuit_filename);
     circuit.load_witness_bytes(witness).unwrap();
     circuit.evaluate();
@@ -176,7 +179,10 @@ fn verify_circuit_file_inner<C: expander_rs::GKRConfig>(
     witness: &[u8],
     proof_and_claimed_v: &[u8],
 ) -> u8 {
-    let config = expander_rs::Config::<C>::new(expander_rs::GKRScheme::Vanilla);
+    let config = expander_rs::Config::<C>::new(
+        expander_rs::GKRScheme::Vanilla,
+        expander_rs::MPIConfig::new(),
+    );
     let mut circuit = expander_rs::Circuit::<C>::load_circuit(circuit_filename);
     match circuit.load_witness_bytes(witness) {
         Ok(_) => (),

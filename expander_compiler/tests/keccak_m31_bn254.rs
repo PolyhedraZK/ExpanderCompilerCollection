@@ -346,8 +346,9 @@ fn keccak_big_field<C: Config, const N_WITNESSES: usize>() {
     assert_eq!(res, expected_res);
     println!("test 3 passed");
 
-    let assignments_correct: Vec<Keccak256Circuit<C::CircuitField>> =
-        (0..N_WITNESSES).map(|i| assignments[i * 2].clone()).collect();
+    let assignments_correct: Vec<Keccak256Circuit<C::CircuitField>> = (0..N_WITNESSES)
+        .map(|i| assignments[i * 2].clone())
+        .collect();
     let witness = witness_solver
         .solve_witnesses(&assignments_correct)
         .unwrap();
