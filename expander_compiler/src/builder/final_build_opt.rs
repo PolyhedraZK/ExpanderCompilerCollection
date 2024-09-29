@@ -23,6 +23,8 @@ use crate::{
 
 use super::basic::LinMeta;
 
+const COMPRESS_THRESHOLD: usize = 64;
+
 struct RootBuilder<C: Config> {
     builders: HashMap<usize, Builder<C>>,
     out_circuits: HashMap<usize, OutCircuit<C>>,
@@ -453,6 +455,7 @@ impl<C: Config> Builder<C> {
         let ref_count = self.in_var_ref_counts[self.in_var_exprs.len()].clone();
         let degree_count = e.count_of_degrees();
         let mut should_compress = ref_count.single > 0;
+        should_compress |= degree_count.iter().sum::<usize>() > COMPRESS_THRESHOLD;
         let cost_no_compress =
             cost_of_possible_references::<C>(&degree_count, ref_count.add, ref_count.mul);
         let cost_compress = cost_of_compress::<C>(&degree_count)
