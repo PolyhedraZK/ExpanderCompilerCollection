@@ -130,7 +130,7 @@ jobs:
           pattern: build-ubuntu-latest
           merge-multiple: true
       - run: |
-          apt-get update && apt-get install libopenmpi-dev -y
+          sudo apt-get update && sudo apt-get install libopenmpi-dev -y
           cp artifacts/libec_go_lib.* ecgo/rust/wrapper/
           cd ecgo
           go run examples/keccak_full/main.go
