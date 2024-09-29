@@ -1,12 +1,6 @@
 name: tests
 
-on:
-  push:
-    branches:
-      - '*'
-      - '!master'
-  pull_request:
-    branches: ["*"]
+on: [push, pull_request]
 
 env:
   RUSTFLAGS: "-Dwarnings"
@@ -37,10 +31,10 @@ jobs:
           path: expander_compiler/target/release/libec_go_lib.*
 
   test-rust:
-    runs-on: ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        platform: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: styfle/cancel-workflow-action@0.11.0
       - uses: actions/checkout@v4
