@@ -24,9 +24,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "expander_compiler -> expander_compiler/target"
-      - if: ${{ matrix.os == 'macos-latest' }}
+      - if: matrix.os == 'macos-latest'
         run: brew install openmpi
-      - if: ${{ matrix.os == 'ubuntu-latest' }}
+      - if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install libopenmpi-dev -y
       - name: Build
         run: cargo build --release --manifest-path=expander_compiler/ec_go_lib/Cargo.toml
@@ -48,9 +48,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "expander_compiler -> expander_compiler/target"
-      - if: ${{ matrix.os == 'macos-latest' }}
+      - if: matrix.os == 'macos-latest'
         run: brew install openmpi
-      - if: ${{ matrix.os == 'ubuntu-latest' }}
+      - if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install libopenmpi-dev -y
       - run: cargo test --manifest-path=expander_compiler/Cargo.toml 
 
