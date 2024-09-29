@@ -1,9 +1,12 @@
-name: ci
+name: tests
 
 on:
   push:
     branches:
-      - master
+      - '*'
+      - '!master'
+  pull_request:
+    branches: ["*"]
 
 env:
   RUSTFLAGS: "-Dwarnings"
@@ -28,31 +31,6 @@ jobs:
         with:
           name: build-${{ matrix.os }}
           path: expander_compiler/target/release/libec_go_lib.*
-
-  upload-rust:
-    needs: [build-rust, test-rust, test-rust-avx512, lint]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./artifacts
-          pattern: build-*
-          merge-multiple: true
-
-      - name: Push built libs to another branch
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-          git checkout --orphan rust-built-libs
-          cp artifacts/libec_go_lib.* ./
-          rm ./libec_go_lib.d
-          git rm --cached -r .
-          git add ./libec_go_lib.* -f
-          git commit -m "Add built libs"
-          git push -f --set-upstream origin rust-built-libs
 
   test-rust:
     runs-on: ${{ matrix.platform }}
