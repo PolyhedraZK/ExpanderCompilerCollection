@@ -143,6 +143,9 @@ func (rc *RootCircuit) evalSub(circuitId uint64, inputs []constraint.Element, pu
 				hint_inputs = append(hint_inputs, rc.Field.ToBigInt(values[x]))
 			}
 			hint_outputs := make([]*big.Int, insn.NumOutputs)
+			for i := range hint_outputs {
+				hint_outputs[i] = big.NewInt(0)
+			}
 			err := callHint(insn.ExtraId, rc.Field.Field(), hint_inputs, hint_outputs)
 			if err != nil {
 				return nil, err
