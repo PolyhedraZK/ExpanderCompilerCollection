@@ -61,7 +61,7 @@ impl<C: Config> Context<C> {
 }
 ```
 
-## 3. DeviceMemory<C>
+## 3. DeviceMemory
 
 The `DeviceMemory<C>` struct represents memory on the device (in this case, the ZK circuit). It has the following internal structure:
 
