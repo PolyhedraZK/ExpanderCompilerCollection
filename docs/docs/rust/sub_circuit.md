@@ -6,7 +6,7 @@ sidebar_position: 4
 
 A sub-circuit is similar to a component in Circom. It is a segment of a circuit that is called repeatedly and can be packaged into a sub-circuit.
 
-The sub-circuit API in Go is introduced in [APIs](../apis).
+The sub-circuit API in Go is introduced in [APIs](../go/apis).
 
 The current Rust frontend only supports sub-circuits equivalent to `SubCircuitSimpleFunc` in Go. The function definition is as follows:
 
