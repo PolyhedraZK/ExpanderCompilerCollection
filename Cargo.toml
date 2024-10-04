@@ -1,0 +1,25 @@
+[workspace]
+members = ["expander_compiler", "expander_compiler/ec_go_lib"]
+
+[profile.test]
+opt-level = 3
+
+[profile.dev]
+opt-level = 3
+
+
+[workspace.dependencies]
+rand = "0.8.5"
+chrono = "0.4"
+ethnum = "1.5.0"
+tiny-keccak = { version = "2.0", features = ["keccak"] }
+halo2curves = { git = "https://github.com/PolyhedraZK/halo2curves", default-features = false, features = [
+    "bits",
+] }
+arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "nightly" }
+expander_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "nightly", package = "config" }
+expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "nightly", package = "circuit" }
+gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "nightly" }
+gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "nightly" }
+mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "nightly" }
+expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "nightly", package = "transcript" }
