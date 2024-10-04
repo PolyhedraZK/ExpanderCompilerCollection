@@ -2,7 +2,7 @@ use expander_compiler::frontend::*;
 use rand::{thread_rng, Rng};
 use tiny_keccak::Hasher;
 
-const N_HASHES: usize = 8;
+const N_HASHES: usize = 1;
 
 fn rc() -> Vec<u64> {
     vec![
@@ -213,7 +213,9 @@ fn compute_keccak<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variabl
 impl Define<GF2Config> for Keccak256Circuit<Variable> {
     fn define(&self, api: &mut API<GF2Config>) {
         for i in 0..N_HASHES {
-            let out = api.memorized_simple_call(compute_keccak, &self.p[i].to_vec());
+            // You can use api.memorized_simple_call for sub-circuits
+            // let out = api.memorized_simple_call(compute_keccak, &self.p[i].to_vec());
+            let out = compute_keccak(api, &self.p[i].to_vec());
             for j in 0..256 {
                 api.assert_is_equal(out[j].clone(), self.out[i][j].clone());
             }
