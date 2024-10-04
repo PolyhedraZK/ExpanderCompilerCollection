@@ -33,18 +33,22 @@ impl<C: Config> Witness<C> {
     where
         T: arith::SimdField<Scalar = C::CircuitField>,
     {
-        if self.num_witnesses < T::pack_size() {
-            println!(
-                "Warning: not enough witnesses, expect {}, got {}",
-                T::pack_size(),
-                self.num_witnesses
-            );
-        } else if self.num_witnesses > T::pack_size() {
-            println!(
-                "Warning: dropping additional witnesses, expect {}, got {}",
-                T::pack_size(),
-                self.num_witnesses
-            );
+        match self.num_witnesses.cmp(&T::pack_size()) {
+            std::cmp::Ordering::Less => {
+                println!(
+                    "Warning: not enough witnesses, expect {}, got {}",
+                    T::pack_size(),
+                    self.num_witnesses
+                )
+            }
+            std::cmp::Ordering::Greater => {
+                println!(
+                    "Warning: dropping additional witnesses, expect {}, got {}",
+                    T::pack_size(),
+                    self.num_witnesses
+                )
+            }
+            std::cmp::Ordering::Equal => {}
         }
         let ni = self.num_inputs_per_witness;
         let np = self.num_public_inputs_per_witness;
