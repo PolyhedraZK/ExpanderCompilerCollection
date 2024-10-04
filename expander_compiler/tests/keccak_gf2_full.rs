@@ -280,35 +280,29 @@ fn keccak_gf2_full() {
     println!("test 3 passed");
 
     let mut expander_circuit = layered_circuit
-        .export_to_expander::<expander_rs::GF2ExtConfigSha2>()
+        .export_to_expander::<expander_config::GF2ExtConfigSha2>()
         .flatten();
-    let config = expander_rs::Config::<expander_rs::GF2ExtConfigSha2>::new(
-        expander_rs::GKRScheme::Vanilla,
-        expander_rs::MPIConfig::new(),
+    let config = expander_config::Config::<expander_config::GF2ExtConfigSha2>::new(
+        expander_config::GKRScheme::Vanilla,
+        expander_config::MPIConfig::new(),
     );
 
-    // currently we have to manually convert witness to expander simd format
-    assert_eq!(
-        witness.num_inputs_per_witness,
-        1 << expander_circuit.log_input_size()
-    );
-    expander_circuit.layers[0].input_vals = (0..witness.num_inputs_per_witness)
-        .map(|i| {
-            let mut t: u8 = 0;
-            for j in 0..8 {
-                t |= (witness.values[j * witness.num_inputs_per_witness + i].v as u8) << j;
-            }
-            arith::GF2x8 { v: t }
-        })
-        .collect();
+    let (simd_input, simd_public_input) = witness.to_simd::<gf2::GF2x8>();
+    expander_circuit.layers[0].input_vals = simd_input;
+    expander_circuit.public_input = simd_public_input.clone();
 
     // prove
     expander_circuit.evaluate();
-    let mut prover = expander_rs::Prover::new(&config);
+    let mut prover = gkr::Prover::new(&config);
     prover.prepare_mem(&expander_circuit);
     let (claimed_v, proof) = prover.prove(&mut expander_circuit);
 
     // verify
-    let verifier = expander_rs::Verifier::new(&config);
-    assert!(verifier.verify(&mut expander_circuit, &claimed_v, &proof));
+    let verifier = gkr::Verifier::new(&config);
+    assert!(verifier.verify(
+        &mut expander_circuit,
+        &simd_public_input,
+        &claimed_v,
+        &proof
+    ));
 }
