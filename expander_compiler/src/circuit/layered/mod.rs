@@ -97,11 +97,14 @@ impl<C: Config> Coef<C> {
         }
     }
 
-    pub fn export_to_expander(&self) -> (C::CircuitField, bool) {
+    pub fn export_to_expander(&self) -> (C::CircuitField, expander_circuit::CoefType) {
         match self {
-            Coef::Constant(c) => (*c, false),
-            Coef::Random => (C::CircuitField::zero(), true),
-            Coef::PublicInput(_) => panic!("public inputs is not implemented"),
+            Coef::Constant(c) => (*c, expander_circuit::CoefType::Constant),
+            Coef::Random => (C::CircuitField::zero(), expander_circuit::CoefType::Random),
+            Coef::PublicInput(x) => (
+                C::CircuitField::zero(),
+                expander_circuit::CoefType::PublicInput(*x),
+            ),
         }
     }
 }
@@ -115,16 +118,16 @@ pub struct Gate<C: Config, const INPUT_NUM: usize> {
 
 impl<C: Config, const INPUT_NUM: usize> Gate<C, INPUT_NUM> {
     pub fn export_to_expander<
-        DestConfig: expander_rs::GKRConfig<CircuitField = C::CircuitField>,
+        DestConfig: expander_config::GKRConfig<CircuitField = C::CircuitField>,
     >(
         &self,
-    ) -> expander_rs::Gate<DestConfig, INPUT_NUM> {
+    ) -> expander_circuit::Gate<DestConfig, INPUT_NUM> {
         let (c, r) = self.coef.export_to_expander();
-        expander_rs::Gate {
+        expander_circuit::Gate {
             i_ids: self.inputs,
             o_id: self.output,
             coef: c,
-            is_random: r,
+            coef_type: r,
             gate_type: 2 - INPUT_NUM, // TODO: check this
         }
     }

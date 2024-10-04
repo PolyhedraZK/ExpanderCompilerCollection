@@ -15,7 +15,7 @@ func Compile(rc *irsource.RootCircuit) (*irwg.RootCircuit, *layered.RootCircuit,
 		return nil, nil, err
 	}
 	irWg := irwg.DeserializeRootCircuit(irWgSer)
-	lc := layered.DeserializeNewCompilerRootCircuit(lcSer)
+	lc := layered.DeserializeRootCircuit(lcSer)
 	return irWg, lc, nil
 }
 

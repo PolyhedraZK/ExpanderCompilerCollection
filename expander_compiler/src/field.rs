@@ -1,4 +1,6 @@
-pub use arith::{Field as FieldArith, FieldForECC as FieldModulus, BN254, GF2, M31};
+pub use arith::{BN254Fr as BN254, Field as FieldArith, FieldForECC as FieldModulus};
+pub use gf2::GF2;
+pub use mersenne31::M31;
 
 use crate::utils::serde::Serde;
 use arith::{FieldForECC, FieldSerde, FieldSerdeError};

@@ -2,14 +2,14 @@ use super::*;
 
 impl<C: Config> Circuit<C> {
     pub fn export_to_expander<
-        DestConfig: expander_rs::GKRConfig<CircuitField = C::CircuitField>,
+        DestConfig: expander_config::GKRConfig<CircuitField = C::CircuitField>,
     >(
         &self,
-    ) -> expander_rs::RecursiveCircuit<DestConfig> {
+    ) -> expander_circuit::RecursiveCircuit<DestConfig> {
         let segments = self
             .segments
             .iter()
-            .map(|seg| expander_rs::Segment {
+            .map(|seg| expander_circuit::Segment {
                 i_var_num: seg.num_inputs.trailing_zeros() as usize,
                 o_var_num: seg.num_outputs.trailing_zeros() as usize,
                 gate_muls: seg
@@ -32,11 +32,11 @@ impl<C: Config> Circuit<C> {
                     .iter()
                     .map(|gate| {
                         let (c, r) = gate.coef.export_to_expander();
-                        expander_rs::GateUni {
+                        expander_circuit::GateUni {
                             i_ids: [gate.inputs[0]],
                             o_id: gate.output,
                             coef: c,
-                            is_random: r,
+                            coef_type: r,
                             gate_type: gate.gate_type,
                         }
                     })
@@ -49,7 +49,7 @@ impl<C: Config> Circuit<C> {
                             seg.0,
                             seg.1
                                 .iter()
-                                .map(|alloc| expander_rs::Allocation {
+                                .map(|alloc| expander_circuit::Allocation {
                                     i_offset: alloc.input_offset,
                                     o_offset: alloc.output_offset,
                                 })
@@ -59,9 +59,12 @@ impl<C: Config> Circuit<C> {
                     .collect(),
             })
             .collect();
-        expander_rs::RecursiveCircuit {
+        expander_circuit::RecursiveCircuit {
             segments,
             layers: self.layer_ids.clone(),
+            num_outputs: self.num_actual_outputs,
+            num_public_inputs: self.num_public_inputs,
+            expected_num_output_zeros: self.expected_num_output_zeroes,
         }
     }
 }

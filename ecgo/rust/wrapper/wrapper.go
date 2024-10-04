@@ -22,7 +22,7 @@ import (
 	"github.com/consensys/gnark/logger"
 )
 
-const ABI_VERSION = 3
+const ABI_VERSION = 4
 
 func currentFileDirectory() string {
 	_, fileName, _, ok := runtime.Caller(1)
