@@ -147,7 +147,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                                     var: x_plus_y,
                                 },
                                 LinCombTerm {
-                                    coef: C::CircuitField::one() + C::CircuitField::one(),
+                                    coef: -(C::CircuitField::one() + C::CircuitField::one()),
                                     var: x_times_y,
                                 },
                             ],
