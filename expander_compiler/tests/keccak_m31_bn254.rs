@@ -276,7 +276,9 @@ fn compute_keccak<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variabl
 impl<C: Config> Define<C> for Keccak256Circuit<Variable> {
     fn define(&self, api: &mut API<C>) {
         for i in 0..N_HASHES {
-            let out = api.memorized_simple_call(compute_keccak, &self.p[i].to_vec());
+            // You can use api.memorized_simple_call for sub-circuits
+            // let out = api.memorized_simple_call(compute_keccak, &self.p[i].to_vec());
+            let out = compute_keccak(api, &self.p[i].to_vec());
             check_bits(api, out, self.out[i].to_vec());
         }
     }
