@@ -54,9 +54,13 @@ pub fn compile<C: Config>(
 
     let mut src_im = InputMapping::new_identity(r_source.input_size());
 
-    let r_source_opt = optimize_until_fixed_point(r_source, &mut src_im, |r| {
+    let mut r_source = r_source.clone();
+    r_source.detect_chains();
+
+    let r_source_opt = optimize_until_fixed_point(&r_source, &mut src_im, |r| {
         let (mut r, im) = r.remove_unreachable();
         r.reassign_duplicate_sub_circuit_outputs();
+        r.detect_chains();
         (r, im)
     });
     r_source_opt
