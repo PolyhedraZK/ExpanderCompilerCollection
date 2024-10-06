@@ -1,12 +1,42 @@
 ---
-sidebar_position: 7
+sidebar_position: 1
 ---
 
-# CUDA-Like Frontend [WIP]
+# Develop, Optimize, and Deploy your Expander-Accelerated zkApp
 
-This page introduces a new CUDA-like circuit frontend, based on current Rust frontend.
+The Polyhedra's zkCUDA provides a development enviroment for creating high-performance GKR native circuits. With zkCUDA, you can leverage the power of Expander GKR prover and hardware's parallelism to accelerate your proof generation without losing the expressiveness of GKR circuits. The language should be familiar to CUDA users, with similar syntax and semantics. And it's written in Rust.
 
-It's still working in progress, not usable now, and the APIs may change in the future.
+With zkCUDA, you can:
+
+1. Easily develop high-performance GKR native circuits.
+2. Easily leverage the power of distributed hardware and highly parallel hardware like GPU or MPI-enabled clusters.
+
+## Programming Model
+
+Due to the nature of GKR circuits, the programming model is very similar to CUDA. We define following concepts:
+
+1. zk Streaming Multiprocessors (zkSMs): Each zkSM is a parallel instance of the same circuit, it can run up to 16 zk threads in parallel, one or more zkSMs can be executed in parallel.
+2. zk Threads: A zk thread is the smallest unit of execution, it's executed in a zkSM where the thread's execution is independent of other threads in the same zkSM.
+3. Device Memory: the device memory is the memory that can be directly accessed by zkSM.
+4. Host Memory: the host memory is the memory that can be directly accessed by the your own CPU.
+5. Kernel: a kernel is a function that describes the circuit computation.
+
+## Basic Concepts mapping from CUDA to Crytpography
+
+1. Memory Copy:
+    a. from host to device: this operation will copy data from host memory to device memory. It's done by using polynomial commitment, each memory copy will generate a commitment to the data array.
+
+    b. from device to host: this operation will copy data from device memory to host memory. It's done by opening the polynomial commitment (either single or batched) and output the polynomial evaluation to the host.
+
+2. zkSM: It's a concept that describes log-space uniformity of the circuit.
+
+3. Kernel function: it will be a circuit described by a variant of gnark frontend in Rust.
+
+4. Lookup tables: a lookup table is a powerful tool to optimize the circuit, we will provide a built in dict type for users to use it flexbilely. You need to fill the dict with data in host, then perform the host to device memory copy to send the data to device.
+
+## Programming Guides [WIP]
+
+It's still working in progress, not usable now, and the APIs may change in the future. Please raise issue in github if you have any questions or suggestions.
 
 ## 1. Kernel Function Definition
 
