@@ -24,15 +24,16 @@ Due to the nature of GKR circuits, the programming model is very similar to CUDA
 ## Basic Concepts mapping from CUDA to Crytpography
 
 1. Memory Copy:
+
     a. from host to device: this operation will copy data from host memory to device memory. It's done by using polynomial commitment, each memory copy will generate a commitment to the data array.
 
     b. from device to host: this operation will copy data from device memory to host memory. It's done by opening the polynomial commitment (either single or batched) and output the polynomial evaluation to the host.
 
-2. zkSM: It's a concept that describes log-space uniformity of the circuit.
+2. zkSM: It's a concept that describes log-space uniformity of the circuit. Data-parallelism is achieved by running multiple instances of the same circuit in parallel.
 
 3. Kernel function: it will be a circuit described by a variant of gnark frontend in Rust.
 
-4. Lookup tables: a lookup table is a powerful tool to optimize the circuit, we will provide a built in dict type for users to use it flexbilely. You need to fill the dict with data in host, then perform the host to device memory copy to send the data to device.
+4. Lookup tables: a lookup table is a powerful tool to optimize the circuit, it works like a global random access memory in CUDA. It's slow but can achieve random access to any memory address. We will provide a built in dict type for users to use it flexbilely. You need to fill the dict with data in host, then perform the host to device memory copy to send the data to device.
 
 ## Programming Guides [WIP]
 
