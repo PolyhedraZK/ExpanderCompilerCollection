@@ -90,14 +90,14 @@ fn compute_output<C: Config>(
     input_layer: &[Variable; 1 << LOG_NUM_VARS],
 ) -> [Variable; 1 << LOG_NUM_VARS] {
     let mut cur_layer = *input_layer;
-    for _ in 1..NUM_LAYERS {
+    (1..NUM_LAYERS).for_each(|_| {
         let mut next_layer = [Variable::default(); 1 << LOG_NUM_VARS];
         for i in 0..(1 << (LOG_NUM_VARS - 1)) {
             next_layer[i << 1] = api.add(cur_layer[i << 1], cur_layer[(i << 1) + 1]);
             next_layer[(i << 1) + 1] = api.mul(cur_layer[i << 1], cur_layer[(i << 1) + 1]);
         }
         cur_layer = next_layer;
-    }
+    });
     cur_layer
 }
 
@@ -111,14 +111,14 @@ impl<T: Field> TrivialCircuit<T> {
             .for_each(|x| *x = T::random_unsafe(&mut rng));
 
         let mut cur_layer = input_layer;
-        for _ in 1..NUM_LAYERS {
+        (1..NUM_LAYERS).for_each(|_| {
             let mut next_layer = [T::default(); 1 << LOG_NUM_VARS];
             for i in 0..1 << (LOG_NUM_VARS - 1) {
                 next_layer[i << 1] = cur_layer[i << 1] + cur_layer[(i << 1) + 1];
                 next_layer[(i << 1) + 1] = cur_layer[i << 1] * cur_layer[(i << 1) + 1];
             }
             cur_layer = next_layer;
-        }
+        });
         Self {
             input_layer,
             output_layer: cur_layer,
