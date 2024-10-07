@@ -29,26 +29,18 @@ fn compile_inner_with_config<C>(ir_source: Vec<u8>) -> Result<(Vec<u8>, Vec<u8>)
 where
     C: config::Config,
 {
-    let ir_source =
-        ir::source::RootCircuit::<C>::deserialize_from(&ir_source[..]).map_err(|e| {
-            format!(
-                "failed to deserialize the source circuit: {}",
-                e.to_string()
-            )
-        })?;
+    let ir_source = ir::source::RootCircuit::<C>::deserialize_from(&ir_source[..])
+        .map_err(|e| format!("failed to deserialize the source circuit: {}", e))?;
     let (ir_witness_gen, layered) =
         expander_compiler::compile::compile(&ir_source).map_err(|e| e.to_string())?;
     let mut ir_wg_s: Vec<u8> = Vec::new();
-    ir_witness_gen.serialize_into(&mut ir_wg_s).map_err(|e| {
-        format!(
-            "failed to serialize the witness generator: {}",
-            e.to_string()
-        )
-    })?;
+    ir_witness_gen
+        .serialize_into(&mut ir_wg_s)
+        .map_err(|e| format!("failed to serialize the witness generator: {}", e))?;
     let mut layered_s: Vec<u8> = Vec::new();
     layered
         .serialize_into(&mut layered_s)
-        .map_err(|e| format!("failed to serialize the layered circuit: {}", e.to_string()))?;
+        .map_err(|e| format!("failed to serialize the layered circuit: {}", e))?;
     Ok((ir_wg_s, layered_s))
 }
 
@@ -170,7 +162,7 @@ where
         expander_config::MPIConfig::new(),
     );
     let mut circuit = expander_circuit::Circuit::<C>::load_circuit(circuit_filename);
-    let witness = layered::witness::Witness::<CC>::deserialize_from(&witness[..]).unwrap();
+    let witness = layered::witness::Witness::<CC>::deserialize_from(witness).unwrap();
     let (simd_input, simd_public_input) = witness.to_simd::<C::SimdCircuitField>();
     circuit.layers[0].input_vals = simd_input;
     circuit.public_input = simd_public_input;
@@ -194,7 +186,7 @@ where
         expander_config::MPIConfig::new(),
     );
     let mut circuit = expander_circuit::Circuit::<C>::load_circuit(circuit_filename);
-    let witness = layered::witness::Witness::<CC>::deserialize_from(&witness[..]).unwrap();
+    let witness = layered::witness::Witness::<CC>::deserialize_from(witness).unwrap();
     let (simd_input, simd_public_input) = witness.to_simd::<C::SimdCircuitField>();
     circuit.layers[0].input_vals = simd_input;
     circuit.public_input = simd_public_input.clone();
