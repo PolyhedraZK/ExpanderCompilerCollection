@@ -28,6 +28,48 @@ impl<C: Config> Circuit<C> {
     }
 }
 
+impl<C: Config> Witness<C> {
+    pub fn to_simd<T>(&self) -> (Vec<T>, Vec<T>)
+    where
+        T: arith::SimdField<Scalar = C::CircuitField>,
+    {
+        match self.num_witnesses.cmp(&T::pack_size()) {
+            std::cmp::Ordering::Less => {
+                println!(
+                    "Warning: not enough witnesses, expect {}, got {}",
+                    T::pack_size(),
+                    self.num_witnesses
+                )
+            }
+            std::cmp::Ordering::Greater => {
+                println!(
+                    "Warning: dropping additional witnesses, expect {}, got {}",
+                    T::pack_size(),
+                    self.num_witnesses
+                )
+            }
+            std::cmp::Ordering::Equal => {}
+        }
+        let ni = self.num_inputs_per_witness;
+        let np = self.num_public_inputs_per_witness;
+        let mut res = Vec::with_capacity(ni);
+        let mut res_public = Vec::with_capacity(np);
+        for i in 0..ni + np {
+            let mut values: Vec<C::CircuitField> = (0..self.num_witnesses.min(T::pack_size()))
+                .map(|j| self.values[j * (ni + np) + i])
+                .collect();
+            values.resize(T::pack_size(), C::CircuitField::zero());
+            let simd_value = T::pack(&values);
+            if i < ni {
+                res.push(simd_value);
+            } else {
+                res_public.push(simd_value);
+            }
+        }
+        (res, res_public)
+    }
+}
+
 impl<C: Config> Serde for Witness<C> {
     fn deserialize_from<R: std::io::Read>(mut reader: R) -> Result<Self, std::io::Error> {
         let num_witnesses = usize::deserialize_from(&mut reader)?;

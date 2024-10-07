@@ -1,10 +1,6 @@
 name: ci
 
-on:
-  push:
-    branches:
-      - rust_rewrite
-      - master
+on: [push, pull_request]
 
 env:
   RUSTFLAGS: "-Dwarnings"
@@ -18,10 +14,14 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "expander_compiler -> expander_compiler/target"
+      - if: matrix.os == 'macos-latest'
+        run: brew install openmpi
+      - if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install libopenmpi-dev -y
       - name: Build
         run: cargo build --release --manifest-path=expander_compiler/ec_go_lib/Cargo.toml
       - name: Upload artifact
@@ -31,8 +31,9 @@ jobs:
           path: expander_compiler/target/release/libec_go_lib.*
 
   upload-rust:
-    needs: [build-rust, test-rust, lint]
+    needs: [build-rust, test-rust, test-rust-avx512, lint]
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@v4
       - name: Download artifacts
@@ -56,18 +57,33 @@ jobs:
           git push -f --set-upstream origin rust-built-libs
 
   test-rust:
-    runs-on: ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        platform: [7950x3d, macos-latest]
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: styfle/cancel-workflow-action@0.11.0
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "expander_compiler -> expander_compiler/target"
-      - run: cargo test --manifest-path=expander_compiler/Cargo.toml --release
+      - if: matrix.os == 'macos-latest'
+        run: brew install openmpi
+      - if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install libopenmpi-dev -y
+      - run: cargo test --manifest-path=expander_compiler/Cargo.toml 
+
+  test-rust-avx512:
+    runs-on: 7950x3d
+    steps:
+      - uses: styfle/cancel-workflow-action@0.11.0
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "expander_compiler -> expander_compiler/target"
+      - run: RUSTFLAGS="-C target-cpu=native -C target-feature=+avx512f" cargo test --manifest-path=expander_compiler/Cargo.toml
 
   test-go:
     runs-on: ${{ matrix.os }}
@@ -88,13 +104,17 @@ jobs:
           path: ./artifacts
           pattern: build-${{ matrix.os }}
           merge-multiple: true
+      - if: matrix.os == 'macos-latest'
+        run: brew install openmpi
+      - if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install libopenmpi-dev -y
       - run: |
           cp artifacts/libec_go_lib.* ecgo/rust/wrapper/
           cd ecgo
           go test ./test/
   
   test-go-keccak-full:
-    runs-on: 7950x3d
+    runs-on: ubuntu-latest
     needs: build-rust
     steps:
       - uses: styfle/cancel-workflow-action@0.11.0
@@ -110,6 +130,7 @@ jobs:
           pattern: build-ubuntu-latest
           merge-multiple: true
       - run: |
+          sudo apt-get update && sudo apt-get install libopenmpi-dev -y
           cp artifacts/libec_go_lib.* ecgo/rust/wrapper/
           cd ecgo
           go run examples/keccak_full/main.go
@@ -118,8 +139,9 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+      - run: brew install openmpi
       - run: cargo fmt --all --manifest-path=expander_compiler/Cargo.toml -- --check
       - run: cargo clippy --manifest-path=expander_compiler/Cargo.toml

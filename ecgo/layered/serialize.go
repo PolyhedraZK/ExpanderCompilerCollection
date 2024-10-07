@@ -2,6 +2,7 @@ package layered
 
 import (
 	"math/big"
+	"os"
 
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/field"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/utils"
@@ -31,7 +32,7 @@ func deserializeCoef(in *utils.InputBuf, bnlen int) (*big.Int, uint8, uint64) {
 }
 
 // Serialize converts a RootCircuit into a byte array for storage or transmission.
-func (rc *RootCircuit) _serialize() []byte {
+func (rc *RootCircuit) Serialize() []byte {
 	bnlen := field.GetFieldFromOrder(rc.Field).SerializedLen()
 	o := utils.OutputBuf{}
 	o.AppendUint64(3914834606642317635)
@@ -88,7 +89,7 @@ func (rc *RootCircuit) _serialize() []byte {
 	return o.Bytes()
 }
 
-func DeserializeNewCompilerRootCircuit(buf []byte) *RootCircuit {
+func DeserializeRootCircuit(buf []byte) *RootCircuit {
 	in := utils.NewInputBuf(buf)
 	if in.ReadUint64() != 3914834606642317635 {
 		panic("invalid file header")
@@ -162,4 +163,24 @@ func DeserializeNewCompilerRootCircuit(buf []byte) *RootCircuit {
 		panic("invalid binary format")
 	}
 	return rc
+}
+
+func DetectFieldIdFromFile(fn string) uint64 {
+	// Read the first 4 bytes of the file
+	file, err := os.Open(fn)
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+	buf := make([]byte, 40)
+	n, err := file.Read(buf)
+	if err != nil || n != 40 {
+		panic(err)
+	}
+	in := utils.NewInputBuf(buf)
+	if in.ReadUint64() != 3914834606642317635 {
+		panic("invalid file header")
+	}
+	f := in.ReadBigInt(32)
+	return field.GetFieldId(field.GetFieldFromOrder(f))
 }

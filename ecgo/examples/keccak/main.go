@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo"
-	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/builder"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/field/m31"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/test"
 	"github.com/consensys/gnark/frontend"
@@ -80,14 +79,17 @@ func checkBits(api frontend.API, a []frontend.Variable, bCompressed []frontend.V
 	}
 	for i := 0; i < len(a); i++ {
 		a[i] = fromMyBitForm(api, a[i])
-		api.Compiler().MarkBoolean(a[i])
 	}
 	for i := 0; i < len(a); i += PartitionBits {
 		r := i + PartitionBits
 		if r > len(a) {
 			r = len(a)
 		}
-		api.AssertIsEqual(api.FromBinary(a[i:r]...), bCompressed[i/PartitionBits])
+		var sum frontend.Variable = 0
+		for j := i; j < r; j++ {
+			sum = api.Add(sum, api.Mul(a[j], 1<<(j-i)))
+		}
+		api.AssertIsEqual(sum, bCompressed[i/PartitionBits])
 	}
 }
 
@@ -322,7 +324,9 @@ func checkKeccak(api frontend.API, P, Out []frontend.Variable) {
 }
 
 func (t *keccak256Circuit) Define(api frontend.API) error {
-	f := builder.MemorizedVoidFunc(checkKeccak)
+	// You can use builder.MemorizedVoidFunc for sub-circuits
+	// f := builder.MemorizedVoidFunc(checkKeccak)
+	f := checkKeccak
 	for i := 0; i < NHashes; i++ {
 		f(api, t.P[i][:], t.Out[i][:])
 	}

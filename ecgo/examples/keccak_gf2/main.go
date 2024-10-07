@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo"
-	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/builder"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/field/gf2"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/test"
 	"github.com/consensys/gnark/frontend"
@@ -284,7 +283,9 @@ func computeKeccak(api frontend.API, P []frontend.Variable) []frontend.Variable 
 }
 
 func (t *keccak256Circuit) Define(api frontend.API) error {
-	f := builder.Memorized1DFunc(computeKeccak)
+	// You can use builder.MemorizedVoidFunc for sub-circuits
+	// f := builder.Memorized1DFunc(computeKeccak)
+	f := computeKeccak
 	for i := 0; i < NHashes; i++ {
 		out := f(api, t.P[i][:])
 		for j := 0; j < CheckBits; j++ {

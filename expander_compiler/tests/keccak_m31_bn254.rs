@@ -1,9 +1,15 @@
+use ethnum::U256;
+use expander_compiler::field::{FieldArith, FieldModulus};
 use expander_compiler::frontend::*;
 use internal::Serde;
 use rand::{thread_rng, Rng};
 use tiny_keccak::Hasher;
 
-const N_HASHES: usize = 1;
+const N_HASHES: usize = 2;
+
+const CHECK_BITS: usize = 256;
+const PARTITION_BITS: usize = 30;
+const CHECK_PARTITIONS: usize = (CHECK_BITS + PARTITION_BITS - 1) / PARTITION_BITS;
 
 fn rc() -> Vec<u64> {
     vec![
@@ -32,6 +38,52 @@ fn rc() -> Vec<u64> {
         0x0000000080000001,
         0x8000000080008008,
     ]
+}
+
+fn compress_bits(b: Vec<usize>) -> Vec<usize> {
+    if b.len() != CHECK_BITS {
+        panic!("gg");
+    }
+    let mut res = vec![0; CHECK_PARTITIONS];
+    for i in (0..b.len()).step_by(PARTITION_BITS) {
+        let r = b.len().min(i + PARTITION_BITS);
+        for j in i..r {
+            res[i / PARTITION_BITS] += b[j] << (j - i);
+        }
+    }
+    res
+}
+
+fn check_bits<C: Config>(api: &mut API<C>, mut a: Vec<Variable>, b_compressed: Vec<Variable>) {
+    if a.len() != CHECK_BITS || C::CircuitField::FIELD_SIZE <= PARTITION_BITS {
+        panic!("gg");
+    }
+    for i in 0..a.len() {
+        a[i] = from_my_bit_form(api, a[i].clone());
+    }
+    for i in (0..a.len()).step_by(PARTITION_BITS) {
+        let r = a.len().min(i + PARTITION_BITS);
+        let mut sum = api.constant(0);
+        for j in i..r {
+            let t = api.mul(a[j].clone(), 1 << (j - i));
+            sum = api.add(sum, t);
+        }
+        api.assert_is_equal(sum, b_compressed[i / PARTITION_BITS].clone());
+    }
+}
+
+fn from_my_bit_form<C: Config>(api: &mut API<C>, x: Variable) -> Variable {
+    let t = api.sub(1, x);
+    api.div(t, 2, true)
+}
+
+fn to_my_bit_form<C: Config>(x: usize) -> C::CircuitField {
+    if x == 0 {
+        C::CircuitField::one()
+    } else {
+        assert_eq!(x, 1);
+        -C::CircuitField::one()
+    }
 }
 
 fn xor_in<C: Config>(
@@ -125,7 +177,7 @@ fn keccak_f<C: Config>(api: &mut API<C>, mut a: Vec<Vec<Variable>>) -> Vec<Vec<V
 
         for j in 0..64 {
             if rc[i] >> j & 1 == 1 {
-                a[0][j] = api.sub(1, a[0][j]);
+                a[0][j] = api.sub(0, a[0][j]);
             }
         }
     }
@@ -137,7 +189,7 @@ fn xor<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<V
     let nbits = a.len();
     let mut bits_res = vec![api.constant(0); nbits];
     for i in 0..nbits {
-        bits_res[i] = api.add(a[i].clone(), b[i].clone());
+        bits_res[i] = api.mul(a[i].clone(), b[i].clone());
     }
     bits_res
 }
@@ -146,7 +198,12 @@ fn and<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<V
     let nbits = a.len();
     let mut bits_res = vec![api.constant(0); nbits];
     for i in 0..nbits {
-        bits_res[i] = api.mul(a[i].clone(), b[i].clone());
+        let t = api.mul(a[i].clone(), b[i].clone());
+        let t = api.sub(0, t);
+        let t = api.add(t, b[i].clone());
+        let t = api.add(t, a[i].clone());
+        let t = api.add(t, 1);
+        bits_res[i] = api.div(t, 2, true);
     }
     bits_res
 }
@@ -154,7 +211,7 @@ fn and<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<V
 fn not<C: Config>(api: &mut API<C>, a: Vec<Variable>) -> Vec<Variable> {
     let mut bits_res = vec![api.constant(0); a.len()];
     for i in 0..a.len() {
-        bits_res[i] = api.sub(1, a[i].clone());
+        bits_res[i] = api.sub(0, a[i].clone());
     }
     bits_res
 }
@@ -186,18 +243,23 @@ fn copy_out_unaligned(s: Vec<Vec<Variable>>, rate: usize, output_len: usize) -> 
 
 declare_circuit!(Keccak256Circuit {
     p: [[Variable; 64 * 8]; N_HASHES],
-    out: [[PublicVariable; 256]; N_HASHES],
+    out: [[PublicVariable; CHECK_PARTITIONS]; N_HASHES],
 });
 
 fn compute_keccak<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variable> {
-    let mut ss = vec![vec![api.constant(0); 64]; 25];
+    for x in p.iter() {
+        let x_sqr = api.mul(x, x);
+        api.assert_is_equal(x_sqr, 1);
+    }
+
+    let mut ss = vec![vec![api.constant(1); 64]; 25];
     let mut new_p = p.clone();
     let mut append_data = vec![0; 136 - 64];
     append_data[0] = 1;
     append_data[135 - 64] = 0x80;
     for i in 0..136 - 64 {
         for j in 0..8 {
-            new_p.push(api.constant(((append_data[i] >> j) & 1) as u32));
+            new_p.push(api.constant(to_my_bit_form::<C>((append_data[i] >> j) & 1)));
         }
     }
     let mut p = vec![vec![api.constant(0); 64]; 17];
@@ -211,28 +273,25 @@ fn compute_keccak<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variabl
     copy_out_unaligned(ss, 136, 32)
 }
 
-impl Define<GF2Config> for Keccak256Circuit<Variable> {
-    fn define(&self, api: &mut API<GF2Config>) {
+impl<C: Config> Define<C> for Keccak256Circuit<Variable> {
+    fn define(&self, api: &mut API<C>) {
         for i in 0..N_HASHES {
             // You can use api.memorized_simple_call for sub-circuits
             // let out = api.memorized_simple_call(compute_keccak, &self.p[i].to_vec());
             let out = compute_keccak(api, &self.p[i].to_vec());
-            for j in 0..256 {
-                api.assert_is_equal(out[j].clone(), self.out[i][j].clone());
-            }
+            check_bits(api, out, self.out[i].to_vec());
         }
     }
 }
 
-#[test]
-fn keccak_gf2_main() {
-    let compile_result = compile(&Keccak256Circuit::default()).unwrap();
+fn keccak_big_field<C: Config, const N_WITNESSES: usize>() {
+    let compile_result: CompileResult<C> = compile(&Keccak256Circuit::default()).unwrap();
     let CompileResult {
         witness_solver,
         layered_circuit,
     } = compile_result;
 
-    let mut assignment = Keccak256Circuit::<GF2>::default();
+    let mut assignment = Keccak256Circuit::<C::CircuitField>::default();
     for k in 0..N_HASHES {
         let mut data = vec![0u8; 64];
         for i in 0..64 {
@@ -244,13 +303,20 @@ fn keccak_gf2_main() {
         hash.finalize(&mut output);
         for i in 0..64 {
             for j in 0..8 {
-                assignment.p[k][i * 8 + j] = ((data[i] >> j) as u32 & 1).into();
+                assignment.p[k][i * 8 + j] = to_my_bit_form::<C>((data[i] >> j) as usize & 1);
             }
         }
+        let mut out_bits = vec![0; 256];
         for i in 0..32 {
             for j in 0..8 {
-                assignment.out[k][i * 8 + j] = ((output[i] >> j) as u32 & 1).into();
+                out_bits[i * 8 + j] = (output[i] >> j) as usize & 1;
             }
+        }
+        let out_compressed = compress_bits(out_bits);
+        assert_eq!(out_compressed.len(), CHECK_PARTITIONS);
+        for (i, x) in out_compressed.iter().enumerate() {
+            assert!(U256::from(*x as u64) < C::CircuitField::modulus());
+            assignment.out[k][i] = C::CircuitField::from(*x as u32);
         }
     }
     let witness = witness_solver.solve_witness(&assignment).unwrap();
@@ -259,7 +325,7 @@ fn keccak_gf2_main() {
     println!("test 1 passed");
 
     for k in 0..N_HASHES {
-        assignment.p[k][0] = assignment.p[k][0] - GF2::from(1);
+        assignment.p[k][0] = -assignment.p[k][0];
     }
     let witness = witness_solver.solve_witness(&assignment).unwrap();
     let res = layered_circuit.run(&witness);
@@ -267,23 +333,24 @@ fn keccak_gf2_main() {
     println!("test 2 passed");
 
     let mut assignments = Vec::new();
-    for _ in 0..16 {
+    for _ in 0..N_WITNESSES * 2 {
         for k in 0..N_HASHES {
-            assignment.p[k][0] = assignment.p[k][0] - GF2::from(1);
+            assignment.p[k][0] = -assignment.p[k][0];
         }
         assignments.push(assignment.clone());
     }
     let witness = witness_solver.solve_witnesses(&assignments).unwrap();
     let res = layered_circuit.run(&witness);
-    let mut expected_res = vec![false; 16];
-    for i in 0..8 {
+    let mut expected_res = vec![false; N_WITNESSES * 2];
+    for i in 0..N_WITNESSES {
         expected_res[i * 2] = true;
     }
     assert_eq!(res, expected_res);
     println!("test 3 passed");
 
-    let assignments_correct: Vec<Keccak256Circuit<GF2>> =
-        (0..8).map(|i| assignments[i * 2].clone()).collect();
+    let assignments_correct: Vec<Keccak256Circuit<C::CircuitField>> = (0..N_WITNESSES)
+        .map(|i| assignments[i * 2].clone())
+        .collect();
     let witness = witness_solver
         .solve_witnesses(&assignments_correct)
         .unwrap();
@@ -301,4 +368,14 @@ fn keccak_gf2_main() {
     witness_solver.serialize_into(writer).unwrap();
 
     println!("dumped to files");
+}
+
+#[test]
+fn keccak_m31_test() {
+    keccak_big_field::<M31Config, 16>();
+}
+
+#[test]
+fn keccak_bn254_test() {
+    keccak_big_field::<BN254Config, 1>();
 }
