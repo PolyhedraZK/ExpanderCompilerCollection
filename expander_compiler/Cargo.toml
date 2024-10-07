@@ -10,8 +10,10 @@ opt-level = 3
 opt-level = 3
 
 [dependencies]
+ark-std.workspace = true
 rand.workspace = true
 chrono.workspace = true
+clap.workspace = true
 ethnum.workspace = true
 halo2curves.workspace = true
 tiny-keccak.workspace = true
@@ -28,8 +30,10 @@ members = [
 ]
 
 [workspace.dependencies]
+ark-std = "0.4.0"
 rand = "0.8.5"
 chrono = "0.4"
+clap = { version = "4.1", features = ["derive"] }
 ethnum = "1.5.0"
 tiny-keccak = { version = "2.0", features = ["keccak"] }
 halo2curves = { git = "https://github.com/PolyhedraZK/halo2curves", default-features = false, features = [
@@ -42,3 +46,8 @@ gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "nightly" }
 gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "nightly" }
 mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "nightly" }
 expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "nightly" , package = "transcript" }
+
+
+[[bin]]
+name = "trivial_circuit"
+path = "bin/trivial_circuit.rs"
