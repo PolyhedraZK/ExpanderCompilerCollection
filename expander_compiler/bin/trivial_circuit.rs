@@ -78,11 +78,10 @@ declare_circuit!(TrivialCircuit {
 
 impl<C: Config> Define<C> for TrivialCircuit<Variable> {
     fn define(&self, builder: &mut API<C>) {
-        let num_vars = 1 << LOG_NUM_VARS;
         let out = compute_output::<C>(builder, &self.input_layer);
-        for i in 0..num_vars {
-            builder.assert_is_equal(out[i].clone(), self.output_layer[i].clone());
-        }
+        out.iter().zip(self.output_layer.iter()).for_each(|(x, y)| {
+            builder.assert_is_equal(x, y);
+        });
     }
 }
 
@@ -90,14 +89,14 @@ fn compute_output<C: Config>(
     api: &mut API<C>,
     input_layer: &[Variable; 1 << LOG_NUM_VARS],
 ) -> [Variable; 1 << LOG_NUM_VARS] {
-    let mut cur_layer = input_layer.clone();
+    let mut cur_layer = *input_layer;
     for _ in 1..NUM_LAYERS {
         let mut next_layer = [Variable::default(); 1 << LOG_NUM_VARS];
         for i in 0..(1 << (LOG_NUM_VARS - 1)) {
             next_layer[i << 1] = api.add(cur_layer[i << 1], cur_layer[(i << 1) + 1]);
             next_layer[(i << 1) + 1] = api.mul(cur_layer[i << 1], cur_layer[(i << 1) + 1]);
         }
-        cur_layer = next_layer.clone();
+        cur_layer = next_layer;
     }
     cur_layer
 }
@@ -111,14 +110,14 @@ impl<T: Field> TrivialCircuit<T> {
             .iter_mut()
             .for_each(|x| *x = T::random_unsafe(&mut rng));
 
-        let mut cur_layer = input_layer.clone();
+        let mut cur_layer = input_layer;
         for _ in 1..NUM_LAYERS {
             let mut next_layer = [T::default(); 1 << LOG_NUM_VARS];
             for i in 0..1 << (LOG_NUM_VARS - 1) {
                 next_layer[i << 1] = cur_layer[i << 1] + cur_layer[(i << 1) + 1];
                 next_layer[(i << 1) + 1] = cur_layer[i << 1] * cur_layer[(i << 1) + 1];
             }
-            cur_layer = next_layer.clone();
+            cur_layer = next_layer;
         }
         Self {
             input_layer,
