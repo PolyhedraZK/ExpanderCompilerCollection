@@ -27,6 +27,12 @@ impl<C: Config> Circuit<C> {
                 _ => {}
             }
         }
+        for x in self.outputs.iter() {
+            insn_ref_count[var_insn_id[*x]] += 1;
+        }
+        for x in self.constraints.iter() {
+            insn_ref_count[var_insn_id[x.var]] += 1;
+        }
         for i in 0..self.instructions.len() {
             if !is_add[i] {
                 continue;
@@ -99,7 +105,7 @@ impl<C: Config> Circuit<C> {
                         break;
                     }
                 }
-                if flag {
+                if !flag {
                     continue;
                 }
                 vars.clone()
