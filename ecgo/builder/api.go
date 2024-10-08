@@ -259,7 +259,7 @@ func (builder *builder) Cmp(i1, i2 frontend.Variable) frontend.Variable {
 	bi1 := bits.ToBinary(builder, i1, bits.WithNbDigits(nbBits))
 	bi2 := bits.ToBinary(builder, i2, bits.WithNbDigits(nbBits))
 
-	res := builder.toVariableId(0)
+	res := newVariable(builder.toVariableId(0))
 
 	for i := builder.field.FieldBitLen() - 1; i >= 0; i-- {
 
@@ -272,7 +272,7 @@ func (builder *builder) Cmp(i1, i2 frontend.Variable) frontend.Variable {
 		n := builder.Select(i2i1, -1, 0)
 		m := builder.Select(i1i2, 1, n)
 
-		res = builder.toVariableId(builder.Select(builder.IsZero(res), m, res))
+		res = newVariable(builder.toVariableId(builder.Select(builder.IsZero(res), m, res)))
 
 	}
 	return res
