@@ -12,6 +12,10 @@ macro_rules! declare_circuit_field_type {
         [$crate::frontend::internal::declare_circuit_field_type!(@type $elem); $n]
     };
 
+    (@type [$elem:tt]) => {
+        Vec<$crate::frontend::internal::declare_circuit_field_type!(@type $elem)>
+    };
+
     (@type $other:ty) => {
         $other
     };
@@ -28,6 +32,12 @@ macro_rules! declare_circuit_dump_into {
     };
 
     ($field_value:expr, @type [$elem:tt; $n:expr], $vars:expr, $public_vars:expr) => {
+        for _x in $field_value.iter() {
+            $crate::frontend::internal::declare_circuit_dump_into!(_x, @type $elem, $vars, $public_vars);
+        }
+    };
+
+    ($field_value:expr, @type [$elem:tt], $vars:expr, $public_vars:expr) => {
         for _x in $field_value.iter() {
             $crate::frontend::internal::declare_circuit_dump_into!(_x, @type $elem, $vars, $public_vars);
         }
@@ -53,6 +63,12 @@ macro_rules! declare_circuit_load_from {
         }
     };
 
+    ($field_value:expr, @type [$elem:tt], $vars:expr, $public_vars:expr) => {
+        for _x in $field_value.iter_mut() {
+            $crate::frontend::internal::declare_circuit_load_from!(_x, @type $elem, $vars, $public_vars);
+        }
+    };
+
     ($field_value:expr, @type $other:ty, $vars:expr, $public_vars:expr) => {
     };
 }
@@ -69,6 +85,12 @@ macro_rules! declare_circuit_num_vars {
 
     ($field_value:expr, @type [$elem:tt; $n:expr], $cnt_sec:expr, $cnt_pub:expr, $array_cnt:expr) => {
         $crate::frontend::internal::declare_circuit_num_vars!($field_value[0], @type $elem, $cnt_sec, $cnt_pub, $array_cnt * $n);
+    };
+
+    ($field_value:expr, @type [$elem:tt], $cnt_sec:expr, $cnt_pub:expr, $array_cnt:expr) => {
+        for _x in $field_value.iter() {
+            $crate::frontend::internal::declare_circuit_num_vars!(_x, @type $elem, $cnt_sec, $cnt_pub, $array_cnt);
+        }
     };
 
     ($field_value:expr, @type $other:ty, $cnt_sec:expr, $cnt_pub:expr, $array_cnt:expr) => {
