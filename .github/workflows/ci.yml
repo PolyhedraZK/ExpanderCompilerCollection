@@ -105,7 +105,8 @@ jobs:
       - if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install libopenmpi-dev -y
       - run: |
-          cp artifacts/libec_go_lib.* ecgo/rust/wrapper/
+          mkdir -p ~/.cache/ExpanderCompilerCollection
+          cp artifacts/libec_go_lib.* ~/.cache/ExpanderCompilerCollection
           cd ecgo
           go test ./test/
   
@@ -127,7 +128,8 @@ jobs:
           merge-multiple: true
       - run: |
           sudo apt-get update && sudo apt-get install libopenmpi-dev -y
-          cp artifacts/libec_go_lib.* ecgo/rust/wrapper/
+          mkdir -p ~/.cache/ExpanderCompilerCollection
+          cp artifacts/libec_go_lib.* ~/.cache/ExpanderCompilerCollection
           cd ecgo
           go run examples/keccak_full/main.go
 
