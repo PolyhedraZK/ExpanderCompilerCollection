@@ -24,13 +24,14 @@ import (
 
 const ABI_VERSION = 4
 
-func currentFileDirectory() string {
-	_, fileName, _, ok := runtime.Caller(1)
-	if !ok {
-		panic("can't get current file directory")
+func getCacheDir() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
 	}
-	dir, _ := filepath.Split(fileName)
-	return dir
+	cacheDir := filepath.Join(homeDir, ".cache", "ExpanderCompilerCollection")
+	err = os.MkdirAll(cacheDir, 0755)
+	return cacheDir, err
 }
 
 var compilePtr unsafe.Pointer = nil
@@ -158,8 +159,11 @@ func initCompilePtr() {
 	if compilePtr != nil {
 		return
 	}
-	curDir := currentFileDirectory()
-	soPath := filepath.Join(curDir, getLibName())
+	cacheDir, err := getCacheDir()
+	if err != nil {
+		panic(fmt.Sprintf("failed to get cache dir: %v", err))
+	}
+	soPath := filepath.Join(cacheDir, getLibName())
 	updateLib(soPath)
 	handle := C.dlopen(C.CString(soPath), C.RTLD_LAZY)
 	if handle == nil {
