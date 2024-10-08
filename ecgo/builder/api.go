@@ -36,7 +36,7 @@ type API interface {
 // Add computes the sum i1+i2+...in and returns the result.
 func (builder *builder) Add(i1, i2 frontend.Variable, in ...frontend.Variable) frontend.Variable {
 	// extract frontend.Variables from input
-	vars := builder.toVariables(append([]frontend.Variable{i1, i2}, in...)...)
+	vars := builder.toVariableIds(append([]frontend.Variable{i1, i2}, in...)...)
 	return builder.add(vars, false)
 }
 
@@ -46,12 +46,12 @@ func (builder *builder) MulAcc(a, b, c frontend.Variable) frontend.Variable {
 
 // Sub computes the difference between the given variables.
 func (builder *builder) Sub(i1, i2 frontend.Variable, in ...frontend.Variable) frontend.Variable {
-	vars := builder.toVariables(append([]frontend.Variable{i1, i2}, in...)...)
+	vars := builder.toVariableIds(append([]frontend.Variable{i1, i2}, in...)...)
 	return builder.add(vars, true)
 }
 
 // returns res = Σ(vars) or res = vars[0] - Σ(vars[1:]) if sub == true.
-func (builder *builder) add(vars []variable, sub bool) variable {
+func (builder *builder) add(vars []int, sub bool) frontend.Variable {
 	coef := make([]constraint.Element, len(vars))
 	coef[0] = builder.tOne
 	if sub {
@@ -65,7 +65,7 @@ func (builder *builder) add(vars []variable, sub bool) variable {
 	}
 	builder.instructions = append(builder.instructions, irsource.Instruction{
 		Type:        irsource.LinComb,
-		Inputs:      unwrapVariables(vars),
+		Inputs:      vars,
 		LinCombCoef: coef,
 	})
 	return builder.addVar()
@@ -73,11 +73,11 @@ func (builder *builder) add(vars []variable, sub bool) variable {
 
 // Neg returns the negation of the given variable.
 func (builder *builder) Neg(i frontend.Variable) frontend.Variable {
-	v := builder.toVariable(i)
+	v := builder.toVariableId(i)
 	coef := []constraint.Element{builder.field.Neg(builder.tOne)}
 	builder.instructions = append(builder.instructions, irsource.Instruction{
 		Type:        irsource.LinComb,
-		Inputs:      []int{v.id},
+		Inputs:      []int{v},
 		LinCombCoef: coef,
 	})
 	return builder.addVar()
@@ -85,23 +85,23 @@ func (builder *builder) Neg(i frontend.Variable) frontend.Variable {
 
 // Mul computes the product of the given variables.
 func (builder *builder) Mul(i1, i2 frontend.Variable, in ...frontend.Variable) frontend.Variable {
-	vars := builder.toVariables(append([]frontend.Variable{i1, i2}, in...)...)
+	vars := builder.toVariableIds(append([]frontend.Variable{i1, i2}, in...)...)
 	builder.instructions = append(builder.instructions, irsource.Instruction{
 		Type:   irsource.Mul,
-		Inputs: unwrapVariables(vars),
+		Inputs: vars,
 	})
 	return builder.addVar()
 }
 
 // DivUnchecked returns i1 divided by i2 and returns 0 if both i1 and i2 are zero.
 func (builder *builder) DivUnchecked(i1, i2 frontend.Variable) frontend.Variable {
-	vars := builder.toVariables(i1, i2)
+	vars := builder.toVariableIds(i1, i2)
 	v1 := vars[0]
 	v2 := vars[1]
 	builder.instructions = append(builder.instructions, irsource.Instruction{
 		Type:    irsource.Div,
-		X:       v1.id,
-		Y:       v2.id,
+		X:       v1,
+		Y:       v2,
 		ExtraId: 1,
 	})
 	return builder.addVar()
@@ -109,13 +109,13 @@ func (builder *builder) DivUnchecked(i1, i2 frontend.Variable) frontend.Variable
 
 // Div returns the result of i1 divided by i2.
 func (builder *builder) Div(i1, i2 frontend.Variable) frontend.Variable {
-	vars := builder.toVariables(i1, i2)
+	vars := builder.toVariableIds(i1, i2)
 	v1 := vars[0]
 	v2 := vars[1]
 	builder.instructions = append(builder.instructions, irsource.Instruction{
 		Type:    irsource.Div,
-		X:       v1.id,
-		Y:       v2.id,
+		X:       v1,
+		Y:       v2,
 		ExtraId: 0,
 	})
 	return builder.addVar()
@@ -154,13 +154,13 @@ func (builder *builder) FromBinary(_b ...frontend.Variable) frontend.Variable {
 
 // Xor computes the logical XOR between two frontend.Variables.
 func (builder *builder) Xor(_a, _b frontend.Variable) frontend.Variable {
-	vars := builder.toVariables(_a, _b)
+	vars := builder.toVariableIds(_a, _b)
 	a := vars[0]
 	b := vars[1]
 	builder.instructions = append(builder.instructions, irsource.Instruction{
 		Type:    irsource.BoolBinOp,
-		X:       a.id,
-		Y:       b.id,
+		X:       a,
+		Y:       b,
 		ExtraId: 1,
 	})
 	return builder.addVar()
@@ -168,13 +168,13 @@ func (builder *builder) Xor(_a, _b frontend.Variable) frontend.Variable {
 
 // Or computes the logical OR between two frontend.Variables.
 func (builder *builder) Or(_a, _b frontend.Variable) frontend.Variable {
-	vars := builder.toVariables(_a, _b)
+	vars := builder.toVariableIds(_a, _b)
 	a := vars[0]
 	b := vars[1]
 	builder.instructions = append(builder.instructions, irsource.Instruction{
 		Type:    irsource.BoolBinOp,
-		X:       a.id,
-		Y:       b.id,
+		X:       a,
+		Y:       b,
 		ExtraId: 2,
 	})
 	return builder.addVar()
@@ -182,13 +182,13 @@ func (builder *builder) Or(_a, _b frontend.Variable) frontend.Variable {
 
 // And computes the logical AND between two frontend.Variables.
 func (builder *builder) And(_a, _b frontend.Variable) frontend.Variable {
-	vars := builder.toVariables(_a, _b)
+	vars := builder.toVariableIds(_a, _b)
 	a := vars[0]
 	b := vars[1]
 	builder.instructions = append(builder.instructions, irsource.Instruction{
 		Type:    irsource.BoolBinOp,
-		X:       a.id,
-		Y:       b.id,
+		X:       a,
+		Y:       b,
 		ExtraId: 3,
 	})
 	return builder.addVar()
@@ -199,20 +199,19 @@ func (builder *builder) And(_a, _b frontend.Variable) frontend.Variable {
 
 // Select yields the second variable if the first is true, otherwise yields the third variable.
 func (builder *builder) Select(i0, i1, i2 frontend.Variable) frontend.Variable {
-	vars := builder.toVariables(i0, i1, i2)
-	cond := vars[0]
+	cond := i0
 
 	// ensures that cond is boolean
 	builder.AssertIsBoolean(cond)
 
-	v := builder.Sub(vars[1], vars[2]) // no constraint is recorded
+	v := builder.Sub(i1, i2) // no constraint is recorded
 	w := builder.Mul(cond, v)
-	return builder.Add(w, vars[2])
+	return builder.Add(w, i2)
 }
 
 // Lookup2 performs a 2-bit lookup based on the given bits and values.
 func (builder *builder) Lookup2(b0, b1 frontend.Variable, i0, i1, i2, i3 frontend.Variable) frontend.Variable {
-	vars := builder.toVariables(b0, b1, i0, i1, i2, i3)
+	vars := []frontend.Variable{b0, b1, i0, i1, i2, i3}
 	s0, s1 := vars[0], vars[1]
 	in0, in1, in2, in3 := vars[2], vars[3], vars[4], vars[5]
 
@@ -243,10 +242,10 @@ func (builder *builder) Lookup2(b0, b1 frontend.Variable, i0, i1, i2, i3 fronten
 
 // IsZero returns 1 if the given variable is zero, otherwise returns 0.
 func (builder *builder) IsZero(i1 frontend.Variable) frontend.Variable {
-	a := builder.toVariable(i1)
+	a := builder.toVariableId(i1)
 	builder.instructions = append(builder.instructions, irsource.Instruction{
 		Type: irsource.IsZero,
-		X:    a.id,
+		X:    a,
 	})
 	return builder.addVar()
 }
@@ -260,7 +259,7 @@ func (builder *builder) Cmp(i1, i2 frontend.Variable) frontend.Variable {
 	bi1 := bits.ToBinary(builder, i1, bits.WithNbDigits(nbBits))
 	bi2 := bits.ToBinary(builder, i2, bits.WithNbDigits(nbBits))
 
-	res := builder.toVariable(0)
+	res := builder.toVariableId(0)
 
 	for i := builder.field.FieldBitLen() - 1; i >= 0; i-- {
 
@@ -273,7 +272,7 @@ func (builder *builder) Cmp(i1, i2 frontend.Variable) frontend.Variable {
 		n := builder.Select(i2i1, -1, 0)
 		m := builder.Select(i1i2, 1, n)
 
-		res = builder.Select(builder.IsZero(res), m, res).(variable)
+		res = builder.toVariableId(builder.Select(builder.IsZero(res), m, res))
 
 	}
 	return res
@@ -291,10 +290,10 @@ func (builder *builder) Compiler() frontend.Compiler {
 
 // Commit is faulty in its current implementation as it merely returns a compile-time random number.
 func (builder *builder) Commit(v ...frontend.Variable) (frontend.Variable, error) {
-	vars := builder.toVariables(v...)
+	vars := builder.toVariableIds(v...)
 	builder.instructions = append(builder.instructions, irsource.Instruction{
 		Type:   irsource.Commit,
-		Inputs: unwrapVariables(vars),
+		Inputs: vars,
 	})
 	return builder.addVar(), nil
 }
@@ -309,6 +308,6 @@ func (builder *builder) Output(x_ frontend.Variable) {
 	if builder.root.builder != builder {
 		panic("Output can only be called on root circuit")
 	}
-	x := builder.toVariable(x_)
+	x := builder.toVariableId(x_)
 	builder.output = append(builder.output, x)
 }
