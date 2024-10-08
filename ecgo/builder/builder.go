@@ -16,6 +16,7 @@ import (
 
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/field"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/irsource"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/utils/gnarkexpr"
 )
 
 // builder implements frontend.API and frontend.Compiler, and builds a circuit
@@ -42,7 +43,7 @@ type builder struct {
 	db map[any]any
 
 	// output of sub circuit
-	output []variable
+	output []int
 }
 
 // newBuilder returns a builder with known number of external input
@@ -108,47 +109,49 @@ func (builder *builder) ConstantValue(v frontend.Variable) (*big.Int, bool) {
 	return nil, false
 }
 
-func (builder *builder) addVar() variable {
+func (builder *builder) addVarId() int {
 	builder.maxVar += 1
-	return newVariable(builder.maxVar)
+	return builder.maxVar
 }
 
-func (builder *builder) ceToVariable(x constraint.Element) variable {
+func (builder *builder) addVar() frontend.Variable {
+	return newVariable(builder.addVarId())
+}
+
+func (builder *builder) ceToId(x constraint.Element) int {
 	builder.instructions = append(builder.instructions, irsource.Instruction{
 		Type:    irsource.ConstantLike,
 		ExtraId: 0,
 		Const:   x,
 	})
-	return builder.addVar()
+	return builder.addVarId()
 }
 
 // toVariable will return (and allocate if neccesary) an Expression from given value
 //
 // if input is already an Expression, does nothing
 // else, attempts to convert input to a big.Int (see utils.FromInterface) and returns a toVariable Expression
-func (builder *builder) toVariable(input interface{}) variable {
+func (builder *builder) toVariableId(input interface{}) int {
 
 	switch t := input.(type) {
-	case variable:
-		return t
-	case *variable:
-		return *t
+	case gnarkexpr.Expr:
+		return t.WireID()
 	case constraint.Element:
-		return builder.ceToVariable(t)
+		return builder.ceToId(t)
 	case *constraint.Element:
-		return builder.ceToVariable(*t)
+		return builder.ceToId(*t)
 	default:
 		// try to make it into a constant
 		c := builder.field.FromInterface(t)
-		return builder.ceToVariable(c)
+		return builder.ceToId(c)
 	}
 }
 
 // toVariables return frontend.Variable corresponding to inputs and the total size of the linear expressions
-func (builder *builder) toVariables(in ...frontend.Variable) []variable {
-	r := make([]variable, 0, len(in))
+func (builder *builder) toVariableIds(in ...frontend.Variable) []int {
+	r := make([]int, 0, len(in))
 	e := func(i frontend.Variable) {
-		v := builder.toVariable(i)
+		v := builder.toVariableId(i)
 		r = append(r, v)
 	}
 	// e(i1)
@@ -181,13 +184,13 @@ func (builder *builder) NewHintForId(id solver.HintID, nbOutputs int, inputs ...
 }
 
 func (builder *builder) newHintForId(id solver.HintID, nbOutputs int, inputs []frontend.Variable) ([]frontend.Variable, error) {
-	hintInputs := builder.toVariables(inputs...)
+	hintInputs := builder.toVariableIds(inputs...)
 
 	builder.instructions = append(builder.instructions,
 		irsource.Instruction{
 			Type:       irsource.Hint,
 			ExtraId:    uint64(id),
-			Inputs:     unwrapVariables(hintInputs),
+			Inputs:     hintInputs,
 			NumOutputs: nbOutputs,
 		},
 	)
@@ -201,13 +204,13 @@ func (builder *builder) newHintForId(id solver.HintID, nbOutputs int, inputs []f
 }
 
 func (builder *builder) CustomGate(gateType uint64, inputs ...frontend.Variable) frontend.Variable {
-	hintInputs := builder.toVariables(inputs...)
+	hintInputs := builder.toVariableIds(inputs...)
 
 	builder.instructions = append(builder.instructions,
 		irsource.Instruction{
 			Type:    irsource.CustomGate,
 			ExtraId: gateType,
-			Inputs:  unwrapVariables(hintInputs),
+			Inputs:  hintInputs,
 		},
 	)
 	return builder.addVar()

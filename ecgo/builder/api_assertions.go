@@ -12,28 +12,28 @@ import (
 
 // AssertIsEqual adds an assertion that i1 is equal to i2.
 func (builder *builder) AssertIsEqual(i1, i2 frontend.Variable) {
-	x := builder.Sub(i1, i2).(variable)
+	x := builder.toVariableId(builder.Sub(i1, i2))
 	builder.constraints = append(builder.constraints, irsource.Constraint{
 		Typ: irsource.Zero,
-		Var: x.id,
+		Var: x,
 	})
 }
 
 // AssertIsDifferent constrains i1 and i2 to have different values.
 func (builder *builder) AssertIsDifferent(i1, i2 frontend.Variable) {
-	x := builder.Sub(i1, i2).(variable)
+	x := builder.toVariableId(builder.Sub(i1, i2))
 	builder.constraints = append(builder.constraints, irsource.Constraint{
 		Typ: irsource.NonZero,
-		Var: x.id,
+		Var: x,
 	})
 }
 
 // AssertIsBoolean adds an assertion that the variable is either 0 or 1.
 func (builder *builder) AssertIsBoolean(i1 frontend.Variable) {
-	x := builder.toVariable(i1)
+	x := builder.toVariableId(i1)
 	builder.constraints = append(builder.constraints, irsource.Constraint{
 		Typ: irsource.Bool,
-		Var: x.id,
+		Var: x,
 	})
 }
 
@@ -59,9 +59,9 @@ func (builder *builder) mustBeLessOrEqVar(a, bound frontend.Variable) {
 	boundBits := bits.ToBinary(builder, bound, bits.WithNbDigits(nbBits))
 
 	p := make([]frontend.Variable, nbBits+1)
-	p[nbBits] = builder.toVariable(1)
+	p[nbBits] = newVariable(builder.toVariableId(1))
 
-	zero := builder.toVariable(0)
+	zero := newVariable(builder.toVariableId(0))
 
 	for i := nbBits - 1; i >= 0; i-- {
 
@@ -78,7 +78,7 @@ func (builder *builder) mustBeLessOrEqVar(a, bound frontend.Variable) {
 
 		// (1 - t - ai) * ai == 0
 		var l frontend.Variable
-		l = builder.toVariable(1)
+		l = newVariable(builder.toVariableId(1))
 		l = builder.Sub(l, t, aBits[i])
 
 		// note if bound[i] == 1, this constraint is (1 - ai) * ai == 0
@@ -118,7 +118,7 @@ func (builder *builder) MustBeLessOrEqCst(aBits []frontend.Variable, bound *big.
 
 	p := make([]frontend.Variable, nbBits+1)
 	// p[i] == 1 → a[j] == c[j] for all j ⩾ i
-	p[nbBits] = builder.toVariable(1)
+	p[nbBits] = newVariable(builder.toVariableId(1))
 
 	for i := nbBits - 1; i >= t; i-- {
 		if bound.Bit(i) == 0 {
@@ -134,7 +134,7 @@ func (builder *builder) MustBeLessOrEqCst(aBits []frontend.Variable, bound *big.
 			l := builder.Sub(1, p[i+1])
 			l = builder.Sub(l, aBits[i])
 
-			builder.AssertIsEqual(builder.Mul(l, aBits[i]), builder.toVariable(0))
+			builder.AssertIsEqual(builder.Mul(l, aBits[i]), newVariable(builder.toVariableId(0)))
 		} else {
 			builder.AssertIsBoolean(aBits[i])
 		}

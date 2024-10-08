@@ -52,18 +52,18 @@ func (parent *builder) callSubCircuit(
 	input_ []frontend.Variable,
 	f SubCircuitSimpleFunc,
 ) []frontend.Variable {
-	input := parent.toVariables(input_...)
+	input := parent.toVariableIds(input_...)
 	if _, ok := parent.root.registry.m[circuitId]; !ok {
 		n := len(input)
 		subBuilder := parent.root.newBuilder(n)
 		subInput := make([]frontend.Variable, n)
 		for i := 0; i < n; i++ {
-			subInput[i] = variable{i + 1}
+			subInput[i] = newVariable(i + 1)
 		}
 		subOutput := f(subBuilder, subInput)
-		subBuilder.output = make([]variable, len(subOutput))
+		subBuilder.output = make([]int, len(subOutput))
 		for i, v := range subOutput {
-			subBuilder.output[i] = subBuilder.toVariable(v)
+			subBuilder.output[i] = subBuilder.toVariableId(v)
 		}
 		sub := SubCircuit{
 			builder: subBuilder,
@@ -72,7 +72,7 @@ func (parent *builder) callSubCircuit(
 	}
 	sub := parent.root.registry.m[circuitId]
 
-	output := make([]variable, len(sub.builder.output))
+	output := make([]frontend.Variable, len(sub.builder.output))
 	for i := range sub.builder.output {
 		output[i] = parent.addVar()
 	}
@@ -81,16 +81,12 @@ func (parent *builder) callSubCircuit(
 		irsource.Instruction{
 			Type:       irsource.SubCircuitCall,
 			ExtraId:    circuitId,
-			Inputs:     unwrapVariables(input),
+			Inputs:     input,
 			NumOutputs: len(output),
 		},
 	)
 
-	output_ := make([]frontend.Variable, len(output))
-	for i, x := range output {
-		output_[i] = x
-	}
-	return output_
+	return output
 }
 
 // MemorizedSimpleCall memorizes a call to a SubCircuitSimpleFunc.
