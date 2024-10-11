@@ -7,7 +7,7 @@ use crate::{
 
 mod compile;
 mod input;
-pub mod ir_split; // TODO
+pub mod ir_split;
 mod layer_layout;
 mod wire;
 
