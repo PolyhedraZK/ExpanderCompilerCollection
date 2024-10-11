@@ -68,6 +68,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "expander_compiler -> expander_compiler/target"
+          # The prefix cache key, this can be changed to start a new cache manually.
+          prefix-key: "mpi-v5.0.5" # update me if brew formula changes to a new version
       - if: matrix.os == 'macos-latest'
         run: brew install openmpi
       - if: matrix.os == 'ubuntu-latest'
@@ -81,6 +85,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "expander_compiler -> expander_compiler/target"
+          # The prefix cache key, this can be changed to start a new cache manually.
+          prefix-key: "mpi-v5.0.5" # update me if brew formula changes to a new version
       - run: RUSTFLAGS="-C target-cpu=native -C target-feature=+avx512f" cargo test
 
   test-go:
