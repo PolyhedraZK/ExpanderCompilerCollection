@@ -288,15 +288,15 @@ fn keccak_gf2_main() {
         .solve_witnesses(&assignments_correct)
         .unwrap();
 
-    let file = std::fs::File::create("circuit.txt").unwrap();
+    let file = std::fs::File::create("circuit_gf2.txt").unwrap();
     let writer = std::io::BufWriter::new(file);
     layered_circuit.serialize_into(writer).unwrap();
 
-    let file = std::fs::File::create("witness.txt").unwrap();
+    let file = std::fs::File::create("witness_gf2.txt").unwrap();
     let writer = std::io::BufWriter::new(file);
     witness.serialize_into(writer).unwrap();
 
-    let file = std::fs::File::create("witness_solver.txt").unwrap();
+    let file = std::fs::File::create("witness_gf2_solver.txt").unwrap();
     let writer = std::io::BufWriter::new(file);
     witness_solver.serialize_into(writer).unwrap();
 

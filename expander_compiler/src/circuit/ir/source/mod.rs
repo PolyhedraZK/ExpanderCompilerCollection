@@ -15,6 +15,7 @@ use super::{
 #[cfg(test)]
 mod tests;
 
+pub mod chains;
 pub mod serde;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
