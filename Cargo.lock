@@ -623,8 +623,10 @@ name = "expander_compiler"
 version = "0.1.0"
 dependencies = [
  "arith",
+ "ark-std",
  "chrono",
  "circuit",
+ "clap",
  "config",
  "ethnum",
  "gf2",
