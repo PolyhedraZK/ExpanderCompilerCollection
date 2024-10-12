@@ -72,7 +72,7 @@ func M31CircuitBuild() {
 
 	layered_circuit := circuit.GetLayeredCircuit()
 	// circuit.GetCircuitIr().Print()
-	err = os.WriteFile("circuit.txt", layered_circuit.Serialize(), 0o644)
+	err = os.WriteFile("poseidon_120_circuit_m31.txt", layered_circuit.Serialize(), 0o644)
 	if err != nil {
 		panic(err)
 	}
@@ -81,7 +81,7 @@ func M31CircuitBuild() {
 	if err != nil {
 		panic(err)
 	}
-	err = os.WriteFile("witness.txt", witness.Serialize(), 0o644)
+	err = os.WriteFile("poseidon_120_witness_m31.txt", witness.Serialize(), 0o644)
 	if err != nil {
 		panic(err)
 	}
