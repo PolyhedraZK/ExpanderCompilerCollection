@@ -185,7 +185,7 @@ fn copy_out_unaligned(s: Vec<Vec<Variable>>, rate: usize, output_len: usize) -> 
 
 declare_circuit!(Keccak256Circuit {
     p: [[Variable; 64 * 8]; N_HASHES],
-    out: [[Variable; 256]; N_HASHES], // TODO: use public inputs
+    out: [[PublicVariable; 256]; N_HASHES],
 });
 
 fn compute_keccak<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variable> {
@@ -290,6 +290,7 @@ fn keccak_gf2_full() {
     );
 
     let (simd_input, simd_public_input) = witness.to_simd::<gf2::GF2x8>();
+    println!("{} {}", simd_input.len(), simd_public_input.len());
     expander_circuit.layers[0].input_vals = simd_input;
     expander_circuit.public_input = simd_public_input.clone();
 
