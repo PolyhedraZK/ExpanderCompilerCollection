@@ -32,7 +32,7 @@ func (builder *builder) Finalize() *irsource.Circuit {
 	return &irsource.Circuit{
 		Instructions: builder.instructions,
 		Constraints:  builder.constraints,
-		Outputs:      unwrapVariables(builder.output),
+		Outputs:      builder.output,
 		NumInputs:    builder.nbExternalInput,
 	}
 }
