@@ -7,6 +7,7 @@ package wrapper
 */
 import "C"
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,13 +25,14 @@ import (
 
 const ABI_VERSION = 4
 
-func currentFileDirectory() string {
-	_, fileName, _, ok := runtime.Caller(1)
-	if !ok {
-		panic("can't get current file directory")
+func getCacheDir() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
 	}
-	dir, _ := filepath.Split(fileName)
-	return dir
+	cacheDir := filepath.Join(homeDir, ".cache", "ExpanderCompilerCollection")
+	err = os.MkdirAll(cacheDir, 0755)
+	return cacheDir, err
 }
 
 var compilePtr unsafe.Pointer = nil
@@ -158,8 +160,11 @@ func initCompilePtr() {
 	if compilePtr != nil {
 		return
 	}
-	curDir := currentFileDirectory()
-	soPath := filepath.Join(curDir, getLibName())
+	cacheDir, err := getCacheDir()
+	if err != nil {
+		panic(fmt.Sprintf("failed to get cache dir: %v", err))
+	}
+	soPath := filepath.Join(cacheDir, getLibName())
 	updateLib(soPath)
 	handle := C.dlopen(C.CString(soPath), C.RTLD_LAZY)
 	if handle == nil {
@@ -187,6 +192,11 @@ func initCompilePtr() {
 	}
 }
 
+// from c to go
+func goBytes(data *C.uint8_t, length C.uint64_t) []byte {
+	return bytes.Clone(unsafe.Slice((*byte)(data), length))
+}
+
 func CompileWithRustLib(s []byte, configId uint64) ([]byte, []byte, error) {
 	initCompilePtr()
 
@@ -199,9 +209,9 @@ func CompileWithRustLib(s []byte, configId uint64) ([]byte, []byte, error) {
 	defer C.free(unsafe.Pointer(cr.layered.data))
 	defer C.free(unsafe.Pointer(cr.error.data))
 
-	irWitnessGen := C.GoBytes(unsafe.Pointer(cr.ir_witness_gen.data), C.int(cr.ir_witness_gen.length))
-	layered := C.GoBytes(unsafe.Pointer(cr.layered.data), C.int(cr.layered.length))
-	errMsg := C.GoBytes(unsafe.Pointer(cr.error.data), C.int(cr.error.length))
+	irWitnessGen := goBytes(cr.ir_witness_gen.data, cr.ir_witness_gen.length)
+	layered := goBytes(cr.layered.data, cr.layered.length)
+	errMsg := goBytes(cr.error.data, cr.error.length)
 
 	if len(errMsg) > 0 {
 		return nil, nil, errors.New(string(errMsg))
@@ -219,7 +229,7 @@ func ProveCircuitFile(circuitFilename string, witness []byte, configId uint64) [
 	defer C.free(unsafe.Pointer(wi.data))
 	proof := C.prove_circuit_file(proveCircuitFilePtr, cf, wi, C.uint64_t(configId))
 	defer C.free(unsafe.Pointer(proof.data))
-	return C.GoBytes(unsafe.Pointer(proof.data), C.int(proof.length))
+	return goBytes(proof.data, proof.length)
 }
 
 func VerifyCircuitFile(circuitFilename string, witness []byte, proof []byte, configId uint64) bool {
