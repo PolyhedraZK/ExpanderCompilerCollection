@@ -190,3 +190,43 @@ impl<C: Config> Serde for Circuit<C> {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::circuit::{
+        config::*,
+        ir::{common::rand_gen::*, dest::RootCircuit},
+    };
+
+    fn test_serde_for_field<C: Config>() {
+        let mut config = RandomCircuitConfig {
+            seed: 0,
+            num_circuits: RandomRange { min: 1, max: 20 },
+            num_inputs: RandomRange { min: 1, max: 3 },
+            num_instructions: RandomRange { min: 30, max: 50 },
+            num_constraints: RandomRange { min: 0, max: 5 },
+            num_outputs: RandomRange { min: 1, max: 3 },
+            num_terms: RandomRange { min: 1, max: 5 },
+            sub_circuit_prob: 0.05,
+        };
+        for i in 0..500 {
+            config.seed = i + 10000;
+            let root = RootCircuit::<C>::random(&config);
+            assert_eq!(root.validate(), Ok(()));
+            let (circuit, _) = crate::layering::compile(&root);
+            assert_eq!(circuit.validate(), Ok(()));
+            let mut buf = Vec::new();
+            circuit.serialize_into(&mut buf).unwrap();
+            let circuit2 = Circuit::<C>::deserialize_from(&buf[..]).unwrap();
+            assert_eq!(circuit, circuit2);
+        }
+    }
+
+    #[test]
+    fn test_serde() {
+        test_serde_for_field::<M31Config>();
+        test_serde_for_field::<GF2Config>();
+        test_serde_for_field::<BN254Config>();
+    }
+}
