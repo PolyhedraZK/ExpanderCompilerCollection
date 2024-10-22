@@ -342,33 +342,49 @@ impl<C: Config> Builder<C> {
         Expression::from_terms(cur_terms)
     }
 
+    fn cmp_expr_for_mul(&self, a: &Expression<C>, b: &Expression<C>) -> std::cmp::Ordering {
+        let la = self.layer_of_expr(a);
+        let lb = self.layer_of_expr(b);
+        if la != lb {
+            return la.cmp(&lb);
+        }
+        let la = a.len();
+        let lb = b.len();
+        if la != lb {
+            return la.cmp(&lb);
+        }
+        a.cmp(b)
+    }
+
     fn mul_vec(&mut self, vars: &[usize]) -> Expression<C> {
+        use crate::utils::heap::{pop, push};
         assert!(vars.len() >= 2);
         let mut exprs: Vec<Expression<C>> = vars
             .iter()
             .map(|&v| self.try_make_single(self.in_var_exprs[v].clone()))
             .collect();
-        while exprs.len() > 1 {
-            let mut exprs_pos: Vec<usize> = (0..exprs.len()).collect();
-            exprs_pos.sort_by(|a, b| {
-                let la = self.layer_of_expr(&exprs[*a]);
-                let lb = self.layer_of_expr(&exprs[*b]);
-                if la != lb {
-                    la.cmp(&lb)
-                } else {
-                    let la = exprs[*a].len();
-                    let lb = exprs[*b].len();
-                    if la != lb {
-                        la.cmp(&lb)
-                    } else {
-                        exprs[*a].cmp(&exprs[*b])
-                    }
-                }
-            });
-            let pos1 = exprs_pos[0];
-            let pos2 = exprs_pos[1];
-            let mut expr1 = exprs.swap_remove(pos1);
-            let mut expr2 = exprs.swap_remove(pos2 - (pos2 > pos1) as usize);
+        let mut exprs_pos_heap: Vec<usize> = vec![];
+        let mut next_push_pos = 0;
+        loop {
+            while next_push_pos != exprs.len() {
+                push(&mut exprs_pos_heap, next_push_pos, |a, b| {
+                    self.cmp_expr_for_mul(&exprs[a], &exprs[b])
+                });
+                next_push_pos += 1;
+            }
+            if exprs_pos_heap.len() == 1 {
+                break;
+            }
+            let pos1 = pop(&mut exprs_pos_heap, |a, b| {
+                self.cmp_expr_for_mul(&exprs[a], &exprs[b])
+            })
+            .unwrap();
+            let pos2 = pop(&mut exprs_pos_heap, |a, b| {
+                self.cmp_expr_for_mul(&exprs[a], &exprs[b])
+            })
+            .unwrap();
+            let mut expr1 = std::mem::take(&mut exprs[pos1]);
+            let mut expr2 = std::mem::take(&mut exprs[pos2]);
             if expr1.len() > expr2.len() {
                 std::mem::swap(&mut expr1, &mut expr2);
             }
@@ -448,7 +464,8 @@ impl<C: Config> Builder<C> {
             }
             exprs.push(self.lin_comb_inner(vars, |_| C::CircuitField::one()));
         }
-        exprs.remove(0)
+        let final_pos = exprs_pos_heap.pop().unwrap();
+        exprs.swap_remove(final_pos)
     }
 
     fn add_and_check_if_should_make_single(&mut self, e: Expression<C>) {
@@ -886,5 +903,66 @@ mod tests {
                 },
             }
         }
+    }
+
+    #[test]
+    fn large_add() {
+        let mut root = super::InRootCircuit::<C>::default();
+        let terms = (1..=100000)
+            .map(|i| ir::expr::LinCombTerm {
+                coef: CField::one(),
+                var: i,
+            })
+            .collect();
+        let lc = ir::expr::LinComb {
+            terms,
+            constant: CField::one(),
+        };
+        root.circuits.insert(
+            0,
+            super::InCircuit::<C> {
+                instructions: vec![super::InInstruction::<C>::LinComb(lc.clone())],
+                constraints: vec![100001],
+                outputs: vec![],
+                num_inputs: 100000,
+            },
+        );
+        assert_eq!(root.validate(), Ok(()));
+        let root_processed = super::process(&root).unwrap();
+        assert_eq!(root_processed.validate(), Ok(()));
+        match &root_processed.circuits[&0].instructions[0] {
+            ir::dest::Instruction::InternalVariable { expr } => {
+                assert_eq!(expr.len(), 100001);
+            }
+            _ => panic!(),
+        }
+        let inputs: Vec<CField> = (1..=100000).map(|i| CField::from(i)).collect();
+        let (out, ok) = root.eval_unsafe(inputs.clone());
+        let (out2, ok2) = root_processed.eval_unsafe(inputs);
+        assert_eq!(out, out2);
+        assert_eq!(ok, ok2);
+    }
+
+    #[test]
+    fn large_mul() {
+        let mut root = super::InRootCircuit::<C>::default();
+        let terms: Vec<usize> = (1..=100000).collect();
+        root.circuits.insert(
+            0,
+            super::InCircuit::<C> {
+                instructions: vec![super::InInstruction::<C>::Mul(terms.clone())],
+                constraints: vec![100001],
+                outputs: vec![],
+                num_inputs: 100000,
+            },
+        );
+        assert_eq!(root.validate(), Ok(()));
+        let root_processed = super::process(&root).unwrap();
+        assert_eq!(root_processed.validate(), Ok(()));
+        let inputs: Vec<CField> = (1..=100000).map(|i| CField::from(i)).collect();
+        let (out, ok) = root.eval_unsafe(inputs.clone());
+        let (out2, ok2) = root_processed.eval_unsafe(inputs);
+        assert_eq!(out, out2);
+        assert_eq!(ok, ok2);
     }
 }
