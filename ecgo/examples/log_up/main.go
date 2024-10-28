@@ -244,9 +244,9 @@ func (c *LogUpCircuit) Define(api frontend.API) error {
 }
 
 func main() {
-	N_TABLE_ROWS := uint(8)
-	N_QUERIES := uint(16)
-	COLUMN_SIZE := uint(2)
+	N_TABLE_ROWS := uint(128)
+	N_QUERIES := uint(512)
+	COLUMN_SIZE := uint(8)
 
 	circuit, err := ecgo.Compile(ecc.BN254.ScalarField(), NewRandomCircuit(N_TABLE_ROWS, N_QUERIES, COLUMN_SIZE, false))
 	if err != nil {
