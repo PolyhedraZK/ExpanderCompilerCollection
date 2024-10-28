@@ -194,7 +194,7 @@ func QueryCountHintFn(field *big.Int, inputs []*big.Int, outputs []*big.Int) err
 func (c *LogUpCircuit) Check(api ecgo.API, column_combine_option ColumnCombineOptions) error {
 	if len(c.Table) == 0 || len(c.QueryID) == 0 {
 		panic("empty table or empty query")
-	}
+	} // Should we allow this?
 
 	// The challenge used to complete polynomial identity check
 	alpha := api.GetRandomValue()
