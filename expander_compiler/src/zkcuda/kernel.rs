@@ -10,16 +10,20 @@ use crate::frontend::*;
 pub struct Kernel<C: Config> {
     pub witness_solver: ir::hint_normalized::RootCircuit<C>,
     pub layered_circuit: LayeredCircuit<C>,
-    pub io: Vec<IOVecOffset>,
-    pub hint_input: Option<IOVecOffset>,
+    pub witness_solver_io: Vec<WitnessSolverIOVec>,
+    pub witness_solver_hint_input: Option<WitnessSolverIOVec>,
+    pub layered_circuit_input: Vec<LayeredCircuitInputVec>,
 }
 
-pub struct IOVecOffset {
+pub struct WitnessSolverIOVec {
     pub len: usize,
     pub input_offset: Option<usize>,
     pub output_offset: Option<usize>,
-    pub witness_solver_input_offset: Option<usize>,
-    pub witness_solver_output_offset: Option<usize>,
+}
+
+pub struct LayeredCircuitInputVec {
+    pub len: usize,
+    pub offset: usize,
 }
 
 pub struct IOVecSpec {
@@ -52,6 +56,7 @@ where
     let mut inputs_offsets = vec![];
     let mut expected_outputs_offsets = vec![];
     let mut global_input_offset = 0;
+    let mut lc_in = vec![];
     for spec in io_specs {
         let mut cur_inputs = vec![];
         if spec.is_input {
@@ -59,6 +64,10 @@ where
                 cur_inputs.push(input_variables[global_input_offset + i]);
             }
             inputs_offsets.push(global_input_offset);
+            lc_in.push(LayeredCircuitInputVec {
+                len: spec.len,
+                offset: global_input_offset,
+            });
             global_input_offset += spec.len;
         } else {
             for _ in 0..spec.len {
@@ -77,6 +86,10 @@ where
             }
             expected_outputs.push(cur_outputs);
             expected_outputs_offsets.push(global_input_offset);
+            lc_in.push(LayeredCircuitInputVec {
+                len: spec.len,
+                offset: global_input_offset,
+            });
             global_input_offset += spec.len;
         } else {
             expected_outputs.push(vec![]);
@@ -85,7 +98,7 @@ where
     }
     let mut io_off = vec![];
     for i in 0..io_specs.len() {
-        io_off.push(IOVecOffset {
+        io_off.push(WitnessSolverIOVec {
             len: io_specs[i].len,
             input_offset: if io_specs[i].is_input {
                 Some(inputs_offsets[i])
@@ -93,16 +106,6 @@ where
                 None
             },
             output_offset: if io_specs[i].is_output {
-                Some(expected_outputs_offsets[i])
-            } else {
-                None
-            },
-            witness_solver_input_offset: if io_specs[i].is_input {
-                Some(inputs_offsets[i])
-            } else {
-                None
-            },
-            witness_solver_output_offset: if io_specs[i].is_output {
                 Some(expected_outputs_offsets[i])
             } else {
                 None
@@ -174,7 +177,7 @@ where
     }
     // remove outputs that used for prevent optimization
     let rd_c0 = r_dest_opt.circuits.get_mut(&0).unwrap();
-    assert_eq!(rd_c0.outputs.len(), n_in + n_out);
+    assert_eq!(rd_c0.outputs.len(), n_in + n_out * 2);
     rd_c0.outputs = vec![];
     // compile step 3
     let (lc, dest_im) = crate::layering::compile(
@@ -199,12 +202,14 @@ where
     re_c0.outputs.truncate(off1);
     let hint_size = re_c0.outputs.len() - n_in - n_out;
     let hint_io = if hint_size > 0 {
-        Some(IOVecOffset {
+        lc_in.push(LayeredCircuitInputVec {
             len: hint_size,
-            input_offset: Some(n_in + n_out),
-            output_offset: None,
-            witness_solver_input_offset: None,
-            witness_solver_output_offset: Some(n_in + n_out),
+            offset: n_in + n_out,
+        });
+        Some(WitnessSolverIOVec {
+            len: hint_size,
+            input_offset: None,
+            output_offset: Some(n_in + n_out),
         })
     } else {
         None
@@ -213,8 +218,9 @@ where
     Ok(Kernel {
         witness_solver: r_hint_exported_opt,
         layered_circuit: lc,
-        io: io_off,
-        hint_input: hint_io,
+        witness_solver_io: io_off,
+        witness_solver_hint_input: hint_io,
+        layered_circuit_input: lc_in,
     })
 }
 
