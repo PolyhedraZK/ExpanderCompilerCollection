@@ -65,6 +65,12 @@ impl<F: Field> ToVariableOrValue<F> for &Variable {
     }
 }
 
+impl Variable {
+    pub fn id(&self) -> usize {
+        self.id
+    }
+}
+
 impl<C: Config> Builder<C> {
     pub fn new(num_inputs: usize) -> (Self, Vec<Variable>) {
         (

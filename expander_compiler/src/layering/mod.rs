@@ -14,7 +14,14 @@ mod wire;
 #[cfg(test)]
 mod tests;
 
-pub fn compile<C: Config>(rc: &ir::dest::RootCircuit<C>) -> (layered::Circuit<C>, InputMapping) {
+pub struct CompileOptions {
+    pub is_zkcuda: bool,
+}
+
+pub fn compile<C: Config>(
+    rc: &ir::dest::RootCircuit<C>,
+    opts: CompileOptions,
+) -> (layered::Circuit<C>, InputMapping) {
     let mut ctx = compile::CompileContext {
         rc,
         circuits: HashMap::new(),
@@ -27,6 +34,7 @@ pub fn compile<C: Config>(rc: &ir::dest::RootCircuit<C>) -> (layered::Circuit<C>
         layers: Vec::new(),
         input_order: Vec::new(),
         root_has_constraints: false,
+        opts,
     };
     ctx.compile();
     let l0_size = ctx.compiled_circuits[ctx.layers[0]].num_inputs;

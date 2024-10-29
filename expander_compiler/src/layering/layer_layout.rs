@@ -343,7 +343,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
     }
 }
 
-fn merge_layouts(s: Vec<Vec<usize>>, additional: Vec<usize>) -> Vec<usize> {
+pub fn merge_layouts(s: Vec<Vec<usize>>, additional: Vec<usize>) -> Vec<usize> {
     // currently it's a simple greedy algorithm
     // sort groups by size, and then place them one by one
     // since their size are always 2^n, the result is aligned

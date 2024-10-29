@@ -682,7 +682,7 @@ impl<C: Config> Circuit<C> {
 mod tests {
     use crate::circuit::layered;
     use crate::field::FieldArith;
-    use crate::layering::compile;
+    use crate::layering::{compile, CompileOptions};
     use crate::{
         circuit::{
             config::{Config, GF2Config as C},
@@ -711,7 +711,7 @@ mod tests {
                 }
             },
         }
-        let (lc, _) = compile(&root);
+        let (lc, _) = compile(&root, CompileOptions { is_zkcuda: false });
         assert_eq!(lc.validate(), Ok(()));
         Some(lc)
     }
