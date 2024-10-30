@@ -7,6 +7,7 @@ use crate::circuit::{
 use crate::field::FieldArith;
 use crate::frontend::*;
 
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Kernel<C: Config> {
     pub witness_solver: ir::hint_normalized::RootCircuit<C>,
     pub layered_circuit: LayeredCircuit<C>,
@@ -15,12 +16,14 @@ pub struct Kernel<C: Config> {
     pub layered_circuit_input: Vec<LayeredCircuitInputVec>,
 }
 
+#[derive(Default, Debug, Clone, Hash, PartialEq, Eq)]
 pub struct WitnessSolverIOVec {
     pub len: usize,
     pub input_offset: Option<usize>,
     pub output_offset: Option<usize>,
 }
 
+#[derive(Default, Debug, Clone, Hash, PartialEq, Eq)]
 pub struct LayeredCircuitInputVec {
     pub len: usize,
     pub offset: usize,
@@ -177,8 +180,7 @@ where
     }
     // remove outputs that used for prevent optimization
     let rd_c0 = r_dest_opt.circuits.get_mut(&0).unwrap();
-    assert_eq!(rd_c0.outputs.len(), n_in + n_out * 2);
-    rd_c0.outputs = vec![];
+    rd_c0.outputs.truncate(rd_c0.outputs.len() - n_in - n_out);
     // compile step 3
     let (lc, dest_im) = crate::layering::compile(
         &r_dest_opt,
@@ -232,5 +234,31 @@ mod tests {
         let x = a[1][1];
         a[0][0] = x;
         a[1][2] = api.add(x, 1);
+    }
+
+    #[test]
+    fn test_1() {
+        let kernel: Kernel<M31Config> = compile_with_spec(
+            example_kernel_1,
+            &[
+                IOVecSpec {
+                    len: 1,
+                    is_input: true,
+                    is_output: true,
+                },
+                IOVecSpec {
+                    len: 3,
+                    is_input: true,
+                    is_output: true,
+                },
+            ],
+        )
+        .unwrap();
+        println!(
+            "{} {} {}",
+            kernel.layered_circuit.num_public_inputs,
+            kernel.layered_circuit.num_actual_outputs,
+            kernel.layered_circuit.expected_num_output_zeroes
+        );
     }
 }

@@ -350,3 +350,16 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
         Ok((res, cond))
     }
 }
+
+impl<Irc: IrConfig> Hash for RootCircuit<Irc> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.num_public_inputs.hash(state);
+        self.expected_num_output_zeroes.hash(state);
+        let mut keys = self.circuits.keys().collect::<Vec<_>>();
+        keys.sort();
+        for k in keys.iter() {
+            k.hash(state);
+            self.circuits[k].hash(state);
+        }
+    }
+}
