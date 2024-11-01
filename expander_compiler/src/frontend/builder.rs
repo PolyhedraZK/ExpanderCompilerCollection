@@ -288,6 +288,12 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         let diff = self.sub(x, y);
         self.assert_is_non_zero(diff);
     }
+
+    fn get_random_value(&mut self) -> Variable {
+        self.instructions
+            .push(SourceInstruction::ConstantLike(Coef::Random));
+        self.new_var()
+    }
 }
 
 // write macro rules for unconstrained binary op definition
@@ -435,6 +441,10 @@ impl<C: Config> BasicAPI<C> for RootBuilder<C> {
         y: impl ToVariableOrValue<C::CircuitField>,
     ) {
         self.last_builder().assert_is_different(x, y)
+    }
+
+    fn get_random_value(&mut self) -> Variable {
+        self.last_builder().get_random_value()
     }
 }
 

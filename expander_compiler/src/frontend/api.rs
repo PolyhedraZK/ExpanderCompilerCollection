@@ -41,6 +41,7 @@ pub trait BasicAPI<C: Config> {
         x: impl ToVariableOrValue<C::CircuitField>,
         y: impl ToVariableOrValue<C::CircuitField>,
     );
+    fn get_random_value(&mut self) -> Variable;
 }
 
 pub trait UnconstrainedAPI<C: Config> {
