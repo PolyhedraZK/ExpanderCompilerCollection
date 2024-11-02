@@ -80,7 +80,7 @@ fn sum_rational_vec<C: Config>(builder: &mut API<C>, vs: &[Rational]) -> Rationa
 // TODO: Add poly randomness
 fn get_column_randomness<C: Config>(builder: &mut API<C>, n_columns: usize) -> Vec<Variable> {
     let mut randomness = vec![];
-    randomness[0] = builder.constant(1);
+    randomness.push(builder.constant(1));
     for _ in 1..n_columns {
         randomness.push(builder.get_random_value());
     }
