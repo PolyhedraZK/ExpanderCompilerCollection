@@ -46,9 +46,9 @@ fn sum_rational_vec<C: Config>(builder: &mut API<C>, vs: &[Rational]) -> Rationa
         return Rational {
             numerator: builder.constant(0),
             denominator: builder.constant(1),
-        }
+        };
     }
-    
+
     // Basic version:
     // let mut sum = Rational {
     //     numerator: builder.constant(0),
@@ -220,7 +220,6 @@ fn logup_test_helper<C: Config>() {
         .serialize_into(writer)
         .unwrap();
 }
-
 
 #[test]
 fn logup_test() {
