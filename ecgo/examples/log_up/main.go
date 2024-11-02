@@ -191,6 +191,17 @@ func QueryCountHintFn(field *big.Int, inputs []*big.Int, outputs []*big.Int) err
 	return nil
 }
 
+func LogUpPolyValsAtAlpha(api ecgo.API, vec_1d []frontend.Variable, count []frontend.Variable, x frontend.Variable) RationalNumber {
+	poly := make([]RationalNumber, len(vec_1d))
+	for i := 0; i < len(vec_1d); i++ {
+		poly[i] = RationalNumber{
+			Numerator:   count[i],
+			Denominator: api.Sub(x, vec_1d[i]),
+		}
+	}
+	return SumRationalNumbers(api, poly)
+}
+
 func (c *LogUpCircuit) Check(api ecgo.API, column_combine_option ColumnCombineOptions) error {
 	if len(c.Table) == 0 || len(c.QueryID) == 0 {
 		panic("empty table or empty query")
@@ -198,36 +209,28 @@ func (c *LogUpCircuit) Check(api ecgo.API, column_combine_option ColumnCombineOp
 
 	// The challenge used to complete polynomial identity check
 	alpha := api.GetRandomValue()
-
+	// The randomness used to combine the columns
 	column_combine_randomness := GetColumnRandomness(api, uint(len(c.Table[0])), column_combine_option)
 
 	// Table Polynomial
 	table_single_column := CombineColumn(api, c.Table, column_combine_randomness)
-	query_count, _ := api.NewHint(
+	query_count, hint_err := api.NewHint(
 		QueryCountHintFn,
 		len(c.Table),
 		c.QueryID...,
 	)
-
-	table_poly := make([]RationalNumber, len(table_single_column))
-	for i := 0; i < len(table_single_column); i++ {
-		table_poly[i] = RationalNumber{
-			Numerator:   query_count[i],
-			Denominator: api.Sub(alpha, table_single_column[i]),
-		}
+	if hint_err != nil {
+		panic(hint_err.Error())
 	}
-	table_poly_at_alpha := SumRationalNumbers(api, table_poly)
+	table_poly_at_alpha := LogUpPolyValsAtAlpha(api, table_single_column, query_count, alpha)
 
 	// Query Polynomial
 	query_single_column := CombineColumn(api, c.QueryResult, column_combine_randomness)
-	query_poly := make([]RationalNumber, len(query_single_column))
-	for i := 0; i < len(query_single_column); i++ {
-		query_poly[i] = RationalNumber{
-			Numerator:   1,
-			Denominator: api.Sub(alpha, query_single_column[i]),
-		}
+	dummy_count := make([]frontend.Variable, len(query_single_column))
+	for i := 0; i < len(dummy_count); i++ {
+		dummy_count[i] = 1
 	}
-	query_poly_at_alpha := SumRationalNumbers(api, query_poly)
+	query_poly_at_alpha := LogUpPolyValsAtAlpha(api, query_single_column, dummy_count, alpha)
 
 	api.AssertIsEqual(
 		api.Mul(table_poly_at_alpha.Numerator, query_poly_at_alpha.Denominator),
