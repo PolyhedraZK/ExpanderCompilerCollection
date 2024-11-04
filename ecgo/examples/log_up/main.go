@@ -2,12 +2,10 @@ package main
 
 import (
 	"math"
-	"math/big"
 	"math/rand"
 	"os"
 
 	"github.com/consensys/gnark-crypto/ecc"
-	"github.com/consensys/gnark/constraint/solver"
 	"github.com/consensys/gnark/frontend"
 
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo"
@@ -26,73 +24,89 @@ func (r *RationalNumber) Add(api frontend.API, other *RationalNumber) RationalNu
 	}
 }
 
-// 0 is considered a power of 2 in this case
-func IsPowerOf2(n int) bool {
-	return n&(n-1) == 0
-}
-
 // Construct a binary summation tree to sum all the values
-func SumRationalNumbers(api frontend.API, rs []RationalNumber) RationalNumber {
-	n := len(rs)
+func SumRationalNumbers(api frontend.API, vs []RationalNumber) RationalNumber {
+	n := len(vs)
 	if n == 0 {
 		return RationalNumber{Numerator: 0, Denominator: 1}
 	}
 
-	if !IsPowerOf2(n) {
-		panic("The length of rs should be a power of 2")
-	}
+	vvs := make([]RationalNumber, len(vs))
+	copy(vvs, vs)
 
-	cur := rs
-	next := make([]RationalNumber, 0)
-
-	for n > 1 {
-		n >>= 1
-		for i := 0; i < n; i++ {
-			next = append(next, cur[i*2].Add(api, &cur[i*2+1]))
+	n_values_to_sum := len(vvs)
+	for n_values_to_sum > 1 {
+		half_size_floor := n_values_to_sum / 2
+		for i := 0; i < half_size_floor; i++ {
+			vvs[i] = vvs[i].Add(api, &vvs[i+half_size_floor])
 		}
-		cur = next
-		next = next[:0]
+
+		if n_values_to_sum&1 != 0 {
+			vvs[half_size_floor] = vvs[n_values_to_sum-1]
+		}
+
+		n_values_to_sum = (n_values_to_sum + 1) / 2
 	}
 
-	if len(cur) != 1 {
-		panic("Summation code may be wrong.")
-	}
-
-	return cur[0]
+	return vvs[0]
 }
 
 type LogUpCircuit struct {
-	Table       [][]frontend.Variable
-	QueryID     []frontend.Variable
+	TableKeys   [][]frontend.Variable
+	TableValues [][]frontend.Variable
+	QueryKeys   [][]frontend.Variable
 	QueryResult [][]frontend.Variable
+
+	QueryCount []frontend.Variable
 }
 
 func NewRandomCircuit(
+	key_len uint,
 	n_table_rows uint,
 	n_queries uint,
 	n_columns uint,
 	fill_values bool,
 ) *LogUpCircuit {
 	c := &LogUpCircuit{}
-	c.Table = make([][]frontend.Variable, n_table_rows)
+
+	c.QueryCount = make([]frontend.Variable, n_table_rows)
+	if fill_values {
+		for i := 0; i < int(n_table_rows); i++ {
+			c.QueryCount[i] = uint(0)
+		}
+	}
+
+	c.TableKeys = make([][]frontend.Variable, n_table_rows)
 	for i := 0; i < int(n_table_rows); i++ {
-		c.Table[i] = make([]frontend.Variable, n_columns)
+		c.TableKeys[i] = make([]frontend.Variable, key_len)
 		if fill_values {
-			for j := 0; j < int(n_columns); j++ {
-				c.Table[i][j] = rand.Intn(math.MaxInt)
+			for j := 0; j < int(key_len); j++ {
+				c.TableKeys[i][j] = rand.Intn(math.MaxInt)
 			}
 		}
 	}
 
-	c.QueryID = make([]frontend.Variable, n_queries)
+	c.TableValues = make([][]frontend.Variable, n_table_rows)
+	for i := 0; i < int(n_table_rows); i++ {
+		c.TableValues[i] = make([]frontend.Variable, n_columns)
+		if fill_values {
+			for j := 0; j < int(n_columns); j++ {
+				c.TableValues[i][j] = rand.Intn(math.MaxInt)
+			}
+		}
+	}
+
+	c.QueryKeys = make([][]frontend.Variable, n_queries)
 	c.QueryResult = make([][]frontend.Variable, n_queries)
 
 	for i := 0; i < int(n_queries); i++ {
+		c.QueryKeys[i] = make([]frontend.Variable, key_len)
 		c.QueryResult[i] = make([]frontend.Variable, n_columns)
 		if fill_values {
 			query_id := rand.Intn(int(n_table_rows))
-			c.QueryID[i] = query_id
-			c.QueryResult[i] = c.Table[query_id]
+			c.QueryKeys[i] = c.TableKeys[query_id]
+			c.QueryResult[i] = c.TableValues[query_id]
+			c.QueryCount[query_id] = c.QueryCount[query_id].(uint) + 1
 		}
 	}
 
@@ -116,7 +130,7 @@ func SimpleMin(a uint, b uint) uint {
 
 func GetColumnRandomness(api ecgo.API, n_columns uint, column_combine_options ColumnCombineOptions) []frontend.Variable {
 	var randomness = make([]frontend.Variable, n_columns)
-	if column_combine_options == Poly {
+	if column_combine_options == Poly { // not tested yet, don't use
 		beta := api.GetRandomValue()
 		randomness[0] = 1
 		randomness[1] = beta
@@ -153,18 +167,8 @@ func CombineColumn(api ecgo.API, vec_2d [][]frontend.Variable, randomness []fron
 	}
 
 	n_columns := len(vec_2d[0])
-
-	// Do not introduce any randomness
-	if n_columns == 1 {
-		vec_combined := make([]frontend.Variable, n_rows)
-		for i := 0; i < n_rows; i++ {
-			vec_combined[i] = vec_2d[i][0]
-		}
-		return vec_combined
-	}
-
-	if !IsPowerOf2(n_columns) {
-		panic("Consider support this")
+	if n_columns != len(randomness) {
+		panic("Inconsistent randomness length and column size")
 	}
 
 	vec_return := make([]frontend.Variable, 0)
@@ -178,56 +182,56 @@ func CombineColumn(api ecgo.API, vec_2d [][]frontend.Variable, randomness []fron
 	return vec_return
 }
 
-// TODO: Do we need bits check for the count?
-func QueryCountHintFn(field *big.Int, inputs []*big.Int, outputs []*big.Int) error {
-	for i := 0; i < len(outputs); i++ {
-		outputs[i] = big.NewInt(0)
+func LogUpPolyValsAtAlpha(api ecgo.API, vec_1d []frontend.Variable, count []frontend.Variable, x frontend.Variable) RationalNumber {
+	poly := make([]RationalNumber, len(vec_1d))
+	for i := 0; i < len(vec_1d); i++ {
+		poly[i] = RationalNumber{
+			Numerator:   count[i],
+			Denominator: api.Sub(x, vec_1d[i]),
+		}
+	}
+	return SumRationalNumbers(api, poly)
+}
+
+func CombineVecAt2d(a [][]frontend.Variable, b [][]frontend.Variable) [][]frontend.Variable {
+	if len(a) != len(b) {
+		panic("Length does not match at combine 2d")
 	}
 
-	for i := 0; i < len(inputs); i++ {
-		query_id := inputs[i].Int64()
-		outputs[query_id].Add(outputs[query_id], big.NewInt(1))
+	r := make([][]frontend.Variable, len(a))
+	for i := 0; i < len(a); i++ {
+		for j := 0; j < len(a[i]); j++ {
+			r[i] = append(r[i], a[i][j])
+		}
+
+		for j := 0; j < len(b[i]); j++ {
+			r[i] = append(r[i], b[i][j])
+		}
 	}
-	return nil
+
+	return r
 }
 
 func (c *LogUpCircuit) Check(api ecgo.API, column_combine_option ColumnCombineOptions) error {
-	if len(c.Table) == 0 || len(c.QueryID) == 0 {
-		panic("empty table or empty query")
-	} // Should we allow this?
 
 	// The challenge used to complete polynomial identity check
 	alpha := api.GetRandomValue()
-
-	column_combine_randomness := GetColumnRandomness(api, uint(len(c.Table[0])), column_combine_option)
+	// The randomness used to combine the columns
+	column_combine_randomness := GetColumnRandomness(api, uint(len(c.TableKeys[0])+len(c.TableValues[0])), column_combine_option)
 
 	// Table Polynomial
-	table_single_column := CombineColumn(api, c.Table, column_combine_randomness)
-	query_count, _ := api.NewHint(
-		QueryCountHintFn,
-		len(c.Table),
-		c.QueryID...,
-	)
-
-	table_poly := make([]RationalNumber, len(table_single_column))
-	for i := 0; i < len(table_single_column); i++ {
-		table_poly[i] = RationalNumber{
-			Numerator:   query_count[i],
-			Denominator: api.Sub(alpha, table_single_column[i]),
-		}
-	}
-	table_poly_at_alpha := SumRationalNumbers(api, table_poly)
+	table_combined := CombineVecAt2d(c.TableKeys, c.TableValues)
+	table_single_column := CombineColumn(api, table_combined, column_combine_randomness)
+	table_poly_at_alpha := LogUpPolyValsAtAlpha(api, table_single_column, c.QueryCount, alpha)
 
 	// Query Polynomial
-	query_single_column := CombineColumn(api, c.QueryResult, column_combine_randomness)
-	query_poly := make([]RationalNumber, len(query_single_column))
-	for i := 0; i < len(query_single_column); i++ {
-		query_poly[i] = RationalNumber{
-			Numerator:   1,
-			Denominator: api.Sub(alpha, query_single_column[i]),
-		}
+	query_combined := CombineVecAt2d(c.QueryKeys, c.QueryResult)
+	query_single_column := CombineColumn(api, query_combined, column_combine_randomness)
+	dummy_count := make([]frontend.Variable, len(query_single_column))
+	for i := 0; i < len(dummy_count); i++ {
+		dummy_count[i] = 1
 	}
-	query_poly_at_alpha := SumRationalNumbers(api, query_poly)
+	query_poly_at_alpha := LogUpPolyValsAtAlpha(api, query_single_column, dummy_count, alpha)
 
 	api.AssertIsEqual(
 		api.Mul(table_poly_at_alpha.Numerator, query_poly_at_alpha.Denominator),
@@ -244,11 +248,12 @@ func (c *LogUpCircuit) Define(api frontend.API) error {
 }
 
 func main() {
+	KEY_LEN := uint(8)
 	N_TABLE_ROWS := uint(128)
 	N_QUERIES := uint(512)
 	COLUMN_SIZE := uint(8)
 
-	circuit, err := ecgo.Compile(ecc.BN254.ScalarField(), NewRandomCircuit(N_TABLE_ROWS, N_QUERIES, COLUMN_SIZE, false))
+	circuit, err := ecgo.Compile(ecc.BN254.ScalarField(), NewRandomCircuit(KEY_LEN, N_TABLE_ROWS, N_QUERIES, COLUMN_SIZE, false))
 	if err != nil {
 		panic(err.Error())
 	}
@@ -256,8 +261,7 @@ func main() {
 	c := circuit.GetLayeredCircuit()
 	os.WriteFile("circuit.txt", c.Serialize(), 0o644)
 
-	assignment := NewRandomCircuit(N_TABLE_ROWS, N_QUERIES, COLUMN_SIZE, true)
-	solver.RegisterHint(QueryCountHintFn)
+	assignment := NewRandomCircuit(KEY_LEN, N_TABLE_ROWS, N_QUERIES, COLUMN_SIZE, true)
 	inputSolver := circuit.GetInputSolver()
 	witness, err := inputSolver.SolveInput(assignment, 0)
 	if err != nil {
