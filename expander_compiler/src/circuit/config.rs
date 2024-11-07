@@ -1,9 +1,11 @@
-use std::{fmt::Debug, hash::Hash};
-
 use crate::field::Field;
+use expander_config::GKRScheme;
+use std::{fmt::Debug, hash::Hash};
 
 pub trait Config: Default + Clone + Ord + Debug + Hash + Copy + 'static {
     type CircuitField: Field;
+
+    const SCHEME: GKRScheme = GKRScheme::Vanilla;
 
     const CONFIG_ID: usize;
 
@@ -23,6 +25,16 @@ impl Config for M31Config {
     type CircuitField = crate::field::M31;
 
     const CONFIG_ID: usize = 1;
+}
+
+#[derive(Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub struct M31Gkr2Config {}
+
+impl Config for M31Gkr2Config {
+    type CircuitField = crate::field::M31;
+
+    const CONFIG_ID: usize = 4;
+    const SCHEME: GKRScheme = GKRScheme::GkrSquare;
 }
 
 #[derive(Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]

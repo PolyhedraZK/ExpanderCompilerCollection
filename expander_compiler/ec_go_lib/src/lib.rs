@@ -49,6 +49,7 @@ fn compile_inner(ir_source: Vec<u8>, config_id: u64) -> Result<(Vec<u8>, Vec<u8>
         1 => compile_inner_with_config::<config::M31Config>(ir_source),
         2 => compile_inner_with_config::<config::BN254Config>(ir_source),
         3 => compile_inner_with_config::<config::GF2Config>(ir_source),
+        4 => compile_inner_with_config::<config::M31Gkr2Config>(ir_source),
         _ => Err(format!("unknown config id: {}", config_id)),
     }
 }
@@ -224,6 +225,10 @@ pub extern "C" fn prove_circuit_file(
             circuit_filename,
             witness,
         ),
+        4 => prove_circuit_file_inner::<expander_config::M31ExtConfigSha2, config::M31Gkr2Config>(
+            circuit_filename,
+            witness,
+        ),
         _ => panic!("unknown config id: {}", config_id),
     };
     let proof_len = proof.len();
@@ -267,6 +272,11 @@ pub extern "C" fn verify_circuit_file(
             proof,
         ),
         3 => verify_circuit_file_inner::<expander_config::GF2ExtConfigSha2, config::GF2Config>(
+            circuit_filename,
+            witness,
+            proof,
+        ),
+        4 => verify_circuit_file_inner::<expander_config::M31ExtConfigSha2, config::M31Gkr2Config>(
             circuit_filename,
             witness,
             proof,

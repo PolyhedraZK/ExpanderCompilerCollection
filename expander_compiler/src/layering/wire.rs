@@ -1,3 +1,4 @@
+use expander_config::GKRScheme;
 use std::collections::HashMap;
 
 use crate::{
@@ -18,6 +19,32 @@ use super::{
 
 struct LayoutQuery {
     var_pos: HashMap<usize, usize>,
+}
+
+/// Add value at `input_pos` to `output_pos` with coefficient `coef`.
+fn push_add_gate<C: Config>(
+    res: &mut Segment<C>,
+    input_pos: usize,
+    output_pos: usize,
+    coef: Coef<C>,
+) {
+    match C::SCHEME {
+        GKRScheme::Vanilla => {
+            res.gate_adds.push(GateAdd {
+                inputs: [input_pos],
+                output: output_pos,
+                coef,
+            });
+        }
+        GKRScheme::GkrSquare => {
+            res.gate_customs.push(GateCustom {
+                gate_type: 12346, // power1 gate
+                inputs: vec![input_pos],
+                output: output_pos,
+                coef,
+            });
+        }
+    }
 }
 
 impl LayoutQuery {
@@ -278,11 +305,12 @@ impl<'a, C: Config> CompileContext<'a, C> {
             };
             // if it's not the first layer, just relay it
             if ic.min_layer[*x] != next_layer {
-                res.gate_adds.push(GateAdd {
-                    inputs: [aq.var_pos[x]],
-                    output: pos,
-                    coef: Coef::Constant(C::CircuitField::one()),
-                });
+                push_add_gate(
+                    &mut res,
+                    aq.var_pos[x],
+                    pos,
+                    Coef::Constant(C::CircuitField::one()),
+                );
                 continue;
             }
             if let Some(value) = ic.constant_like_variables.get(x) {
@@ -302,11 +330,12 @@ impl<'a, C: Config> CompileContext<'a, C> {
                             });
                         }
                         VarSpec::Linear(vid) => {
-                            res.gate_adds.push(GateAdd {
-                                inputs: [aq.var_pos[vid]],
-                                output: pos,
-                                coef: Coef::Constant(term.coef),
-                            });
+                            push_add_gate(
+                                &mut res,
+                                aq.var_pos[vid],
+                                pos,
+                                Coef::Constant(term.coef),
+                            );
                         }
                         VarSpec::Quad(vid0, vid1) => {
                             res.gate_muls.push(GateMul {
@@ -324,11 +353,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
                             });
                         }
                         VarSpec::RandomLinear(vid) => {
-                            res.gate_adds.push(GateAdd {
-                                inputs: [aq.var_pos[vid]],
-                                output: pos,
-                                coef: Coef::Random,
-                            });
+                            push_add_gate(&mut res, aq.var_pos[vid], pos, Coef::Random);
                         }
                     }
                 }
@@ -345,11 +370,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
                 } else {
                     Coef::Random
                 };
-                res.gate_adds.push(GateAdd {
-                    inputs: [aq.var_pos[v]],
-                    output: pos,
-                    coef,
-                });
+                push_add_gate(&mut res, aq.var_pos[v], pos, coef);
             }
             for i in cc.sub_circuit_ids.iter() {
                 let insn_id = ic.sub_circuit_insn_ids[*i];
@@ -373,11 +394,12 @@ impl<'a, C: Config> CompileContext<'a, C> {
                         placement.iter().position(|x| *x == vpid).unwrap()
                     }
                 };
-                res.gate_adds.push(GateAdd {
-                    inputs: [sub_cur_layout_all[&insn_id].offset + spos],
-                    output: pos,
-                    coef: Coef::Constant(C::CircuitField::one()),
-                });
+                push_add_gate(
+                    &mut res,
+                    sub_cur_layout_all[&insn_id].offset + spos,
+                    pos,
+                    Coef::Constant(C::CircuitField::one()),
+                );
             }
         }
 
