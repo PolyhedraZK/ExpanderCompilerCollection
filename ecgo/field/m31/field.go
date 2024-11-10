@@ -8,7 +8,7 @@ import (
 	"github.com/consensys/gnark/constraint"
 )
 
-const P = 2147483647
+const P = 0x7fffffff
 
 var Pbig = big.NewInt(P)
 var ScalarField = Pbig

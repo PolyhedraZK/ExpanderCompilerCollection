@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math/big"
 
 	"github.com/consensys/gnark/constraint"
@@ -20,11 +21,11 @@ type SimpleField interface {
 func (o *OutputBuf) AppendBigInt(n int, x *big.Int) {
 	zbuf := make([]byte, n)
 	b := x.Bytes()
+	if len(b) > n {
+		panic(fmt.Sprintf("big.Int is too large to serialize: %d > %d", len(b), n))
+	}
 	for i := 0; i < len(b); i++ {
 		zbuf[i] = b[len(b)-i-1]
-	}
-	for i := len(b); i < n; i++ {
-		zbuf[i] = 0
 	}
 	o.buf = append(o.buf, zbuf...)
 }
@@ -53,7 +54,9 @@ func (o *OutputBuf) AppendIntSlice(x []int) {
 }
 
 func (o *OutputBuf) Bytes() []byte {
-	return o.buf
+	res := o.buf
+	o.buf = nil
+	return res
 }
 
 type InputBuf struct {
