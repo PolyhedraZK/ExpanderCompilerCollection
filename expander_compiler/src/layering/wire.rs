@@ -21,14 +21,15 @@ struct LayoutQuery {
 }
 
 impl LayoutQuery {
+    // given a parent layer layout, this function query the layout of a sub circuit
     fn query<F, C: Config>(
         &self,
         layer_layout_pool: &mut Pool<LayerLayout>,
         circuits: &HashMap<usize, IrContext<'_, C>>,
-        vs: &[usize],
-        f: F,
-        cid: usize,
-        lid: usize,
+        vs: &[usize], // variables to query (in parent layer)
+        f: F,         // f(i) = id of i-th variable in the sub circuit
+        cid: usize,   // target circuit id
+        lid: usize,   // target layer id
     ) -> SubLayout
     where
         F: Fn(usize) -> usize,
@@ -64,9 +65,13 @@ impl LayoutQuery {
             }
         }
         let mut xor = if l <= r { l ^ r } else { 0 };
-        while xor != 0 && (xor & (xor - 1)) != 0 {
-            xor &= xor - 1;
-        }
+        xor |= xor >> 1;
+        xor |= xor >> 2;
+        xor |= xor >> 4;
+        xor |= xor >> 8;
+        xor |= xor >> 16;
+        xor |= xor >> 32;
+        xor ^= xor >> 1;
         let n = if xor == 0 { 1 } else { xor << 1 };
         let offset = if l <= r { l & !(n - 1) } else { 0 };
         let mut placement = vec![EMPTY; n];
@@ -134,15 +139,6 @@ impl<'a, C: Config> CompileContext<'a, C> {
         let (cur_lc, next_lc) = (&ic.lcs[cur_layer], &ic.lcs[next_layer]);
         let aq = self.layout_query(&a, cur_lc.vars.vec());
         let bq = self.layout_query(&b, next_lc.vars.vec());
-
-        /*println!(
-            "connect_wires: {} {} circuit_id={} cur_layer={} output_layer={}",
-            a_, b_, a.circuit_id, cur_layer, ic.output_layer
-        );
-        println!("cur: {:?}", a.inner);
-        println!("next: {:?}", b.inner);
-        println!("cur_var: {:?}", cur_lc.vars.vec());
-        println!("next_var: {:?}", next_lc.vars.vec());*/
 
         // check if all variables exist in the layout
         for x in cur_lc.vars.vec().iter() {

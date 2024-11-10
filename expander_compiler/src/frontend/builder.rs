@@ -1,9 +1,7 @@
-use std::{
-    collections::HashMap,
-    hash::{Hash, Hasher},
-};
+use std::collections::HashMap;
 
 use ethnum::U256;
+use tiny_keccak::Hasher;
 
 use crate::{
     circuit::{
@@ -373,6 +371,7 @@ pub struct RootBuilder<C: Config> {
     num_public_inputs: usize,
     current_builders: Vec<(usize, Builder<C>)>,
     sub_circuits: HashMap<usize, source::Circuit<C>>,
+    full_hash_id: HashMap<usize, [u8; 32]>,
 }
 
 macro_rules! root_binary_op {
@@ -465,6 +464,7 @@ impl<C: Config> RootBuilder<C> {
                 num_public_inputs,
                 current_builders: vec![(0, builder0)],
                 sub_circuits: HashMap::new(),
+                full_hash_id: HashMap::new(),
             },
             inputs,
             public_inputs,
@@ -530,11 +530,22 @@ impl<C: Config> RootBuilder<C> {
         f: F,
         inputs: &[Variable],
     ) -> Vec<Variable> {
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        "simple".hash(&mut hasher);
-        inputs.len().hash(&mut hasher);
-        get_function_id::<F>().hash(&mut hasher);
-        let circuit_id = hasher.finish() as usize;
+        let mut hasher = tiny_keccak::Keccak::v256();
+        hasher.update(b"simple");
+        hasher.update(&inputs.len().to_le_bytes());
+        hasher.update(&get_function_id::<F>().to_le_bytes());
+        let mut hash = [0u8; 32];
+        hasher.finalize(&mut hash);
+
+        let circuit_id = usize::from_le_bytes(hash[0..8].try_into().unwrap());
+        if let Some(prev_hash) = self.full_hash_id.get(&circuit_id) {
+            if *prev_hash != hash {
+                panic!("subcircuit id collision");
+            }
+        } else {
+            self.full_hash_id.insert(circuit_id, hash);
+        }
+
         self.call_sub_circuit(circuit_id, inputs, f)
     }
 

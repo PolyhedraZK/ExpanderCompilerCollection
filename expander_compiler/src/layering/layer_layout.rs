@@ -27,8 +27,6 @@ pub struct PlacementRequest {
     pub input_ids: Vec<usize>,
 }
 
-// TODO: use better data structure to maintain the segments
-
 // finalized layout of a layer
 // dense -> placementDense[i] = variable on slot i (placementDense[i] == j means i-th slot stores varIdx[j])
 // sparse -> placementSparse[i] = variable on slot i, and there are subLayouts.
@@ -83,7 +81,6 @@ pub struct SubLayout {
 // request for layer layout
 #[derive(Hash, Clone, PartialEq, Eq)]
 pub struct LayerReq {
-    // TODO: more requirements, e.g. alignment
     pub circuit_id: usize,
     pub layer: usize, // which layer to solve?
 }
@@ -179,7 +176,6 @@ impl<'a, C: Config> CompileContext<'a, C> {
                     lc.parent.push(parent);
                 }
             }
-            // TODO: partial merge
         }
         self.circuits.insert(circuit_id, ic);
     }
@@ -263,11 +259,6 @@ impl<'a, C: Config> CompileContext<'a, C> {
             placements[i] = merge_layouts(s, mem::take(&mut children_variables[i]));
         }
 
-        // now placements[0] contains all direct variables
-        // we only need to merge with middle layers
-        // currently it's the most basic merging algorithm - just put them together
-        // TODO: optimize the merging algorithm
-
         if lc.middle_sub_circuits.is_empty() {
             self.circuits.insert(req.circuit_id, ic);
             return LayerLayout {
@@ -348,7 +339,6 @@ fn merge_layouts(s: Vec<Vec<usize>>, additional: Vec<usize>) -> Vec<usize> {
     // sort groups by size, and then place them one by one
     // since their size are always 2^n, the result is aligned
     // finally we insert the remaining variables to the empty slots
-    // TODO: improve this
     let mut n = 0;
     for x in s.iter() {
         let m = x.len();
@@ -379,7 +369,6 @@ fn merge_layouts(s: Vec<Vec<usize>>, additional: Vec<usize>) -> Vec<usize> {
             panic!("unexpected situation");
         }
         let mut placed = false;
-        // TODO: better collision detection
         for i in (0..res.len()).step_by(pg.len()) {
             let mut ok = true;
             for j in 0..pg.len() {

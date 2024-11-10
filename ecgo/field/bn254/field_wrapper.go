@@ -80,15 +80,16 @@ func (engine *Field) Inverse(a constraint.Element) (constraint.Element, bool) {
 		return a, false
 	} else if e.IsOne() {
 		return a, true
-	}
-	var t fr.Element
-	t.Neg(e)
-	if t.IsOne() {
+	} else {
+		var t fr.Element
+		t.Neg(e)
+		if t.IsOne() {
+			return a, true
+		}
+
+		e.Inverse(e)
 		return a, true
 	}
-
-	e.Inverse(e)
-	return a, true
 }
 
 func (engine *Field) IsOne(a constraint.Element) bool {

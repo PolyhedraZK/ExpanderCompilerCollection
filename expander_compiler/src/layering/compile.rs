@@ -88,6 +88,8 @@ pub struct SubCircuitInsn<'a> {
     pub outputs: Vec<usize>,
 }
 
+const EXTRA_PRE_ALLOC_SIZE: usize = 1000;
+
 impl<'a, C: Config> CompileContext<'a, C> {
     pub fn compile(&mut self) {
         // 1. do a toposort of the circuits
@@ -187,7 +189,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
         let mut n = nv + ns;
         let circuit = self.rc.circuits.get(&circuit_id).unwrap();
 
-        let pre_alloc_size = n + (if n < 1000 { n } else { 1000 });
+        let pre_alloc_size = n + EXTRA_PRE_ALLOC_SIZE.min(n);
         ic.min_layer = Vec::with_capacity(pre_alloc_size);
         ic.max_layer = Vec::with_capacity(pre_alloc_size);
 

@@ -104,7 +104,7 @@ func (builder *builder) Compile() (constraint.ConstraintSystem, error) {
 	return nil, nil
 }
 
-// ConstantValue returns the big.Int value of v and panics if v is not a constant.
+// ConstantValue returns always returns (nil, false) now, since the Golang frontend doesn't know the values of variables.
 func (builder *builder) ConstantValue(v frontend.Variable) (*big.Int, bool) {
 	return nil, false
 }
@@ -154,8 +154,6 @@ func (builder *builder) toVariableIds(in ...frontend.Variable) []int {
 		v := builder.toVariableId(i)
 		r = append(r, v)
 	}
-	// e(i1)
-	// e(i2)
 	for i := 0; i < len(in); i++ {
 		e(in[i])
 	}

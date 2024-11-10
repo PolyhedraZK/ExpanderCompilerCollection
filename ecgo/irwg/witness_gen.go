@@ -194,6 +194,9 @@ func (rc *RootCircuit) evalSub(circuitId uint64, inputs []constraint.Element, pu
 func callHint(hintId uint64, field *big.Int, inputs []*big.Int, outputs []*big.Int) error {
 	// The only required builtin hint (Div)
 	if hintId == 0xCCC000000001 {
+		if len(inputs) != 2 || len(outputs) != 1 {
+			return errors.New("Div hint requires 2 inputs and 1 output")
+		}
 		x := (&big.Int{}).Mod(inputs[0], field)
 		y := (&big.Int{}).Mod(inputs[1], field)
 		if y.Cmp(big.NewInt(0)) == 0 {

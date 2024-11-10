@@ -1,6 +1,8 @@
 package builder
 
 import (
+	"fmt"
+
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/irsource"
 )
 
@@ -25,7 +27,7 @@ func (builder *builder) Finalize() *irsource.Circuit {
 		cb := builder.defers[i]
 		err := cb(builder)
 		if err != nil {
-			panic(err)
+			panic(fmt.Sprintf("deferred function failed: %v", err))
 		}
 	}
 
