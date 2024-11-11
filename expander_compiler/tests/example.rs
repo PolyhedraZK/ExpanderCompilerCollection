@@ -1,14 +1,16 @@
 use expander_compiler::frontend::*;
 use extra::Serde;
 
+// Circuit that asserts x^5 = y
 declare_circuit!(Circuit {
     x: Variable,
     y: Variable,
 });
 
-impl Define<M31Config> for Circuit<Variable> {
-    fn define(&self, builder: &mut API<M31Config>) {
-        builder.assert_is_equal(self.x, self.y);
+impl Define<M31Gkr2Config> for Circuit<Variable> {
+    fn define(&self, builder: &mut API<M31Gkr2Config>) {
+        let x5 = builder.power_gate(self.x, 5);
+        builder.assert_is_equal(x5, self.y);
     }
 }
 
@@ -16,8 +18,8 @@ impl Define<M31Config> for Circuit<Variable> {
 fn example_full() {
     let compile_result = compile(&Circuit::default()).unwrap();
     let assignment = Circuit::<M31> {
-        x: M31::from(123),
-        y: M31::from(123),
+        x: M31::from(2),
+        y: M31::from(32),
     };
     let witness = compile_result
         .witness_solver

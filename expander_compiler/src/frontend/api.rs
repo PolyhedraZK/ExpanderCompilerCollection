@@ -42,6 +42,8 @@ pub trait BasicAPI<C: Config> {
         y: impl ToVariableOrValue<C::CircuitField>,
     );
     fn get_random_value(&mut self) -> Variable;
+    /// Can be either power5 or power7
+    fn power_gate(&mut self, x: impl ToVariableOrValue<C::CircuitField>, power: usize) -> Variable;
 }
 
 pub trait UnconstrainedAPI<C: Config> {
