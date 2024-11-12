@@ -243,10 +243,15 @@ pub fn stub_impl<F: Field>(hint_id: usize, inputs: &Vec<F>, num_outputs: usize) 
         return vec![a4 * inputs[0]];
     } else if hint_id == 12346 {
         return vec![inputs[0]];
+    } else if hint_id == 12347 {
+        let a2 = inputs[0].square();
+        let a4 = a2.square();
+        let a6 = a4 * a2;
+        return vec![a6 * inputs[0]];
     }
     match BuiltinHintIds::from_usize(hint_id) {
         Some(hint_id) => impl_builtin_hint(hint_id, inputs, num_outputs),
-        None => stub_impl_general(hint_id, inputs, num_outputs),
+        None => panic!("invalid hint_id")
     }
 }
 
