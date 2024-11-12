@@ -1,12 +1,14 @@
 pub use arith::{BN254Fr as BN254, Field as FieldArith, FieldForECC as FieldModulus};
 pub use gf2::GF2;
 pub use mersenne31::M31;
+pub use babybear::BabyBear;
 
 use crate::utils::serde::Serde;
 use arith::{FieldForECC, FieldSerde, FieldSerdeError};
 
 pub trait Field: FieldArith + FieldForECC + FieldSerde {}
 
+impl Field for BabyBear {}
 impl Field for BN254 {}
 impl Field for GF2 {}
 impl Field for M31 {}

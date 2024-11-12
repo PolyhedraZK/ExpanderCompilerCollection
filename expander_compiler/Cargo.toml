@@ -14,6 +14,7 @@ halo2curves.workspace = true
 tiny-keccak.workspace = true
 expander_config.workspace = true
 expander_circuit.workspace = true
+babybear.workspace = true
 gkr.workspace = true
 arith.workspace = true
 gf2.workspace = true
