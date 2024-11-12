@@ -60,3 +60,22 @@ impl Config for GF2Config {
 
     const ENABLE_RANDOM_COMBINATION: bool = false;
 }
+
+#[derive(Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub struct BabyBearConfig {}
+
+impl Config for BabyBearConfig {
+    type CircuitField = crate::field::BabyBear;
+
+    const CONFIG_ID: usize = 5;
+}
+
+#[derive(Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub struct BabyBearGkr2Config {}
+
+impl Config for BabyBearGkr2Config {
+    type CircuitField = crate::field::BabyBear;
+
+    const CONFIG_ID: usize = 6;
+    const SCHEME: GKRScheme = GKRScheme::GkrSquare;
+}

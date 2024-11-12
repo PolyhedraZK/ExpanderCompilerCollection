@@ -1,7 +1,7 @@
 pub use arith::{BN254Fr as BN254, Field as FieldArith, FieldForECC as FieldModulus};
+pub use babybear::BabyBear;
 pub use gf2::GF2;
 pub use mersenne31::M31;
-pub use babybear::BabyBear;
 
 use crate::utils::serde::Serde;
 use arith::{FieldForECC, FieldSerde, FieldSerdeError};

@@ -99,7 +99,7 @@ dependencies = [
 [[package]]
 name = "arith"
 version = "0.1.0"
-source = "git+https://github.com/NebraZKP/Expander?branch=gkr2-baby-bear#8221796462a28644244c86bac33bf4cd5a5f1afc"
+source = "git+https://github.com/NebraZKP/Expander?branch=gkr2-baby-bear#a5060701a0114ef8f9bdd03d033e46fc947741b5"
 dependencies = [
  "ark-std",
  "cfg-if",
@@ -145,7 +145,7 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 [[package]]
 name = "babybear"
 version = "0.1.0"
-source = "git+https://github.com/NebraZKP/Expander?branch=gkr2-baby-bear#8221796462a28644244c86bac33bf4cd5a5f1afc"
+source = "git+https://github.com/NebraZKP/Expander?branch=gkr2-baby-bear#a5060701a0114ef8f9bdd03d033e46fc947741b5"
 dependencies = [
  "arith",
  "ark-std",
@@ -349,7 +349,7 @@ dependencies = [
 [[package]]
 name = "circuit"
 version = "0.1.0"
-source = "git+https://github.com/NebraZKP/Expander?branch=gkr2-baby-bear#8221796462a28644244c86bac33bf4cd5a5f1afc"
+source = "git+https://github.com/NebraZKP/Expander?branch=gkr2-baby-bear#a5060701a0114ef8f9bdd03d033e46fc947741b5"
 dependencies = [
  "arith",
  "ark-std",
@@ -435,10 +435,11 @@ checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 [[package]]
 name = "config"
 version = "0.1.0"
-source = "git+https://github.com/NebraZKP/Expander?branch=gkr2-baby-bear#8221796462a28644244c86bac33bf4cd5a5f1afc"
+source = "git+https://github.com/NebraZKP/Expander?branch=gkr2-baby-bear#a5060701a0114ef8f9bdd03d033e46fc947741b5"
 dependencies = [
  "arith",
  "ark-std",
+ "babybear",
  "gf2",
  "gf2_128",
  "halo2curves",
@@ -786,7 +787,7 @@ dependencies = [
 [[package]]
 name = "gf2"
 version = "0.1.0"
-source = "git+https://github.com/NebraZKP/Expander?branch=gkr2-baby-bear#8221796462a28644244c86bac33bf4cd5a5f1afc"
+source = "git+https://github.com/NebraZKP/Expander?branch=gkr2-baby-bear#a5060701a0114ef8f9bdd03d033e46fc947741b5"
 dependencies = [
  "arith",
  "ark-std",
@@ -803,7 +804,7 @@ dependencies = [
 [[package]]
 name = "gf2_128"
 version = "0.1.0"
-source = "git+https://github.com/NebraZKP/Expander?branch=gkr2-baby-bear#8221796462a28644244c86bac33bf4cd5a5f1afc"
+source = "git+https://github.com/NebraZKP/Expander?branch=gkr2-baby-bear#a5060701a0114ef8f9bdd03d033e46fc947741b5"
 dependencies = [
  "arith",
  "ark-std",
@@ -820,7 +821,7 @@ checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 [[package]]
 name = "gkr"
 version = "0.1.0"
-source = "git+https://github.com/NebraZKP/Expander?branch=gkr2-baby-bear#8221796462a28644244c86bac33bf4cd5a5f1afc"
+source = "git+https://github.com/NebraZKP/Expander?branch=gkr2-baby-bear#a5060701a0114ef8f9bdd03d033e46fc947741b5"
 dependencies = [
  "arith",
  "ark-std",
@@ -1369,7 +1370,7 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 [[package]]
 name = "mersenne31"
 version = "0.1.0"
-source = "git+https://github.com/NebraZKP/Expander?branch=gkr2-baby-bear#8221796462a28644244c86bac33bf4cd5a5f1afc"
+source = "git+https://github.com/NebraZKP/Expander?branch=gkr2-baby-bear#a5060701a0114ef8f9bdd03d033e46fc947741b5"
 dependencies = [
  "arith",
  "ark-std",
@@ -1799,7 +1800,7 @@ dependencies = [
 [[package]]
 name = "polynomials"
 version = "0.1.0"
-source = "git+https://github.com/NebraZKP/Expander?branch=gkr2-baby-bear#8221796462a28644244c86bac33bf4cd5a5f1afc"
+source = "git+https://github.com/NebraZKP/Expander?branch=gkr2-baby-bear#a5060701a0114ef8f9bdd03d033e46fc947741b5"
 dependencies = [
  "arith",
  "ark-std",
@@ -2150,7 +2151,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 [[package]]
 name = "sumcheck"
 version = "0.1.0"
-source = "git+https://github.com/NebraZKP/Expander?branch=gkr2-baby-bear#8221796462a28644244c86bac33bf4cd5a5f1afc"
+source = "git+https://github.com/NebraZKP/Expander?branch=gkr2-baby-bear#a5060701a0114ef8f9bdd03d033e46fc947741b5"
 dependencies = [
  "arith",
  "circuit",
@@ -2344,7 +2345,7 @@ dependencies = [
 [[package]]
 name = "transcript"
 version = "0.1.0"
-source = "git+https://github.com/NebraZKP/Expander?branch=gkr2-baby-bear#8221796462a28644244c86bac33bf4cd5a5f1afc"
+source = "git+https://github.com/NebraZKP/Expander?branch=gkr2-baby-bear#a5060701a0114ef8f9bdd03d033e46fc947741b5"
 dependencies = [
  "arith",
  "sha2",
