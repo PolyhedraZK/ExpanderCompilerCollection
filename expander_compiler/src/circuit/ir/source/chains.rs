@@ -140,6 +140,7 @@ impl<C: Config> Circuit<C> {
 }
 
 impl<C: Config> RootCircuit<C> {
+    // this function must be used with remove_unreachable
     pub fn detect_chains(&mut self) {
         for (_, circuit) in self.circuits.iter_mut() {
             circuit.detect_chains();
