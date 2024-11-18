@@ -467,4 +467,67 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn large_add() {
+        let mut root = ir::common::RootCircuit::<super::IrcIn<C>>::default();
+        let terms = (1..=100000)
+            .map(|i| ir::expr::LinCombTerm {
+                coef: CField::one(),
+                var: i,
+            })
+            .collect();
+        let lc = ir::expr::LinComb {
+            terms,
+            constant: CField::one(),
+        };
+        root.circuits.insert(
+            0,
+            ir::common::Circuit::<super::IrcIn<C>> {
+                instructions: vec![ir::source::Instruction::LinComb(lc.clone())],
+                constraints: vec![ir::source::Constraint {
+                    typ: ir::source::ConstraintType::Zero,
+                    var: 100001,
+                }],
+                outputs: vec![],
+                num_inputs: 100000,
+            },
+        );
+        assert_eq!(root.validate(), Ok(()));
+        let root_processed = super::process(&root).unwrap();
+        assert_eq!(root_processed.validate(), Ok(()));
+        match &root_processed.circuits[&0].instructions[0] {
+            ir::hint_normalized::Instruction::LinComb(lc2) => {
+                assert_eq!(lc, *lc2);
+            }
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn large_mul() {
+        let mut root = ir::common::RootCircuit::<super::IrcIn<C>>::default();
+        let terms: Vec<usize> = (1..=100000).collect();
+        root.circuits.insert(
+            0,
+            ir::common::Circuit::<super::IrcIn<C>> {
+                instructions: vec![ir::source::Instruction::Mul(terms.clone())],
+                constraints: vec![ir::source::Constraint {
+                    typ: ir::source::ConstraintType::Zero,
+                    var: 100001,
+                }],
+                outputs: vec![],
+                num_inputs: 100000,
+            },
+        );
+        assert_eq!(root.validate(), Ok(()));
+        let root_processed = super::process(&root).unwrap();
+        assert_eq!(root_processed.validate(), Ok(()));
+        match &root_processed.circuits[&0].instructions[0] {
+            ir::hint_normalized::Instruction::Mul(terms2) => {
+                assert_eq!(terms, *terms2);
+            }
+            _ => panic!(),
+        }
+    }
 }

@@ -18,8 +18,6 @@ pub fn test_input<C: Config>(
     let (rc_output, rc_cond) = rc.eval_unsafe(input.clone());
     let lc_input = input_mapping.map_inputs(input);
     let (lc_output, lc_cond) = lc.eval_unsafe(lc_input);
-    //println!("{:?}", rc_output);
-    //println!("{:?}", lc_output);
     assert_eq!(rc_cond, lc_cond);
     assert_eq!(rc_output, lc_output);
 }
@@ -30,7 +28,6 @@ pub fn compile_and_random_test<C: Config>(
 ) -> (layered::Circuit<C>, InputMapping) {
     assert!(rc.validate().is_ok());
     let (lc, input_mapping) = compile(rc);
-    //print!("{}", lc);
     assert_eq!(lc.validate(), Ok(()));
     assert_eq!(rc.input_size(), input_mapping.cur_size());
     let input_size = rc.input_size();

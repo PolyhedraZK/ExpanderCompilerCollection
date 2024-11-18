@@ -46,7 +46,7 @@ func (m Map) Set(e Hashable, v interface{}) {
 	})
 }
 
-// adds (e, v) to the map, does nothing when e already exists
+// adds (e, v) to the map, returns the current value when e already exists
 func (m Map) Add(e Hashable, v interface{}) interface{} {
 	h := e.HashCode()
 	s, ok := m[h]
@@ -66,7 +66,7 @@ func (m Map) Add(e Hashable, v interface{}) interface{} {
 	return v
 }
 
-// filter keys in the map using the given function
+// filter (e, v) in the map using f(v), returns the keys
 func (m Map) FilterKeys(f func(interface{}) bool) []Hashable {
 	keys := []Hashable{}
 	for _, s := range m {

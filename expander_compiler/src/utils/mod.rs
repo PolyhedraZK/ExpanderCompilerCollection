@@ -1,6 +1,7 @@
 pub mod bucket_sort;
 pub mod error;
 pub mod function_id;
+pub mod heap;
 pub mod misc;
 pub mod pool;
 pub mod serde;

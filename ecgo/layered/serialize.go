@@ -8,6 +8,8 @@ import (
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/utils"
 )
 
+const MAGIC = 3914834606642317635
+
 func serializeCoef(o *utils.OutputBuf, bnlen int, coef *big.Int, coefType uint8, publicInputId uint64) {
 	if coefType == 1 {
 		o.AppendUint8(1)
@@ -35,7 +37,7 @@ func deserializeCoef(in *utils.InputBuf, bnlen int) (*big.Int, uint8, uint64) {
 func (rc *RootCircuit) Serialize() []byte {
 	bnlen := field.GetFieldFromOrder(rc.Field).SerializedLen()
 	o := utils.OutputBuf{}
-	o.AppendUint64(3914834606642317635)
+	o.AppendUint64(MAGIC)
 	o.AppendBigInt(32, rc.Field)
 	o.AppendUint64(uint64(rc.NumPublicInputs))
 	o.AppendUint64(uint64(rc.NumActualOutputs))
@@ -91,7 +93,7 @@ func (rc *RootCircuit) Serialize() []byte {
 
 func DeserializeRootCircuit(buf []byte) *RootCircuit {
 	in := utils.NewInputBuf(buf)
-	if in.ReadUint64() != 3914834606642317635 {
+	if in.ReadUint64() != MAGIC {
 		panic("invalid file header")
 	}
 	rc := &RootCircuit{}
@@ -178,7 +180,7 @@ func DetectFieldIdFromFile(fn string) uint64 {
 		panic(err)
 	}
 	in := utils.NewInputBuf(buf)
-	if in.ReadUint64() != 3914834606642317635 {
+	if in.ReadUint64() != MAGIC {
 		panic("invalid file header")
 	}
 	f := in.ReadBigInt(32)

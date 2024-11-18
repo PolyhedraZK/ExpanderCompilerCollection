@@ -32,6 +32,7 @@ type SubCircuit struct {
 type SubCircuitRegistry struct {
 	m               map[uint64]*SubCircuit
 	outputStructure map[uint64]*sliceStructure
+	fullHash        map[uint64][32]byte
 }
 
 // SubCircuitAPI defines methods for working with subcircuits.
@@ -44,7 +45,20 @@ func newSubCircuitRegistry() *SubCircuitRegistry {
 	return &SubCircuitRegistry{
 		m:               make(map[uint64]*SubCircuit),
 		outputStructure: make(map[uint64]*sliceStructure),
+		fullHash:        make(map[uint64][32]byte),
 	}
+}
+
+func (sr *SubCircuitRegistry) getFullHashId(h [32]byte) uint64 {
+	id := binary.LittleEndian.Uint64(h[:8])
+	if v, ok := sr.fullHash[id]; ok {
+		if v != h {
+			panic("subcircuit id collision")
+		}
+		return id
+	}
+	sr.fullHash[id] = h
+	return id
 }
 
 func (parent *builder) callSubCircuit(
@@ -93,7 +107,7 @@ func (parent *builder) callSubCircuit(
 func (parent *builder) MemorizedSimpleCall(f SubCircuitSimpleFunc, input []frontend.Variable) []frontend.Variable {
 	name := GetFuncName(f)
 	h := sha256.Sum256([]byte(fmt.Sprintf("simple_%d(%s)_%d", len(name), name, len(input))))
-	circuitId := binary.LittleEndian.Uint64(h[:8])
+	circuitId := parent.root.registry.getFullHashId(h)
 	return parent.callSubCircuit(circuitId, input, f)
 }
 
@@ -205,13 +219,10 @@ func rebuildSliceVariables(vars []frontend.Variable, s *sliceStructure) reflect.
 func isTypeSimple(t reflect.Type) bool {
 	k := t.Kind()
 	switch k {
-	case reflect.Bool:
-		return true
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return true
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return true
-	case reflect.String:
+	case reflect.Bool,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.String:
 		return true
 	default:
 		return false
@@ -310,7 +321,9 @@ func (parent *builder) MemorizedCall(fn SubCircuitFunc, inputs ...interface{}) i
 		vs := inputVals[i].String()
 		h.Write([]byte(strconv.Itoa(len(vs)) + vs))
 	}
-	circuitId := binary.LittleEndian.Uint64(h.Sum(nil)[:8])
+	var tmp [32]byte
+	copy(tmp[:], h.Sum(nil))
+	circuitId := parent.root.registry.getFullHashId(tmp)
 
 	// sub-circuit caller
 	fnInner := func(api frontend.API, input []frontend.Variable) []frontend.Variable {

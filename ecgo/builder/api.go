@@ -45,6 +45,7 @@ func (builder *builder) MulAcc(a, b, c frontend.Variable) frontend.Variable {
 }
 
 // Sub computes the difference between the given variables.
+// When more than two variables are provided, the difference is computed as i1 - Σ(i2...).
 func (builder *builder) Sub(i1, i2 frontend.Variable, in ...frontend.Variable) frontend.Variable {
 	vars := builder.toVariableIds(append([]frontend.Variable{i1, i2}, in...)...)
 	return builder.add(vars, true)
@@ -142,6 +143,8 @@ func (builder *builder) ToBinary(i1 frontend.Variable, n ...int) []frontend.Vari
 		if nbBits < 0 {
 			panic("invalid n")
 		}
+	} else {
+		panic("only one argument is supported")
 	}
 
 	return bits.ToBinary(builder, i1, bits.WithNbDigits(nbBits))
