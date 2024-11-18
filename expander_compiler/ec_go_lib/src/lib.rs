@@ -1,3 +1,5 @@
+#![allow(incomplete_features)]
+#![feature(generic_const_exprs)]
 use arith::FieldSerde;
 use expander_compiler::circuit::layered;
 use libc::{c_uchar, c_ulong, malloc};
@@ -49,6 +51,9 @@ fn compile_inner(ir_source: Vec<u8>, config_id: u64) -> Result<(Vec<u8>, Vec<u8>
         1 => compile_inner_with_config::<config::M31Config>(ir_source),
         2 => compile_inner_with_config::<config::BN254Config>(ir_source),
         3 => compile_inner_with_config::<config::GF2Config>(ir_source),
+        4 => compile_inner_with_config::<config::M31Gkr2Config>(ir_source),
+        5 => compile_inner_with_config::<config::BabyBearConfig>(ir_source),
+        6 => compile_inner_with_config::<config::BabyBearGkr2Config>(ir_source),
         _ => Err(format!("unknown config id: {}", config_id)),
     }
 }
@@ -156,6 +161,7 @@ fn prove_circuit_file_inner<C: expander_config::GKRConfig, CC: config::Config>(
 ) -> Vec<u8>
 where
     C::SimdCircuitField: arith::SimdField<Scalar = CC::CircuitField>,
+    [(); C::DEGREE_PLUS_ONE]:,
 {
     let config = expander_config::Config::<C>::new(
         expander_config::GKRScheme::Vanilla,
@@ -180,6 +186,7 @@ fn verify_circuit_file_inner<C: expander_config::GKRConfig, CC: config::Config>(
 ) -> u8
 where
     C::SimdCircuitField: arith::SimdField<Scalar = CC::CircuitField>,
+    [(); C::DEGREE_PLUS_ONE]:,
 {
     let config = expander_config::Config::<C>::new(
         expander_config::GKRScheme::Vanilla,
@@ -224,6 +231,18 @@ pub extern "C" fn prove_circuit_file(
             circuit_filename,
             witness,
         ),
+        4 => prove_circuit_file_inner::<expander_config::M31ExtConfigSha2, config::M31Gkr2Config>(
+            circuit_filename,
+            witness,
+        ),
+        5 => prove_circuit_file_inner::<
+            expander_config::BabyBearExt4ConfigSha2,
+            config::BabyBearConfig,
+        >(circuit_filename, witness),
+        6 => prove_circuit_file_inner::<
+            expander_config::BabyBearExt4ConfigSha2,
+            config::BabyBearGkr2Config,
+        >(circuit_filename, witness),
         _ => panic!("unknown config id: {}", config_id),
     };
     let proof_len = proof.len();
@@ -271,6 +290,19 @@ pub extern "C" fn verify_circuit_file(
             witness,
             proof,
         ),
+        4 => verify_circuit_file_inner::<expander_config::M31ExtConfigSha2, config::M31Gkr2Config>(
+            circuit_filename,
+            witness,
+            proof,
+        ),
+        5 => verify_circuit_file_inner::<
+            expander_config::BabyBearExt4ConfigSha2,
+            config::BabyBearConfig,
+        >(circuit_filename, witness, proof),
+        6 => verify_circuit_file_inner::<
+            expander_config::BabyBearExt4ConfigSha2,
+            config::BabyBearGkr2Config,
+        >(circuit_filename, witness, proof),
         _ => panic!("unknown config id: {}", config_id),
     }
 }

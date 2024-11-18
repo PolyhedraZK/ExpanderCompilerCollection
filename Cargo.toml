@@ -19,11 +19,11 @@ tiny-keccak = { version = "2.0", features = ["keccak"] }
 halo2curves = { git = "https://github.com/PolyhedraZK/halo2curves", default-features = false, features = [
     "bits",
 ] }
-arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
-expander_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev", package = "config" }
-expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev", package = "circuit" }
-gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
-gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
-mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
-expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev", package = "transcript" }
-
+arith = { git = "https://github.com/NebraZKP/Expander", rev = "5470aaee59718f4d48977b63fac3baa046e7f5bb" }
+babybear = { git = "https://github.com/NebraZKP/Expander", rev = "5470aaee59718f4d48977b63fac3baa046e7f5bb"}
+expander_config = { git = "https://github.com/NebraZKP/Expander", rev = "5470aaee59718f4d48977b63fac3baa046e7f5bb", package = "config" }
+expander_circuit = { git = "https://github.com/NebraZKP/Expander", rev = "5470aaee59718f4d48977b63fac3baa046e7f5bb", package = "circuit" }
+gkr = { git = "https://github.com/NebraZKP/Expander", rev = "5470aaee59718f4d48977b63fac3baa046e7f5bb" }
+gf2 = { git = "https://github.com/NebraZKP/Expander", rev = "5470aaee59718f4d48977b63fac3baa046e7f5bb" }
+mersenne31 = { git = "https://github.com/NebraZKP/Expander", rev = "5470aaee59718f4d48977b63fac3baa046e7f5bb" }
+expander_transcript = { git = "https://github.com/NebraZKP/Expander", rev = "5470aaee59718f4d48977b63fac3baa046e7f5bb", package = "transcript" }

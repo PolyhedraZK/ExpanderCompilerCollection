@@ -174,6 +174,28 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         self.new_var()
     }
 
+    fn power_gate(&mut self, x: impl ToVariableOrValue<C::CircuitField>, power: usize) -> Variable {
+        match power {
+            5 => {
+                let x = self.convert_to_variable(x);
+                self.instructions.push(SourceInstruction::CustomGate {
+                    gate_type: 12345,
+                    inputs: vec![x.id],
+                });
+                self.new_var()
+            }
+            7 => {
+                let x = self.convert_to_variable(x);
+                self.instructions.push(SourceInstruction::CustomGate {
+                    gate_type: 12347,
+                    inputs: vec![x.id],
+                });
+                self.new_var()
+            }
+            _ => panic!("Unsupported power gate"),
+        }
+    }
+
     fn div(
         &mut self,
         x: impl ToVariableOrValue<C::CircuitField>,
@@ -444,6 +466,14 @@ impl<C: Config> BasicAPI<C> for RootBuilder<C> {
 
     fn get_random_value(&mut self) -> Variable {
         self.last_builder().get_random_value()
+    }
+
+    fn power_gate(
+        &mut self,
+        x: impl ToVariableOrValue<<C as Config>::CircuitField>,
+        power: usize,
+    ) -> Variable {
+        self.last_builder().power_gate(x, power)
     }
 }
 
