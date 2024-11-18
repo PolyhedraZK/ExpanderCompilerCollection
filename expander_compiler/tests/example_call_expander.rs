@@ -1,3 +1,5 @@
+#![allow(incomplete_features)]
+#![feature(generic_const_exprs)]
 use arith::Field;
 use expander_compiler::frontend::*;
 use expander_config::{
@@ -23,6 +25,7 @@ impl<C: Config> Define<C> for Circuit<Variable> {
 fn example<C: Config, GKRC>()
 where
     GKRC: expander_config::GKRConfig<CircuitField = C::CircuitField>,
+    [(); GKRC::DEGREE_PLUS_ONE]:,
 {
     let n_witnesses = <GKRC::SimdCircuitField as arith::SimdField>::pack_size();
     println!("n_witnesses: {}", n_witnesses);

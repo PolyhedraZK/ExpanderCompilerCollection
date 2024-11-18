@@ -1,3 +1,5 @@
+#![allow(incomplete_features)]
+#![feature(generic_const_exprs)]
 use arith::FieldSerde;
 use expander_compiler::circuit::layered;
 use libc::{c_uchar, c_ulong, malloc};
@@ -159,6 +161,7 @@ fn prove_circuit_file_inner<C: expander_config::GKRConfig, CC: config::Config>(
 ) -> Vec<u8>
 where
     C::SimdCircuitField: arith::SimdField<Scalar = CC::CircuitField>,
+    [(); C::DEGREE_PLUS_ONE]:,
 {
     let config = expander_config::Config::<C>::new(
         expander_config::GKRScheme::Vanilla,
@@ -183,6 +186,7 @@ fn verify_circuit_file_inner<C: expander_config::GKRConfig, CC: config::Config>(
 ) -> u8
 where
     C::SimdCircuitField: arith::SimdField<Scalar = CC::CircuitField>,
+    [(); C::DEGREE_PLUS_ONE]:,
 {
     let config = expander_config::Config::<C>::new(
         expander_config::GKRScheme::Vanilla,
