@@ -229,7 +229,7 @@ impl<C: Config> RootCircuitRelaxed<C> {
 
         let mut circuits = HashMap::new();
         for (id, circuit) in self.circuits.iter() {
-            circuits.insert(id.clone(), circuit.solve_mul_fanout_limit(limit));
+            circuits.insert(*id, circuit.solve_mul_fanout_limit(limit));
         }
         RootCircuitRelaxed {
             circuits,
