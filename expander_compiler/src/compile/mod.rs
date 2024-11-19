@@ -10,16 +10,9 @@ mod random_circuit_tests;
 #[cfg(test)]
 mod tests;
 
+#[derive(Default)]
 pub struct CompileOptions {
     pub mul_fanout_limit: Option<usize>,
-}
-
-impl Default for CompileOptions {
-    fn default() -> Self {
-        Self {
-            mul_fanout_limit: None,
-        }
-    }
 }
 
 impl CompileOptions {
