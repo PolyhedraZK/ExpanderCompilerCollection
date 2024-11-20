@@ -95,7 +95,7 @@ trait GateOpt<C: Config>: PartialEq + Ord + Clone {
     fn coef_add(&mut self, coef: Coef<C>);
     fn can_merge_with(&self, other: &Self) -> bool;
     fn get_coef(&self) -> Coef<C>;
-    fn add_offset(&self, in_offset: usize, out_offset: usize) -> Self;
+    fn add_offset(&self, in_offset: &Vec<usize>, out_offset: usize) -> Self;
 }
 
 impl<C: Config, const INPUT_NUM: usize> GateOpt<C> for Gate<C, INPUT_NUM> {
@@ -111,10 +111,10 @@ impl<C: Config, const INPUT_NUM: usize> GateOpt<C> for Gate<C, INPUT_NUM> {
     fn get_coef(&self) -> Coef<C> {
         self.coef.clone()
     }
-    fn add_offset(&self, in_offset: usize, out_offset: usize) -> Self {
+    fn add_offset(&self, in_offset: &Vec<usize>, out_offset: usize) -> Self {
         let mut inputs = self.inputs;
         for input in inputs.iter_mut() {
-            *input += in_offset;
+            input.offset += in_offset[input.layer];
         }
         let output = self.output + out_offset;
         let coef = self.coef.clone();
@@ -140,10 +140,10 @@ impl<C: Config> GateOpt<C> for GateCustom<C> {
     fn get_coef(&self) -> Coef<C> {
         self.coef.clone()
     }
-    fn add_offset(&self, in_offset: usize, out_offset: usize) -> Self {
+    fn add_offset(&self, in_offset: &Vec<usize>, out_offset: usize) -> Self {
         let mut inputs = self.inputs.clone();
         for input in inputs.iter_mut() {
-            *input += in_offset;
+            input.offset += in_offset[input.layer];
         }
         let output = self.output + out_offset;
         let coef = self.coef.clone();
@@ -341,17 +341,23 @@ impl<C: Config> Segment<C> {
         gate_adds.sort();
         gate_consts.sort();
         gate_customs.sort();
-        let mut max_input = 0;
+        let mut max_input = Vec::new();
         let mut max_output = 0;
         for gate in gate_muls.iter() {
             for input in gate.inputs.iter() {
-                max_input = max_input.max(*input);
+                while max_input.len() <= input.layer {
+                    max_input.push(0);
+                }
+                max_input[input.layer] = max_input[input.layer].max(input.offset);
             }
             max_output = max_output.max(gate.output);
         }
         for gate in gate_adds.iter() {
             for input in gate.inputs.iter() {
-                max_input = max_input.max(*input);
+                while max_input.len() <= input.layer {
+                    max_input.push(0);
+                }
+                max_input[input.layer] = max_input[input.layer].max(input.offset);
             }
             max_output = max_output.max(gate.output);
         }
@@ -360,12 +366,18 @@ impl<C: Config> Segment<C> {
         }
         for gate in gate_customs.iter() {
             for input in gate.inputs.iter() {
-                max_input = max_input.max(*input);
+                while max_input.len() <= input.layer {
+                    max_input.push(0);
+                }
+                max_input[input.layer] = max_input[input.layer].max(input.offset);
             }
             max_output = max_output.max(gate.output);
         }
+        if max_input.is_empty() {
+            max_input.push(0);
+        }
         Segment {
-            num_inputs: next_power_of_two(max_input + 1),
+            num_inputs: max_input.iter().map(|x| next_power_of_two(x + 1)).collect(),
             num_outputs: next_power_of_two(max_output + 1),
             gate_muls,
             gate_adds,
@@ -397,7 +409,7 @@ impl<C: Config> Circuit<C> {
                 let sub_segment = &prev_segments[*sub_segment_id];
                 let sub_gates = get_gates(sub_segment).clone();
                 for allocation in allocations.iter() {
-                    let in_offset = allocation.input_offset;
+                    let in_offset = &allocation.input_offset;
                     let out_offset = allocation.output_offset;
                     for gate in sub_gates.iter() {
                         gates.push(gate.add_offset(in_offset, out_offset));
@@ -444,7 +456,12 @@ impl<C: Config> Circuit<C> {
                     for sub_allocation in sub_allocations.iter() {
                         for allocation in allocations.iter() {
                             let new_allocation = Allocation {
-                                input_offset: sub_allocation.input_offset + allocation.input_offset,
+                                input_offset: sub_allocation
+                                    .input_offset
+                                    .iter()
+                                    .zip(allocation.input_offset.iter())
+                                    .map(|(x, y)| x + y)
+                                    .collect(),
                                 output_offset: sub_allocation.output_offset
                                     + allocation.output_offset,
                             };
@@ -462,7 +479,7 @@ impl<C: Config> Circuit<C> {
         }
         let child_segs = child_segs_map.into_iter().collect();
         Segment {
-            num_inputs: segment.num_inputs,
+            num_inputs: segment.num_inputs.clone(),
             num_outputs: segment.num_outputs,
             gate_muls,
             gate_adds,
@@ -537,7 +554,7 @@ impl<C: Config> Circuit<C> {
                     new_child_segs.push((new_id[sub_segment.0], sub_segment.1.clone()));
                 }
                 let mut seg = Segment {
-                    num_inputs: segment.num_inputs,
+                    num_inputs: segment.num_inputs.clone(),
                     num_outputs: segment.num_outputs,
                     gate_muls: segment.gate_muls.clone(),
                     gate_adds: segment.gate_adds.clone(),
@@ -644,7 +661,7 @@ impl<C: Config> Circuit<C> {
                 new_child_segs.push((new_id[sub_segment.0], sub_segment.1.clone()));
             }
             let mut seg = Segment {
-                num_inputs: segment.num_inputs,
+                num_inputs: segment.num_inputs.clone(),
                 num_outputs: segment.num_outputs,
                 gate_muls: segment.gate_muls.clone(),
                 gate_adds: segment.gate_adds.clone(),
@@ -655,10 +672,11 @@ impl<C: Config> Circuit<C> {
             let parent_id = uf.find(segment_id);
             if let Some(common_id) = rm_id[parent_id] {
                 seg.remove_gates(&group_gates[parent_id]);
+                let common_seg = &new_segments[common_id];
                 seg.child_segs.push((
                     common_id,
                     vec![Allocation {
-                        input_offset: 0,
+                        input_offset: vec![0; common_seg.num_inputs.len()],
                         output_offset: 0,
                     }],
                 ));

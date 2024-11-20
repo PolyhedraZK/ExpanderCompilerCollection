@@ -29,7 +29,7 @@ pub fn compile<C: Config>(rc: &ir::dest::RootCircuit<C>) -> (layered::Circuit<C>
         root_has_constraints: false,
     };
     ctx.compile();
-    let l0_size = ctx.compiled_circuits[ctx.layers[0]].num_inputs;
+    let l0_size = ctx.compiled_circuits[ctx.layers[0]].num_inputs[0];
     let output_zeroes = rc.expected_num_output_zeroes + ctx.root_has_constraints as usize;
     let output_all = rc.circuits[&0].outputs.len() + ctx.root_has_constraints as usize;
     (

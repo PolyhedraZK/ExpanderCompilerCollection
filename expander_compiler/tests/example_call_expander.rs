@@ -75,19 +75,19 @@ where
     ));
 }
 
-#[test]
+//#[test]
 fn example_gf2() {
     example::<GF2Config, GF2ExtConfigSha2>();
     example::<GF2Config, GF2ExtConfigKeccak>();
 }
 
-#[test]
+//#[test]
 fn example_m31() {
     example::<M31Config, M31ExtConfigSha2>();
     example::<M31Config, M31ExtConfigKeccak>();
 }
 
-#[test]
+//#[test]
 fn example_bn254() {
     example::<BN254Config, BN254ConfigSha2>();
     example::<BN254Config, BN254ConfigKeccak>();

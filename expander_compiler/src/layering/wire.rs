@@ -5,7 +5,7 @@ use crate::{
         config::Config,
         input_mapping::EMPTY,
         ir::expr::VarSpec,
-        layered::{Allocation, Coef, GateAdd, GateConst, GateCustom, GateMul, Segment},
+        layered::{Allocation, Coef, GateAdd, GateConst, GateCustom, GateMul, Input, Segment},
     },
     field::FieldArith,
     utils::pool::Pool,
@@ -230,7 +230,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
         }
 
         let mut res: Segment<C> = Segment {
-            num_inputs: a.size,
+            num_inputs: vec![a.size],
             num_outputs: b.size,
             ..Default::default()
         };
@@ -242,7 +242,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
             sub_cur_layout_all.insert(*sub_insns.get(i), sub_cur_layout.clone());
             let scid = self.connect_wires(sub_cur_layout.id, sub_next_layout.id);
             let al = Allocation {
-                input_offset: sub_cur_layout.offset,
+                input_offset: vec![sub_cur_layout.offset],
                 output_offset: sub_next_layout.offset,
             };
             let mut found = false;
@@ -279,7 +279,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
             // if it's not the first layer, just relay it
             if ic.min_layer[*x] != next_layer {
                 res.gate_adds.push(GateAdd {
-                    inputs: [aq.var_pos[x]],
+                    inputs: [Input::new(0, aq.var_pos[x])],
                     output: pos,
                     coef: Coef::Constant(C::CircuitField::one()),
                 });
@@ -303,14 +303,17 @@ impl<'a, C: Config> CompileContext<'a, C> {
                         }
                         VarSpec::Linear(vid) => {
                             res.gate_adds.push(GateAdd {
-                                inputs: [aq.var_pos[vid]],
+                                inputs: [Input::new(0, aq.var_pos[vid])],
                                 output: pos,
                                 coef: Coef::Constant(term.coef),
                             });
                         }
                         VarSpec::Quad(vid0, vid1) => {
                             res.gate_muls.push(GateMul {
-                                inputs: [aq.var_pos[vid0], aq.var_pos[vid1]],
+                                inputs: [
+                                    Input::new(0, aq.var_pos[vid0]),
+                                    Input::new(0, aq.var_pos[vid1]),
+                                ],
                                 output: pos,
                                 coef: Coef::Constant(term.coef),
                             });
@@ -318,14 +321,17 @@ impl<'a, C: Config> CompileContext<'a, C> {
                         VarSpec::Custom { gate_type, inputs } => {
                             res.gate_customs.push(GateCustom {
                                 gate_type: *gate_type,
-                                inputs: inputs.iter().map(|x| aq.var_pos[x]).collect(),
+                                inputs: inputs
+                                    .iter()
+                                    .map(|x| Input::new(0, aq.var_pos[x]))
+                                    .collect(),
                                 output: pos,
                                 coef: Coef::Constant(term.coef),
                             });
                         }
                         VarSpec::RandomLinear(vid) => {
                             res.gate_adds.push(GateAdd {
-                                inputs: [aq.var_pos[vid]],
+                                inputs: [Input::new(0, aq.var_pos[vid])],
                                 output: pos,
                                 coef: Coef::Random,
                             });
@@ -346,7 +352,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
                     Coef::Random
                 };
                 res.gate_adds.push(GateAdd {
-                    inputs: [aq.var_pos[v]],
+                    inputs: [Input::new(0, aq.var_pos[v])],
                     output: pos,
                     coef,
                 });
@@ -374,7 +380,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
                     }
                 };
                 res.gate_adds.push(GateAdd {
-                    inputs: [sub_cur_layout_all[&insn_id].offset + spos],
+                    inputs: [Input::new(0, sub_cur_layout_all[&insn_id].offset + spos)],
                     output: pos,
                     coef: Coef::Constant(C::CircuitField::one()),
                 });

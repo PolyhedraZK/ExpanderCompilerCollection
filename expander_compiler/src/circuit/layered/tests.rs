@@ -1,4 +1,6 @@
-use super::{Allocation, Circuit, Coef, GateAdd, GateConst, GateMul, Segment};
+use std::vec;
+
+use super::{Allocation, Circuit, Coef, GateAdd, GateConst, GateMul, Input, Segment};
 
 use crate::circuit::config::{Config, M31Config as C};
 use crate::field::FieldArith;
@@ -12,11 +14,11 @@ fn simple() {
         expected_num_output_zeroes: 0,
         segments: vec![
             Segment {
-                num_inputs: 2,
+                num_inputs: vec![2],
                 num_outputs: 1,
                 child_segs: vec![],
                 gate_muls: vec![GateMul {
-                    inputs: [0, 1],
+                    inputs: [Input::new(0, 0), Input::new(0, 1)],
                     output: 0,
                     coef: Coef::Constant(CField::from(2)),
                 }],
@@ -25,17 +27,17 @@ fn simple() {
                 gate_customs: vec![],
             },
             Segment {
-                num_inputs: 4,
+                num_inputs: vec![4],
                 num_outputs: 2,
                 child_segs: vec![(
                     0,
                     vec![
                         Allocation {
-                            input_offset: 0,
+                            input_offset: vec![0],
                             output_offset: 0,
                         },
                         Allocation {
-                            input_offset: 2,
+                            input_offset: vec![2],
                             output_offset: 1,
                         },
                     ],
@@ -46,24 +48,24 @@ fn simple() {
                 gate_customs: vec![],
             },
             Segment {
-                num_inputs: 2,
+                num_inputs: vec![2],
                 num_outputs: 2,
                 child_segs: vec![(
                     0,
                     vec![Allocation {
-                        input_offset: 0,
+                        input_offset: vec![0],
                         output_offset: 0,
                     }],
                 )],
                 gate_muls: vec![],
                 gate_adds: vec![
                     GateAdd {
-                        inputs: [0],
+                        inputs: [Input::new(0, 0)],
                         output: 1,
                         coef: Coef::Constant(CField::from(3)),
                     },
                     GateAdd {
-                        inputs: [1],
+                        inputs: [Input::new(0, 1)],
                         output: 1,
                         coef: Coef::Constant(CField::from(4)),
                     },

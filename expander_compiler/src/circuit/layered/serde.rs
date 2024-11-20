@@ -41,6 +41,19 @@ impl<C: Config> Serde for Coef<C> {
     }
 }
 
+impl Serde for Input {
+    fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
+        self.layer.serialize_into(&mut writer)?;
+        self.offset.serialize_into(&mut writer)?;
+        Ok(())
+    }
+    fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
+        let layer = usize::deserialize_from(&mut reader)?;
+        let offset = usize::deserialize_from(&mut reader)?;
+        Ok(Input { layer, offset })
+    }
+}
+
 impl<C: Config, const INPUT_NUM: usize> Serde for Gate<C, INPUT_NUM> {
     fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
         for input in &self.inputs {
@@ -51,9 +64,9 @@ impl<C: Config, const INPUT_NUM: usize> Serde for Gate<C, INPUT_NUM> {
         Ok(())
     }
     fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
-        let mut inputs = [0; INPUT_NUM];
+        let mut inputs = [Input::default(); INPUT_NUM];
         for input in inputs.iter_mut() {
-            *input = usize::deserialize_from(&mut reader)?;
+            *input = Input::deserialize_from(&mut reader)?;
         }
         let output = usize::deserialize_from(&mut reader)?;
         let coef = Coef::deserialize_from(&mut reader)?;
@@ -72,7 +85,7 @@ impl Serde for Allocation {
         Ok(())
     }
     fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
-        let input_offset = usize::deserialize_from(&mut reader)?;
+        let input_offset = Vec::<usize>::deserialize_from(&mut reader)?;
         let output_offset = usize::deserialize_from(&mut reader)?;
         Ok(Allocation {
             input_offset,
@@ -104,7 +117,7 @@ impl<C: Config> Serde for GateCustom<C> {
     }
     fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
         let gate_type = usize::deserialize_from(&mut reader)?;
-        let inputs = Vec::<usize>::deserialize_from(&mut reader)?;
+        let inputs = Vec::<Input>::deserialize_from(&mut reader)?;
         let output = usize::deserialize_from(&mut reader)?;
         let coef = Coef::<C>::deserialize_from(&mut reader)?;
         Ok(GateCustom {
@@ -128,7 +141,7 @@ impl<C: Config> Serde for Segment<C> {
         Ok(())
     }
     fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
-        let num_inputs = usize::deserialize_from(&mut reader)?;
+        let num_inputs = Vec::<usize>::deserialize_from(&mut reader)?;
         let num_outputs = usize::deserialize_from(&mut reader)?;
         let child_segs = Vec::<ChildSpec>::deserialize_from(&mut reader)?;
         let gate_muls = Vec::<GateMul<C>>::deserialize_from(&mut reader)?;

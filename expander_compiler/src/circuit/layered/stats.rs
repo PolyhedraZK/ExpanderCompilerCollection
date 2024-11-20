@@ -83,12 +83,22 @@ impl<C: Config> Circuit<C> {
                 }
             }
         }
-        for i in 0..self.segments[self.layer_ids[0]].num_inputs {
-            if input_mask[self.layer_ids[0]][i] {
+        let mut global_input_mask = vec![false; self.input_size()];
+        for (l, &id) in self.layer_ids.iter().enumerate() {
+            if self.segments[id].num_inputs.len() > l {
+                for i in 0..self.segments[id].num_inputs[l] {
+                    if input_mask[id][l][i] {
+                        global_input_mask[i] = true;
+                    }
+                }
+            }
+        }
+        for i in 0..self.input_size() {
+            if global_input_mask[i] {
                 ar.num_inputs += 1;
             }
         }
-        ar.total_cost = self.segments[self.layer_ids[0]].num_inputs * C::COST_INPUT;
+        ar.total_cost = self.input_size() * C::COST_INPUT;
         ar.total_cost += ar.num_total_gates * C::COST_VARIABLE;
         ar.total_cost += ar.num_expanded_mul * C::COST_MUL;
         ar.total_cost += ar.num_expanded_add * C::COST_ADD;
