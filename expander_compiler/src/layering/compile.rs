@@ -116,10 +116,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
         self.layout_ids = layout_ids;
 
         // 5. generate wires
-        let mut layers = Vec::with_capacity(self.circuits[&0].output_layer);
-        for i in 0..self.circuits[&0].output_layer {
-            layers.push(self.connect_wires(self.layout_ids[i], self.layout_ids[i + 1]));
-        }
+        let layers = self.connect_wires(&self.layout_ids.clone());
         self.layers = layers;
 
         // 6. record the input order (used to generate witness)

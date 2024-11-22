@@ -122,42 +122,47 @@ impl<'a, C: Config> CompileContext<'a, C> {
         LayoutQuery { var_pos }
     }
 
-    pub fn connect_wires(&mut self, a_: usize, b_: usize) -> usize {
-        let map_id = (a_ as u128) << 64 | b_ as u128;
-        if let Some(x) = self.conncected_wires.get(&map_id) {
-            return *x;
-        }
-        let a = self.layer_layout_pool.get(a_).clone();
-        let b = self.layer_layout_pool.get(b_).clone();
-        if (a.layer + 1 != b.layer) || a.circuit_id != b.circuit_id {
-            panic!("unexpected situation");
-        }
-        let circuit_id = a.circuit_id;
-        let ic = self.circuits.remove(&circuit_id).unwrap();
-        let cur_layer = a.layer;
-        let next_layer = b.layer;
-        let (cur_lc, next_lc) = (&ic.lcs[cur_layer], &ic.lcs[next_layer]);
-        let aq = self.layout_query(&a, cur_lc.vars.vec());
-        let bq = self.layout_query(&b, next_lc.vars.vec());
-
-        // check if all variables exist in the layout
-        for x in cur_lc.vars.vec().iter() {
-            if !aq.var_pos.contains_key(x) {
+    pub fn connect_wires(&mut self, layout_ids: &[usize]) -> Vec<usize> {
+        let layouts = layout_ids
+            .iter()
+            .map(|x| self.layer_layout_pool.get(*x).clone())
+            .collect::<Vec<_>>();
+        for (a, b) in layouts.iter().zip(layouts.iter().skip(1)) {
+            if a.layer + 1 != b.layer || a.circuit_id != b.circuit_id {
                 panic!("unexpected situation");
             }
         }
-        if cur_layer + 1 != ic.output_layer {
-            for x in next_lc.vars.vec().iter() {
-                if !bq.var_pos.contains_key(x) {
+        for (i, a) in layouts.iter().enumerate() {
+            if i != a.layer {
+                panic!("unexpected situation");
+            }
+        }
+        let circuit_id = layouts[0].circuit_id;
+        let ic = self.circuits.remove(&circuit_id).unwrap();
+        if layouts.len() != ic.output_layer + 1 {
+            panic!("unexpected situation");
+        }
+        let lqs = layouts
+            .iter()
+            .map(|x| self.layout_query(x, ic.lcs[x.layer].vars.vec()))
+            .collect::<Vec<_>>();
+
+        for (i, (lc, lq)) in ic
+            .lcs
+            .iter()
+            .zip(lqs.iter())
+            .take(ic.output_layer)
+            .enumerate()
+        {
+            for x in lc.vars.vec() {
+                if !lq.var_pos.contains_key(x) {
                     panic!("unexpected situation");
                 }
             }
         }
 
-        let mut sub_insns: Pool<usize> = Pool::new();
-        let mut sub_cur_layout: Vec<Option<SubLayout>> = Vec::new();
-        let mut sub_next_layout: Vec<Option<SubLayout>> = Vec::new();
-        let mut sub_cur_layout_all: HashMap<usize, SubLayout> = HashMap::new();
+        let mut sub_layouts_of_layer: Vec<HashMap<usize, SubLayout>> =
+            vec![HashMap::new(); ic.output_layer + 1];
 
         // find all sub circuits
         for (i, insn_id) in ic.sub_circuit_insn_ids.iter().enumerate() {
@@ -167,174 +172,171 @@ impl<'a, C: Config> CompileContext<'a, C> {
             let dep = sub_c.output_layer;
             let input_layer = ic.sub_circuit_start_layer[i];
             let output_layer = input_layer + dep;
-            let mut cur_layout = None;
-            let mut next_layout = None;
-            let outf = |x: usize| -> usize { sub_c.circuit.outputs[x] };
-            if input_layer <= cur_layer && output_layer >= next_layer {
-                // normal
-                if input_layer == cur_layer {
-                    // for the input layer, we need to manually query the layout. (other layers are already subLayouts)
-                    let vs = insn.inputs.clone();
-                    cur_layout = Some(aq.query(
-                        &mut self.layer_layout_pool,
-                        &self.circuits,
-                        &vs,
-                        |x| x + 1,
-                        sub_id,
-                        0,
-                    ));
-                }
-                if output_layer == next_layer {
-                    // also for the output layer
-                    next_layout = Some(bq.query(
-                        &mut self.layer_layout_pool,
-                        &self.circuits,
-                        &insn.outputs,
-                        outf,
-                        sub_id,
-                        dep,
-                    ));
-                }
-            } else if cur_layer == output_layer {
-                cur_layout = Some(aq.query(
+
+            sub_layouts_of_layer[input_layer].insert(
+                *insn_id,
+                lqs[input_layer].query(
+                    &mut self.layer_layout_pool,
+                    &self.circuits,
+                    &insn.inputs,
+                    |x| x + 1,
+                    sub_id,
+                    0,
+                ),
+            );
+            sub_layouts_of_layer[output_layer].insert(
+                *insn_id,
+                lqs[output_layer].query(
                     &mut self.layer_layout_pool,
                     &self.circuits,
                     &insn.outputs,
-                    outf,
+                    |x| sub_c.circuit.outputs[x],
                     sub_id,
                     dep,
-                ));
-                sub_cur_layout_all.insert(*insn_id, cur_layout.unwrap());
-                continue;
-            } else {
-                continue;
-            }
-            sub_insns.add(insn_id);
-            sub_cur_layout.push(cur_layout);
-            sub_next_layout.push(next_layout);
+                ),
+            );
         }
 
-        // fill already known subLayouts
-        let a = self.layer_layout_pool.get(a_);
-        let b = self.layer_layout_pool.get(b_);
         // fill already known sub_layouts
-        if let LayerLayoutInner::Sparse { sub_layout, .. } = &a.inner {
-            for x in sub_layout.iter() {
-                sub_cur_layout[sub_insns.get_idx(&x.insn_id)] = Some(x.clone());
-            }
-        }
-        if let LayerLayoutInner::Sparse { sub_layout, .. } = &b.inner {
-            for x in sub_layout.iter() {
-                sub_next_layout[sub_insns.get_idx(&x.insn_id)] = Some(x.clone());
+        for (i, a) in layouts.iter().enumerate() {
+            if let LayerLayoutInner::Sparse { sub_layout, .. } = &a.inner {
+                for x in sub_layout.iter() {
+                    sub_layouts_of_layer[i].insert(x.insn_id, x.clone());
+                }
             }
         }
 
-        let mut res: Segment<C> = Segment {
-            num_inputs: vec![a.size],
-            num_outputs: b.size,
-            ..Default::default()
-        };
+        let mut ress: Vec<Segment<C>> = Vec::new();
+        for (a, b) in layouts.iter().zip(layouts.iter().skip(1)) {
+            ress.push(Segment {
+                num_inputs: vec![a.size],
+                num_outputs: b.size,
+                ..Default::default()
+            });
+        }
 
         // connect sub circuits
-        for i in 0..sub_insns.len() {
-            let sub_cur_layout = sub_cur_layout[i].as_ref().unwrap();
-            let sub_next_layout = sub_next_layout[i].as_ref().unwrap();
-            sub_cur_layout_all.insert(*sub_insns.get(i), sub_cur_layout.clone());
-            let scid = self.connect_wires(sub_cur_layout.id, sub_next_layout.id);
-            let al = Allocation {
-                input_offset: vec![sub_cur_layout.offset],
-                output_offset: sub_next_layout.offset,
-            };
-            let mut found = false;
-            for j in 0..=res.child_segs.len() {
-                if j == res.child_segs.len() {
-                    res.child_segs.push((scid, vec![al]));
-                    found = true;
-                    break;
+        for (i, insn_id) in ic.sub_circuit_insn_ids.iter().enumerate() {
+            let insn = &ic.sub_circuit_insn_refs[i];
+            let sub_id = insn.sub_circuit_id;
+            let sub_c = &self.circuits[&sub_id];
+            let dep = sub_c.output_layer;
+            let input_layer = ic.sub_circuit_start_layer[i];
+            let output_layer = input_layer + dep;
+
+            let cur_sub_layout_ids = (input_layer..=output_layer)
+                .map(|x| sub_layouts_of_layer[x][insn_id].id)
+                .collect::<Vec<_>>();
+            let segment_ids = self.connect_wires(&cur_sub_layout_ids);
+
+            for (i, segment_id) in segment_ids.iter().enumerate() {
+                let al = Allocation {
+                    input_offset: vec![sub_layouts_of_layer[input_layer + i][insn_id].offset],
+                    output_offset: sub_layouts_of_layer[input_layer + i + 1][insn_id].offset,
+                };
+                let mut found = false;
+                let child_segs = &mut ress[input_layer + i].child_segs;
+                for j in 0..=child_segs.len() {
+                    if j == child_segs.len() {
+                        child_segs.push((*segment_id, vec![al]));
+                        found = true;
+                        break;
+                    }
+                    if child_segs[j].0 == *segment_id {
+                        child_segs[j].1.push(al);
+                        found = true;
+                        break;
+                    }
                 }
-                if res.child_segs[j].0 == scid {
-                    res.child_segs[j].1.push(al);
-                    found = true;
-                    break;
+                if !found {
+                    panic!("unexpected situation");
                 }
-            }
-            if !found {
-                panic!("unexpected situation");
             }
         }
 
         // connect self variables
-        for x in next_lc.vars.vec().iter() {
-            // only consider real variables
-            if *x >= ic.num_var {
-                continue;
-            }
-            let pos = if let Some(p) = bq.var_pos.get(x) {
-                *p
-            } else {
-                assert_eq!(cur_layer + 1, ic.output_layer);
-                //assert!(!ic.output_order.contains_key(x));
-                continue;
-            };
-            // if it's not the first layer, just relay it
-            if ic.min_layer[*x] != next_layer {
-                res.gate_adds.push(GateAdd {
-                    inputs: [Input::new(0, aq.var_pos[x])],
-                    output: pos,
-                    coef: Coef::Constant(C::CircuitField::one()),
-                });
-                continue;
-            }
-            if let Some(value) = ic.constant_like_variables.get(x) {
-                res.gate_consts.push(GateConst {
-                    inputs: [],
-                    output: pos,
-                    coef: value.clone(),
-                });
-            } else if ic.internal_variable_expr.contains_key(x) {
-                for term in ic.internal_variable_expr[x].iter() {
-                    match &term.vars {
-                        VarSpec::Const => {
-                            res.gate_consts.push(GateConst {
-                                inputs: [],
-                                output: pos,
-                                coef: Coef::Constant(term.coef),
-                            });
-                        }
-                        VarSpec::Linear(vid) => {
-                            res.gate_adds.push(GateAdd {
-                                inputs: [Input::new(0, aq.var_pos[vid])],
-                                output: pos,
-                                coef: Coef::Constant(term.coef),
-                            });
-                        }
-                        VarSpec::Quad(vid0, vid1) => {
-                            res.gate_muls.push(GateMul {
-                                inputs: [
-                                    Input::new(0, aq.var_pos[vid0]),
-                                    Input::new(0, aq.var_pos[vid1]),
-                                ],
-                                output: pos,
-                                coef: Coef::Constant(term.coef),
-                            });
-                        }
-                        VarSpec::Custom { gate_type, inputs } => {
-                            res.gate_customs.push(GateCustom {
-                                gate_type: *gate_type,
-                                inputs: inputs
-                                    .iter()
-                                    .map(|x| Input::new(0, aq.var_pos[x]))
-                                    .collect(),
-                                output: pos,
-                                coef: Coef::Constant(term.coef),
-                            });
-                        }
-                        VarSpec::RandomLinear(vid) => {
-                            res.gate_adds.push(GateAdd {
-                                inputs: [Input::new(0, aq.var_pos[vid])],
-                                output: pos,
-                                coef: Coef::Random,
-                            });
+        for (cur_layer, ((lc, bq), aq)) in ic
+            .lcs
+            .iter()
+            .zip(lqs.iter())
+            .skip(1)
+            .zip(lqs.iter())
+            .enumerate()
+        {
+            let next_layer = cur_layer + 1;
+            let res = &mut ress[cur_layer];
+            for x in lc.vars.vec().iter() {
+                // only consider real variables
+                if *x >= ic.num_var {
+                    continue;
+                }
+                let pos = if let Some(p) = bq.var_pos.get(x) {
+                    *p
+                } else {
+                    assert_eq!(cur_layer + 1, ic.output_layer);
+                    //assert!(!ic.output_order.contains_key(x));
+                    continue;
+                };
+                // if it's not the first layer, just relay it
+                if ic.min_layer[*x] != next_layer {
+                    res.gate_adds.push(GateAdd {
+                        inputs: [Input::new(0, aq.var_pos[x])],
+                        output: pos,
+                        coef: Coef::Constant(C::CircuitField::one()),
+                    });
+                    continue;
+                }
+                if let Some(value) = ic.constant_like_variables.get(x) {
+                    res.gate_consts.push(GateConst {
+                        inputs: [],
+                        output: pos,
+                        coef: value.clone(),
+                    });
+                } else if ic.internal_variable_expr.contains_key(x) {
+                    for term in ic.internal_variable_expr[x].iter() {
+                        match &term.vars {
+                            VarSpec::Const => {
+                                res.gate_consts.push(GateConst {
+                                    inputs: [],
+                                    output: pos,
+                                    coef: Coef::Constant(term.coef),
+                                });
+                            }
+                            VarSpec::Linear(vid) => {
+                                res.gate_adds.push(GateAdd {
+                                    inputs: [Input::new(0, aq.var_pos[vid])],
+                                    output: pos,
+                                    coef: Coef::Constant(term.coef),
+                                });
+                            }
+                            VarSpec::Quad(vid0, vid1) => {
+                                res.gate_muls.push(GateMul {
+                                    inputs: [
+                                        Input::new(0, aq.var_pos[vid0]),
+                                        Input::new(0, aq.var_pos[vid1]),
+                                    ],
+                                    output: pos,
+                                    coef: Coef::Constant(term.coef),
+                                });
+                            }
+                            VarSpec::Custom { gate_type, inputs } => {
+                                res.gate_customs.push(GateCustom {
+                                    gate_type: *gate_type,
+                                    inputs: inputs
+                                        .iter()
+                                        .map(|x| Input::new(0, aq.var_pos[x]))
+                                        .collect(),
+                                    output: pos,
+                                    coef: Coef::Constant(term.coef),
+                                });
+                            }
+                            VarSpec::RandomLinear(vid) => {
+                                res.gate_adds.push(GateAdd {
+                                    inputs: [Input::new(0, aq.var_pos[vid])],
+                                    output: pos,
+                                    coef: Coef::Random,
+                                });
+                            }
                         }
                     }
                 }
@@ -342,56 +344,74 @@ impl<'a, C: Config> CompileContext<'a, C> {
         }
 
         // also combined output variables
-        let cc = ic.combined_constraints[next_layer].as_ref();
-        if let Some(cc) = cc {
-            let pos = bq.var_pos[&cc.id];
-            for v in cc.variables.iter() {
-                let coef = if *v >= ic.num_var {
-                    Coef::Constant(C::CircuitField::one())
-                } else {
-                    Coef::Random
-                };
-                res.gate_adds.push(GateAdd {
-                    inputs: [Input::new(0, aq.var_pos[v])],
-                    output: pos,
-                    coef,
-                });
-            }
-            for i in cc.sub_circuit_ids.iter() {
-                let insn_id = ic.sub_circuit_insn_ids[*i];
-                let insn = &ic.sub_circuit_insn_refs[*i];
-                let input_layer = ic.sub_circuit_start_layer[*i];
-                let vid = self.circuits[&insn.sub_circuit_id].combined_constraints
-                    [cur_layer - input_layer]
-                    .as_ref()
-                    .unwrap()
-                    .id;
-                let vpid = self.circuits[&insn.sub_circuit_id].lcs[cur_layer - input_layer]
-                    .vars
-                    .get_idx(&vid);
-                let layout = self.layer_layout_pool.get(sub_cur_layout_all[&insn_id].id);
-                let spos = match &layout.inner {
-                    LayerLayoutInner::Sparse { placement, .. } => placement
-                        .iter()
-                        .find_map(|(i, v)| if *v == vpid { Some(*i) } else { None })
-                        .unwrap(),
-                    LayerLayoutInner::Dense { placement } => {
-                        placement.iter().position(|x| *x == vpid).unwrap()
-                    }
-                };
-                res.gate_adds.push(GateAdd {
-                    inputs: [Input::new(0, sub_cur_layout_all[&insn_id].offset + spos)],
-                    output: pos,
-                    coef: Coef::Constant(C::CircuitField::one()),
-                });
+        for (cur_layer, ((cc, bq), aq)) in ic
+            .combined_constraints
+            .iter()
+            .zip(lqs.iter())
+            .skip(1)
+            .zip(lqs.iter())
+            .enumerate()
+        {
+            let res = &mut ress[cur_layer];
+            if let Some(cc) = cc {
+                let pos = bq.var_pos[&cc.id];
+                for v in cc.variables.iter() {
+                    let coef = if *v >= ic.num_var {
+                        Coef::Constant(C::CircuitField::one())
+                    } else {
+                        Coef::Random
+                    };
+                    res.gate_adds.push(GateAdd {
+                        inputs: [Input::new(0, aq.var_pos[v])],
+                        output: pos,
+                        coef,
+                    });
+                }
+                for i in cc.sub_circuit_ids.iter() {
+                    let insn_id = ic.sub_circuit_insn_ids[*i];
+                    let insn = &ic.sub_circuit_insn_refs[*i];
+                    let input_layer = ic.sub_circuit_start_layer[*i];
+                    let vid = self.circuits[&insn.sub_circuit_id].combined_constraints
+                        [cur_layer - input_layer]
+                        .as_ref()
+                        .unwrap()
+                        .id;
+                    let vpid = self.circuits[&insn.sub_circuit_id].lcs[cur_layer - input_layer]
+                        .vars
+                        .get_idx(&vid);
+                    let layout = self
+                        .layer_layout_pool
+                        .get(sub_layouts_of_layer[cur_layer][&insn_id].id);
+                    let spos = match &layout.inner {
+                        LayerLayoutInner::Sparse { placement, .. } => placement
+                            .iter()
+                            .find_map(|(i, v)| if *v == vpid { Some(*i) } else { None })
+                            .unwrap(),
+                        LayerLayoutInner::Dense { placement } => {
+                            placement.iter().position(|x| *x == vpid).unwrap()
+                        }
+                    };
+                    res.gate_adds.push(GateAdd {
+                        inputs: [Input::new(
+                            0,
+                            sub_layouts_of_layer[cur_layer][&insn_id].offset + spos,
+                        )],
+                        output: pos,
+                        coef: Coef::Constant(C::CircuitField::one()),
+                    });
+                }
             }
         }
 
-        let res_id = self.compiled_circuits.len();
-        self.compiled_circuits.push(res);
-        self.conncected_wires.insert(map_id, res_id);
+        let mut ress_ids = Vec::new();
+
+        for res in ress.iter() {
+            let res_id = self.compiled_circuits.len();
+            self.compiled_circuits.push(res.clone());
+            ress_ids.push(res_id);
+        }
         self.circuits.insert(circuit_id, ic);
 
-        res_id
+        ress_ids
     }
 }
