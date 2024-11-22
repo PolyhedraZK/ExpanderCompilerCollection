@@ -1,0 +1,201 @@
+use ark_std::test_rng;
+use rand::Rng;
+
+const N_LIMBS: usize = 18;
+const MASK120: u128 = (1 << 120) - 1;
+const MASK60: u128 = (1 << 60) - 1;
+const MASK8: u128 = (1 << 8) - 1;
+const HEX_PER_LIMB: usize = 30;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RSAFieldElement {
+    // an RSA field element is a 2048 bits integer
+    // it is represented as an array of 18 u120 elements, stored each in a u128
+    data: [u128; N_LIMBS],
+}
+
+#[inline]
+fn add_u120_with_carry(a: &u128, b: &u128, carry: &u128) -> (u128, u128) {
+    // a, b, carry are all 120 bits integers, so we can simply add them
+    let mut sum = *a + *b + *carry;
+
+    let carry = sum >> 120;
+    sum = sum & MASK120;
+
+    (sum, carry)
+}
+
+#[inline]
+fn mul_u120_with_carry(a: &u128, b: &u128, carry: &u128) -> (u128, u128) {
+    let a_lo = a & MASK60;
+    let a_hi = a >> 60;
+    let b_lo = b & MASK60;
+    let b_hi = b >> 60;
+    let c_lo = *carry & MASK60;
+    let c_hi = *carry >> 60;
+
+    let tmp_0 = &a_lo * &b_lo + &c_lo;
+    let tmp_1 = &a_lo * &b_hi + &a_hi * &b_lo + c_hi;
+    let tmp_2 = &a_hi * &b_hi;
+
+    let tmp_1_lo = tmp_1 & MASK60;
+    let tmp_1_hi = tmp_1 >> 60;
+
+    let (res, mut c) = add_u120_with_carry(&tmp_0, &(tmp_1_lo << 60), &0u128);
+    c += tmp_1_hi + tmp_2;
+
+    (res, c)
+}
+
+impl RSAFieldElement {
+    pub fn new(data: [u128; N_LIMBS]) -> Self {
+        Self { data }
+    }
+
+    pub fn random(rng: &mut impl Rng) -> Self {
+        let mut data = [0; N_LIMBS];
+        rng.fill(&mut data);
+        data.iter_mut()
+            .take(N_LIMBS - 1)
+            .for_each(|x| *x &= MASK120);
+        data[N_LIMBS - 1] &= MASK8;
+        Self { data }
+    }
+
+    pub fn to_string(&self) -> String {
+        let mut s = String::new();
+        for i in 0..N_LIMBS {
+            s = (&format!("{:030x}", self.data[i])).to_string() + &s;
+        }
+        s
+    }
+
+    pub fn from_string(s: &str) -> Self {
+        let mut data = [0; N_LIMBS];
+        for i in 0..N_LIMBS {
+            data[N_LIMBS - 1 - i] =
+                u128::from_str_radix(&s[i * HEX_PER_LIMB..(i + 1) * HEX_PER_LIMB], 16).unwrap();
+        }
+        Self { data }
+    }
+
+    // assert a + b = result + r * carry
+    pub fn assert_addition(a: &Self, b: &Self, modulus: &Self, carry: &bool, result: &Self) {
+        let mut left_result = [0u128; N_LIMBS]; // for a + b
+        let mut right_result = result.data.clone(); // for result + r * carry
+
+        // First compute a + b
+        let mut c = 0u128;
+        for i in 0..N_LIMBS {
+            let (sum, new_carry) = add_u120_with_carry(&a.data[i], &b.data[i], &c);
+            left_result[i] = sum;
+            c = new_carry;
+        }
+
+        // If carry is true, add modulus to right_result
+        if *carry {
+            let mut c = 0u128;
+            for i in 0..N_LIMBS {
+                let (sum, new_carry) = add_u120_with_carry(&right_result[i], &modulus.data[i], &c);
+                right_result[i] = sum;
+                c = new_carry;
+            }
+        }
+
+        // Assert equality
+        assert!(
+            left_result == right_result,
+            "Addition assertion failed\n{:?}\n{:?}",
+            left_result,
+            right_result
+        );
+    }
+}
+
+#[test]
+fn test_rsa_field_serial() {
+    let mut rng = test_rng();
+    let a = RSAFieldElement::random(&mut rng);
+    let a_str = a.to_string();
+    println!("{:?}", a_str);
+
+    let a2 = RSAFieldElement::from_string(&a_str);
+    assert_eq!(a, a2);
+
+    for _ in 0..100 {
+        let a = RSAFieldElement::random(&mut rng);
+        let a_str = a.to_string();
+        let a2 = RSAFieldElement::from_string(&a_str);
+        assert_eq!(a, a2);
+    }
+}
+
+#[test]
+fn test_u120_add() {
+    let a = MASK120;
+    let b = 1;
+    let carry = 0;
+    let (sum, carry) = add_u120_with_carry(&a, &b, &carry);
+
+    assert_eq!(sum, 0);
+    assert_eq!(carry, 1);
+}
+
+#[test]
+fn test_u120_mul() {
+    let a = MASK120;
+    let b = 8;
+    let carry = 0;
+    let (sum, carry) = mul_u120_with_carry(&a, &b, &carry);
+
+    assert_eq!(sum, 0xfffffffffffffffffffffffffffff8);
+    assert_eq!(carry, 7);
+
+    let a = MASK120;
+    let b = MASK120 - 1;
+    let carry = a;
+    let (sum, carry) = mul_u120_with_carry(&a, &b, &carry);
+
+    assert_eq!(sum, 1);
+    assert_eq!(carry, 0xfffffffffffffffffffffffffffffe);
+}
+
+#[test]
+fn test_assert_rsa_addition() {
+    let mut r = RSAFieldElement::new([MASK120; N_LIMBS]);
+    r.data[N_LIMBS - 1] = MASK8;
+
+    {
+        let a = RSAFieldElement::new([1u128; N_LIMBS]);
+        let b = RSAFieldElement::new([2u128; N_LIMBS]);
+        let result = RSAFieldElement::new([3u128; N_LIMBS]);
+        RSAFieldElement::assert_addition(&a, &b, &r, &false, &result);
+        println!("case 1 passed");
+    }
+
+    {
+        let mut a = RSAFieldElement::new([MASK120 - 1; N_LIMBS]);
+        a.data[N_LIMBS - 1] = MASK8 - 1;
+        let b = RSAFieldElement::new([1u128; N_LIMBS]);
+        let result = RSAFieldElement::new([0u128; N_LIMBS]);
+        println!("a: {:?}", a.to_string());
+        println!("b: {:?}", b.to_string());
+        println!("r: {:?}", r.to_string());
+        println!("result: {:?}", result.to_string());
+        RSAFieldElement::assert_addition(&a, &b, &r, &true, &result);
+        println!("case 2 passed");
+    }
+
+    {
+        let mut a = RSAFieldElement::new([MASK120 - 1; N_LIMBS]);
+        a.data[N_LIMBS - 1] = MASK8 - 1;
+        let b = RSAFieldElement::new([2u128; N_LIMBS]);
+        let result = RSAFieldElement::from_string("000000000000000000000000000001000000000000000000000000000001000000000000000000000000000001000000000000000000000000000001000000000000000000000000000001000000000000000000000000000001000000000000000000000000000001000000000000000000000000000001000000000000000000000000000001000000000000000000000000000001000000000000000000000000000001000000000000000000000000000001000000000000000000000000000001000000000000000000000000000001000000000000000000000000000001000000000000000000000000000001000000000000000000000000000001000000000000000000000000000001");
+        println!("a: {:?}", a.to_string());
+        println!("b: {:?}", b.to_string());
+        println!("r: {:?}", r.to_string());
+        println!("result: {:?}", result.to_string());
+        RSAFieldElement::assert_addition(&a, &b, &r, &true, &result);
+        println!("case 3 passed");
+    }
+}
