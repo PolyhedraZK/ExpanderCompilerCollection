@@ -436,4 +436,42 @@ mod tests {
 
         do_test(root, vec![2, 3, 4, 5, 6, 7, 8, 9, 10, 16, 64, 2000]);
     }
+
+    #[test]
+    fn full_fanout_test_and_dump() {
+        use crate::circuit::ir::common::rand_gen::{RandomCircuitConfig, RandomRange};
+        use crate::utils::serde::Serde;
+
+        let config = RandomCircuitConfig {
+            seed: 2,
+            num_circuits: RandomRange { min: 20, max: 20 },
+            num_inputs: RandomRange { min: 1, max: 3 },
+            num_instructions: RandomRange { min: 30, max: 50 },
+            num_constraints: RandomRange { min: 0, max: 5 },
+            num_outputs: RandomRange { min: 1, max: 3 },
+            num_terms: RandomRange { min: 1, max: 5 },
+            sub_circuit_prob: 0.05,
+        };
+        let root = crate::circuit::ir::source::RootCircuit::<C>::random(&config);
+        assert_eq!(root.validate(), Ok(()));
+        let (_, circuit) = crate::compile::compile_with_options(
+            &root,
+            crate::compile::CompileOptions::default().with_mul_fanout_limit(256),
+        )
+        .unwrap();
+        assert_eq!(circuit.validate(), Ok(()));
+        for segment in circuit.segments.iter() {
+            let mut ref_num = vec![0; segment.num_inputs];
+            for m in segment.gate_muls.iter() {
+                ref_num[m.inputs[0]] += 1;
+                ref_num[m.inputs[1]] += 1;
+            }
+            for x in ref_num.iter() {
+                assert!(*x <= 256);
+            }
+        }
+
+        let mut buf = Vec::new();
+        circuit.serialize_into(&mut buf).unwrap();
+    }
 }
