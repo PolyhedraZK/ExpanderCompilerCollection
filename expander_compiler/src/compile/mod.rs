@@ -10,6 +10,18 @@ mod random_circuit_tests;
 #[cfg(test)]
 mod tests;
 
+#[derive(Default)]
+pub struct CompileOptions {
+    pub mul_fanout_limit: Option<usize>,
+}
+
+impl CompileOptions {
+    pub fn with_mul_fanout_limit(mut self, mul_fanout_limit: usize) -> Self {
+        self.mul_fanout_limit = Some(mul_fanout_limit);
+        self
+    }
+}
+
 fn optimize_until_fixed_point<T, F>(x: &T, im: &mut InputMapping, f: F) -> T
 where
     T: Clone + Eq,
@@ -49,6 +61,13 @@ fn print_stat(stat_name: &str, stat: usize, is_last: bool) {
 
 pub fn compile<C: Config>(
     r_source: &ir::source::RootCircuit<C>,
+) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C>), Error> {
+    compile_with_options(r_source, CompileOptions::default())
+}
+
+pub fn compile_with_options<C: Config>(
+    r_source: &ir::source::RootCircuit<C>,
+    options: CompileOptions,
 ) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C>), Error> {
     r_source.validate()?;
 
@@ -110,6 +129,15 @@ pub fn compile<C: Config>(
         r.reassign_duplicate_sub_circuit_outputs();
         (r, im)
     });
+    r_dest_relaxed_opt
+        .validate()
+        .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
+
+    let r_dest_relaxed_opt = if let Some(limit) = options.mul_fanout_limit {
+        r_dest_relaxed_opt.solve_mul_fanout_limit(limit)
+    } else {
+        r_dest_relaxed_opt
+    };
     r_dest_relaxed_opt
         .validate()
         .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
