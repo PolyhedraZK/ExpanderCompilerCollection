@@ -1,0 +1,11 @@
+[package]
+name = "rsa_circuit"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ark-std.workspace = true
+halo2curves.workspace = true
+rand.workspace = true
+
+expander_compiler = { path = "../expander_compiler" }
