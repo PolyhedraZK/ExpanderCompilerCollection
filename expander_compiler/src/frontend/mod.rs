@@ -54,6 +54,7 @@ pub struct CompileResult<C: Config> {
     pub layered_circuit: layered::Circuit<C>,
 }
 
+// QQ(ZZ): we need to distinguish between the two compile functions
 pub fn compile<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone>(
     circuit: &Cir,
 ) -> Result<CompileResult<C>, Error> {
