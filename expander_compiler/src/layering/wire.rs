@@ -147,13 +147,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
             .map(|x| self.layout_query(x, ic.lcs[x.layer].vars.vec()))
             .collect::<Vec<_>>();
 
-        for (i, (lc, lq)) in ic
-            .lcs
-            .iter()
-            .zip(lqs.iter())
-            .take(ic.output_layer)
-            .enumerate()
-        {
+        for (lc, lq) in ic.lcs.iter().zip(lqs.iter()).take(ic.output_layer) {
             for x in lc.vars.vec() {
                 if !lq.var_pos.contains_key(x) {
                     panic!("unexpected situation");
@@ -207,9 +201,12 @@ impl<'a, C: Config> CompileContext<'a, C> {
         }
 
         let mut ress: Vec<Segment<C>> = Vec::new();
-        for (a, b) in layouts.iter().zip(layouts.iter().skip(1)) {
+        for (i, b) in layouts.iter().enumerate().skip(1) {
             ress.push(Segment {
-                num_inputs: vec![a.size],
+                num_inputs: (ic.min_used_layer[i]..i)
+                    .rev()
+                    .map(|j| layouts[j].size)
+                    .collect(),
                 num_outputs: b.size,
                 ..Default::default()
             });
@@ -228,10 +225,15 @@ impl<'a, C: Config> CompileContext<'a, C> {
                 .map(|x| sub_layouts_of_layer[x][insn_id].id)
                 .collect::<Vec<_>>();
             let segment_ids = self.connect_wires(&cur_sub_layout_ids);
+            let sub_c = &self.circuits[&sub_id];
 
             for (i, segment_id) in segment_ids.iter().enumerate() {
+                let alloc_min_layer = sub_c.min_used_layer[i + 1] + input_layer;
                 let al = Allocation {
-                    input_offset: vec![sub_layouts_of_layer[input_layer + i][insn_id].offset],
+                    input_offset: (alloc_min_layer..=input_layer + i)
+                        .rev()
+                        .map(|x| sub_layouts_of_layer[x][insn_id].offset)
+                        .collect::<Vec<_>>(),
                     output_offset: sub_layouts_of_layer[input_layer + i + 1][insn_id].offset,
                 };
                 let mut found = false;
@@ -255,45 +257,28 @@ impl<'a, C: Config> CompileContext<'a, C> {
         }
 
         // connect self variables
-        for (cur_layer, ((lc, bq), aq)) in ic
-            .lcs
-            .iter()
-            .zip(lqs.iter())
-            .skip(1)
-            .zip(lqs.iter())
-            .enumerate()
-        {
-            let next_layer = cur_layer + 1;
-            let res = &mut ress[cur_layer];
-            for x in lc.vars.vec().iter() {
-                // only consider real variables
-                if *x >= ic.num_var {
-                    continue;
-                }
-                let pos = if let Some(p) = bq.var_pos.get(x) {
+        for x in 0..ic.num_var {
+            // connect first occurance
+            if ic.min_layer[x] != 0 {
+                let next_layer = ic.min_layer[x];
+                let cur_layer = next_layer - 1;
+                let res = &mut ress[cur_layer];
+                let aq = &lqs[cur_layer];
+                let bq = &lqs[next_layer];
+                let pos = if let Some(p) = bq.var_pos.get(&x) {
                     *p
                 } else {
                     assert_eq!(cur_layer + 1, ic.output_layer);
-                    //assert!(!ic.output_order.contains_key(x));
                     continue;
                 };
-                // if it's not the first layer, just relay it
-                if ic.min_layer[*x] != next_layer {
-                    res.gate_adds.push(GateAdd {
-                        inputs: [Input::new(0, aq.var_pos[x])],
-                        output: pos,
-                        coef: Coef::Constant(C::CircuitField::one()),
-                    });
-                    continue;
-                }
-                if let Some(value) = ic.constant_like_variables.get(x) {
+                if let Some(value) = ic.constant_like_variables.get(&x) {
                     res.gate_consts.push(GateConst {
                         inputs: [],
                         output: pos,
                         coef: value.clone(),
                     });
-                } else if ic.internal_variable_expr.contains_key(x) {
-                    for term in ic.internal_variable_expr[x].iter() {
+                } else if ic.internal_variable_expr.contains_key(&x) {
+                    for term in ic.internal_variable_expr[&x].iter() {
                         match &term.vars {
                             VarSpec::Const => {
                                 res.gate_consts.push(GateConst {
@@ -340,6 +325,26 @@ impl<'a, C: Config> CompileContext<'a, C> {
                         }
                     }
                 }
+            }
+            // connect relays (this may generate cross layer connections)
+            for (cur_layer, next_layer) in ic.occured_layers[x]
+                .iter()
+                .zip(ic.occured_layers[x].iter().skip(1))
+            {
+                let res = &mut ress[next_layer - 1];
+                let aq = &lqs[*cur_layer];
+                let bq = &lqs[*next_layer];
+                let pos = if let Some(p) = bq.var_pos.get(&x) {
+                    *p
+                } else {
+                    assert_eq!(*next_layer, ic.output_layer);
+                    continue;
+                };
+                res.gate_adds.push(GateAdd {
+                    inputs: [Input::new(next_layer - cur_layer - 1, aq.var_pos[&x])],
+                    output: pos,
+                    coef: Coef::Constant(C::CircuitField::one()),
+                });
             }
         }
 

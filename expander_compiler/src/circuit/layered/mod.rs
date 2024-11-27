@@ -383,15 +383,23 @@ impl<C: Config> Circuit<C> {
                 .iter()
                 .enumerate()
             {
+                if i == l {
+                    // if this is also the global input, it's always initialized
+                    continue;
+                }
                 for j in 0..*len {
                     if input_mask[self.layer_ids[i]][l][j]
                         && !output_mask[self.layer_ids[i - 1 - l]][j]
                     {
+                        println!("{:?}", self.segments[17]);
+                        println!("{:?}", self.segments[18]);
                         return Err(Error::InternalError(format!(
-                            "circuit {} input {} not initialized by circuit {} output",
+                            "circuit {} (layer {}) input {} not initialized by circuit {} (layer {}) output",
                             self.layer_ids[i],
+                            i,
                             j,
-                            self.layer_ids[i - 1 - l]
+                            self.layer_ids[i - 1 - l],
+                            i - 1 - l
                         )));
                     }
                 }

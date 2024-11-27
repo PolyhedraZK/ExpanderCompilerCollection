@@ -100,7 +100,10 @@ impl<'a, C: Config> CompileContext<'a, C> {
             ic.lcs[ic.output_layer].vars.add(v);
         }
         for i in 1..ic.num_var {
-            for j in ic.min_layer[i]..=ic.max_layer[i] {
+            /*for j in ic.min_layer[i]..=ic.max_layer[i] {
+                ic.lcs[j].vars.add(&i);
+            }*/
+            for j in ic.occured_layers[i].iter().cloned() {
                 ic.lcs[j].vars.add(&i);
             }
         }
