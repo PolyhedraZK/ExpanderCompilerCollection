@@ -12,7 +12,7 @@ use expander_compiler::{
 pub(crate) fn assert_u120(x: &Variable, builder: &mut API<BN254Config>) {}
 
 #[inline]
-// Add two variables x and y, with a carry_in, 
+// Add two variables x and y, with a carry_in,
 // and return the result and carry_out
 // Ensures:
 // - result is 120 bits
@@ -21,7 +21,7 @@ pub(crate) fn assert_u120(x: &Variable, builder: &mut API<BN254Config>) {}
 // Does not ensure:
 // - x, y are 120 bits
 // - carry_in is 1 bit
-pub(crate) fn add_u120<C: Config>(
+pub(crate) fn add_u120(
     x: &Variable,
     y: &Variable,
     carry_in: &Variable,
@@ -34,7 +34,7 @@ pub(crate) fn add_u120<C: Config>(
     let carry_out = builder.unconstrained_greater_eq(sum, two_to_120);
     let carry_times_two_to_120 = builder.mul(carry_out, two_to_120);
     let result = builder.sub(sum, carry_times_two_to_120);
-    
+
     // carry_out is 1 bit
     builder.assert_is_bool(carry_out);
     // todo: constrain result to be 120 bits
@@ -42,9 +42,8 @@ pub(crate) fn add_u120<C: Config>(
     (result, carry_out)
 }
 
-
 #[inline]
-// Mul two variables x and y, with a carry_in, 
+// Mul two variables x and y, with a carry_in,
 // and return the result and carry_out
 // Ensures:
 // - result is 120 bits
@@ -53,7 +52,7 @@ pub(crate) fn add_u120<C: Config>(
 // Does not ensure:
 // - x, y are 120 bits
 // - carry_in is 120 bit
-pub(crate) fn mul_u120<C: Config>(
+pub(crate) fn mul_u120(
     x: &Variable,
     y: &Variable,
     carry_in: &Variable,
@@ -65,7 +64,7 @@ pub(crate) fn mul_u120<C: Config>(
 
     let carry_out = builder.unconstrained_int_div(left, two_to_120);
     let right = builder.mul(carry_out, two_to_120);
-    
+
     let result = builder.sub(left, right);
 
     // todo: constrain result and carry_out to be 120 bits

@@ -14,6 +14,7 @@ pub use crate::circuit::config::*;
 pub use crate::field::{Field, BN254, GF2, M31};
 pub use crate::utils::error::Error;
 pub use api::BasicAPI;
+pub use builder::ToVariableOrValue;
 pub use builder::Variable;
 pub use circuit::Define;
 pub use witness::WitnessSolver;

@@ -23,12 +23,10 @@ impl Define<BN254Config> for MulCircuit<Variable> {
         let two_to_120 = builder.constant(BN_TWO_TO_120);
 
         let (result, carry_out) =
-        u120::mul_u120::<BN254Config>(&self.x, &self.y, &self.carry_in, &two_to_120, builder);
-
+            u120::mul_u120(&self.x, &self.y, &self.carry_in, &two_to_120, builder);
 
         builder.assert_is_equal(result, self.result);
         builder.assert_is_equal(carry_out, self.carry_out);
-
     }
 }
 

@@ -28,7 +28,7 @@ pub struct Builder<C: Config> {
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Variable {
-    id: usize,
+    pub id: usize,
 }
 
 pub enum VariableOrValue<F: Field> {
@@ -484,7 +484,7 @@ impl<C: Config> RootBuilder<C> {
         }
     }
 
-    fn last_builder(&mut self) -> &mut Builder<C> {
+    pub fn last_builder(&mut self) -> &mut Builder<C> {
         &mut self.current_builders.last_mut().unwrap().1
     }
 
