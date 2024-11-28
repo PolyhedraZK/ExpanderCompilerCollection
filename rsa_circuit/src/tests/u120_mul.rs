@@ -22,15 +22,13 @@ impl Define<BN254Config> for MulCircuit<Variable> {
     fn define(&self, builder: &mut API<BN254Config>) {
         let two_to_120 = builder.constant(BN_TWO_TO_120);
 
-        u120::assert_mul_120_with_carry(
-            &self.x,
-            &self.y,
-            &self.carry_in,
-            &self.result,
-            &self.carry_out,
-            &two_to_120,
-            builder,
-        );
+        let (result, carry_out) =
+        u120::mul_u120::<BN254Config>(&self.x, &self.y, &self.carry_in, &two_to_120, builder);
+
+
+        builder.assert_is_equal(result, self.result);
+        builder.assert_is_equal(carry_out, self.carry_out);
+
     }
 }
 
@@ -159,7 +157,6 @@ fn test_rsa_circuit_120_multiplication() {
         let output = compile_result.layered_circuit.run(&witness);
         assert_eq!(output, vec![true]);
     }
-
     {
         // Test case: Negative case (incorrect result)
         let x = [5, 0];
