@@ -27,7 +27,7 @@ pub struct CompileContext<'a, C: Config> {
 
     // compiled layered circuits
     pub compiled_circuits: Vec<Segment<C>>,
-    pub conncected_wires: HashMap<u128, usize>,
+    pub conncected_wires: HashMap<Vec<usize>, usize>,
 
     // layout id of each layer
     pub layout_ids: Vec<usize>,
