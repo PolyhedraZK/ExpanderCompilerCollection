@@ -1,6 +1,5 @@
 use std::mem::transmute;
 
-use circuit_std_rs::LogUpParams;
 use expander_compiler::frontend::*;
 use expander_compiler::{
     declare_circuit,
