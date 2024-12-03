@@ -1,6 +1,6 @@
 use expander_compiler::frontend::{extra::UnconstrainedAPI, BN254Config, BasicAPI, Variable, API};
 
-use crate::{constants::N_LIMBS, u120};
+use crate::{constants::N_LIMBS, u120::{self, is_less_than_u120}};
 
 #[derive(Debug, Clone, Copy)]
 pub struct U2048Variable {
@@ -46,6 +46,92 @@ impl U2048Variable {
 
         // Result is true if we found a greater limb or if all limbs were equal
         builder.unconstrained_bit_or(result, all_eq_so_far)
+    }
+
+    #[inline]
+    pub fn assert_is_less_than(
+        &self,
+        other: &Self,
+        builder: &mut API<BN254Config>,
+    ) -> Variable {
+        let mut result = builder.constant(0);
+        let mut all_eq_so_far = builder.constant(1);
+        
+        // Compare limbs from most significant to least significant
+        for i in (0..N_LIMBS).rev() {
+            // Compare current limbs using u120 comparison
+            let curr_less = is_less_than_u120(&self.limbs[i], &other.limbs[i], builder);
+            
+            // Check equality for current limbs
+            let diff = builder.sub(&self.limbs[i], &other.limbs[i]);
+            let curr_eq = builder.is_zero(diff);
+            
+            // If all previous limbs were equal and current limb is less
+            let update = builder.mul(all_eq_so_far, curr_less);
+            
+            // Update result: result = result OR (all_eq_so_far AND curr_less)
+            result = builder.add(result, update);
+            let tmp= builder.mul(result, update);
+            result = builder.sub(result, tmp);
+            
+            // Update equality chain: all_eq_so_far = all_eq_so_far AND curr_eq
+            all_eq_so_far = builder.mul(all_eq_so_far, curr_eq);
+            
+            // Assert boolean constraints
+            builder.assert_is_bool(result);
+            builder.assert_is_bool(all_eq_so_far);
+            builder.assert_is_bool(curr_less);
+            builder.assert_is_bool(curr_eq);
+            
+            // Cannot be both less and equal for current limb
+            let both = builder.mul(curr_less, curr_eq);
+            builder.assert_is_zero(both);
+        }
+
+        // If all limbs were equal, result must be 0
+        let equal_case = builder.mul(all_eq_so_far, result);
+        builder.assert_is_zero(equal_case);
+        
+        result
+    }
+
+    // Helper function to check if one U2048 is greater than or equal to another
+    #[inline]
+    pub fn assert_is_greater_eq(
+        &self,
+        other: &Self,
+        builder: &mut API<BN254Config>,
+    ) -> Variable {
+        let less = other.assert_is_less_than(self, builder);
+        let eq = self.assert_is_equal(other, builder);
+        
+        // result = less OR eq
+        let mut result = builder.add(less, eq);
+        let tmp = builder.mul(less, eq);
+        result = builder.sub(result, tmp);
+        builder.assert_is_bool(result);
+        
+        result
+    }
+
+    // Helper function to check equality
+    #[inline]
+    pub fn assert_is_equal(
+        &self,
+        other: &Self,
+        builder: &mut API<BN254Config>,
+    ) -> Variable {
+        let mut is_equal = builder.constant(1);
+        
+        for i in 0..N_LIMBS {
+            let diff = builder.sub(&self.limbs[i], &other.limbs[i]);
+            let curr_eq = builder.is_zero(diff);
+            is_equal = builder.mul(is_equal, curr_eq);
+            builder.assert_is_bool(curr_eq);
+        }
+        
+        builder.assert_is_bool(is_equal);
+        is_equal
     }
 
     #[inline]
@@ -100,5 +186,9 @@ impl U2048Variable {
 
         // Final carry should be 0 since all numbers are within range
         builder.assert_is_zero(temp_carry);
+
+        let lt = Self::assert_is_less_than(result, modulus, builder);
+        let one = builder.constant(1);
+        builder.assert_is_equal(lt, one);
     }
 }

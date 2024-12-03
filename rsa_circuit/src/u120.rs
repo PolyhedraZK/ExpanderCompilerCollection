@@ -79,7 +79,18 @@ pub(crate) fn is_less_than_u120(
     builder: &mut API<BN254Config>,
 ) -> Variable {
     let diff = builder.sub(x, y);
-    // if x < y, then diff will underflow a range check will fail
+    let byte_decomp = crate::util::unconstrained_byte_decomposition(&diff, builder);    
+    let res = builder.unconstrained_lesser(x, y);
 
-    todo!()
+    // if res = 1: x < y, then diff will underflow so byte_decomp[31] will be non-zero
+    // if res = 0: x >= y, then diff will not underflow so byte_decomp[31] will be zero
+    let zero = builder.constant(0);
+    let one = builder.constant(1);
+    let one_minus_res = builder.sub(one, res);
+    let t1 = builder.mul(one_minus_res, byte_decomp[31]);
+    let t2 = builder.mul(res, zero);
+    let t3 = builder.add(t1, t2);
+    builder.assert_is_zero(t3);
+
+    res
 }

@@ -30,7 +30,7 @@ pub(crate) fn assert_byte_decomposition(
     builder: &mut API<BN254Config>,
 ) -> Vec<Variable> {
     let bytes = unconstrained_byte_decomposition(x, builder);
-
+    // todo: constraint each byte to be less than 256 via logup
     let inner_product = bytes.iter().zip(constant_scalars.iter()).fold(
         builder.constant(Fr::zero()),
         |acc, (byte, scalar)| {
