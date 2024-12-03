@@ -12,7 +12,7 @@ pub(crate) fn unconstrained_byte_decomposition(
 ) -> Vec<Variable> {
     let mut res = vec![];
     let mut x = x.clone();
-    let u8modulus = builder.constant(1<<8);
+    let u8modulus = builder.constant(1 << 8);
     for _ in 0..256 / 8 {
         let byte = builder.unconstrained_mod(x, u8modulus);
         x = builder.unconstrained_int_div(x, u8modulus);

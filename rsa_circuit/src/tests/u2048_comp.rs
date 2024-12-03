@@ -54,7 +54,7 @@ fn test_u2048_comparison() {
         let x = vec![5; N_LIMBS];
         let y = vec![5; N_LIMBS];
 
-        let assignment = CompareCircuit::<Fr>::create_circuit(x, y, false);  // x < y is false when equal
+        let assignment = CompareCircuit::<Fr>::create_circuit(x, y, false); // x < y is false when equal
         let witness = compile_result
             .witness_solver
             .solve_witness(&assignment)
@@ -71,7 +71,7 @@ fn test_u2048_comparison() {
         x[N_LIMBS - 1] = 5;
         y[N_LIMBS - 1] = 10;
 
-        let assignment = CompareCircuit::<Fr>::create_circuit(x, y, true);  // x < y is true
+        let assignment = CompareCircuit::<Fr>::create_circuit(x, y, true); // x < y is true
         let witness = compile_result
             .witness_solver
             .solve_witness(&assignment)
@@ -88,7 +88,7 @@ fn test_u2048_comparison() {
         x[N_LIMBS - 1] = 10;
         y[N_LIMBS - 1] = 5;
 
-        let assignment = CompareCircuit::<Fr>::create_circuit(x, y, false);  // x < y is false
+        let assignment = CompareCircuit::<Fr>::create_circuit(x, y, false); // x < y is false
         let witness = compile_result
             .witness_solver
             .solve_witness(&assignment)
@@ -107,7 +107,7 @@ fn test_u2048_comparison() {
         x[N_LIMBS - 2] = 5;
         y[N_LIMBS - 2] = 10;
 
-        let assignment = CompareCircuit::<Fr>::create_circuit(x, y, true);  // x < y is true
+        let assignment = CompareCircuit::<Fr>::create_circuit(x, y, true); // x < y is true
         let witness = compile_result
             .witness_solver
             .solve_witness(&assignment)

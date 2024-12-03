@@ -1,7 +1,10 @@
-use std::mem::transmute;
 use expander_compiler::frontend::*;
-use expander_compiler::{declare_circuit, frontend::{BN254Config, Define, Variable, API}};
+use expander_compiler::{
+    declare_circuit,
+    frontend::{BN254Config, Define, Variable, API},
+};
 use halo2curves::bn256::Fr;
+use std::mem::transmute;
 
 use crate::constants::MASK120;
 use crate::u120::is_less_than_u120;
@@ -40,7 +43,10 @@ fn test_u120_less_than() {
         let result = [1, 0]; // true: 5 < 10
 
         let assignment = LessThanCircuit::<Fr>::create_circuit(x, y, result);
-        let witness = compile_result.witness_solver.solve_witness(&assignment).unwrap();
+        let witness = compile_result
+            .witness_solver
+            .solve_witness(&assignment)
+            .unwrap();
         let output = compile_result.layered_circuit.run(&witness);
         assert_eq!(output, vec![true]);
     }
@@ -51,7 +57,10 @@ fn test_u120_less_than() {
         let result = [0, 0]; // false: 42 = 42
 
         let assignment = LessThanCircuit::<Fr>::create_circuit(x, y, result);
-        let witness = compile_result.witness_solver.solve_witness(&assignment).unwrap();
+        let witness = compile_result
+            .witness_solver
+            .solve_witness(&assignment)
+            .unwrap();
         let output = compile_result.layered_circuit.run(&witness);
         assert_eq!(output, vec![true]);
     }
@@ -62,7 +71,10 @@ fn test_u120_less_than() {
         let result = [0, 0]; // false: 100 > 50
 
         let assignment = LessThanCircuit::<Fr>::create_circuit(x, y, result);
-        let witness = compile_result.witness_solver.solve_witness(&assignment).unwrap();
+        let witness = compile_result
+            .witness_solver
+            .solve_witness(&assignment)
+            .unwrap();
         let output = compile_result.layered_circuit.run(&witness);
         assert_eq!(output, vec![true]);
     }
@@ -73,7 +85,10 @@ fn test_u120_less_than() {
         let result = [0, 0]; // false: 2^64 > u64::MAX
 
         let assignment = LessThanCircuit::<Fr>::create_circuit(x, y, result);
-        let witness = compile_result.witness_solver.solve_witness(&assignment).unwrap();
+        let witness = compile_result
+            .witness_solver
+            .solve_witness(&assignment)
+            .unwrap();
         let output = compile_result.layered_circuit.run(&witness);
         assert_eq!(output, vec![true]);
     }
@@ -84,7 +99,10 @@ fn test_u120_less_than() {
         let result = [1, 0]; // true: (2^120 - 2) < (2^120 - 1)
 
         let assignment = LessThanCircuit::<Fr>::create_circuit(x, y, result);
-        let witness = compile_result.witness_solver.solve_witness(&assignment).unwrap();
+        let witness = compile_result
+            .witness_solver
+            .solve_witness(&assignment)
+            .unwrap();
         let output = compile_result.layered_circuit.run(&witness);
         assert_eq!(output, vec![true]);
     }
@@ -95,7 +113,10 @@ fn test_u120_less_than() {
         let result = [0, 0]; // false: equal values
 
         let assignment = LessThanCircuit::<Fr>::create_circuit(x, y, result);
-        let witness = compile_result.witness_solver.solve_witness(&assignment).unwrap();
+        let witness = compile_result
+            .witness_solver
+            .solve_witness(&assignment)
+            .unwrap();
         let output = compile_result.layered_circuit.run(&witness);
         assert_eq!(output, vec![true]);
     }
@@ -106,7 +127,10 @@ fn test_u120_less_than() {
         let result = [0, 0]; // incorrect: should be 1 since 5 < 10
 
         let assignment = LessThanCircuit::<Fr>::create_circuit(x, y, result);
-        let witness = compile_result.witness_solver.solve_witness(&assignment).unwrap();
+        let witness = compile_result
+            .witness_solver
+            .solve_witness(&assignment)
+            .unwrap();
         let output = compile_result.layered_circuit.run(&witness);
         assert_eq!(output, vec![false]);
     }
@@ -117,7 +141,10 @@ fn test_u120_less_than() {
         let result = [1, 0]; // incorrect: should be 0 since 5 = 5
 
         let assignment = LessThanCircuit::<Fr>::create_circuit(x, y, result);
-        let witness = compile_result.witness_solver.solve_witness(&assignment).unwrap();
+        let witness = compile_result
+            .witness_solver
+            .solve_witness(&assignment)
+            .unwrap();
         let output = compile_result.layered_circuit.run(&witness);
         assert_eq!(output, vec![false]);
     }

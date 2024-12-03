@@ -2,8 +2,9 @@ use expander_compiler::frontend::*;
 use expander_compiler::{
     declare_circuit,
     frontend::{BN254Config, Define, Variable, API},
-};use halo2curves::ff::Field;
+};
 use halo2curves::bn256::Fr;
+use halo2curves::ff::Field;
 
 use crate::util::assert_byte_decomposition;
 
@@ -14,7 +15,7 @@ declare_circuit!(ByteDecompCircuit {
 
 impl Define<BN254Config> for ByteDecompCircuit<Variable> {
     fn define(&self, builder: &mut API<BN254Config>) {
-        let two_to_eight = Fr::from(1u64<<8);
+        let two_to_eight = Fr::from(1u64 << 8);
         let constant_scalars = (0..32)
             .map(|i| {
                 let scalar = two_to_eight.pow([i as u64, 0, 0, 0]);
@@ -139,10 +140,10 @@ fn test_byte_decomposition() {
             0xFFFFFFFFFFFFFFFF,
             0xAAAAAAAAAAAAAAAA,
             0x5555555555555555,
-            0x1111111111111111
+            0x1111111111111111,
         ];
         let mut bytes = vec![[0, 0, 0, 0]; 32];
-        
+
         // Fill expected bytes based on the input limbs
         // First limb (0xFFFFFFFFFFFFFFFF)
         for i in 0..8 {
@@ -162,7 +163,10 @@ fn test_byte_decomposition() {
         }
 
         let assignment = ByteDecompCircuit::<Fr>::create_circuit(input, bytes);
-        let witness = compile_result.witness_solver.solve_witness(&assignment).unwrap();
+        let witness = compile_result
+            .witness_solver
+            .solve_witness(&assignment)
+            .unwrap();
         let output = compile_result.layered_circuit.run(&witness);
         assert_eq!(output, vec![true]);
     }
