@@ -2,7 +2,7 @@ use expander_compiler::frontend::{extra::UnconstrainedAPI, BN254Config, BasicAPI
 
 use crate::{
     constants::N_LIMBS,
-    u120::{self, is_less_than_u120},
+    u120::{self, add_u120, is_less_than_u120, mul_u120},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -179,5 +179,104 @@ impl U2048Variable {
         let lt = Self::assert_is_less_than(result, modulus, builder);
         let one = builder.constant(1);
         builder.assert_is_equal(lt, one);
+    }
+
+    // #[inline]
+    // pub fn assert_mul(
+    //     x: &U2048Variable,
+    //     y: &U2048Variable,
+    //     result: &U2048Variable,
+    //     carry: &U2048Variable,
+    //     modulus: &U2048Variable,
+    //     two_to_120: &Variable,
+    //     builder: &mut API<BN254Config>,
+    // ) {
+    //     let zero = builder.constant(0);
+    //    let mut res = vec![zero; 2 * N_LIMBS];
+    //    let mut carries = vec![zero; 2 * N_LIMBS];
+
+    //     for i in 0..N_LIMBS{
+    //         for j in 0..N_LIMBS {
+    //             let target_position = i + j;
+    //             let (prod, prod_carry) = mul_u120(&x.limbs[i], &y.limbs[j], &zero, two_to_120, builder);
+    //             let
+
+    //         }
+
+    //     }
+
+    // }
+
+    #[inline]
+    pub fn assert_mul_without_mod_reduction(
+        x: &U2048Variable,
+        y: &U2048Variable,
+        result: &[Variable; 2 * N_LIMBS],
+        two_to_120: &Variable,
+        builder: &mut API<BN254Config>,
+    ) {
+        let zero = builder.constant(0);
+        let mut local_res = vec![zero; 2 * N_LIMBS];
+        let mut addition_carries = vec![zero; 2 * N_LIMBS];
+
+        for i in 0..N_LIMBS {
+            for j in 0..N_LIMBS {
+                let target_position = i + j;
+
+                // prod + mul_carry * 2^120 = x[i] * y[j]
+                let (prod, mul_carry) =
+                    mul_u120(&x.limbs[i], &y.limbs[j], &zero, two_to_120, builder);
+
+                // update prod to result[target]
+                let (sum, new_carry) = add_u120(
+                    &local_res[target_position],
+                    &prod,
+                    &zero,
+                    two_to_120,
+                    builder,
+                );
+                {
+                    // todo remove
+                    builder.assert_is_zero(new_carry);
+                }
+
+                local_res[target_position] = sum;
+                addition_carries[target_position] =
+                    builder.add(addition_carries[target_position], new_carry);
+
+                {
+                    // todo remove
+                    builder.assert_is_zero(addition_carries[target_position]);
+                }
+                // update mul_carry to result[target+1]
+                let (sum, new_carry) = add_u120(
+                    &local_res[target_position + 1],
+                    &mul_carry,
+                    &zero,
+                    two_to_120,
+                    builder,
+                );
+                local_res[target_position + 1] = sum;
+                addition_carries[target_position + 1] =
+                    builder.add(addition_carries[target_position + 1], new_carry);
+            }
+        }
+
+        // integrate carries into result
+        let mut cur_carry = addition_carries[0];
+        for i in 1..2 * N_LIMBS {
+            (local_res[i], cur_carry) = add_u120(
+                &local_res[i],
+                &addition_carries[i],
+                &cur_carry,
+                two_to_120,
+                builder,
+            );
+        }
+
+        // assert equality
+        for i in 0..2 {
+            builder.assert_is_equal(local_res[i], result[i]);
+        }
     }
 }

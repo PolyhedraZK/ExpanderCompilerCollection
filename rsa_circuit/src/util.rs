@@ -24,7 +24,7 @@ pub(crate) fn unconstrained_byte_decomposition(
 
 // assert bit decomposition
 // the constant_scalars are 2^8, 2^16, ... 2^248
-pub(crate) fn assert_byte_decomposition(
+pub(crate) fn byte_decomposition(
     x: &Variable,
     constant_scalars: &[Variable],
     builder: &mut API<BN254Config>,

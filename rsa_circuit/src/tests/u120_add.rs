@@ -22,28 +22,11 @@ impl Define<BN254Config> for AddCircuit<Variable> {
     fn define(&self, builder: &mut API<BN254Config>) {
         let two_to_120 = builder.constant(BN_TWO_TO_120);
 
-        // let log_up_param = LogUpParams {
-        //     key_len: 1,
-        //     value_len: 1,
-        //     n_table_rows: 1 << 8,
-        //     n_queries: 1,
-        // };
-
         let (result, carry_out) =
             u120::add_u120(&self.x, &self.y, &self.carry_in, &two_to_120, builder);
 
         builder.assert_is_equal(result, self.result);
         builder.assert_is_equal(carry_out, self.carry_out);
-
-        // u120::assert_add_120_with_carry(
-        //     &self.x,
-        //     &self.y,
-        //     &self.carry_in,
-        //     &self.result,
-        //     &self.carry_out,
-        //     &two_to_120,
-        //     builder,
-        // );
     }
 }
 impl AddCircuit<Fr> {

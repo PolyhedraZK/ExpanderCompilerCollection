@@ -9,7 +9,34 @@ use expander_compiler::{
 #[inline]
 // TODO:
 // Assert the variable x is 120 bits, via LogUp
-pub(crate) fn assert_u120(x: &Variable, builder: &mut API<BN254Config>) {}
+pub(crate) fn range_proof_u120(x: &Variable, builder: &mut API<BN254Config>) {}
+
+// Accumulate up to 2^120 variables
+pub(crate) fn accumulate_u120(
+    x: &[Variable],
+    two_to_120: &Variable,
+    builder: &mut API<BN254Config>,
+) -> (Variable, Variable) {
+    assert!(x.len() > 1, "length is {}", x.len());
+
+    // left = x0 + x1 + x2 + ... + x(n-1)
+    let mut sum_left = x[0];
+    for xi in x.iter().skip(1) {
+        sum_left = builder.add(sum_left, xi);
+    }
+
+    // right = result + carry_out * 2^120
+    let result = builder.unconstrained_mod(sum_left, two_to_120);
+    let carry_out = builder.unconstrained_int_div(sum_left, two_to_120);
+    let carry_times_two_to_120 = builder.mul(carry_out, two_to_120);
+    let sum_right = builder.add(result, carry_times_two_to_120);
+    builder.assert_is_equal(sum_left, sum_right);
+
+    range_proof_u120(&carry_out, builder);
+    range_proof_u120(&result, builder);
+
+    (result, carry_out)
+}
 
 #[inline]
 // Add two variables x and y, with a carry_in,
@@ -37,7 +64,7 @@ pub(crate) fn add_u120(
 
     // carry_out is 1 bit
     builder.assert_is_bool(carry_out);
-    // todo: constrain result to be 120 bits
+    range_proof_u120(&result, builder);
 
     (result, carry_out)
 }
@@ -67,7 +94,9 @@ pub(crate) fn mul_u120(
 
     let result = builder.sub(left, right);
 
-    // todo: constrain result and carry_out to be 120 bits
+    range_proof_u120(&result, builder);
+    range_proof_u120(&carry_out, builder);
+
     (result, carry_out)
 }
 

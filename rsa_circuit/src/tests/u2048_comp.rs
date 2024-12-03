@@ -99,6 +99,23 @@ fn test_u2048_comparison() {
     }
 
     {
+        // Test case: Equal in all limbs except least significant
+        let mut x = vec![1; N_LIMBS];
+        let mut y = vec![1; N_LIMBS];
+        x[0] = 5;
+        y[0] = 6;
+
+        let assignment = CompareCircuit::<Fr>::create_circuit(x, y, true); // x < y is true
+        let witness = compile_result
+            .witness_solver
+            .solve_witness(&assignment)
+            .unwrap();
+
+        let output = compile_result.layered_circuit.run(&witness);
+        assert_eq!(output, vec![true]);
+    }
+
+    {
         // Test case: Equal in most significant limb, less than in next limb
         let mut x = vec![0; N_LIMBS];
         let mut y = vec![0; N_LIMBS];

@@ -6,7 +6,7 @@ use expander_compiler::{
 use halo2curves::bn256::Fr;
 use halo2curves::ff::Field;
 
-use crate::util::assert_byte_decomposition;
+use crate::util::byte_decomposition;
 
 declare_circuit!(ByteDecompCircuit {
     input: Variable,
@@ -23,7 +23,7 @@ impl Define<BN254Config> for ByteDecompCircuit<Variable> {
             })
             .collect::<Vec<_>>();
 
-        let decomposed = assert_byte_decomposition(&self.input, &constant_scalars, builder);
+        let decomposed = byte_decomposition(&self.input, &constant_scalars, builder);
         assert_eq!(decomposed.len(), self.bytes.len());
 
         for (actual, expected) in decomposed.iter().zip(self.bytes.iter()) {

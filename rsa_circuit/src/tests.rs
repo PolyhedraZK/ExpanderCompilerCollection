@@ -1,7 +1,9 @@
 mod native;
+mod u120_acc;
 mod u120_add;
 mod u120_comp;
 mod u120_mul;
 mod u2048_add;
 mod u2048_comp;
+mod u2048_mul;
 mod util;
