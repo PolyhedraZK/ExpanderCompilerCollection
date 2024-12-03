@@ -194,11 +194,18 @@ impl U2048Variable {
         // x * y
         let left = U2048Variable::mul_without_mod_reduction(x, y, two_to_120, builder);
         // carry * modulus
-        let mut right = U2048Variable::mul_without_mod_reduction(carry, modulus, two_to_120, builder);
+        let mut right =
+            U2048Variable::mul_without_mod_reduction(carry, modulus, two_to_120, builder);
         // add result to carry
         let mut right_carry = builder.constant(0);
         for i in 0..N_LIMBS {
-            (right[i], right_carry) = u120::add_u120(&result.limbs[i], &right[i], &right_carry, two_to_120, builder);
+            (right[i], right_carry) = u120::add_u120(
+                &result.limbs[i],
+                &right[i],
+                &right_carry,
+                two_to_120,
+                builder,
+            );
         }
 
         for i in 0..N_LIMBS {

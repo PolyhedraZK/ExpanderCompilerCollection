@@ -5,7 +5,7 @@ use expander_compiler::{
 };
 use halo2curves::bn256::Fr;
 
-use crate::constants::{BN_TWO_TO_120, MASK120};
+use crate::constants::BN_TWO_TO_120;
 use crate::u120;
 
 declare_circuit!(AccumulateCircuit {
