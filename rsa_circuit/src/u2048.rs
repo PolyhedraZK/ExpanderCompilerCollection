@@ -224,34 +224,34 @@ impl U2048Variable {
                 let target_position = i + j;
 
                 // prod + mul_carry * 2^120 = x[i] * y[j]
-                let (prod, mul_carry) =
+                let (xiyi_lo, xiyi_hi) =
                     mul_u120(&x.limbs[i], &y.limbs[j], &zero, two_to_120, builder);
 
-                // update prod to result[target]
+                // update xiyi_lo to result[target]
                 let (sum, new_carry) = add_u120(
                     &local_res[target_position],
-                    &prod,
+                    &xiyi_lo,
                     &zero,
                     two_to_120,
                     builder,
                 );
-                {
-                    // todo remove
-                    builder.assert_is_zero(new_carry);
-                }
+                // {
+                //     // todo remove
+                //     builder.assert_is_zero(new_carry);
+                // }
 
                 local_res[target_position] = sum;
                 addition_carries[target_position] =
                     builder.add(addition_carries[target_position], new_carry);
 
-                {
-                    // todo remove
-                    builder.assert_is_zero(addition_carries[target_position]);
-                }
+                // {
+                //     // todo remove
+                //     builder.assert_is_zero(addition_carries[target_position]);
+                // }
                 // update mul_carry to result[target+1]
                 let (sum, new_carry) = add_u120(
                     &local_res[target_position + 1],
-                    &mul_carry,
+                    &xiyi_hi,
                     &zero,
                     two_to_120,
                     builder,
