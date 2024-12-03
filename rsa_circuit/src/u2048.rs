@@ -181,40 +181,38 @@ impl U2048Variable {
         builder.assert_is_equal(lt, one);
     }
 
-    // #[inline]
-    // pub fn assert_mul(
-    //     x: &U2048Variable,
-    //     y: &U2048Variable,
-    //     result: &U2048Variable,
-    //     carry: &U2048Variable,
-    //     modulus: &U2048Variable,
-    //     two_to_120: &Variable,
-    //     builder: &mut API<BN254Config>,
-    // ) {
-    //     let zero = builder.constant(0);
-    //    let mut res = vec![zero; 2 * N_LIMBS];
-    //    let mut carries = vec![zero; 2 * N_LIMBS];
-
-    //     for i in 0..N_LIMBS{
-    //         for j in 0..N_LIMBS {
-    //             let target_position = i + j;
-    //             let (prod, prod_carry) = mul_u120(&x.limbs[i], &y.limbs[j], &zero, two_to_120, builder);
-    //             let
-
-    //         }
-
-    //     }
-
-    // }
-
     #[inline]
-    pub fn assert_mul_without_mod_reduction(
+    pub fn assert_mul(
         x: &U2048Variable,
         y: &U2048Variable,
-        result: &[Variable; 2 * N_LIMBS],
+        result: &U2048Variable,
+        carry: &U2048Variable,
+        modulus: &U2048Variable,
         two_to_120: &Variable,
         builder: &mut API<BN254Config>,
     ) {
+        // x * y
+        let left = U2048Variable::mul_without_mod_reduction(x, y, two_to_120, builder);
+        // carry * modulus
+        let mut right = U2048Variable::mul_without_mod_reduction(carry, modulus, two_to_120, builder);
+        // add result to carry
+        let mut right_carry = builder.constant(0);
+        for i in 0..N_LIMBS {
+            (right[i], right_carry) = u120::add_u120(&result.limbs[i], &right[i], &right_carry, two_to_120, builder);
+        }
+
+        for i in 0..N_LIMBS {
+            builder.assert_is_equal(left[i], right[i]);
+        }
+    }
+
+    #[inline]
+    pub fn mul_without_mod_reduction(
+        x: &U2048Variable,
+        y: &U2048Variable,
+        two_to_120: &Variable,
+        builder: &mut API<BN254Config>,
+    ) -> Vec<Variable> {
         let zero = builder.constant(0);
         let mut local_res = vec![zero; 2 * N_LIMBS];
         let mut addition_carries = vec![zero; 2 * N_LIMBS];
@@ -273,10 +271,6 @@ impl U2048Variable {
                 builder,
             );
         }
-
-        // assert equality
-        for i in 0..2 {
-            builder.assert_is_equal(local_res[i], result[i]);
-        }
+        local_res
     }
 }

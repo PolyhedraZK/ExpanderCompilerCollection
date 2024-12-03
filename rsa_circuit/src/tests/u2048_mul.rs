@@ -20,7 +20,10 @@ impl Define<BN254Config> for MulNoModCircuit<Variable> {
         let y = U2048Variable::from_raw(self.y);
         let two_to_120 = builder.constant(BN_TWO_TO_120);
 
-        U2048Variable::assert_mul_without_mod_reduction(&x, &y, &self.result, &two_to_120, builder);
+        let res = U2048Variable::mul_without_mod_reduction(&x, &y, &two_to_120, builder);
+        for i in 0..2 * N_LIMBS {
+            builder.assert_is_equal(res[i], self.result[i]);
+        }
     }
 }
 
