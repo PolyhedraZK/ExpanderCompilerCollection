@@ -86,15 +86,13 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         let mut global_input_mask = vec![false; self.input_size()];
         for (l, &id) in self.layer_ids.iter().enumerate() {
             if self.segments[id].num_inputs.len() > l {
-                for i in 0..self.segments[id].num_inputs.get(l) {
-                    if input_mask[id][l][i] {
-                        global_input_mask[i] = true;
-                    }
+                for (g, i) in global_input_mask.iter_mut().zip(input_mask[id][l].iter()) {
+                    *g |= *i;
                 }
             }
         }
-        for i in 0..self.input_size() {
-            if global_input_mask[i] {
+        for x in global_input_mask.iter() {
+            if *x {
                 ar.num_inputs += 1;
             }
         }

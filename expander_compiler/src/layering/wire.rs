@@ -175,7 +175,7 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
                 lqs[input_layer].query(
                     &mut self.layer_layout_pool,
                     &self.circuits,
-                    &insn.inputs,
+                    insn.inputs,
                     |x| x + 1,
                     sub_id,
                     0,

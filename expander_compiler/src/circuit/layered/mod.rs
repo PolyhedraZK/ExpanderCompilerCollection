@@ -198,6 +198,9 @@ pub trait InputUsize:
     fn get(&self, i: usize) -> usize {
         self.iter().nth(i).unwrap()
     }
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
     fn from_vec(v: Vec<usize>) -> Self;
 }
 
@@ -271,8 +274,8 @@ impl<C: Config, const INPUT_NUM: usize> Gate<C, NormalInputType, INPUT_NUM> {
     ) -> expander_circuit::Gate<DestConfig, INPUT_NUM> {
         let (c, r) = self.coef.export_to_expander();
         let mut i_ids: [usize; INPUT_NUM] = [0; INPUT_NUM];
-        for i in 0..INPUT_NUM {
-            i_ids[i] = self.inputs[i].offset();
+        for (x, y) in self.inputs.iter().zip(i_ids.iter_mut()) {
+            *y = x.offset();
         }
         expander_circuit::Gate {
             i_ids,
