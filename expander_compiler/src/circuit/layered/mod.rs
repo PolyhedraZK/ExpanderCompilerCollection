@@ -269,7 +269,18 @@ impl<C: Config, const INPUT_NUM: usize> Gate<C, NormalInputType, INPUT_NUM> {
     >(
         &self,
     ) -> expander_circuit::Gate<DestConfig, INPUT_NUM> {
-        panic!("TODO")
+        let (c, r) = self.coef.export_to_expander();
+        let mut i_ids: [usize; INPUT_NUM] = [0; INPUT_NUM];
+        for i in 0..INPUT_NUM {
+            i_ids[i] = self.inputs[i].offset();
+        }
+        expander_circuit::Gate {
+            i_ids,
+            o_id: self.output,
+            coef: c,
+            coef_type: r,
+            gate_type: 2 - INPUT_NUM,
+        }
     }
 }
 

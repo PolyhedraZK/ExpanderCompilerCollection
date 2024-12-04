@@ -223,8 +223,7 @@ impl Define<GF2Config> for Keccak256Circuit<Variable> {
     }
 }
 
-//#[test]
-#[allow(dead_code)]
+#[test]
 fn keccak_gf2_full() {
     let compile_result = compile(&Keccak256Circuit::default()).unwrap();
     let CompileResult {
