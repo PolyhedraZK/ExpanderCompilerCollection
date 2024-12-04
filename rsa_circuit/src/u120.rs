@@ -1,18 +1,12 @@
-use expander_compiler::{
-    circuit::ir::{self, dest::Instruction},
-    frontend::{
-        extra::UnconstrainedAPI, BN254Config, BasicAPI, Config, ToVariableOrValue, Variable, API,
-    },
-    hints::BuiltinHintIds,
-};
+use expander_compiler::frontend::{extra::UnconstrainedAPI, BN254Config, BasicAPI, Variable, API};
 
 #[inline]
 // TODO:
 // Assert the variable x is 120 bits, via LogUp
-pub(crate) fn range_proof_u120(x: &Variable, builder: &mut API<BN254Config>) {}
+pub fn range_proof_u120(_x: &Variable, _builder: &mut API<BN254Config>) {}
 
 // Accumulate up to 2^120 variables
-pub(crate) fn accumulate_u120(
+pub fn accumulate_u120(
     x: &[Variable],
     two_to_120: &Variable,
     builder: &mut API<BN254Config>,

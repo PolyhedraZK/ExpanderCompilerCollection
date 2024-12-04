@@ -1,7 +1,6 @@
 use std::mem::transmute;
 
 use halo2curves::bn256::Fr;
-use itertools::Itertools;
 use num_bigint::BigUint;
 use rand::Rng;
 
@@ -266,13 +265,13 @@ impl RSAFieldElement {
         // Start from the most significant limb
         for i in (0..N_LIMBS).rev() {
             // Process each limb of the product
-            let mut current_value = product[i + N_LIMBS];
+            let current_value = product[i + N_LIMBS];
 
             // If we have any value in the upper half, we need to reduce it
             if current_value > 0 {
                 // Estimate how many times we need to subtract modulus
                 // Since we're working with 120-bit limbs, we can do a rough estimate
-                let mut q = current_value;
+                let q = current_value;
 
                 // Update quotient
                 quotient[i] = q;

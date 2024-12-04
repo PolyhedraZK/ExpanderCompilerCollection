@@ -1,8 +1,5 @@
 use expander_compiler::frontend::*;
-use expander_compiler::{
-    declare_circuit,
-    frontend::{BN254Config, Define, Variable, API},
-};
+use expander_compiler::frontend::{BN254Config, Variable, API};
 use extra::UnconstrainedAPI;
 use halo2curves::bn256::Fr;
 
@@ -24,7 +21,7 @@ pub(crate) fn unconstrained_byte_decomposition(
 
 // assert bit decomposition
 // the constant_scalars are 2^8, 2^16, ... 2^248
-pub(crate) fn byte_decomposition(
+pub fn byte_decomposition(
     x: &Variable,
     constant_scalars: &[Variable],
     builder: &mut API<BN254Config>,
