@@ -6,7 +6,9 @@ edition = "2021"
 [dependencies]
 ark-std.workspace = true
 halo2curves.workspace = true
+itertools.workspace = true
 rand.workspace = true
+num-bigint.workspace = true
 
 circuit-std-rs = { path = "../circuit-std-rs" }
 expander_compiler = { path = "../expander_compiler" }

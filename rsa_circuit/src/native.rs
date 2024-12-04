@@ -1,3 +1,5 @@
+use itertools::Itertools;
+use num_bigint::BigUint;
 use rand::Rng;
 
 use crate::constants::{HEX_PER_LIMB, MASK120, MASK60, MASK8, N_LIMBS};
@@ -7,6 +9,47 @@ pub struct RSAFieldElement {
     // an RSA field element is a 2048 bits integer
     // it is represented as an array of 18 u120 elements, stored each in a u128
     pub data: [u128; N_LIMBS],
+}
+
+impl From<RSAFieldElement> for BigUint {
+    fn from(x: RSAFieldElement) -> BigUint {
+        x.to_big_uint()
+    }
+}
+
+impl From<BigUint> for RSAFieldElement {
+    fn from(x: BigUint) -> RSAFieldElement {
+        RSAFieldElement::from_big_uint(x)
+    }
+}
+
+
+impl RSAFieldElement {
+    pub fn from_big_uint(x: BigUint) -> Self {
+        assert!(x.bits() <= 2048, "Input exceeds 2048 bits");
+        let mut data = [0u128; N_LIMBS];
+
+        let mut x = x;
+        let mut cur_idx = 0;
+        while x != BigUint::from(0u32) {
+            let remainder = (x.clone() & BigUint::from(MASK120)).to_u64_digits();
+            data[cur_idx] = match remainder.len() {
+                0 => 0,
+                1 => remainder[0] as u128,
+                _ => remainder[0] as u128 + ((remainder[1] as u128) << 64),
+            };
+            x >>= 120;
+            cur_idx += 1;
+        }
+        Self { data }
+    }
+
+    pub fn to_big_uint(&self) -> BigUint {
+        let res = self.data.iter().rev().fold(BigUint::from(0u32), |acc, &x| {
+            (acc << 120) + BigUint::from(x)
+        });
+        res
+    }
 }
 
 #[inline]
@@ -175,5 +218,87 @@ impl RSAFieldElement {
             left_result == right_result,
             "Multiplication assertion failed"
         );
+    }
+
+    // Performs modular multiplication: (self * other) mod modulus
+    pub fn mod_mul(&self, other: &Self, modulus: &Self) -> Self {
+        // First compute full multiplication without reduction
+        let mut product = [0u128; 2 * N_LIMBS];
+        Self::mul_without_reduction(self, other, &mut product);
+
+        // Now we need to reduce the result modulo our modulus
+        // We'll use the division algorithm to compute quotient and remainder
+        let mut quotient = [0u128; N_LIMBS];
+        let mut remainder = [0u128; N_LIMBS];
+
+        // Start from the most significant limb
+        for i in (0..N_LIMBS).rev() {
+            // Process each limb of the product
+            let mut current_value = product[i + N_LIMBS];
+
+            // If we have any value in the upper half, we need to reduce it
+            if current_value > 0 {
+                // Estimate how many times we need to subtract modulus
+                // Since we're working with 120-bit limbs, we can do a rough estimate
+                let mut q = current_value;
+
+                // Update quotient
+                quotient[i] = q;
+
+                // Subtract q * modulus from the current position
+                let mut borrow = 0u128;
+                let mut carry = 0u128;
+
+                // First multiply q with modulus
+                for j in 0..N_LIMBS {
+                    if i + j < 2 * N_LIMBS {
+                        let (prod, prod_carry) = mul_u120_with_carry(&q, &modulus.data[j], &carry);
+                        carry = prod_carry;
+
+                        // Subtract from product
+                        if prod > product[i + j] + borrow {
+                            product[i + j] = (1u128 << 120) + product[i + j] - prod - borrow;
+                            borrow = 1;
+                        } else {
+                            product[i + j] = product[i + j] - prod - borrow;
+                            borrow = 0;
+                        }
+                    }
+                }
+            }
+        }
+
+        // The lower N_LIMBS of product is now our remainder
+        for i in 0..N_LIMBS {
+            remainder[i] = product[i] & MASK120;
+        }
+        remainder[N_LIMBS - 1] &= MASK8;
+
+        // Final adjustments if remainder >= modulus
+        let mut is_greater = false;
+        let mut i = N_LIMBS - 1;
+        while i > 0 && !is_greater {
+            if remainder[i] > modulus.data[i] {
+                is_greater = true;
+            } else if remainder[i] < modulus.data[i] {
+                break;
+            }
+            i -= 1;
+        }
+
+        if is_greater {
+            let mut borrow = 0u128;
+            for i in 0..N_LIMBS {
+                if modulus.data[i] + borrow > remainder[i] {
+                    remainder[i] = (1u128 << 120) + remainder[i] - modulus.data[i] - borrow;
+                    borrow = 1;
+                } else {
+                    remainder[i] = remainder[i] - modulus.data[i] - borrow;
+                    borrow = 0;
+                }
+            }
+        }
+
+        Self { data: remainder }
     }
 }

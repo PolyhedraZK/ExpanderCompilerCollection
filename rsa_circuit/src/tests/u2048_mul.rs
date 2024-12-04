@@ -1,5 +1,3 @@
-use std::mem::transmute;
-
 use expander_compiler::frontend::*;
 use expander_compiler::{
     declare_circuit,
@@ -7,8 +5,7 @@ use expander_compiler::{
 };
 use halo2curves::bn256::Fr;
 
-use crate::constants::{BN_TWO_TO_120, MASK120, MASK8, N_LIMBS};
-use crate::native::RSAFieldElement;
+use crate::constants::{BN_TWO_TO_120, N_LIMBS};
 use crate::u2048::U2048Variable;
 
 declare_circuit!(MulModCircuit {
