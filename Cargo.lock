@@ -1642,6 +1642,7 @@ dependencies = [
  "halo2curves",
  "itertools 0.13.0",
  "num-bigint",
+ "num-traits",
  "rand",
 ]
 

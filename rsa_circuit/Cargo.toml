@@ -9,6 +9,7 @@ halo2curves.workspace = true
 itertools.workspace = true
 rand.workspace = true
 num-bigint.workspace = true
+num-traits.workspace = true
 
 circuit-std-rs = { path = "../circuit-std-rs" }
 expander_compiler = { path = "../expander_compiler" }

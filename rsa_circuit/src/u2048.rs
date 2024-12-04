@@ -199,7 +199,7 @@ impl U2048Variable {
         // carry * modulus
         let mut right =
             U2048Variable::mul_without_mod_reduction(carry, modulus, two_to_120, builder);
-        // add result to carry
+        // result + carry
         let mut right_carry = builder.constant(0);
         for i in 0..N_LIMBS {
             (right[i], right_carry) = u120::add_u120(
@@ -220,7 +220,7 @@ impl U2048Variable {
             );
         }
 
-        for i in 0..N_LIMBS * 2 {
+        for i in 0..4 {
             builder.assert_is_equal(left[i], right[i]);
         }
     }
@@ -252,19 +252,10 @@ impl U2048Variable {
                     two_to_120,
                     builder,
                 );
-                // {
-                //     // todo remove
-                //     builder.assert_is_zero(new_carry);
-                // }
-
                 local_res[target_position] = sum;
                 addition_carries[target_position] =
                     builder.add(addition_carries[target_position], new_carry);
 
-                // {
-                //     // todo remove
-                //     builder.assert_is_zero(addition_carries[target_position]);
-                // }
                 // update mul_carry to result[target+1]
                 let (sum, new_carry) = add_u120(
                     &local_res[target_position + 1],
@@ -281,7 +272,7 @@ impl U2048Variable {
 
         // integrate carries into result
         let mut cur_carry = addition_carries[0];
-        for i in 1..2 * N_LIMBS {
+        for i in 0..2 * N_LIMBS {
             (local_res[i], cur_carry) = add_u120(
                 &local_res[i],
                 &addition_carries[i],

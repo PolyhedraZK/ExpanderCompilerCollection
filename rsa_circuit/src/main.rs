@@ -4,6 +4,7 @@ mod u120;
 mod u2048;
 mod util;
 
+use circuit_std_rs::{LogUpCircuit, LogUpParams, StdCircuit};
 use constants::N_LIMBS;
 use expander_compiler::frontend::*;
 use expander_compiler::{
@@ -89,7 +90,7 @@ impl Define<BN254Config> for RSACircuit<Variable> {
         );
 
         // compute x^4, to x^65536
-        for i in 1..12 {
+        for i in 1..11 {
             U2048Variable::assert_mul(
                 &x_power_vars[i - 1],
                 &x_power_vars[i - 1],
@@ -116,6 +117,18 @@ impl Define<BN254Config> for RSACircuit<Variable> {
         for i in 0..N_LIMBS {
             builder.assert_is_equal(x_power_vars[16].limbs[i], self.result[i]);
         }
+    }
+}
+
+impl RSACircuit<Fr> {
+    fn build_log_up_table() {
+        let logup_param = LogUpParams {
+            key_len: 1,
+            value_len: 1,
+            n_table_rows: 1 << 8,
+            n_queries: 1 << 8,
+        };
+        let mut circuit = <LogUpCircuit as StdCircuit<BN254Config>>::new_circuit(&logup_param);
     }
 }
 
@@ -168,12 +181,8 @@ fn main() {
 
     let (x_powers, mul_carries) = build_rsa_traces(&x, &n, &res);
     for (i, x) in x_powers.iter().enumerate() {
-        println!("x^{}: {:0x?}", 2u64.pow(i as u32 + 1), x.to_big_uint());        
-        println!(
-            "carry for x^{}: {:0x?}",
-            2u64.pow(i as u32 + 1),
-            mul_carries[i].to_big_uint()
-        );
+        println!("x^{}:\n{:0x?}", 2u64.pow(i as u32 + 1), x.to_big_uint());
+        println!("{:0x?}\n", mul_carries[i].to_big_uint());
     }
 
     let assignment = RSACircuit::create_circuit(&x, &n, x_powers, mul_carries, &res);
