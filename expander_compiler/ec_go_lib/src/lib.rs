@@ -1,5 +1,6 @@
 use arith::FieldSerde;
 use expander_compiler::circuit::layered;
+use expander_compiler::circuit::layered::NormalInputType;
 use libc::{c_uchar, c_ulong, malloc};
 use std::io::Cursor;
 use std::ptr;
@@ -32,7 +33,8 @@ where
     let ir_source = ir::source::RootCircuit::<C>::deserialize_from(&ir_source[..])
         .map_err(|e| format!("failed to deserialize the source circuit: {}", e))?;
     let (ir_witness_gen, layered) =
-        expander_compiler::compile::compile(&ir_source).map_err(|e| e.to_string())?;
+        expander_compiler::compile::compile::<_, NormalInputType>(&ir_source)
+            .map_err(|e| e.to_string())?;
     let mut ir_wg_s: Vec<u8> = Vec::new();
     ir_witness_gen
         .serialize_into(&mut ir_wg_s)

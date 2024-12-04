@@ -1,7 +1,12 @@
 use std::collections::HashMap;
 
 use crate::{
-    circuit::{config::Config, input_mapping::InputMapping, ir, layered},
+    circuit::{
+        config::Config,
+        input_mapping::InputMapping,
+        ir,
+        layered::{self, InputType, InputUsize},
+    },
     utils::pool::Pool,
 };
 
@@ -14,7 +19,9 @@ mod wire;
 #[cfg(test)]
 mod tests;
 
-pub fn compile<C: Config>(rc: &ir::dest::RootCircuit<C>) -> (layered::Circuit<C>, InputMapping) {
+pub fn compile<C: Config, I: InputType>(
+    rc: &ir::dest::RootCircuit<C>,
+) -> (layered::Circuit<C, I>, InputMapping) {
     let mut ctx = compile::CompileContext {
         rc,
         circuits: HashMap::new(),
@@ -29,7 +36,8 @@ pub fn compile<C: Config>(rc: &ir::dest::RootCircuit<C>) -> (layered::Circuit<C>
         root_has_constraints: false,
     };
     ctx.compile();
-    let l0_size = ctx.compiled_circuits[ctx.layers[0]].num_inputs[0];
+    let t: &I::InputUsize = &ctx.compiled_circuits[ctx.layers[0]].num_inputs;
+    let l0_size = t.get(0);
     let output_zeroes = rc.expected_num_output_zeroes + ctx.root_has_constraints as usize;
     let output_all = rc.circuits[&0].outputs.len() + ctx.root_has_constraints as usize;
     (

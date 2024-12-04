@@ -5,7 +5,10 @@ use crate::{
         config::Config,
         input_mapping::EMPTY,
         ir::expr::VarSpec,
-        layered::{Allocation, Coef, GateAdd, GateConst, GateCustom, GateMul, Input, Segment},
+        layered::{
+            Allocation, Coef, GateAdd, GateConst, GateCustom, GateMul, Input, InputType,
+            InputUsize, Segment,
+        },
     },
     field::FieldArith,
     utils::pool::Pool,
@@ -96,7 +99,7 @@ impl LayoutQuery {
     }
 }
 
-impl<'a, C: Config> CompileContext<'a, C> {
+impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
     fn layout_query(&self, l: &LayerLayout, s: &[usize]) -> LayoutQuery {
         let mut var_pos = HashMap::new();
         match &l.inner {
@@ -200,13 +203,14 @@ impl<'a, C: Config> CompileContext<'a, C> {
             }
         }
 
-        let mut ress: Vec<Segment<C>> = Vec::new();
+        let mut ress: Vec<Segment<C, I>> = Vec::new();
         for (i, b) in layouts.iter().enumerate().skip(1) {
+            let num_inputs_vec = (ic.min_used_layer[i]..i)
+                .rev()
+                .map(|j| layouts[j].size)
+                .collect();
             ress.push(Segment {
-                num_inputs: (ic.min_used_layer[i]..i)
-                    .rev()
-                    .map(|j| layouts[j].size)
-                    .collect(),
+                num_inputs: I::InputUsize::from_vec(num_inputs_vec),
                 num_outputs: b.size,
                 ..Default::default()
             });
@@ -239,11 +243,12 @@ impl<'a, C: Config> CompileContext<'a, C> {
 
             for (i, segment_id) in segment_ids.iter().enumerate() {
                 let alloc_min_layer = sub_c.min_used_layer[i + 1] + input_layer;
+                let input_offset_vec = (alloc_min_layer..=input_layer + i)
+                    .rev()
+                    .map(|x| sub_layouts_of_layer[x][insn_id].offset)
+                    .collect::<Vec<_>>();
                 let al = Allocation {
-                    input_offset: (alloc_min_layer..=input_layer + i)
-                        .rev()
-                        .map(|x| sub_layouts_of_layer[x][insn_id].offset)
-                        .collect::<Vec<_>>(),
+                    input_offset: I::InputUsize::from_vec(input_offset_vec),
                     output_offset: sub_layouts_of_layer[input_layer + i + 1][insn_id].offset,
                 };
                 let mut found = false;
@@ -300,7 +305,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
                                 }
                                 VarSpec::Linear(vid) => {
                                     res.gate_adds.push(GateAdd {
-                                        inputs: [Input::new(0, aq.var_pos[vid])],
+                                        inputs: [I::Input::new(0, aq.var_pos[vid])],
                                         output: pos,
                                         coef: Coef::Constant(term.coef),
                                     });
@@ -308,8 +313,8 @@ impl<'a, C: Config> CompileContext<'a, C> {
                                 VarSpec::Quad(vid0, vid1) => {
                                     res.gate_muls.push(GateMul {
                                         inputs: [
-                                            Input::new(0, aq.var_pos[vid0]),
-                                            Input::new(0, aq.var_pos[vid1]),
+                                            I::Input::new(0, aq.var_pos[vid0]),
+                                            I::Input::new(0, aq.var_pos[vid1]),
                                         ],
                                         output: pos,
                                         coef: Coef::Constant(term.coef),
@@ -320,7 +325,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
                                         gate_type: *gate_type,
                                         inputs: inputs
                                             .iter()
-                                            .map(|x| Input::new(0, aq.var_pos[x]))
+                                            .map(|x| I::Input::new(0, aq.var_pos[x]))
                                             .collect(),
                                         output: pos,
                                         coef: Coef::Constant(term.coef),
@@ -328,7 +333,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
                                 }
                                 VarSpec::RandomLinear(vid) => {
                                     res.gate_adds.push(GateAdd {
-                                        inputs: [Input::new(0, aq.var_pos[vid])],
+                                        inputs: [I::Input::new(0, aq.var_pos[vid])],
                                         output: pos,
                                         coef: Coef::Random,
                                     });
@@ -339,25 +344,47 @@ impl<'a, C: Config> CompileContext<'a, C> {
                 }
             }
             // connect relays (this may generate cross layer connections)
-            for (cur_layer, next_layer) in ic.occured_layers[x]
-                .iter()
-                .zip(ic.occured_layers[x].iter().skip(1))
-            {
-                if cached_ress[next_layer - 1].is_none() {
-                    let res = &mut ress[next_layer - 1];
-                    let aq = &lqs[*cur_layer];
-                    let bq = &lqs[*next_layer];
-                    let pos = if let Some(p) = bq.var_pos.get(&x) {
-                        *p
-                    } else {
-                        assert_eq!(*next_layer, ic.output_layer);
-                        continue;
-                    };
-                    res.gate_adds.push(GateAdd {
-                        inputs: [Input::new(next_layer - cur_layer - 1, aq.var_pos[&x])],
-                        output: pos,
-                        coef: Coef::Constant(C::CircuitField::one()),
-                    });
+            if I::CROSS_LAYER_RELAY {
+                for (cur_layer, next_layer) in ic.occured_layers[x]
+                    .iter()
+                    .zip(ic.occured_layers[x].iter().skip(1))
+                {
+                    if cached_ress[next_layer - 1].is_none() {
+                        let res = &mut ress[next_layer - 1];
+                        let aq = &lqs[*cur_layer];
+                        let bq = &lqs[*next_layer];
+                        let pos = if let Some(p) = bq.var_pos.get(&x) {
+                            *p
+                        } else {
+                            assert_eq!(*next_layer, ic.output_layer);
+                            continue;
+                        };
+                        res.gate_adds.push(GateAdd {
+                            inputs: [I::Input::new(next_layer - cur_layer - 1, aq.var_pos[&x])],
+                            output: pos,
+                            coef: Coef::Constant(C::CircuitField::one()),
+                        });
+                    }
+                }
+            } else {
+                for cur_layer in ic.min_layer[x]..ic.max_layer[x] {
+                    let next_layer = cur_layer + 1;
+                    if cached_ress[cur_layer].is_none() {
+                        let res = &mut ress[cur_layer];
+                        let aq = &lqs[cur_layer];
+                        let bq = &lqs[next_layer];
+                        let pos = if let Some(p) = bq.var_pos.get(&x) {
+                            *p
+                        } else {
+                            assert_eq!(next_layer, ic.output_layer);
+                            continue;
+                        };
+                        res.gate_adds.push(GateAdd {
+                            inputs: [I::Input::new(0, aq.var_pos[&x])],
+                            output: pos,
+                            coef: Coef::Constant(C::CircuitField::one()),
+                        });
+                    }
                 }
             }
         }

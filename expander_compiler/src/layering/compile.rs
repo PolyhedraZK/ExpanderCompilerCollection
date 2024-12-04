@@ -5,13 +5,13 @@ use crate::circuit::{
     config::Config,
     ir::dest::{Circuit as IrCircuit, Instruction, RootCircuit as IrRootCircuit},
     ir::expr::Expression,
-    layered::{Coef, Segment},
+    layered::{Coef, InputType, Segment},
 };
 use crate::utils::pool::Pool;
 
 use super::layer_layout::{LayerLayout, LayerLayoutContext, LayerReq};
 
-pub struct CompileContext<'a, C: Config> {
+pub struct CompileContext<'a, C: Config, I: InputType> {
     // the root circuit
     pub rc: &'a IrRootCircuit<C>,
 
@@ -26,7 +26,7 @@ pub struct CompileContext<'a, C: Config> {
     pub layer_req_to_layout: HashMap<LayerReq, usize>,
 
     // compiled layered circuits
-    pub compiled_circuits: Vec<Segment<C>>,
+    pub compiled_circuits: Vec<Segment<C, I>>,
     pub conncected_wires: HashMap<Vec<usize>, usize>,
 
     // layout id of each layer
@@ -94,7 +94,7 @@ pub struct SubCircuitInsn<'a> {
 
 const EXTRA_PRE_ALLOC_SIZE: usize = 1000;
 
-impl<'a, C: Config> CompileContext<'a, C> {
+impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
     pub fn compile(&mut self) {
         // 1. do a toposort of the circuits
         self.dfs_topo_sort(0);
@@ -440,27 +440,29 @@ impl<'a, C: Config> CompileContext<'a, C> {
         }
 
         // compute occured layers
-        ic.occured_layers = vec![Vec::new(); ic.max_layer.len()];
-        let outputs_set: HashSet<usize> = circuit.outputs.iter().cloned().collect();
-        for x in q.iter().cloned() {
-            let mut tmp = Vec::with_capacity(out_edges[x].len() + 1);
-            tmp.push(ic.min_layer[x]);
-            for y in out_edges[x].iter().cloned() {
-                tmp.push(ic.min_layer[y] - layer_advance[y]);
-            }
-            if outputs_set.contains(&x) {
-                tmp.push(ic.output_layer);
-            }
-            tmp.sort();
-            let mut tmp2 = Vec::with_capacity(tmp.len());
-            for &v in tmp.iter() {
-                if tmp2.is_empty() || *tmp2.last().unwrap() != v {
-                    tmp2.push(v);
+        if I::CROSS_LAYER_RELAY {
+            ic.occured_layers = vec![Vec::new(); ic.max_layer.len()];
+            let outputs_set: HashSet<usize> = circuit.outputs.iter().cloned().collect();
+            for x in q.iter().cloned() {
+                let mut tmp = Vec::with_capacity(out_edges[x].len() + 1);
+                tmp.push(ic.min_layer[x]);
+                for y in out_edges[x].iter().cloned() {
+                    tmp.push(ic.min_layer[y] - layer_advance[y]);
                 }
+                if outputs_set.contains(&x) {
+                    tmp.push(ic.output_layer);
+                }
+                tmp.sort();
+                let mut tmp2 = Vec::with_capacity(tmp.len());
+                for &v in tmp.iter() {
+                    if tmp2.is_empty() || *tmp2.last().unwrap() != v {
+                        tmp2.push(v);
+                    }
+                }
+                assert_eq!(tmp2[0], ic.min_layer[x]);
+                assert_eq!(*tmp2.last().unwrap(), ic.max_layer[x]);
+                ic.occured_layers[x] = tmp2;
             }
-            assert_eq!(tmp2[0], ic.min_layer[x]);
-            assert_eq!(*tmp2.last().unwrap(), ic.max_layer[x]);
-            ic.occured_layers[x] = tmp2;
         }
 
         // compute minUsedLayer
@@ -475,10 +477,12 @@ impl<'a, C: Config> CompileContext<'a, C> {
                     .min(sub_circuit.min_used_layer[j] + input_layer);
             }
         }
-        for x in q.iter().cloned() {
-            let t = &ic.occured_layers[x];
-            for (u, v) in t.iter().zip(t.iter().skip(1)) {
-                ic.min_used_layer[*v] = ic.min_used_layer[*v].min(*u);
+        if I::CROSS_LAYER_RELAY {
+            for x in q.iter().cloned() {
+                let t = &ic.occured_layers[x];
+                for (u, v) in t.iter().zip(t.iter().skip(1)) {
+                    ic.min_used_layer[*v] = ic.min_used_layer[*v].min(*u);
+                }
             }
         }
 

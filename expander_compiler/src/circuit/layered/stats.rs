@@ -1,6 +1,6 @@
 use crate::circuit::config::Config;
 
-use super::Circuit;
+use super::{Circuit, InputType, InputUsize};
 
 pub struct Stats {
     // number of layers in the final circuit
@@ -31,7 +31,7 @@ struct CircuitStats {
     num_expanded_cst: usize,
 }
 
-impl<C: Config> Circuit<C> {
+impl<C: Config, I: InputType> Circuit<C, I> {
     pub fn get_stats(&self) -> Stats {
         let mut m: Vec<CircuitStats> = Vec::with_capacity(self.segments.len());
         let mut ar = Stats {
@@ -86,7 +86,7 @@ impl<C: Config> Circuit<C> {
         let mut global_input_mask = vec![false; self.input_size()];
         for (l, &id) in self.layer_ids.iter().enumerate() {
             if self.segments[id].num_inputs.len() > l {
-                for i in 0..self.segments[id].num_inputs[l] {
+                for i in 0..self.segments[id].num_inputs.get(l) {
                     if input_mask[id][l][i] {
                         global_input_mask[i] = true;
                     }

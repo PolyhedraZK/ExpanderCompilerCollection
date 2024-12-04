@@ -1,5 +1,6 @@
 use builder::RootBuilder;
 
+use crate::circuit::layered::NormalInputType;
 use crate::circuit::{ir, layered};
 
 mod api;
@@ -51,14 +52,14 @@ fn build<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + 
 
 pub struct CompileResult<C: Config> {
     pub witness_solver: WitnessSolver<C>,
-    pub layered_circuit: layered::Circuit<C>,
+    pub layered_circuit: layered::Circuit<C, NormalInputType>,
 }
 
 pub fn compile<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone>(
     circuit: &Cir,
 ) -> Result<CompileResult<C>, Error> {
     let root = build(circuit);
-    let (irw, lc) = crate::compile::compile::<C>(&root)?;
+    let (irw, lc) = crate::compile::compile::<C, _>(&root)?;
     Ok(CompileResult {
         witness_solver: WitnessSolver { circuit: irw },
         layered_circuit: lc,
