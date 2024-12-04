@@ -182,6 +182,8 @@ impl U2048Variable {
     }
 
     #[inline]
+    // assert multiplication of two U2048 variables
+    // x * y = result + carry * modulus
     pub fn assert_mul(
         x: &U2048Variable,
         y: &U2048Variable,

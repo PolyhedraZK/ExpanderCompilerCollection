@@ -140,25 +140,25 @@ fn test_mod_add() {
         assert_eq!(output, vec![false]);
     }
 
-    // {
-    //     // Negative test: result >= modulus
-    //     let mut x = [[0, 0]; N_LIMBS];
-    //     let mut y = [[0, 0]; N_LIMBS];
-    //     let mut result = [[0, 0]; N_LIMBS];
-    //     let mut modulus = [[0, 0]; N_LIMBS];
+    {
+        // Negative test: result >= modulus
+        let mut x = [[0, 0]; N_LIMBS];
+        let mut y = [[0, 0]; N_LIMBS];
+        let mut result = [[0, 0]; N_LIMBS];
+        let mut modulus = [[0, 0]; N_LIMBS];
 
-    //     x[0] = [7, 0];
-    //     y[0] = [5, 0];
-    //     result[0] = [12, 0]; // result > modulus
-    //     modulus[0] = [10, 0];
+        x[0] = [7, 0];
+        y[0] = [5, 0];
+        result[0] = [12, 0]; // result > modulus
+        modulus[0] = [10, 0];
 
-    //     let assignment = AddModCircuit::<Fr>::create_circuit(x, y, result, 0, modulus);
-    //     let witness = compile_result
-    //         .witness_solver
-    //         .solve_witness(&assignment)
-    //         .unwrap();
+        let assignment = AddModCircuit::<Fr>::create_circuit(x, y, result, 0, modulus);
+        let witness = compile_result
+            .witness_solver
+            .solve_witness(&assignment)
+            .unwrap();
 
-    //     let output = compile_result.layered_circuit.run(&witness);
-    //     assert_eq!(output, vec![false]);
-    // }
+        let output = compile_result.layered_circuit.run(&witness);
+        assert_eq!(output, vec![false]);
+    }
 }

@@ -1,3 +1,6 @@
+use std::mem::transmute;
+
+use halo2curves::bn256::Fr;
 use itertools::Itertools;
 use num_bigint::BigUint;
 use rand::Rng;
@@ -23,6 +26,19 @@ impl From<BigUint> for RSAFieldElement {
     }
 }
 
+impl From<RSAFieldElement> for [Fr; N_LIMBS] {
+    fn from(x: RSAFieldElement) -> [Fr; N_LIMBS] {
+        x.data
+            .iter()
+            .map(|&x| {
+                let x_u64 = unsafe { transmute::<u128, [u64; 2]>(x) };
+                Fr::from_raw([x_u64[0], x_u64[1], 0, 0])
+            })
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap()
+    }
+}
 
 impl RSAFieldElement {
     pub fn from_big_uint(x: BigUint) -> Self {
@@ -49,6 +65,22 @@ impl RSAFieldElement {
             (acc << 120) + BigUint::from(x)
         });
         res
+    }
+
+    /// Multiplication of two RSAFieldElement, very slow. used only for trace generation
+    /// return both the result and the carry
+    pub fn slow_mul_mod(&self, other: &Self, modulus: &Self) -> (Self, Self) {
+        let self_int = self.to_big_uint();
+        let other_int = other.to_big_uint();
+        let modulus_int = modulus.to_big_uint();
+        let prod_int = self_int * other_int;
+        let res_int = &prod_int % &modulus_int;
+        let carry_int = (prod_int - &res_int) / modulus_int;
+
+        (
+            RSAFieldElement::from_big_uint(res_int),
+            RSAFieldElement::from_big_uint(carry_int),
+        )
     }
 }
 
