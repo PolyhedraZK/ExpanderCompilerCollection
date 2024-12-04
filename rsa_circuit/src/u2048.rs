@@ -191,6 +191,7 @@ impl U2048Variable {
         two_to_120: &Variable,
         builder: &mut API<BN254Config>,
     ) {
+        let zero = builder.constant(0);
         // x * y
         let left = U2048Variable::mul_without_mod_reduction(x, y, two_to_120, builder);
         // carry * modulus
@@ -207,8 +208,17 @@ impl U2048Variable {
                 builder,
             );
         }
-
         for i in 0..N_LIMBS {
+            (right[N_LIMBS + i], right_carry) = u120::add_u120(
+                &zero,
+                &right[N_LIMBS + i],
+                &right_carry,
+                two_to_120,
+                builder,
+            );
+        }
+
+        for i in 0..N_LIMBS * 2 {
             builder.assert_is_equal(left[i], right[i]);
         }
     }

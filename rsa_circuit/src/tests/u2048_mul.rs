@@ -160,7 +160,7 @@ fn test_mul_mod() {
     }
 
     {
-        // Test case 5: Large numbers with modular reduction
+        // Test case 5: Large numbers with modular reduction, power of 2 modulus
         let x = [[1, 0]; N_LIMBS];
         let y = [[2, 0]; N_LIMBS];
 
@@ -187,25 +187,82 @@ fn test_mul_mod() {
         result[16] = [34, 0]; // 0x22
         result[17] = [36, 0]; // 0x24
 
-        carry[0] = [0, 34 << 54]; // 34 * 2^54
-        carry[1] = [0, 32 << 54]; // 32 * 2^54
-        carry[2] = [0, 30 << 54]; // 30 * 2^54
-        carry[3] = [0, 28 << 54]; // 28 * 2^54
-        carry[4] = [0, 26 << 54]; // 26 * 2^54
-        carry[5] = [0, 24 << 54]; // 24 * 2^54
-        carry[6] = [0, 22 << 54]; // 22 * 2^54
-        carry[7] = [0, 20 << 54]; // 20 * 2^54
-        carry[8] = [0, 18 << 54]; // 18 * 2^54
-        carry[9] = [0, 16 << 54]; // 16 * 2^54
-        carry[10] = [0, 14 << 54]; // 14 * 2^54
-        carry[11] = [0, 12 << 54]; // 12 * 2^54
-        carry[12] = [0, 10 << 54]; // 10 * 2^54
-        carry[13] = [0, 8 << 54]; // 8 * 2^54
-        carry[14] = [0, 6 << 54]; // 6 * 2^54
-        carry[15] = [0, 4 << 54]; // 4 * 2^54
-        carry[16] = [0, 2 << 54]; // 2 * 2^54
+        carry[0] = [0, 34 << 48]; // 34 * 2^48
+        carry[1] = [0, 32 << 48]; // 32 * 2^48
+        carry[2] = [0, 30 << 48]; // 30 * 2^48
+        carry[3] = [0, 28 << 48]; // 28 * 2^48
+        carry[4] = [0, 26 << 48]; // 26 * 2^48
+        carry[5] = [0, 24 << 48]; // 24 * 2^48
+        carry[6] = [0, 22 << 48]; // 22 * 2^48
+        carry[7] = [0, 20 << 48]; // 20 * 2^48
+        carry[8] = [0, 18 << 48]; // 18 * 2^48
+        carry[9] = [0, 16 << 48]; // 16 * 2^48
+        carry[10] = [0, 14 << 48]; // 14 * 2^48
+        carry[11] = [0, 12 << 48]; // 12 * 2^48
+        carry[12] = [0, 10 << 48]; // 10 * 2^48
+        carry[13] = [0, 8 << 48]; // 8 * 2^48
+        carry[14] = [0, 6 << 48]; // 6 * 2^48
+        carry[15] = [0, 4 << 48]; // 4 * 2^48
+        carry[16] = [0, 2 << 48]; // 2 * 2^48
 
         modulus[N_LIMBS - 1] = [1 << 8, 0];
+
+        let assignment = MulModCircuit::<Fr>::create_circuit(x, y, result, carry, modulus);
+        let witness = compile_result
+            .witness_solver
+            .solve_witness(&assignment)
+            .unwrap();
+        let output = compile_result.layered_circuit.run(&witness);
+        assert_eq!(output, vec![true]);
+    }
+    {
+        // Test case 6: Large numbers with modular reduction, odd modulus
+        let x = [[1, 0]; N_LIMBS];
+        let y = [[2, 0]; N_LIMBS];
+
+        let mut result = [[0, 0]; N_LIMBS];
+        let mut carry = [[0, 0]; N_LIMBS];
+        let mut modulus = [[0, 0]; N_LIMBS];
+
+        result[0] = [2, 0xde000000000000];
+        result[1] = [3, 0xe0000000000000];
+        result[2] = [5, 0xe2000000000000];
+        result[3] = [7, 0xe4000000000000];
+        result[4] = [9, 0xe6000000000000];
+        result[5] = [0xb, 0xe8000000000000];
+        result[6] = [0xd, 0xea000000000000];
+        result[7] = [0xf, 0xec000000000000];
+        result[8] = [0x11, 0xee000000000000];
+        result[9] = [0x13, 0xf0000000000000];
+        result[10] = [0x15, 0xf2000000000000];
+        result[11] = [0x17, 0xf4000000000000];
+        result[12] = [0x19, 0xf6000000000000];
+        result[13] = [0x1b, 0xf8000000000000];
+        result[14] = [0x1d, 0xfa000000000000];
+        result[15] = [0x1f, 0xfc000000000000];
+        result[16] = [0x21, 0xfe000000000000];
+        result[17] = [0x23, 0x00000000000000];
+
+        carry[0] = [0, 34 << 48]; // 34 * 2^48
+        carry[1] = [0, 32 << 48]; // 32 * 2^48
+        carry[2] = [0, 30 << 48]; // 30 * 2^48
+        carry[3] = [0, 28 << 48]; // 28 * 2^48
+        carry[4] = [0, 26 << 48]; // 26 * 2^48
+        carry[5] = [0, 24 << 48]; // 24 * 2^48
+        carry[6] = [0, 22 << 48]; // 22 * 2^48
+        carry[7] = [0, 20 << 48]; // 20 * 2^48
+        carry[8] = [0, 18 << 48]; // 18 * 2^48
+        carry[9] = [0, 16 << 48]; // 16 * 2^48
+        carry[10] = [0, 14 << 48]; // 14 * 2^48
+        carry[11] = [0, 12 << 48]; // 12 * 2^48
+        carry[12] = [0, 10 << 48]; // 10 * 2^48
+        carry[13] = [0, 8 << 48]; // 8 * 2^48
+        carry[14] = [0, 6 << 48]; // 6 * 2^48
+        carry[15] = [0, 4 << 48]; // 4 * 2^48
+        carry[16] = [0, 2 << 48]; // 2 * 2^48
+
+        modulus[N_LIMBS - 1] = [1 << 8, 0];
+        modulus[0] = [1, 0];
 
         let assignment = MulModCircuit::<Fr>::create_circuit(x, y, result, carry, modulus);
         let witness = compile_result
@@ -218,7 +275,7 @@ fn test_mul_mod() {
 
     // Negative test cases
     {
-        // Test case 6: Result >= modulus
+        // Test case 7: Result >= modulus
         let mut x = [[0, 0]; N_LIMBS];
         let mut y = [[0, 0]; N_LIMBS];
         let mut result = [[0, 0]; N_LIMBS];
@@ -240,7 +297,7 @@ fn test_mul_mod() {
     }
 
     {
-        // Test case 7: Incorrect carry value
+        // Test case 8: Incorrect carry value
         let mut x = [[0, 0]; N_LIMBS];
         let mut y = [[0, 0]; N_LIMBS];
         let mut result = [[0, 0]; N_LIMBS];
@@ -263,7 +320,7 @@ fn test_mul_mod() {
     }
 
     {
-        // Test case 8: Incorrect result
+        // Test case 9: Incorrect result
         let mut x = [[0, 0]; N_LIMBS];
         let mut y = [[0, 0]; N_LIMBS];
         let mut result = [[0, 0]; N_LIMBS];
