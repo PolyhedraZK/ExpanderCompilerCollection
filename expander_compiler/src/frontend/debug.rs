@@ -392,9 +392,9 @@ impl<C: Config> DebugBuilder<C> {
         let mut builder = DebugBuilder {
             values: vec![C::CircuitField::zero()],
         };
-        let vars = (1..=inputs.len()).map(|i| new_variable(i)).collect();
+        let vars = (1..=inputs.len()).map(new_variable).collect();
         let public_vars = (inputs.len() + 1..=inputs.len() + public_inputs.len())
-            .map(|i| new_variable(i))
+            .map(new_variable)
             .collect();
         builder.values.extend(inputs);
         builder.values.extend(public_inputs);
