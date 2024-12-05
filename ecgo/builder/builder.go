@@ -35,6 +35,8 @@ type builder struct {
 
 	nbExternalInput int
 	maxVar          int
+	varConstId      []int
+	constValues     []constraint.Element
 
 	// defers (for gnark API)
 	defers []func(frontend.API) error
@@ -58,6 +60,8 @@ func (r *Root) newBuilder(nbExternalInput int) *builder {
 	builder.tOne = builder.field.One()
 
 	builder.maxVar = nbExternalInput
+	builder.varConstId = make([]int, 1)
+	builder.constValues = make([]constraint.Element, 1)
 
 	return &builder
 }
@@ -106,11 +110,24 @@ func (builder *builder) Compile() (constraint.ConstraintSystem, error) {
 
 // ConstantValue returns always returns (nil, false) now, since the Golang frontend doesn't know the values of variables.
 func (builder *builder) ConstantValue(v frontend.Variable) (*big.Int, bool) {
-	return nil, false
+	coeff, ok := builder.constantValue(builder.toVariableId(v))
+	if !ok {
+		return nil, false
+	}
+	return builder.field.ToBigInt(coeff), true
+}
+
+func (builder *builder) constantValue(x int) (constraint.Element, bool) {
+	i := builder.varConstId[x]
+	if i == 0 {
+		return constraint.Element{}, false
+	}
+	return builder.constValues[i], true
 }
 
 func (builder *builder) addVarId() int {
 	builder.maxVar += 1
+	builder.varConstId = append(builder.varConstId, 0)
 	return builder.maxVar
 }
 
@@ -124,7 +141,10 @@ func (builder *builder) ceToId(x constraint.Element) int {
 		ExtraId: 0,
 		Const:   x,
 	})
-	return builder.addVarId()
+	res := builder.addVarId()
+	builder.constValues = append(builder.constValues, x)
+	builder.varConstId[res] = len(builder.constValues) - 1
+	return res
 }
 
 // toVariable will return (and allocate if neccesary) an Expression from given value
@@ -145,6 +165,10 @@ func (builder *builder) toVariableId(input interface{}) int {
 		c := builder.field.FromInterface(t)
 		return builder.ceToId(c)
 	}
+}
+
+func (builder *builder) toVariable(input interface{}) frontend.Variable {
+	return newVariable(builder.toVariableId(input))
 }
 
 // toVariables return frontend.Variable corresponding to inputs and the total size of the linear expressions
@@ -195,8 +219,7 @@ func (builder *builder) newHintForId(id solver.HintID, nbOutputs int, inputs []f
 
 	res := make([]frontend.Variable, nbOutputs)
 	for i := 0; i < nbOutputs; i++ {
-		builder.maxVar += 1
-		res[i] = newVariable(builder.maxVar)
+		res[i] = builder.addVar()
 	}
 	return res, nil
 }
