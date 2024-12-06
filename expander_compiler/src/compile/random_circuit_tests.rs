@@ -5,18 +5,19 @@ use crate::{
             common::rand_gen::{RandomCircuitConfig, RandomRange},
             source::RootCircuit as IrSourceRoot,
         },
+        layered::{CrossLayerInputType, InputType, NormalInputType},
     },
     compile::compile,
     field::FieldArith,
     utils::error::Error,
 };
 
-fn do_test<C: Config>(mut config: RandomCircuitConfig, seed: RandomRange) {
+fn do_test<C: Config, I: InputType>(mut config: RandomCircuitConfig, seed: RandomRange) {
     for i in seed.min..seed.max {
         config.seed = i;
         let root = IrSourceRoot::<C>::random(&config);
         assert_eq!(root.validate(), Ok(()));
-        let res = compile(&root);
+        let res = compile::<_, I>(&root);
         match res {
             Ok((ir_hint_normalized, layered_circuit)) => {
                 assert_eq!(ir_hint_normalized.validate(), Ok(()));
@@ -60,7 +61,7 @@ fn do_test<C: Config>(mut config: RandomCircuitConfig, seed: RandomRange) {
     }
 }
 
-fn do_tests<C: Config>(seed: usize) {
+fn do_tests<C: Config, I: InputType>(seed: usize) {
     let config = RandomCircuitConfig {
         seed: 0,
         num_circuits: RandomRange { min: 1, max: 10 },
@@ -71,7 +72,7 @@ fn do_tests<C: Config>(seed: usize) {
         num_terms: RandomRange { min: 1, max: 5 },
         sub_circuit_prob: 0.5,
     };
-    do_test::<C>(
+    do_test::<C, I>(
         config,
         RandomRange {
             min: 100000 + seed,
@@ -88,7 +89,7 @@ fn do_tests<C: Config>(seed: usize) {
         num_terms: RandomRange { min: 1, max: 5 },
         sub_circuit_prob: 0.05,
     };
-    do_test::<C>(
+    do_test::<C, I>(
         config,
         RandomRange {
             min: 200000 + seed,
@@ -99,21 +100,35 @@ fn do_tests<C: Config>(seed: usize) {
 
 #[test]
 fn test_m31() {
-    do_tests::<M31Config>(1000000);
+    do_tests::<M31Config, NormalInputType>(1000000);
 }
 
 #[test]
 fn test_bn254() {
-    do_tests::<BN254Config>(2000000);
+    do_tests::<BN254Config, NormalInputType>(2000000);
 }
 
 #[test]
 fn test_gf2() {
-    do_tests::<GF2Config>(3000000);
+    do_tests::<GF2Config, NormalInputType>(3000000);
 }
 
 #[test]
-fn deterministic() {
+fn test_m31_cross() {
+    do_tests::<M31Config, CrossLayerInputType>(4000000);
+}
+
+#[test]
+fn test_bn254_cross() {
+    do_tests::<BN254Config, CrossLayerInputType>(5000000);
+}
+
+#[test]
+fn test_gf2_cross() {
+    do_tests::<GF2Config, CrossLayerInputType>(6000000);
+}
+
+fn deterministic_<I: InputType>() {
     let mut config = RandomCircuitConfig {
         seed: 0,
         num_circuits: RandomRange { min: 1, max: 10 },
@@ -128,8 +143,8 @@ fn deterministic() {
         config.seed = i;
         let root = IrSourceRoot::<M31Config>::random(&config);
         assert_eq!(root.validate(), Ok(()));
-        let res = compile(&root);
-        let res2 = compile(&root);
+        let res = compile::<_, I>(&root);
+        let res2 = compile::<_, I>(&root);
         match (res, res2) {
             (
                 Ok((ir_hint_normalized, layered_circuit)),
@@ -156,4 +171,14 @@ fn deterministic() {
             }
         }
     }
+}
+
+#[test]
+fn deterministic_normal() {
+    deterministic_::<NormalInputType>();
+}
+
+#[test]
+fn deterministic_cross() {
+    deterministic_::<CrossLayerInputType>();
 }
