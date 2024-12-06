@@ -1,4 +1,4 @@
-use expander_compiler::frontend::*;
+use expander_compiler::{circuit::layered::InputType, frontend::*};
 use internal::Serde;
 use rand::{thread_rng, Rng};
 use tiny_keccak::Hasher;
@@ -224,14 +224,10 @@ impl Define<GF2Config> for Keccak256Circuit<Variable> {
     }
 }
 
-#[test]
-fn keccak_gf2_main() {
-    let compile_result = compile(&Keccak256Circuit::default()).unwrap();
-    let CompileResult {
-        witness_solver,
-        layered_circuit,
-    } = compile_result;
-
+fn keccak_gf2_test<I: InputType>(
+    witness_solver: WitnessSolver<GF2Config>,
+    layered_circuit: expander_compiler::circuit::layered::Circuit<GF2Config, I>,
+) {
     let mut assignment = Keccak256Circuit::<GF2>::default();
     for k in 0..N_HASHES {
         let mut data = vec![0u8; 64];
@@ -301,4 +297,24 @@ fn keccak_gf2_main() {
     witness_solver.serialize_into(writer).unwrap();
 
     println!("dumped to files");
+}
+
+#[test]
+fn keccak_gf2_main() {
+    let compile_result = compile(&Keccak256Circuit::default()).unwrap();
+    let CompileResult {
+        witness_solver,
+        layered_circuit,
+    } = compile_result;
+    keccak_gf2_test(witness_solver, layered_circuit);
+}
+
+#[test]
+fn keccak_gf2_main_cross_layer() {
+    let compile_result = compile_cross_layer(&Keccak256Circuit::default()).unwrap();
+    let CompileResultCrossLayer {
+        witness_solver,
+        layered_circuit,
+    } = compile_result;
+    keccak_gf2_test(witness_solver, layered_circuit);
 }

@@ -1,6 +1,6 @@
 use builder::RootBuilder;
 
-use crate::circuit::layered::NormalInputType;
+use crate::circuit::layered::{CrossLayerInputType, NormalInputType};
 use crate::circuit::{ir, layered};
 
 mod api;
@@ -55,12 +55,31 @@ pub struct CompileResult<C: Config> {
     pub layered_circuit: layered::Circuit<C, NormalInputType>,
 }
 
+pub struct CompileResultCrossLayer<C: Config> {
+    pub witness_solver: WitnessSolver<C>,
+    pub layered_circuit: layered::Circuit<C, CrossLayerInputType>,
+}
+
 pub fn compile<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone>(
     circuit: &Cir,
 ) -> Result<CompileResult<C>, Error> {
     let root = build(circuit);
     let (irw, lc) = crate::compile::compile::<C, _>(&root)?;
     Ok(CompileResult {
+        witness_solver: WitnessSolver { circuit: irw },
+        layered_circuit: lc,
+    })
+}
+
+pub fn compile_cross_layer<
+    C: Config,
+    Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone,
+>(
+    circuit: &Cir,
+) -> Result<CompileResultCrossLayer<C>, Error> {
+    let root = build(circuit);
+    let (irw, lc) = crate::compile::compile::<C, _>(&root)?;
+    Ok(CompileResultCrossLayer {
         witness_solver: WitnessSolver { circuit: irw },
         layered_circuit: lc,
     })
