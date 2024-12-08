@@ -60,7 +60,7 @@ func (r *Root) newBuilder(nbExternalInput int) *builder {
 	builder.tOne = builder.field.One()
 
 	builder.maxVar = nbExternalInput
-	builder.varConstId = make([]int, 1)
+	builder.varConstId = make([]int, nbExternalInput+1)
 	builder.constValues = make([]constraint.Element, 1)
 
 	return &builder
