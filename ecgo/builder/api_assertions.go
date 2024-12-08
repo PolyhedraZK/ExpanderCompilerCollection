@@ -13,6 +13,13 @@ import (
 // AssertIsEqual adds an assertion that i1 is equal to i2.
 func (builder *builder) AssertIsEqual(i1, i2 frontend.Variable) {
 	x := builder.toVariableId(builder.Sub(i1, i2))
+	v, xConstant := builder.constantValue(x)
+	if xConstant {
+		if !v.IsZero() {
+			panic("AssertIsEqual will never be satisfied on nonzero constant")
+		}
+		return
+	}
 	builder.constraints = append(builder.constraints, irsource.Constraint{
 		Typ: irsource.Zero,
 		Var: x,
@@ -22,6 +29,13 @@ func (builder *builder) AssertIsEqual(i1, i2 frontend.Variable) {
 // AssertIsDifferent constrains i1 and i2 to have different values.
 func (builder *builder) AssertIsDifferent(i1, i2 frontend.Variable) {
 	x := builder.toVariableId(builder.Sub(i1, i2))
+	v, xConstant := builder.constantValue(x)
+	if xConstant {
+		if v.IsZero() {
+			panic("AssertIsDifferent will never be satisfied on zero constant")
+		}
+		return
+	}
 	builder.constraints = append(builder.constraints, irsource.Constraint{
 		Typ: irsource.NonZero,
 		Var: x,
@@ -31,6 +45,12 @@ func (builder *builder) AssertIsDifferent(i1, i2 frontend.Variable) {
 // AssertIsBoolean adds an assertion that the variable is either 0 or 1.
 func (builder *builder) AssertIsBoolean(i1 frontend.Variable) {
 	x := builder.toVariableId(i1)
+	if b, ok := builder.constantValue(x); ok {
+		if !(b.IsZero() || builder.field.IsOne(b)) {
+			panic("assertIsBoolean failed: constant is not 0 or 1")
+		}
+		return
+	}
 	builder.constraints = append(builder.constraints, irsource.Constraint{
 		Typ: irsource.Bool,
 		Var: x,

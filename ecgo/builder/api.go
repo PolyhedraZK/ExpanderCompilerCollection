@@ -53,6 +53,26 @@ func (builder *builder) Sub(i1, i2 frontend.Variable, in ...frontend.Variable) f
 
 // returns res = Σ(vars) or res = vars[0] - Σ(vars[1:]) if sub == true.
 func (builder *builder) add(vars []int, sub bool) frontend.Variable {
+	// check if all variables are constants
+	allConst := true
+	if sum, ok := builder.constantValue(vars[0]); ok {
+		for _, x := range vars[1:] {
+			if v, ok := builder.constantValue(x); ok {
+				if sub {
+					sum = builder.field.Sub(sum, v)
+				} else {
+					sum = builder.field.Add(sum, v)
+				}
+			} else {
+				allConst = false
+				break
+			}
+		}
+		if allConst {
+			return builder.toVariable(sum)
+		}
+	}
+
 	coef := make([]constraint.Element, len(vars))
 	coef[0] = builder.tOne
 	if sub {
@@ -75,6 +95,9 @@ func (builder *builder) add(vars []int, sub bool) frontend.Variable {
 // Neg returns the negation of the given variable.
 func (builder *builder) Neg(i frontend.Variable) frontend.Variable {
 	v := builder.toVariableId(i)
+	if c, ok := builder.constantValue(v); ok {
+		return builder.toVariable(builder.field.Neg(c))
+	}
 	coef := []constraint.Element{builder.field.Neg(builder.tOne)}
 	builder.instructions = append(builder.instructions, irsource.Instruction{
 		Type:        irsource.LinComb,
@@ -87,6 +110,20 @@ func (builder *builder) Neg(i frontend.Variable) frontend.Variable {
 // Mul computes the product of the given variables.
 func (builder *builder) Mul(i1, i2 frontend.Variable, in ...frontend.Variable) frontend.Variable {
 	vars := builder.toVariableIds(append([]frontend.Variable{i1, i2}, in...)...)
+	allConst := true
+	if sum, ok := builder.constantValue(vars[0]); ok {
+		for _, x := range vars[1:] {
+			if v, ok := builder.constantValue(x); ok {
+				sum = builder.field.Mul(sum, v)
+			} else {
+				allConst = false
+				break
+			}
+		}
+		if allConst {
+			return builder.toVariable(sum)
+		}
+	}
 	builder.instructions = append(builder.instructions, irsource.Instruction{
 		Type:   irsource.Mul,
 		Inputs: vars,
@@ -99,6 +136,18 @@ func (builder *builder) DivUnchecked(i1, i2 frontend.Variable) frontend.Variable
 	vars := builder.toVariableIds(i1, i2)
 	v1 := vars[0]
 	v2 := vars[1]
+	c1, ok1 := builder.constantValue(v1)
+	c2, ok2 := builder.constantValue(v2)
+	if ok1 && ok2 {
+		if c2.IsZero() {
+			if c1.IsZero() {
+				return builder.toVariable(constraint.Element{})
+			}
+			panic("division by zero")
+		}
+		inv, _ := builder.field.Inverse(c2)
+		return builder.toVariable(builder.field.Mul(c1, inv))
+	}
 	builder.instructions = append(builder.instructions, irsource.Instruction{
 		Type:    irsource.Div,
 		X:       v1,
@@ -113,6 +162,15 @@ func (builder *builder) Div(i1, i2 frontend.Variable) frontend.Variable {
 	vars := builder.toVariableIds(i1, i2)
 	v1 := vars[0]
 	v2 := vars[1]
+	c1, ok1 := builder.constantValue(v1)
+	c2, ok2 := builder.constantValue(v2)
+	if ok1 && ok2 {
+		if c2.IsZero() {
+			panic("division by zero")
+		}
+		inv, _ := builder.field.Inverse(c2)
+		return builder.toVariable(builder.field.Mul(c1, inv))
+	}
 	builder.instructions = append(builder.instructions, irsource.Instruction{
 		Type:    irsource.Div,
 		X:       v1,
@@ -160,6 +218,17 @@ func (builder *builder) Xor(_a, _b frontend.Variable) frontend.Variable {
 	vars := builder.toVariableIds(_a, _b)
 	a := vars[0]
 	b := vars[1]
+	c1, ok1 := builder.constantValue(a)
+	c2, ok2 := builder.constantValue(b)
+	if ok1 && ok2 {
+		builder.AssertIsBoolean(_a)
+		builder.AssertIsBoolean(_b)
+		t := builder.field.Sub(c1, c2)
+		if t.IsZero() {
+			return builder.toVariable(constraint.Element{})
+		}
+		return builder.toVariable(builder.tOne)
+	}
 	builder.instructions = append(builder.instructions, irsource.Instruction{
 		Type:    irsource.BoolBinOp,
 		X:       a,
@@ -174,6 +243,16 @@ func (builder *builder) Or(_a, _b frontend.Variable) frontend.Variable {
 	vars := builder.toVariableIds(_a, _b)
 	a := vars[0]
 	b := vars[1]
+	c1, ok1 := builder.constantValue(a)
+	c2, ok2 := builder.constantValue(b)
+	if ok1 && ok2 {
+		builder.AssertIsBoolean(_a)
+		builder.AssertIsBoolean(_b)
+		if c1.IsZero() && c2.IsZero() {
+			return builder.toVariable(constraint.Element{})
+		}
+		return builder.toVariable(builder.tOne)
+	}
 	builder.instructions = append(builder.instructions, irsource.Instruction{
 		Type:    irsource.BoolBinOp,
 		X:       a,
@@ -188,6 +267,16 @@ func (builder *builder) And(_a, _b frontend.Variable) frontend.Variable {
 	vars := builder.toVariableIds(_a, _b)
 	a := vars[0]
 	b := vars[1]
+	c1, ok1 := builder.constantValue(a)
+	c2, ok2 := builder.constantValue(b)
+	if ok1 && ok2 {
+		builder.AssertIsBoolean(_a)
+		builder.AssertIsBoolean(_b)
+		if c1.IsZero() || c2.IsZero() {
+			return builder.toVariable(constraint.Element{})
+		}
+		return builder.toVariable(builder.tOne)
+	}
 	builder.instructions = append(builder.instructions, irsource.Instruction{
 		Type:    irsource.BoolBinOp,
 		X:       a,
@@ -207,7 +296,15 @@ func (builder *builder) Select(i0, i1, i2 frontend.Variable) frontend.Variable {
 	// ensures that cond is boolean
 	builder.AssertIsBoolean(cond)
 
-	v := builder.Sub(i1, i2) // no constraint is recorded
+	cst, ok := builder.constantValue(builder.toVariableId(cond))
+	if ok {
+		if cst.IsZero() {
+			return i2
+		}
+		return i1
+	}
+
+	v := builder.Sub(i1, i2)
 	w := builder.Mul(cond, v)
 	return builder.Add(w, i2)
 }
@@ -246,6 +343,12 @@ func (builder *builder) Lookup2(b0, b1 frontend.Variable, i0, i1, i2, i3 fronten
 // IsZero returns 1 if the given variable is zero, otherwise returns 0.
 func (builder *builder) IsZero(i1 frontend.Variable) frontend.Variable {
 	a := builder.toVariableId(i1)
+	if c, ok := builder.constantValue(a); ok {
+		if c.IsZero() {
+			return builder.toVariable(builder.tOne)
+		}
+		return builder.toVariable(constraint.Element{})
+	}
 	builder.instructions = append(builder.instructions, irsource.Instruction{
 		Type: irsource.IsZero,
 		X:    a,
