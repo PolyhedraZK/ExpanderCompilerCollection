@@ -1,6 +1,4 @@
-use expander_compiler::frontend::{
-    extra::UnconstrainedAPI, BN254Config, BasicAPI, RootAPI, Variable, API,
-};
+use expander_compiler::frontend::{BN254Config, RootAPI, Variable};
 
 #[inline]
 // TODO:

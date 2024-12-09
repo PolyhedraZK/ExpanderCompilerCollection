@@ -3,9 +3,9 @@ use std::mem::transmute;
 use expander_compiler::frontend::*;
 use expander_compiler::{
     declare_circuit,
-    frontend::{BN254Config, Define, Variable, API},
+    frontend::{BN254Config, Variable},
 };
-use extra::{debug_eval, DebugAPI};
+use extra::debug_eval;
 use halo2curves::bn256::Fr;
 use num_bigint::BigUint;
 use num_traits::Num;

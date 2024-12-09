@@ -1,6 +1,4 @@
-use expander_compiler::frontend::{
-    extra::UnconstrainedAPI, BN254Config, BasicAPI, RootAPI, Variable, API,
-};
+use expander_compiler::frontend::{BN254Config, RootAPI, Variable};
 
 use crate::{
     constants::N_LIMBS,
@@ -268,8 +266,8 @@ impl U2048Variable {
                 );
 
                 local_res[target_position] = sum;
-                addition_carries[target_position+1] =
-                    builder.add(addition_carries[target_position+1], new_carry);
+                addition_carries[target_position + 1] =
+                    builder.add(addition_carries[target_position + 1], new_carry);
 
                 // update mul_carry to result[target+1]
                 let (sum, new_carry) = add_u120(
