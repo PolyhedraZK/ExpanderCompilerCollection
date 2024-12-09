@@ -335,22 +335,22 @@ fn test_mul_mod() {
             .unwrap();
         let output = compile_result.layered_circuit.run(&witness);
 
-        println!("x");
-        for i in 0..N_LIMBS {
-            println!("{} {:0x?}", i, x[i]);
-        }
-        println!("modulus");
-        for i in 0..N_LIMBS {
-            println!("{} {:0x?}", i, modulus[i]);
-        }
-        println!("res");
-        for i in 0..N_LIMBS {
-            println!("{} {:0x?}", i, res[i]);
-        }
-        println!("carry");
-        for i in 0..N_LIMBS {
-            println!("{} {:0x?}", i, carry[i]);
-        }
+        // println!("x");
+        // for i in 0..N_LIMBS {
+        //     println!("{} {:0x?}", i, x[i]);
+        // }
+        // println!("modulus");
+        // for i in 0..N_LIMBS {
+        //     println!("{} {:0x?}", i, modulus[i]);
+        // }
+        // println!("res");
+        // for i in 0..N_LIMBS {
+        //     println!("{} {:0x?}", i, res[i]);
+        // }
+        // println!("carry");
+        // for i in 0..N_LIMBS {
+        //     println!("{} {:0x?}", i, carry[i]);
+        // }
 
         assert_eq!(output, vec![true]);
     }

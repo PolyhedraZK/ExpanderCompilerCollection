@@ -28,18 +28,13 @@ impl GenericDefine<BN254Config> for MulNoModCircuit<Variable> {
 
         let res = U2048Variable::mul_without_mod_reduction(&x, &y, &two_to_120, builder);
 
-        for i in 0..2 * N_LIMBS {
-            // println!("{:?}",
-            // <Builder as DebugAPI<BN254Config>>::value_of(&builder, res[i]));
-            println!("{i}");
-            builder.display(res[i]);
-            builder.display(self.result[i]);
-        }
+        // for i in 0..2 * N_LIMBS {
+        //     println!("{i}");
+        //     builder.display(res[i]);
+        //     builder.display(self.result[i]);
+        // }
 
         for i in 0..2 * N_LIMBS {
-            // println!("{:?}",
-            // <Builder as DebugAPI<BN254Config>>::value_of(&builder, res[i]));
-
             builder.assert_is_equal(res[i], self.result[i]);
         }
     }
@@ -312,16 +307,6 @@ fn test_mul_without_mod() {
         let output = compile_result.layered_circuit.run(&witness);
 
         debug_eval(&MulNoModCircuit::default(), &assignment);
-
-        println!("x");
-        for i in 0..N_LIMBS {
-            println!("{} {:0x?}", i, x[i]);
-        }
-        println!("res");
-        for i in 0..N_LIMBS * 2 {
-            println!("{} {:0x?}", i, result[i]);
-        }
-        println!("carry");
 
         assert_eq!(output, vec![true]);
     }

@@ -59,6 +59,7 @@ impl RSAFieldElement {
         Self { data }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_big_uint(&self) -> BigUint {
         let res = self.data.iter().rev().fold(BigUint::from(0u32), |acc, &x| {
             (acc << 120) + BigUint::from(x)
@@ -90,7 +91,7 @@ pub fn add_u120_with_carry(a: &u128, b: &u128, carry: &u128) -> (u128, u128) {
     let mut sum = *a + *b + *carry;
 
     let carry = sum >> 120;
-    sum = sum & MASK120;
+    sum &= MASK120;
 
     (sum, carry)
 }
@@ -104,9 +105,9 @@ pub fn mul_u120_with_carry(a: &u128, b: &u128, carry: &u128) -> (u128, u128) {
     let c_lo = *carry & MASK60;
     let c_hi = *carry >> 60;
 
-    let tmp_0 = &a_lo * &b_lo + &c_lo;
-    let tmp_1 = &a_lo * &b_hi + &a_hi * &b_lo + c_hi;
-    let tmp_2 = &a_hi * &b_hi;
+    let tmp_0 = a_lo * b_lo + c_lo;
+    let tmp_1 = a_lo * b_hi + a_hi * b_lo + c_hi;
+    let tmp_2 = a_hi * b_hi;
 
     let tmp_1_lo = tmp_1 & MASK60;
     let tmp_1_hi = tmp_1 >> 60;
@@ -132,10 +133,12 @@ impl RSAFieldElement {
         Self { data }
     }
 
+    #[allow(clippy::wrong_self_convention)]
+    #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {
         let mut s = String::new();
         for i in 0..N_LIMBS {
-            s = (&format!("{:030x}", self.data[i])).to_string() + &s;
+            s = (format!("{:030x}", self.data[i])).to_string() + &s;
         }
         s
     }
@@ -153,7 +156,7 @@ impl RSAFieldElement {
     // a, b, result, modulus are all RSAFieldElement
     pub fn assert_addition(a: &Self, b: &Self, modulus: &Self, carry: &bool, result: &Self) {
         let mut left_result = [0u128; N_LIMBS]; // for a + b
-        let mut right_result = result.data.clone(); // for result + r * carry
+        let mut right_result = result.data; // for result + r * carry
 
         // First compute a + b
         let mut c = 0u128;
@@ -234,15 +237,11 @@ impl RSAFieldElement {
 
         // First compute a * b
         Self::mul_without_reduction(a, b, &mut left_result);
-        println!("left_result: {:0x?}", left_result);
 
         // Now compute result + r * carry
         // First copy result
-        for i in 0..N_LIMBS {
-            right_result[i] = result.data[i];
-        }
+        right_result[..N_LIMBS].copy_from_slice(&result.data[..N_LIMBS]);
         Self::mul_without_reduction(modulus, carry, &mut right_result);
-        println!("right_result: {:0x?}", right_result);
 
         // Assert equality
         assert!(
@@ -309,10 +308,16 @@ impl RSAFieldElement {
         let mut is_greater = false;
         let mut i = N_LIMBS - 1;
         while i > 0 && !is_greater {
-            if remainder[i] > modulus.data[i] {
-                is_greater = true;
-            } else if remainder[i] < modulus.data[i] {
-                break;
+            match remainder[i].cmp(&modulus.data[i]) {
+                std::cmp::Ordering::Greater => {
+                    is_greater = true;
+                }
+                std::cmp::Ordering::Less => {
+                    break;
+                }
+                std::cmp::Ordering::Equal => {
+                    break;
+                }
             }
             i -= 1;
         }

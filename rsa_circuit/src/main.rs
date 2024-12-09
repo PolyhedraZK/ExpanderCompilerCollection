@@ -1,4 +1,6 @@
 #![allow(dead_code)]
+// allow range loop for better readability
+#![allow(clippy::needless_range_loop)]
 
 mod constants;
 mod native;
@@ -54,11 +56,11 @@ pub fn build_rsa_traces(
     let mut x_powers = [RSAFieldElement::new([0u128; N_LIMBS]); 17];
     let mut mul_carries = [RSAFieldElement::new([0u128; N_LIMBS]); 17];
 
-    (x_powers[0], mul_carries[0]) = x.slow_mul_mod(&x, n);
+    (x_powers[0], mul_carries[0]) = x.slow_mul_mod(x, n);
     for i in 1..16 {
         (x_powers[i], mul_carries[i]) = x_powers[i - 1].slow_mul_mod(&x_powers[i - 1], n);
     }
-    (x_powers[16], mul_carries[16]) = x_powers[15].slow_mul_mod(&x, n);
+    (x_powers[16], mul_carries[16]) = x_powers[15].slow_mul_mod(x, n);
 
     // sanity check
     assert_eq!(x_powers[16], *res);

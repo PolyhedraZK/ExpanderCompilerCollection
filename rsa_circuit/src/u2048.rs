@@ -66,7 +66,7 @@ impl U2048Variable {
             let curr_less = is_less_than_u120(&self.limbs[i], &other.limbs[i], builder);
 
             // Check equality for current limbs
-            let diff = builder.sub(&self.limbs[i], &other.limbs[i]);
+            let diff = builder.sub(self.limbs[i], other.limbs[i]);
             let curr_eq = builder.is_zero(diff);
 
             // If all previous limbs were equal and current limb is less
@@ -125,7 +125,7 @@ impl U2048Variable {
         let mut is_equal = builder.constant(1);
 
         for i in 0..N_LIMBS {
-            let diff = builder.sub(&self.limbs[i], &other.limbs[i]);
+            let diff = builder.sub(self.limbs[i], other.limbs[i]);
             let curr_eq = builder.is_zero(diff);
             is_equal = builder.mul(is_equal, curr_eq);
             builder.assert_is_bool(curr_eq);
@@ -282,11 +282,11 @@ impl U2048Variable {
                     builder.add(addition_carries[target_position + 2], new_carry);
             }
         }
-        for i in 0..2 * N_LIMBS {
-            println!("{i}");
-            builder.display(local_res[i]);
-            builder.display(addition_carries[i]);
-        }
+        // for i in 0..2 * N_LIMBS {
+        //     println!("{i}");
+        //     builder.display(local_res[i]);
+        //     builder.display(addition_carries[i]);
+        // }
 
         // integrate carries into result
         let mut cur_carry = builder.constant(0);

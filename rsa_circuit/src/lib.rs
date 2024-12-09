@@ -1,3 +1,6 @@
+// allow range loop for better readability
+#![allow(clippy::needless_range_loop)]
+
 mod constants;
 pub use constants::*;
 

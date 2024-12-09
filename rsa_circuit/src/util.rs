@@ -7,7 +7,7 @@ pub(crate) fn unconstrained_byte_decomposition<Builder: RootAPI<BN254Config>>(
     builder: &mut Builder,
 ) -> Vec<Variable> {
     let mut res = vec![];
-    let mut x = x.clone();
+    let mut x = *x;
     let u8modulus = builder.constant(1 << 8);
     for _ in 0..256 / 8 {
         let byte = builder.unconstrained_mod(x, u8modulus);
