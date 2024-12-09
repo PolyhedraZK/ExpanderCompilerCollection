@@ -1,4 +1,6 @@
-use expander_compiler::frontend::{extra::UnconstrainedAPI, BN254Config, BasicAPI, Variable, API};
+use expander_compiler::frontend::{
+    extra::UnconstrainedAPI, BN254Config, BasicAPI, RootAPI, Variable, API,
+};
 
 use crate::{
     constants::N_LIMBS,
@@ -18,10 +20,10 @@ impl U2048Variable {
 
     #[inline]
     // generate a bool variable for the comparison of two U2048 variables
-    pub fn unconstrained_greater_eq(
+    pub fn unconstrained_greater_eq<Builder: RootAPI<BN254Config>>(
         &self,
         other: &Self,
-        builder: &mut API<BN254Config>,
+        builder: &mut Builder,
     ) -> Variable {
         // Start from most significant limb (N_LIMBS-1) and work down
         let mut gt_flags = Vec::with_capacity(N_LIMBS);
@@ -52,7 +54,11 @@ impl U2048Variable {
     }
 
     #[inline]
-    pub fn assert_is_less_than(&self, other: &Self, builder: &mut API<BN254Config>) -> Variable {
+    pub fn assert_is_less_than<Builder: RootAPI<BN254Config>>(
+        &self,
+        other: &Self,
+        builder: &mut Builder,
+    ) -> Variable {
         let mut result = builder.constant(0);
         let mut all_eq_so_far = builder.constant(1);
 
@@ -94,7 +100,11 @@ impl U2048Variable {
 
     // Helper function to check if one U2048 is greater than or equal to another
     #[inline]
-    pub fn assert_is_greater_eq(&self, other: &Self, builder: &mut API<BN254Config>) -> Variable {
+    pub fn assert_is_greater_eq<Builder: RootAPI<BN254Config>>(
+        &self,
+        other: &Self,
+        builder: &mut Builder,
+    ) -> Variable {
         let less = other.assert_is_less_than(self, builder);
         let eq = self.assert_is_equal(other, builder);
 
@@ -109,7 +119,11 @@ impl U2048Variable {
 
     // Helper function to check equality
     #[inline]
-    pub fn assert_is_equal(&self, other: &Self, builder: &mut API<BN254Config>) -> Variable {
+    pub fn assert_is_equal<Builder: RootAPI<BN254Config>>(
+        &self,
+        other: &Self,
+        builder: &mut Builder,
+    ) -> Variable {
         let mut is_equal = builder.constant(1);
 
         for i in 0..N_LIMBS {
@@ -126,14 +140,14 @@ impl U2048Variable {
     #[inline]
     // add two U2048 variables with mod reductions
     // a + b = result + carry * modulus
-    pub fn assert_add(
+    pub fn assert_add<Builder: RootAPI<BN254Config>>(
         x: &U2048Variable,
         y: &U2048Variable,
         result: &U2048Variable,
         carry: &Variable,
         modulus: &U2048Variable,
         two_to_120: &Variable,
-        builder: &mut API<BN254Config>,
+        builder: &mut Builder,
     ) {
         // First compute raw sum x + y with carries between limbs
         let mut sum = vec![];
@@ -184,14 +198,14 @@ impl U2048Variable {
     #[inline]
     // assert multiplication of two U2048 variables
     // x * y = result + carry * modulus
-    pub fn assert_mul(
+    pub fn assert_mul<Builder: RootAPI<BN254Config>>(
         x: &U2048Variable,
         y: &U2048Variable,
         result: &U2048Variable,
         carry: &U2048Variable,
         modulus: &U2048Variable,
         two_to_120: &Variable,
-        builder: &mut API<BN254Config>,
+        builder: &mut Builder,
     ) {
         let zero = builder.constant(0);
         // x * y
@@ -226,15 +240,15 @@ impl U2048Variable {
     }
 
     #[inline]
-    pub fn mul_without_mod_reduction(
+    pub fn mul_without_mod_reduction<Builder: RootAPI<BN254Config>>(
         x: &U2048Variable,
         y: &U2048Variable,
         two_to_120: &Variable,
-        builder: &mut API<BN254Config>,
+        builder: &mut Builder,
     ) -> Vec<Variable> {
         let zero = builder.constant(0);
         let mut local_res = vec![zero; 2 * N_LIMBS];
-        let mut addition_carries = vec![zero; 2 * N_LIMBS];
+        let mut addition_carries = vec![zero; 2 * N_LIMBS + 1];
 
         for i in 0..N_LIMBS {
             for j in 0..N_LIMBS {
@@ -252,9 +266,10 @@ impl U2048Variable {
                     two_to_120,
                     builder,
                 );
+
                 local_res[target_position] = sum;
-                addition_carries[target_position] =
-                    builder.add(addition_carries[target_position], new_carry);
+                addition_carries[target_position+1] =
+                    builder.add(addition_carries[target_position+1], new_carry);
 
                 // update mul_carry to result[target+1]
                 let (sum, new_carry) = add_u120(
@@ -265,13 +280,18 @@ impl U2048Variable {
                     builder,
                 );
                 local_res[target_position + 1] = sum;
-                addition_carries[target_position + 1] =
-                    builder.add(addition_carries[target_position + 1], new_carry);
+                addition_carries[target_position + 2] =
+                    builder.add(addition_carries[target_position + 2], new_carry);
             }
+        }
+        for i in 0..2 * N_LIMBS {
+            println!("{i}");
+            builder.display(local_res[i]);
+            builder.display(addition_carries[i]);
         }
 
         // integrate carries into result
-        let mut cur_carry = addition_carries[0];
+        let mut cur_carry = builder.constant(0);
         for i in 0..2 * N_LIMBS {
             (local_res[i], cur_carry) = add_u120(
                 &local_res[i],

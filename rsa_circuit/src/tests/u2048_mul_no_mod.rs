@@ -5,6 +5,7 @@ use expander_compiler::{
     declare_circuit,
     frontend::{BN254Config, Define, Variable, API},
 };
+use extra::{debug_eval, DebugAPI};
 use halo2curves::bn256::Fr;
 use num_bigint::BigUint;
 use num_traits::Num;
@@ -19,14 +20,26 @@ declare_circuit!(MulNoModCircuit {
     result: [Variable; 2 * N_LIMBS],
 });
 
-impl Define<BN254Config> for MulNoModCircuit<Variable> {
-    fn define(&self, builder: &mut API<BN254Config>) {
+impl GenericDefine<BN254Config> for MulNoModCircuit<Variable> {
+    fn define<Builder: RootAPI<BN254Config>>(&self, builder: &mut Builder) {
         let x = U2048Variable::from_raw(self.x);
         let y = U2048Variable::from_raw(self.y);
         let two_to_120 = builder.constant(BN_TWO_TO_120);
 
         let res = U2048Variable::mul_without_mod_reduction(&x, &y, &two_to_120, builder);
+
         for i in 0..2 * N_LIMBS {
+            // println!("{:?}",
+            // <Builder as DebugAPI<BN254Config>>::value_of(&builder, res[i]));
+            println!("{i}");
+            builder.display(res[i]);
+            builder.display(self.result[i]);
+        }
+
+        for i in 0..2 * N_LIMBS {
+            // println!("{:?}",
+            // <Builder as DebugAPI<BN254Config>>::value_of(&builder, res[i]));
+
             builder.assert_is_equal(res[i], self.result[i]);
         }
     }
@@ -60,7 +73,7 @@ impl MulNoModCircuit<Fr> {
 }
 #[test]
 fn test_mul_without_mod() {
-    let compile_result = compile(&MulNoModCircuit::default()).unwrap();
+    let compile_result = compile_generic(&MulNoModCircuit::default()).unwrap();
 
     {
         // Test case 1: Simple multiplication with no carries
@@ -291,11 +304,14 @@ fn test_mul_without_mod() {
         }
 
         let assignment = MulNoModCircuit::<Fr>::create_circuit(x, x, result);
+
         let witness = compile_result
             .witness_solver
             .solve_witness(&assignment)
             .unwrap();
         let output = compile_result.layered_circuit.run(&witness);
+
+        debug_eval(&MulNoModCircuit::default(), &assignment);
 
         println!("x");
         for i in 0..N_LIMBS {

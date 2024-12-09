@@ -19,6 +19,8 @@ pub trait BasicAPI<C: Config> {
     binary_op!(xor);
     binary_op!(or);
     binary_op!(and);
+    
+    fn display(&self, _x: impl ToVariableOrValue<C::CircuitField>) {}
     fn div(
         &mut self,
         x: impl ToVariableOrValue<C::CircuitField>,

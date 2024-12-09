@@ -50,12 +50,22 @@ pub mod extra {
         let mut inputs = Vec::new();
         let mut public_inputs = Vec::new();
         assignment.dump_into(&mut inputs, &mut public_inputs);
+
+        println!("input len: {}", inputs.len());
+        println!("public input len: {}", public_inputs.len());
+
         let (mut root_builder, input_variables, public_input_variables) =
             DebugBuilder::<C>::new(inputs, public_inputs);
         let mut circuit = circuit.clone();
         let mut vars_ptr = input_variables.as_slice();
         let mut public_vars_ptr = public_input_variables.as_slice();
         circuit.load_from(&mut vars_ptr, &mut public_vars_ptr);
+
+        for (i, v) in input_variables.iter().enumerate() {
+            println!("{}: {:?} {}", i, root_builder.value_of(v), v.id);
+        }
+        println!("num vars: {:?}", circuit.num_vars());
+
         circuit.define(&mut root_builder);
     }
 }

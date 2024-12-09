@@ -3,9 +3,9 @@ use expander_compiler::frontend::{BN254Config, Variable, API};
 use extra::UnconstrainedAPI;
 use halo2curves::bn256::Fr;
 
-pub(crate) fn unconstrained_byte_decomposition(
+pub(crate) fn unconstrained_byte_decomposition<Builder: RootAPI<BN254Config>>(
     x: &Variable,
-    builder: &mut API<BN254Config>,
+    builder: &mut Builder,
 ) -> Vec<Variable> {
     let mut res = vec![];
     let mut x = x.clone();
@@ -21,10 +21,10 @@ pub(crate) fn unconstrained_byte_decomposition(
 
 // assert bit decomposition
 // the constant_scalars are 2^8, 2^16, ... 2^248
-pub fn byte_decomposition(
+pub fn byte_decomposition<Builder: RootAPI<BN254Config>>(
     x: &Variable,
     constant_scalars: &[Variable],
-    builder: &mut API<BN254Config>,
+    builder: &mut Builder,
 ) -> Vec<Variable> {
     let bytes = unconstrained_byte_decomposition(x, builder);
     // todo: constraint each byte to be less than 256 via logup

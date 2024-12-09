@@ -1,15 +1,17 @@
-use expander_compiler::frontend::{extra::UnconstrainedAPI, BN254Config, BasicAPI, Variable, API};
+use expander_compiler::frontend::{
+    extra::UnconstrainedAPI, BN254Config, BasicAPI, RootAPI, Variable, API,
+};
 
 #[inline]
 // TODO:
 // Assert the variable x is 120 bits, via LogUp
-pub fn range_proof_u120(_x: &Variable, _builder: &mut API<BN254Config>) {}
+pub fn range_proof_u120<Builder: RootAPI<BN254Config>>(_x: &Variable, _builder: &mut Builder) {}
 
 // Accumulate up to 2^120 variables
-pub fn accumulate_u120(
+pub fn accumulate_u120<Builder: RootAPI<BN254Config>>(
     x: &[Variable],
     two_to_120: &Variable,
-    builder: &mut API<BN254Config>,
+    builder: &mut Builder,
 ) -> (Variable, Variable) {
     assert!(x.len() > 1, "length is {}", x.len());
 
@@ -42,12 +44,12 @@ pub fn accumulate_u120(
 // Does not ensure:
 // - x, y are 120 bits
 // - carry_in is 1 bit
-pub(crate) fn add_u120(
+pub(crate) fn add_u120<Builder: RootAPI<BN254Config>>(
     x: &Variable,
     y: &Variable,
     carry_in: &Variable,
     two_to_120: &Variable,
-    builder: &mut API<BN254Config>,
+    builder: &mut Builder,
 ) -> (Variable, Variable) {
     let x_plus_y = builder.add(x, y);
     let sum = builder.add(x_plus_y, carry_in);
@@ -73,12 +75,12 @@ pub(crate) fn add_u120(
 // Does not ensure:
 // - x, y are 120 bits
 // - carry_in is 120 bit
-pub(crate) fn mul_u120(
+pub(crate) fn mul_u120<Builder: RootAPI<BN254Config>>(
     x: &Variable,
     y: &Variable,
     carry_in: &Variable,
     two_to_120: &Variable,
-    builder: &mut API<BN254Config>,
+    builder: &mut Builder,
 ) -> (Variable, Variable) {
     let x_mul_y = builder.mul(x, y);
     let left = builder.add(x_mul_y, carry_in);
@@ -96,10 +98,10 @@ pub(crate) fn mul_u120(
 
 // check if x < y
 // assumption: x, y are 120 bits
-pub(crate) fn is_less_than_u120(
+pub(crate) fn is_less_than_u120<Builder: RootAPI<BN254Config>>(
     x: &Variable,
     y: &Variable,
-    builder: &mut API<BN254Config>,
+    builder: &mut Builder,
 ) -> Variable {
     let diff = builder.sub(x, y);
     let byte_decomp = crate::util::unconstrained_byte_decomposition(&diff, builder);

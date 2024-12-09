@@ -20,6 +20,11 @@ pub struct DebugBuilder<C: Config> {
 }
 
 impl<C: Config> BasicAPI<C> for DebugBuilder<C> {
+    fn display(&self, x: impl ToVariableOrValue<<C as Config>::CircuitField>) {
+        let x = self.convert_to_value(x);
+        println!("x: {:?}", x);
+    }
+
     fn add(
         &mut self,
         x: impl ToVariableOrValue<C::CircuitField>,
@@ -36,6 +41,7 @@ impl<C: Config> BasicAPI<C> for DebugBuilder<C> {
     ) -> Variable {
         let x = self.convert_to_value(x);
         let y = self.convert_to_value(y);
+        // println!("sub x: {:?}, y: {:?}", x, y);
         self.return_as_variable(x - y)
     }
     fn mul(
