@@ -41,7 +41,6 @@ impl<C: Config> BasicAPI<C> for DebugBuilder<C> {
     ) -> Variable {
         let x = self.convert_to_value(x);
         let y = self.convert_to_value(y);
-        // println!("sub x: {:?}, y: {:?}", x, y);
         self.return_as_variable(x - y)
     }
     fn mul(
