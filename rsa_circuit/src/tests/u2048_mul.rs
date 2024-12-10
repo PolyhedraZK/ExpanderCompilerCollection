@@ -5,6 +5,7 @@ use expander_compiler::{
     declare_circuit,
     frontend::{BN254Config, Define, Variable, API},
 };
+use extra::DebugAPI;
 use halo2curves::bn256::Fr;
 use num_bigint::BigUint;
 use num_traits::Num;
@@ -29,6 +30,8 @@ impl Define<BN254Config> for MulModCircuit<Variable> {
         let carry = U2048Variable::from_raw(self.carry);
         let modulus = U2048Variable::from_raw(self.modulus);
         let two_to_120 = builder.constant(BN_TWO_TO_120);
+
+        builder.value_of(x.limbs[0]);
 
         U2048Variable::assert_mul(&x, &y, &result, &carry, &modulus, &two_to_120, builder);
     }
