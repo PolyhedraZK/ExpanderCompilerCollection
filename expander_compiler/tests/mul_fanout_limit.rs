@@ -6,8 +6,8 @@ declare_circuit!(Circuit {
     sum: Variable,
 });
 
-impl Define<M31Config> for Circuit<Variable> {
-    fn define(&self, builder: &mut API<M31Config>) {
+impl GenericDefine<M31Config> for Circuit<Variable> {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut sum = builder.constant(0);
         for i in 0..16 {
             for j in 0..512 {
@@ -20,7 +20,7 @@ impl Define<M31Config> for Circuit<Variable> {
 }
 
 fn mul_fanout_limit(limit: usize) {
-    let compile_result = compile_with_options(
+    let compile_result = compile_generic(
         &Circuit::default(),
         CompileOptions::default().with_mul_fanout_limit(limit),
     )
