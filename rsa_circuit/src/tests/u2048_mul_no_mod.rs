@@ -64,7 +64,8 @@ impl MulNoModCircuit<Fr> {
 }
 #[test]
 fn test_mul_without_mod() {
-    let compile_result = compile_generic(&MulNoModCircuit::default()).unwrap();
+    let compile_result =
+        compile_generic(&MulNoModCircuit::default(), CompileOptions::default()).unwrap();
 
     {
         // Test case 1: Simple multiplication with no carries

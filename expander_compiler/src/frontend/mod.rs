@@ -12,6 +12,7 @@ mod witness;
 pub use circuit::declare_circuit;
 pub type API<C> = builder::RootBuilder<C>;
 pub use crate::circuit::config::*;
+pub use crate::compile::CompileOptions;
 pub use crate::field::{Field, BN254, GF2, M31};
 pub use crate::utils::error::Error;
 pub use api::{BasicAPI, RootAPI};
@@ -50,14 +51,12 @@ pub mod extra {
         let mut inputs = Vec::new();
         let mut public_inputs = Vec::new();
         assignment.dump_into(&mut inputs, &mut public_inputs);
-
         let (mut root_builder, input_variables, public_input_variables) =
             DebugBuilder::<C>::new(inputs, public_inputs);
         let mut circuit = circuit.clone();
         let mut vars_ptr = input_variables.as_slice();
         let mut public_vars_ptr = public_input_variables.as_slice();
         circuit.load_from(&mut vars_ptr, &mut public_vars_ptr);
-
         circuit.define(&mut root_builder);
     }
 }
@@ -117,9 +116,10 @@ pub fn compile_generic<
     Cir: internal::DumpLoadTwoVariables<Variable> + GenericDefine<C> + Clone,
 >(
     circuit: &Cir,
+    options: CompileOptions,
 ) -> Result<CompileResult<C>, Error> {
     let root = build_generic(circuit);
-    let (irw, lc) = crate::compile::compile::<C>(&root)?;
+    let (irw, lc) = crate::compile::compile_with_options::<C>(&root, options)?;
     Ok(CompileResult {
         witness_solver: WitnessSolver { circuit: irw },
         layered_circuit: lc,

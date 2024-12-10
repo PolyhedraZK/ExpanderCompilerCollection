@@ -231,7 +231,8 @@ impl GenericDefine<GF2Config> for Keccak256Circuit<Variable> {
 
 #[test]
 fn keccak_gf2_main() {
-    let compile_result = compile_generic(&Keccak256Circuit::default()).unwrap();
+    let compile_result =
+        compile_generic(&Keccak256Circuit::default(), CompileOptions::default()).unwrap();
     let CompileResult {
         witness_solver,
         layered_circuit,
