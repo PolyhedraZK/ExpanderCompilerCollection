@@ -12,6 +12,7 @@ mod witness;
 pub use circuit::declare_circuit;
 pub type API<C> = builder::RootBuilder<C>;
 pub use crate::circuit::config::*;
+pub use crate::compile::CompileOptions;
 pub use crate::field::{Field, BN254, GF2, M31};
 pub use crate::utils::error::Error;
 pub use api::{BasicAPI, RootAPI};
@@ -115,9 +116,10 @@ pub fn compile_generic<
     Cir: internal::DumpLoadTwoVariables<Variable> + GenericDefine<C> + Clone,
 >(
     circuit: &Cir,
+    options: CompileOptions,
 ) -> Result<CompileResult<C>, Error> {
     let root = build_generic(circuit);
-    let (irw, lc) = crate::compile::compile::<C>(&root)?;
+    let (irw, lc) = crate::compile::compile_with_options::<C>(&root, options)?;
     Ok(CompileResult {
         witness_solver: WitnessSolver { circuit: irw },
         layered_circuit: lc,
