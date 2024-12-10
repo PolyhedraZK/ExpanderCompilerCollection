@@ -256,9 +256,64 @@ fn test_mul_without_mod() {
     }
 
     {
-        let x = BigUint::from_str_radix("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000", 16).unwrap();
+        let x = BigUint::from_str_radix(
+            "7f\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            000000000000000000000000000000",
+            16,
+        )
+        .unwrap();
         let mut res = BigUint::from_str_radix(
-            "3fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000",
+            "3fff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffff00\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000001\
+            000000000000000000000000000000\
+            000000000000000000000000000000",
             16,
         )
         .unwrap();

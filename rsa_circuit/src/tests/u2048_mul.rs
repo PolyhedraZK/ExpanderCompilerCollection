@@ -276,14 +276,78 @@ fn test_mul_mod() {
     }
 
     {
-        let x = BigUint::from_str_radix("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000", 16).unwrap();
-        let modulus = BigUint::from_str_radix("80000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000", 16).unwrap();
+        let x = BigUint::from_str_radix(
+            "7f\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            000000000000000000000000000000",
+            16,
+        )
+        .unwrap();
+        let modulus = BigUint::from_str_radix(
+            "80\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000000\
+            000000000000000000000000000001\
+            000000000000000000000000000000",
+            16,
+        )
+        .unwrap();
+
         let res = BigUint::from_str_radix(
             "4000000000000000000000000000000000000000000000000000000000000",
             16,
         )
         .unwrap();
-        let carry= BigUint::from_str_radix("7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd000000000000000000000000000000", 16).unwrap();
+        let carry = BigUint::from_str_radix(
+            "7f\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            ffffffffffffffffffffffffffffff\
+            fffffffffffffffffffffffffffffd\
+            000000000000000000000000000000",
+            16,
+        )
+        .unwrap();
         assert_eq!(&x * &x, &res + &carry * &modulus);
 
         let x = RSAFieldElement::from_big_uint(x);
@@ -355,72 +419,72 @@ fn test_mul_mod() {
         assert_eq!(output, vec![true]);
     }
 
-    // // Negative test cases
-    // {
-    //     // Test case 8: Result >= modulus
-    //     let mut x = [[0, 0]; N_LIMBS];
-    //     let mut y = [[0, 0]; N_LIMBS];
-    //     let mut result = [[0, 0]; N_LIMBS];
-    //     let carry = [[0, 0]; N_LIMBS];
-    //     let mut modulus = [[0, 0]; N_LIMBS];
+    // Negative test cases
+    {
+        // Test case 8: Result >= modulus
+        let mut x = [[0, 0]; N_LIMBS];
+        let mut y = [[0, 0]; N_LIMBS];
+        let mut result = [[0, 0]; N_LIMBS];
+        let carry = [[0, 0]; N_LIMBS];
+        let mut modulus = [[0, 0]; N_LIMBS];
 
-    //     x[0] = [7, 0];
-    //     y[0] = [5, 0];
-    //     result[0] = [10, 0]; // Invalid: result >= modulus
-    //     modulus[0] = [10, 0];
+        x[0] = [7, 0];
+        y[0] = [5, 0];
+        result[0] = [10, 0]; // Invalid: result >= modulus
+        modulus[0] = [10, 0];
 
-    //     let assignment = MulModCircuit::<Fr>::create_circuit(x, y, result, carry, modulus);
-    //     let witness = compile_result
-    //         .witness_solver
-    //         .solve_witness(&assignment)
-    //         .unwrap();
-    //     let output = compile_result.layered_circuit.run(&witness);
-    //     assert_eq!(output, vec![false]);
-    // }
+        let assignment = MulModCircuit::<Fr>::create_circuit(x, y, result, carry, modulus);
+        let witness = compile_result
+            .witness_solver
+            .solve_witness(&assignment)
+            .unwrap();
+        let output = compile_result.layered_circuit.run(&witness);
+        assert_eq!(output, vec![false]);
+    }
 
-    // {
-    //     // Test case 9: Incorrect carry value
-    //     let mut x = [[0, 0]; N_LIMBS];
-    //     let mut y = [[0, 0]; N_LIMBS];
-    //     let mut result = [[0, 0]; N_LIMBS];
-    //     let mut carry = [[0, 0]; N_LIMBS];
-    //     let mut modulus = [[0, 0]; N_LIMBS];
+    {
+        // Test case 9: Incorrect carry value
+        let mut x = [[0, 0]; N_LIMBS];
+        let mut y = [[0, 0]; N_LIMBS];
+        let mut result = [[0, 0]; N_LIMBS];
+        let mut carry = [[0, 0]; N_LIMBS];
+        let mut modulus = [[0, 0]; N_LIMBS];
 
-    //     x[0] = [7, 0];
-    //     y[0] = [5, 0];
-    //     result[0] = [5, 0];
-    //     carry[0] = [2, 0]; // Wrong carry (should be 3)
-    //     modulus[0] = [10, 0];
+        x[0] = [7, 0];
+        y[0] = [5, 0];
+        result[0] = [5, 0];
+        carry[0] = [2, 0]; // Wrong carry (should be 3)
+        modulus[0] = [10, 0];
 
-    //     let assignment = MulModCircuit::<Fr>::create_circuit(x, y, result, carry, modulus);
-    //     let witness = compile_result
-    //         .witness_solver
-    //         .solve_witness(&assignment)
-    //         .unwrap();
-    //     let output = compile_result.layered_circuit.run(&witness);
-    //     assert_eq!(output, vec![false]);
-    // }
+        let assignment = MulModCircuit::<Fr>::create_circuit(x, y, result, carry, modulus);
+        let witness = compile_result
+            .witness_solver
+            .solve_witness(&assignment)
+            .unwrap();
+        let output = compile_result.layered_circuit.run(&witness);
+        assert_eq!(output, vec![false]);
+    }
 
-    // {
-    //     // Test case 10: Incorrect result
-    //     let mut x = [[0, 0]; N_LIMBS];
-    //     let mut y = [[0, 0]; N_LIMBS];
-    //     let mut result = [[0, 0]; N_LIMBS];
-    //     let mut carry = [[0, 0]; N_LIMBS];
-    //     let mut modulus = [[0, 0]; N_LIMBS];
+    {
+        // Test case 10: Incorrect result
+        let mut x = [[0, 0]; N_LIMBS];
+        let mut y = [[0, 0]; N_LIMBS];
+        let mut result = [[0, 0]; N_LIMBS];
+        let mut carry = [[0, 0]; N_LIMBS];
+        let mut modulus = [[0, 0]; N_LIMBS];
 
-    //     x[0] = [7, 0];
-    //     y[0] = [5, 0];
-    //     result[0] = [6, 0]; // Wrong result (should be 5)
-    //     carry[0] = [3, 0];
-    //     modulus[0] = [10, 0];
+        x[0] = [7, 0];
+        y[0] = [5, 0];
+        result[0] = [6, 0]; // Wrong result (should be 5)
+        carry[0] = [3, 0];
+        modulus[0] = [10, 0];
 
-    //     let assignment = MulModCircuit::<Fr>::create_circuit(x, y, result, carry, modulus);
-    //     let witness = compile_result
-    //         .witness_solver
-    //         .solve_witness(&assignment)
-    //         .unwrap();
-    //     let output = compile_result.layered_circuit.run(&witness);
-    //     assert_eq!(output, vec![false]);
-    // }
+        let assignment = MulModCircuit::<Fr>::create_circuit(x, y, result, carry, modulus);
+        let witness = compile_result
+            .witness_solver
+            .solve_witness(&assignment)
+            .unwrap();
+        let output = compile_result.layered_circuit.run(&witness);
+        assert_eq!(output, vec![false]);
+    }
 }

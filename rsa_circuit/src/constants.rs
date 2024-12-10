@@ -2,8 +2,7 @@ use halo2curves::bn256::Fr;
 
 // we use 18 limbs, each with 120 bits, to store a 2048 bit integer
 pub const N_LIMBS: usize = 18;
-// // 2048 bits = 256 bytes
-// pub(crate) const N_BYTES: usize = 256;
+
 // Each 120 bits limb needs 30 hex number to store
 pub(crate) const HEX_PER_LIMB: usize = 30;
 
