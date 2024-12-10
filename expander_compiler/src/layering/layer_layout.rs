@@ -1,7 +1,7 @@
 use std::{collections::HashMap, mem};
 
 use crate::{
-    circuit::{config::Config, input_mapping::EMPTY},
+    circuit::{config::Config, input_mapping::EMPTY, layered::InputType},
     utils::{misc::next_power_of_two, pool::Pool},
 };
 
@@ -85,7 +85,7 @@ pub struct LayerReq {
     pub layer: usize, // which layer to solve?
 }
 
-impl<'a, C: Config> CompileContext<'a, C> {
+impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
     pub fn prepare_layer_layout_context(&mut self, circuit_id: usize) {
         let mut ic = self.circuits.remove(&circuit_id).unwrap();
 
@@ -100,8 +100,14 @@ impl<'a, C: Config> CompileContext<'a, C> {
             ic.lcs[ic.output_layer].vars.add(v);
         }
         for i in 1..ic.num_var {
-            for j in ic.min_layer[i]..=ic.max_layer[i] {
-                ic.lcs[j].vars.add(&i);
+            if I::CROSS_LAYER_RELAY {
+                for j in ic.occured_layers[i].iter().cloned() {
+                    ic.lcs[j].vars.add(&i);
+                }
+            } else {
+                for j in ic.min_layer[i]..=ic.max_layer[i] {
+                    ic.lcs[j].vars.add(&i);
+                }
             }
         }
 

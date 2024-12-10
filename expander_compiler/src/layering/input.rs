@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use crate::circuit::{config::Config, input_mapping::EMPTY};
+use crate::circuit::{config::Config, input_mapping::EMPTY, layered::InputType};
 
 use super::{compile::CompileContext, layer_layout::LayerLayoutInner};
 
-impl<'a, C: Config> CompileContext<'a, C> {
+impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
     pub fn record_input_order(&self) -> Vec<usize> {
         let layout_id = self.layout_ids[0];
         let l = self.layer_layout_pool.get(layout_id);

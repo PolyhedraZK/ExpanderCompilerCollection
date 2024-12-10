@@ -1,6 +1,11 @@
 use crate::{
     builder,
-    circuit::{config::Config, input_mapping::InputMapping, ir, layered},
+    circuit::{
+        config::Config,
+        input_mapping::InputMapping,
+        ir,
+        layered::{self, InputType},
+    },
     layering,
     utils::error::Error,
 };
@@ -59,16 +64,16 @@ fn print_stat(stat_name: &str, stat: usize, is_last: bool) {
     }
 }
 
-pub fn compile<C: Config>(
+pub fn compile<C: Config, I: InputType>(
     r_source: &ir::source::RootCircuit<C>,
-) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C>), Error> {
+) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C, I>), Error> {
     compile_with_options(r_source, CompileOptions::default())
 }
 
-pub fn compile_with_options<C: Config>(
+pub fn compile_with_options<C: Config, I: InputType>(
     r_source: &ir::source::RootCircuit<C>,
     options: CompileOptions,
-) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C>), Error> {
+) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C, I>), Error> {
     r_source.validate()?;
 
     let mut src_im = InputMapping::new_identity(r_source.input_size());

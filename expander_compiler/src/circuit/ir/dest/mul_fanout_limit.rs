@@ -243,6 +243,7 @@ impl<C: Config> RootCircuitRelaxed<C> {
 mod tests {
     use super::*;
     use crate::circuit::config::{Config, M31Config as C};
+    use crate::circuit::layered::{InputUsize, NormalInputType};
     use crate::field::FieldArith;
     use rand::{RngCore, SeedableRng};
 
@@ -454,17 +455,17 @@ mod tests {
         };
         let root = crate::circuit::ir::source::RootCircuit::<C>::random(&config);
         assert_eq!(root.validate(), Ok(()));
-        let (_, circuit) = crate::compile::compile_with_options(
+        let (_, circuit) = crate::compile::compile_with_options::<_, NormalInputType>(
             &root,
             crate::compile::CompileOptions::default().with_mul_fanout_limit(256),
         )
         .unwrap();
         assert_eq!(circuit.validate(), Ok(()));
         for segment in circuit.segments.iter() {
-            let mut ref_num = vec![0; segment.num_inputs];
+            let mut ref_num = vec![0; segment.num_inputs.get(0)];
             for m in segment.gate_muls.iter() {
-                ref_num[m.inputs[0]] += 1;
-                ref_num[m.inputs[1]] += 1;
+                ref_num[m.inputs[0].offset] += 1;
+                ref_num[m.inputs[1].offset] += 1;
             }
             for x in ref_num.iter() {
                 assert!(*x <= 256);

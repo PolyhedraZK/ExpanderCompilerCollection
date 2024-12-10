@@ -1,6 +1,6 @@
 use crate::circuit::config::Config;
 
-use super::Circuit;
+use super::{Circuit, InputType, InputUsize};
 
 pub struct Stats {
     // number of layers in the final circuit
@@ -31,7 +31,7 @@ struct CircuitStats {
     num_expanded_cst: usize,
 }
 
-impl<C: Config> Circuit<C> {
+impl<C: Config, I: InputType> Circuit<C, I> {
     pub fn get_stats(&self) -> Stats {
         let mut m: Vec<CircuitStats> = Vec::with_capacity(self.segments.len());
         let mut ar = Stats {
@@ -83,12 +83,20 @@ impl<C: Config> Circuit<C> {
                 }
             }
         }
-        for i in 0..self.segments[self.layer_ids[0]].num_inputs {
-            if input_mask[self.layer_ids[0]][i] {
+        let mut global_input_mask = vec![false; self.input_size()];
+        for (l, &id) in self.layer_ids.iter().enumerate() {
+            if self.segments[id].num_inputs.len() > l {
+                for (g, i) in global_input_mask.iter_mut().zip(input_mask[id][l].iter()) {
+                    *g |= *i;
+                }
+            }
+        }
+        for x in global_input_mask.iter() {
+            if *x {
                 ar.num_inputs += 1;
             }
         }
-        ar.total_cost = self.segments[self.layer_ids[0]].num_inputs * C::COST_INPUT;
+        ar.total_cost = self.input_size() * C::COST_INPUT;
         ar.total_cost += ar.num_total_gates * C::COST_VARIABLE;
         ar.total_cost += ar.num_expanded_mul * C::COST_MUL;
         ar.total_cost += ar.num_expanded_add * C::COST_ADD;
