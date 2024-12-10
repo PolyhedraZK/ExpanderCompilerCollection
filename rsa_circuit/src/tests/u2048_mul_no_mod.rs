@@ -28,11 +28,7 @@ impl GenericDefine<BN254Config> for MulNoModCircuit<Variable> {
 
         let res = U2048Variable::mul_without_mod_reduction(&x, &y, &two_to_120, builder);
 
-        // for i in 0..2 * N_LIMBS {
-        //     println!("{i}");
-        //     builder.display(res[i]);
-        //     builder.display(self.result[i]);
-        // }
+        // builder.display("first limb", x.limbs[0]);
 
         for i in 0..2 * N_LIMBS {
             builder.assert_is_equal(res[i], self.result[i]);

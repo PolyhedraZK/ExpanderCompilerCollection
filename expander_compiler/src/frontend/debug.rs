@@ -10,7 +10,7 @@ use crate::{
 };
 
 use super::{
-    api::{BasicAPI, DebugAPI, RootAPI, UnconstrainedAPI},
+    api::{BasicAPI, RootAPI, UnconstrainedAPI},
     builder::{get_variable_id, new_variable, ToVariableOrValue, VariableOrValue},
     Variable,
 };
@@ -20,9 +20,9 @@ pub struct DebugBuilder<C: Config> {
 }
 
 impl<C: Config> BasicAPI<C> for DebugBuilder<C> {
-    fn display(&self, x: impl ToVariableOrValue<<C as Config>::CircuitField>) {
+    fn display(&self, str: &str, x: impl ToVariableOrValue<<C as Config>::CircuitField>) {
         let x = self.convert_to_value(x);
-        println!("x: {:?}", x);
+        println!("{}: {:?}", str, x);
     }
 
     fn add(
@@ -369,12 +369,6 @@ impl<C: Config> UnconstrainedAPI<C> for DebugBuilder<C> {
             y,
             op: UnconstrainedBinOpType::BitXor,
         })
-    }
-}
-
-impl<C: Config> DebugAPI<C> for DebugBuilder<C> {
-    fn value_of(&self, x: impl ToVariableOrValue<C::CircuitField>) -> C::CircuitField {
-        self.convert_to_value(x)
     }
 }
 
