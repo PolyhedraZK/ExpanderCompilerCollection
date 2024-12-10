@@ -12,6 +12,7 @@ mod witness;
 pub use circuit::declare_circuit;
 pub type API<C> = builder::RootBuilder<C>;
 pub use crate::circuit::config::*;
+pub use crate::compile::CompileOptions;
 pub use crate::field::{Field, BN254, GF2, M31};
 pub use crate::utils::error::Error;
 pub use api::BasicAPI;
@@ -71,6 +72,7 @@ pub fn compile<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define
     })
 }
 
+// TODO: when merge with debug-eval, rewrite into compile_generic_cross_layer
 pub fn compile_cross_layer<
     C: Config,
     Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone,
@@ -80,6 +82,21 @@ pub fn compile_cross_layer<
     let root = build(circuit);
     let (irw, lc) = crate::compile::compile::<C, _>(&root)?;
     Ok(CompileResultCrossLayer {
+        witness_solver: WitnessSolver { circuit: irw },
+        layered_circuit: lc,
+    })
+}
+
+pub fn compile_with_options<
+    C: Config,
+    Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone,
+>(
+    circuit: &Cir,
+    options: CompileOptions,
+) -> Result<CompileResult<C>, Error> {
+    let root = build(circuit);
+    let (irw, lc) = crate::compile::compile_with_options::<C, _>(&root, options)?;
+    Ok(CompileResult {
         witness_solver: WitnessSolver { circuit: irw },
         layered_circuit: lc,
     })

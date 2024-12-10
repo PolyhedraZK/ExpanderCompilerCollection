@@ -311,10 +311,13 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
                                     });
                                 }
                                 VarSpec::Quad(vid0, vid1) => {
+                                    let x = aq.var_pos[vid0];
+                                    let y = aq.var_pos[vid1];
+                                    let inputs = if x < y { [x, y] } else { [y, x] };
                                     res.gate_muls.push(GateMul {
                                         inputs: [
-                                            I::Input::new(0, aq.var_pos[vid0]),
-                                            I::Input::new(0, aq.var_pos[vid1]),
+                                            I::Input::new(0, inputs[0]),
+                                            I::Input::new(0, inputs[1]),
                                         ],
                                         output: pos,
                                         coef: Coef::Constant(term.coef),

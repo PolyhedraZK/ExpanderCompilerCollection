@@ -17,15 +17,6 @@ impl<C: Config, I: InputType, const INPUT_NUM: usize> PartialOrd for Gate<C, I, 
 
 impl<C: Config, I: InputType, const INPUT_NUM: usize> Ord for Gate<C, I, INPUT_NUM> {
     fn cmp(&self, other: &Self) -> Ordering {
-        match self.output.cmp(&other.output) {
-            Ordering::Less => {
-                return Ordering::Less;
-            }
-            Ordering::Greater => {
-                return Ordering::Greater;
-            }
-            Ordering::Equal => {}
-        };
         for i in 0..INPUT_NUM {
             match self.inputs[i].cmp(&other.inputs[i]) {
                 Ordering::Less => {
@@ -37,6 +28,15 @@ impl<C: Config, I: InputType, const INPUT_NUM: usize> Ord for Gate<C, I, INPUT_N
                 Ordering::Equal => {}
             };
         }
+        match self.output.cmp(&other.output) {
+            Ordering::Less => {
+                return Ordering::Less;
+            }
+            Ordering::Greater => {
+                return Ordering::Greater;
+            }
+            Ordering::Equal => {}
+        };
         self.coef.cmp(&other.coef)
     }
 }
@@ -50,15 +50,6 @@ impl<C: Config, I: InputType> PartialOrd for GateCustom<C, I> {
 impl<C: Config, I: InputType> Ord for GateCustom<C, I> {
     fn cmp(&self, other: &Self) -> Ordering {
         match self.gate_type.cmp(&other.gate_type) {
-            Ordering::Less => {
-                return Ordering::Less;
-            }
-            Ordering::Greater => {
-                return Ordering::Greater;
-            }
-            Ordering::Equal => {}
-        };
-        match self.output.cmp(&other.output) {
             Ordering::Less => {
                 return Ordering::Less;
             }
@@ -87,6 +78,15 @@ impl<C: Config, I: InputType> Ord for GateCustom<C, I> {
                 Ordering::Equal => {}
             };
         }
+        match self.output.cmp(&other.output) {
+            Ordering::Less => {
+                return Ordering::Less;
+            }
+            Ordering::Greater => {
+                return Ordering::Greater;
+            }
+            Ordering::Equal => {}
+        };
         self.coef.cmp(&other.coef)
     }
 }

@@ -79,6 +79,18 @@ impl VarSpec {
             (_, VarSpec::RandomLinear(_)) => panic!("unexpected situation: RandomLinear"),
         }
     }
+    pub fn replace_vars<F: Fn(usize) -> usize>(&self, f: F) -> Self {
+        match self {
+            VarSpec::Const => VarSpec::Const,
+            VarSpec::Linear(x) => VarSpec::Linear(f(*x)),
+            VarSpec::Quad(x, y) => VarSpec::Quad(f(*x), f(*y)),
+            VarSpec::Custom { gate_type, inputs } => VarSpec::Custom {
+                gate_type: *gate_type,
+                inputs: inputs.iter().cloned().map(&f).collect(),
+            },
+            VarSpec::RandomLinear(x) => VarSpec::RandomLinear(f(*x)),
+        }
+    }
 }
 
 impl<C: Config> Ord for Term<C> {
@@ -310,16 +322,7 @@ impl<C: Config> Expression<C> {
             .iter()
             .map(|term| Term {
                 coef: term.coef,
-                vars: match &term.vars {
-                    VarSpec::Const => VarSpec::Const,
-                    VarSpec::Linear(index) => VarSpec::Linear(f(*index)),
-                    VarSpec::Quad(index1, index2) => VarSpec::Quad(f(*index1), f(*index2)),
-                    VarSpec::Custom { gate_type, inputs } => VarSpec::Custom {
-                        gate_type: *gate_type,
-                        inputs: inputs.iter().cloned().map(&f).collect(),
-                    },
-                    VarSpec::RandomLinear(index) => VarSpec::RandomLinear(f(*index)),
-                },
+                vars: term.vars.replace_vars(&f),
             })
             .collect();
         Expression { terms }
