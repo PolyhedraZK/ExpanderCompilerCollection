@@ -28,7 +28,7 @@ pub struct Builder<C: Config> {
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Variable {
-    pub id: usize,
+    id: usize,
 }
 
 pub fn new_variable(id: usize) -> Variable {
