@@ -211,7 +211,7 @@ impl<C: Config> Instruction<C> {
     ) -> EvalResult<C> {
         if let Instruction::ConstantLike(coef) = self {
             return match coef {
-                Coef::Constant(c) => EvalResult::Value(c.clone()),
+                Coef::Constant(c) => EvalResult::Value(*c),
                 Coef::PublicInput(i) => EvalResult::Value(public_inputs[*i]),
                 Coef::Random => EvalResult::Error(Error::UserError(
                     "random coef occured in witness solver".to_string(),
@@ -224,12 +224,8 @@ impl<C: Config> Instruction<C> {
             num_outputs,
         } = self
         {
-            return match hints::safe_impl(
-                hint_registry,
-                *hint_id,
-                &inputs.iter().map(|i| values[*i]).collect(),
-                *num_outputs,
-            ) {
+            let inputs: Vec<C::CircuitField> = inputs.iter().map(|i| values[*i]).collect();
+            return match hints::safe_impl(hint_registry, *hint_id, &inputs, *num_outputs) {
                 Ok(outputs) => EvalResult::Values(outputs),
                 Err(e) => EvalResult::Error(e),
             };

@@ -8,6 +8,7 @@ use super::BuiltinHintIds;
 
 pub type HintFn<F> = dyn FnMut(&[F], &mut [F]) -> Result<(), Error>;
 
+#[derive(Default)]
 pub struct HintRegistry<F: Field> {
     hints: HashMap<usize, Box<HintFn<F>>>,
 }
@@ -27,9 +28,7 @@ pub fn hint_key_to_id(key: &str) -> usize {
 
 impl<F: Field> HintRegistry<F> {
     pub fn new() -> Self {
-        Self {
-            hints: HashMap::new(),
-        }
+        Self::default()
     }
     pub fn register<Hint: Fn(&[F], &mut [F]) -> Result<(), Error> + 'static>(
         &mut self,

@@ -10,7 +10,7 @@ use crate::{field::Field, utils::error::Error};
 pub fn safe_impl<F: Field>(
     hint_registry: &mut HintRegistry<F>,
     hint_id: usize,
-    inputs: &Vec<F>,
+    inputs: &[F],
     num_outputs: usize,
 ) -> Result<Vec<F>, Error> {
     match BuiltinHintIds::from_usize(hint_id) {
