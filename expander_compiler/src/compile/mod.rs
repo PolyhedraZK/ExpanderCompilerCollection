@@ -160,18 +160,21 @@ pub fn compile_with_options<C: Config, I: InputType>(
         .validate()
         .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
 
-    let r_dest_relaxed_p3 = layering::ir_split::split_to_single_layer(&r_dest_relaxed_p2);
-    r_dest_relaxed_p3
-        .validate()
-        .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
+    let r_dest_relaxed_p3 = if I::CROSS_LAYER_RELAY {
+        let r = layering::ir_split::split_to_single_layer(&r_dest_relaxed_p2);
+        r.validate()
+            .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
 
-    let r_dest_relaxed_p3_opt = optimize_until_fixed_point(&r_dest_relaxed_p3, &mut hl_im, |r| {
-        let (mut r, im) = r.remove_unreachable();
-        r.reassign_duplicate_sub_circuit_outputs();
-        (r, im)
-    });
+        optimize_until_fixed_point(&r, &mut hl_im, |r| {
+            let (mut r, im) = r.remove_unreachable();
+            r.reassign_duplicate_sub_circuit_outputs();
+            (r, im)
+        })
+    } else {
+        r_dest_relaxed_p2
+    };
 
-    let r_dest = r_dest_relaxed_p3_opt.solve_duplicates();
+    let r_dest = r_dest_relaxed_p3.solve_duplicates();
 
     let r_dest_opt = optimize_until_fixed_point(&r_dest, &mut hl_im, |r| {
         let (mut r, im) = r.remove_unreachable();
