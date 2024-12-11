@@ -66,31 +66,31 @@ fn compute_sha256<C: Config>(api: &mut API<C>, input: &Vec<Variable>) -> Vec<Var
         );
         let shft = shift_right(api, w[i - 2].clone(), 10);
         let s1 = xor(api, tmp, shft);
-        let s0 = add_crosslayer(api, w[i - 16].clone(), s0);
-        let s1 = add_crosslayer(api, w[i - 7].clone(), s1);
+        let s0 = add_vanilla(api, w[i - 16].clone(), s0);
+        let s1 = add_vanilla(api, w[i - 7].clone(), s1);
         let s1 = add_const(api, s1, k32[i]);
-        w[i] = add_crosslayer(api, s0, s1);
+        w[i] = add_vanilla(api, s0, s1);
     }
 
     for i in 0..64 {
         let s1 = sigma1(api, h[4].clone());
         let c = ch(api, h[4].clone(), h[5].clone(), h[6].clone());
-        w[i] = add_crosslayer(api, w[i].clone(), h[7].clone());
+        w[i] = add_vanilla(api, w[i].clone(), h[7].clone());
         let c = add_const(api, c, k32[i].clone());
-        let s1 = add_crosslayer(api, s1, w[i].clone());
-        let s1 = add_crosslayer(api, s1, c);
+        let s1 = add_vanilla(api, s1, w[i].clone());
+        let s1 = add_vanilla(api, s1, c);
         let s0 = sigma0(api, h[0].clone());
         let m = maj(api, h[0].clone(), h[1].clone(), h[2].clone());
-        let s0 = add_crosslayer(api, s0, m);
+        let s0 = add_vanilla(api, s0, m);
 
         h[7] = h[6].clone();
         h[6] = h[5].clone();
         h[5] = h[4].clone();
-        h[4] = add_crosslayer(api, h[3].clone(), s1.clone());
+        h[4] = add_vanilla(api, h[3].clone(), s1.clone());
         h[3] = h[2].clone();
         h[2] = h[1].clone();
         h[1] = h[0].clone();
-        h[0] = add_crosslayer(api, s1, s0);
+        h[0] = add_vanilla(api, s1, s0);
     }
 
     let mut result = add_const(api, h[0].clone(), h32[0].clone());
