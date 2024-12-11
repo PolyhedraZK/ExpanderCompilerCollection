@@ -161,6 +161,8 @@ pub fn compile_with_options<C: Config, I: InputType>(
         .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
 
     let r_dest_relaxed_p3 = if I::CROSS_LAYER_RELAY {
+        r_dest_relaxed_p2
+    } else {
         let r = layering::ir_split::split_to_single_layer(&r_dest_relaxed_p2);
         r.validate()
             .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
@@ -170,8 +172,6 @@ pub fn compile_with_options<C: Config, I: InputType>(
             r.reassign_duplicate_sub_circuit_outputs();
             (r, im)
         })
-    } else {
-        r_dest_relaxed_p2
     };
 
     let r_dest = r_dest_relaxed_p3.solve_duplicates();
