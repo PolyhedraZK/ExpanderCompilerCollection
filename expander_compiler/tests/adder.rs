@@ -19,7 +19,7 @@ declare_circuit!(CrossLayerAdder {
 
 impl Define<GF2Config> for CrossLayerAdder<Variable> {
     fn define(&self, api: &mut API<GF2Config>) {
-        let c_target = add_crosslayer(api, self.a.to_vec(), self.b.to_vec());
+        let c_target = add_vanilla(api, self.a.to_vec(), self.b.to_vec());
         for i in 0..32 {
             api.assert_is_equal(self.c[i], c_target[i]);
         }
