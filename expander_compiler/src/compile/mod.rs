@@ -10,14 +10,28 @@ mod random_circuit_tests;
 #[cfg(test)]
 mod tests;
 
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct CompileOptions {
     pub mul_fanout_limit: Option<usize>,
+    pub allow_input_reorder: bool,
+}
+
+impl Default for CompileOptions {
+    fn default() -> Self {
+        Self {
+            mul_fanout_limit: None,
+            allow_input_reorder: true,
+        }
+    }
 }
 
 impl CompileOptions {
     pub fn with_mul_fanout_limit(mut self, mul_fanout_limit: usize) -> Self {
         self.mul_fanout_limit = Some(mul_fanout_limit);
+        self
+    }
+    pub fn without_input_reorder(mut self) -> Self {
+        self.allow_input_reorder = false;
         self
     }
 }
@@ -235,8 +249,12 @@ pub fn compile_with_options<C: Config>(
 
     let (r_dest_opt, mut hl_im) = compile_step_2(r_hint_less, options.clone())?;
 
-    let (lc, dest_im) =
-        layering::compile(&r_dest_opt, layering::CompileOptions { is_zkcuda: false });
+    let (lc, dest_im) = layering::compile(
+        &r_dest_opt,
+        layering::CompileOptions {
+            allow_input_reorder: options.allow_input_reorder,
+        },
+    );
 
     let lc = compile_step_3(lc)?;
 

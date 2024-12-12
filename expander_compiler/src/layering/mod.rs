@@ -15,7 +15,7 @@ mod wire;
 mod tests;
 
 pub struct CompileOptions {
-    pub is_zkcuda: bool,
+    pub allow_input_reorder: bool,
 }
 
 pub fn compile<C: Config>(

@@ -216,7 +216,9 @@ mod tests {
             assert_eq!(root.validate(), Ok(()));
             let (circuit, _) = crate::layering::compile(
                 &root,
-                crate::layering::CompileOptions { is_zkcuda: false },
+                crate::layering::CompileOptions {
+                    allow_input_reorder: true,
+                },
             );
             assert_eq!(circuit.validate(), Ok(()));
             let mut buf = Vec::new();

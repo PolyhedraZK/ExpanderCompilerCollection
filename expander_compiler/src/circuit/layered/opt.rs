@@ -711,7 +711,12 @@ mod tests {
                 }
             },
         }
-        let (lc, _) = compile(&root, CompileOptions { is_zkcuda: false });
+        let (lc, _) = compile(
+            &root,
+            CompileOptions {
+                allow_input_reorder: true,
+            },
+        );
         assert_eq!(lc.validate(), Ok(()));
         Some(lc)
     }

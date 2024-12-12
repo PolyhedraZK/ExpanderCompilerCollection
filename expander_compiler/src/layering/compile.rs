@@ -118,7 +118,7 @@ impl<'a, C: Config> CompileContext<'a, C> {
             }));
         }
         self.layout_ids = layout_ids;
-        if self.opts.is_zkcuda {
+        if !self.opts.allow_input_reorder {
             let layout_vec =
                 merge_layouts(vec![], (0..self.circuits[&0].lcs[0].vars.len()).collect());
             let id = self.layer_layout_pool.add(&LayerLayout {

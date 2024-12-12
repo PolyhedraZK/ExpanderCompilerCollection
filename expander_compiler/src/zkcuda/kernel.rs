@@ -185,7 +185,9 @@ where
     // compile step 3
     let (lc, dest_im) = crate::layering::compile(
         &r_dest_opt,
-        crate::layering::CompileOptions { is_zkcuda: true },
+        crate::layering::CompileOptions {
+            allow_input_reorder: false,
+        },
     );
     for (i, x) in dest_im.mapping().iter().enumerate() {
         if i < num_inputs_with_hint {

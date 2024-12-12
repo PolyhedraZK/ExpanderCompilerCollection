@@ -27,7 +27,12 @@ pub fn compile_and_random_test<C: Config>(
     n_tests: usize,
 ) -> (layered::Circuit<C>, InputMapping) {
     assert!(rc.validate().is_ok());
-    let (lc, input_mapping) = compile(rc, CompileOptions { is_zkcuda: false });
+    let (lc, input_mapping) = compile(
+        rc,
+        CompileOptions {
+            allow_input_reorder: true,
+        },
+    );
     assert_eq!(lc.validate(), Ok(()));
     assert_eq!(rc.input_size(), input_mapping.cur_size());
     let input_size = rc.input_size();
