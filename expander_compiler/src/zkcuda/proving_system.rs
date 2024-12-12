@@ -52,7 +52,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
     type Proof = DummyProof;
     type Commitment = DummyCommitment<C>;
     fn commit(vals: &[C::CircuitField]) -> Self::Commitment {
-        assert!(vals.len() & vals.len() - 1 == 0);
+        assert!(vals.len() & (vals.len() - 1) == 0);
         DummyCommitment {
             vals: vals.to_vec(),
         }

@@ -244,7 +244,7 @@ where
 
 fn reorder_ir_inputs<C: Config>(
     r: &mut ir::hint_less::RootCircuit<C>,
-    lc_in: &mut Vec<LayeredCircuitInputVec>,
+    lc_in: &mut [LayeredCircuitInputVec],
 ) {
     // sort by size, pad to 2^n, then reorder
     let mut sizes: Vec<(usize, usize)> =
