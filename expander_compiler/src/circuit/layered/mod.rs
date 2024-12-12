@@ -145,7 +145,7 @@ pub struct GateCustom<C: Config> {
     pub coef: Coef<C>,
 }
 
-#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub struct Allocation {
     pub input_offset: usize,
     pub output_offset: usize,
@@ -153,7 +153,7 @@ pub struct Allocation {
 
 pub type ChildSpec = (usize, Vec<Allocation>);
 
-#[derive(Default, Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Default, Debug, Hash, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub struct Segment<C: Config> {
     pub num_inputs: usize,
     pub num_outputs: usize,
@@ -164,7 +164,7 @@ pub struct Segment<C: Config> {
     pub gate_customs: Vec<GateCustom<C>>,
 }
 
-#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub struct Circuit<C: Config> {
     pub num_public_inputs: usize,
     pub num_actual_outputs: usize,

@@ -2,12 +2,12 @@ use builder::RootBuilder;
 
 use crate::circuit::{ir, layered};
 
-mod api;
-mod builder;
-mod circuit;
-mod debug;
-mod variables;
-mod witness;
+pub mod api;
+pub mod builder;
+pub mod circuit;
+pub mod debug;
+pub mod variables;
+pub mod witness;
 
 pub use circuit::declare_circuit;
 pub type API<C> = builder::RootBuilder<C>;
