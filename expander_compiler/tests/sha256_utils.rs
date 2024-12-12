@@ -177,18 +177,22 @@ fn bit_add_with_carry<C: Config>(
     let sum = api.add(a, b);
     let sum = api.add(sum, carry);
 
-    // case 1 a = b = 1
-    let carry_case_1 = api.and(a, b);
+    // a * (b + (b + 1) * carry) + (a + 1) * b * carry
+    // = a * b + a * b * carry + a * b * carry + a * carry + b * carry
+    let ab = api.mul(a, b);
+    let ac = api.mul(a, carry);
+    let bc = api.mul(b, carry);
+    let abc = api.mul(ab, carry);
 
-    // case 2 (a = 1 or b = 1) and carry = 1
-    let a_or_b = api.or(a, b);
-    let carry_case_2 = api.and(a_or_b, carry);
-    let carry_next = api.or(carry_case_1, carry_case_2);
+    let carry_next = api.add(ab, abc);
+    let carry_next = api.add(carry_next, abc);
+    let carry_next = api.add(carry_next, ac);
+    let carry_next = api.add(carry_next, bc);
 
     (sum, carry_next)
 }
 
-pub fn add_crosslayer<C: Config>(
+pub fn add_vanilla<C: Config>(
     api: &mut API<C>,
     a: Vec<Variable>,
     b: Vec<Variable>,
