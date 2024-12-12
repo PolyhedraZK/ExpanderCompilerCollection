@@ -174,7 +174,8 @@ where
     rl_c0.outputs.truncate(n_in + n_out);
     let num_inputs_with_hint = rl_c0.num_inputs;
     // compile step 2
-    let (mut r_dest_opt, hl_im) = crate::compile::compile_step_2(r_hint_less)?;
+    let (mut r_dest_opt, hl_im) =
+        crate::compile::compile_step_2(r_hint_less, CompileOptions::default())?;
     for (i, x) in hl_im.mapping().iter().enumerate() {
         assert_eq!(i, *x);
     }

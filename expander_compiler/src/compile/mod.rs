@@ -10,6 +10,18 @@ mod random_circuit_tests;
 #[cfg(test)]
 mod tests;
 
+#[derive(Default, Debug, Clone)]
+pub struct CompileOptions {
+    pub mul_fanout_limit: Option<usize>,
+}
+
+impl CompileOptions {
+    pub fn with_mul_fanout_limit(mut self, mul_fanout_limit: usize) -> Self {
+        self.mul_fanout_limit = Some(mul_fanout_limit);
+        self
+    }
+}
+
 fn optimize_until_fixed_point<T, F>(x: &T, im: &mut InputMapping, f: F) -> T
 where
     T: Clone + Eq,
@@ -83,6 +95,7 @@ pub fn compile_step_1<C: Config>(
 
 pub fn compile_step_2<C: Config>(
     r_hint_less: ir::hint_less::RootCircuit<C>,
+    options: CompileOptions,
 ) -> Result<(ir::dest::RootCircuit<C>, InputMapping), Error> {
     let mut hl_im = InputMapping::new_identity(r_hint_less.input_size());
 
@@ -103,6 +116,15 @@ pub fn compile_step_2<C: Config>(
         r.reassign_duplicate_sub_circuit_outputs();
         (r, im)
     });
+    r_dest_relaxed_opt
+        .validate()
+        .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
+
+    let r_dest_relaxed_opt = if let Some(limit) = options.mul_fanout_limit {
+        r_dest_relaxed_opt.solve_mul_fanout_limit(limit)
+    } else {
+        r_dest_relaxed_opt
+    };
     r_dest_relaxed_opt
         .validate()
         .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
@@ -189,6 +211,13 @@ pub fn compile_step_4<C: Config>(
 pub fn compile<C: Config>(
     r_source: &ir::source::RootCircuit<C>,
 ) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C>), Error> {
+    compile_with_options(r_source, CompileOptions::default())
+}
+
+pub fn compile_with_options<C: Config>(
+    r_source: &ir::source::RootCircuit<C>,
+    options: CompileOptions,
+) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C>), Error> {
     let (r_hint_normalized_opt, mut src_im) = compile_step_1(r_source)?;
 
     let ho_stats = r_hint_normalized_opt.get_stats();
@@ -204,7 +233,7 @@ pub fn compile<C: Config>(
         .validate()
         .map_err(|e| e.prepend("hint exported circuit invalid"))?;
 
-    let (r_dest_opt, mut hl_im) = compile_step_2(r_hint_less)?;
+    let (r_dest_opt, mut hl_im) = compile_step_2(r_hint_less, options.clone())?;
 
     let (lc, dest_im) =
         layering::compile(&r_dest_opt, layering::CompileOptions { is_zkcuda: false });

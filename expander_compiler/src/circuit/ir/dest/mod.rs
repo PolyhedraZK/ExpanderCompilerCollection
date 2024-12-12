@@ -16,6 +16,7 @@ use super::{
 pub mod tests;
 
 pub mod display;
+pub mod mul_fanout_limit;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Instruction<C: Config> {

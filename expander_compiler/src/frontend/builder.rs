@@ -1,9 +1,7 @@
-use std::{
-    collections::HashMap,
-    hash::{Hash, Hasher},
-};
+use std::collections::HashMap;
 
 use ethnum::U256;
+use tiny_keccak::Hasher;
 
 use crate::{
     circuit::{
@@ -19,7 +17,7 @@ use crate::{
     utils::function_id::get_function_id,
 };
 
-use super::api::{BasicAPI, UnconstrainedAPI};
+use super::api::{BasicAPI, DebugAPI, RootAPI, UnconstrainedAPI};
 
 pub struct Builder<C: Config> {
     instructions: Vec<SourceInstruction<C>>,
@@ -31,6 +29,14 @@ pub struct Builder<C: Config> {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Variable {
     id: usize,
+}
+
+pub fn new_variable(id: usize) -> Variable {
+    Variable { id }
+}
+
+pub fn get_variable_id(v: Variable) -> usize {
+    v.id
 }
 
 pub enum VariableOrValue<F: Field> {
@@ -198,10 +204,6 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         self.new_var()
     }
 
-    fn inverse(&mut self, x: impl ToVariableOrValue<C::CircuitField>) -> Variable {
-        self.div(1, x, true)
-    }
-
     fn xor(
         &mut self,
         x: impl ToVariableOrValue<C::CircuitField>,
@@ -277,22 +279,14 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         });
     }
 
-    fn assert_is_equal(
-        &mut self,
-        x: impl ToVariableOrValue<C::CircuitField>,
-        y: impl ToVariableOrValue<C::CircuitField>,
-    ) {
-        let diff = self.sub(x, y);
-        self.assert_is_zero(diff);
+    fn get_random_value(&mut self) -> Variable {
+        self.instructions
+            .push(SourceInstruction::ConstantLike(Coef::Random));
+        self.new_var()
     }
 
-    fn assert_is_different(
-        &mut self,
-        x: impl ToVariableOrValue<C::CircuitField>,
-        y: impl ToVariableOrValue<C::CircuitField>,
-    ) {
-        let diff = self.sub(x, y);
-        self.assert_is_non_zero(diff);
+    fn constant(&mut self, value: impl ToVariableOrValue<C::CircuitField>) -> Variable {
+        self.convert_to_variable(value)
     }
 }
 
@@ -373,6 +367,7 @@ pub struct RootBuilder<C: Config> {
     num_public_inputs: usize,
     current_builders: Vec<(usize, Builder<C>)>,
     sub_circuits: HashMap<usize, source::Circuit<C>>,
+    full_hash_id: HashMap<usize, [u8; 32]>,
 }
 
 macro_rules! root_binary_op {
@@ -407,10 +402,6 @@ impl<C: Config> BasicAPI<C> for RootBuilder<C> {
         self.last_builder().div(x, y, checked)
     }
 
-    fn inverse(&mut self, x: impl ToVariableOrValue<C::CircuitField>) -> Variable {
-        self.last_builder().inverse(x)
-    }
-
     fn is_zero(&mut self, x: impl ToVariableOrValue<C::CircuitField>) -> Variable {
         self.last_builder().is_zero(x)
     }
@@ -427,20 +418,44 @@ impl<C: Config> BasicAPI<C> for RootBuilder<C> {
         self.last_builder().assert_is_bool(x)
     }
 
-    fn assert_is_equal(
-        &mut self,
-        x: impl ToVariableOrValue<C::CircuitField>,
-        y: impl ToVariableOrValue<C::CircuitField>,
-    ) {
-        self.last_builder().assert_is_equal(x, y)
+    fn get_random_value(&mut self) -> Variable {
+        self.last_builder().get_random_value()
     }
 
-    fn assert_is_different(
+    fn constant(&mut self, x: impl ToVariableOrValue<<C as Config>::CircuitField>) -> Variable {
+        self.last_builder().constant(x)
+    }
+}
+
+impl<C: Config> RootAPI<C> for RootBuilder<C> {
+    fn memorized_simple_call<F: Fn(&mut Self, &Vec<Variable>) -> Vec<Variable> + 'static>(
         &mut self,
-        x: impl ToVariableOrValue<C::CircuitField>,
-        y: impl ToVariableOrValue<C::CircuitField>,
-    ) {
-        self.last_builder().assert_is_different(x, y)
+        f: F,
+        inputs: &[Variable],
+    ) -> Vec<Variable> {
+        let mut hasher = tiny_keccak::Keccak::v256();
+        hasher.update(b"simple");
+        hasher.update(&inputs.len().to_le_bytes());
+        hasher.update(&get_function_id::<F>().to_le_bytes());
+        let mut hash = [0u8; 32];
+        hasher.finalize(&mut hash);
+
+        let circuit_id = usize::from_le_bytes(hash[0..8].try_into().unwrap());
+        if let Some(prev_hash) = self.full_hash_id.get(&circuit_id) {
+            if *prev_hash != hash {
+                panic!("subcircuit id collision");
+            }
+        } else {
+            self.full_hash_id.insert(circuit_id, hash);
+        }
+
+        self.call_sub_circuit(circuit_id, inputs, f)
+    }
+}
+
+impl<C: Config> DebugAPI<C> for RootBuilder<C> {
+    fn value_of(&self, _x: impl ToVariableOrValue<C::CircuitField>) -> C::CircuitField {
+        panic!("ValueOf is not supported in non-debug mode");
     }
 }
 
@@ -461,6 +476,7 @@ impl<C: Config> RootBuilder<C> {
                 num_public_inputs,
                 current_builders: vec![(0, builder0)],
                 sub_circuits: HashMap::new(),
+                full_hash_id: HashMap::new(),
             },
             inputs,
             public_inputs,
@@ -519,23 +535,6 @@ impl<C: Config> RootBuilder<C> {
                 num_outputs: outputs.len(),
             });
         outputs
-    }
-
-    pub fn memorized_simple_call<F: Fn(&mut Self, &Vec<Variable>) -> Vec<Variable> + 'static>(
-        &mut self,
-        f: F,
-        inputs: &[Variable],
-    ) -> Vec<Variable> {
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        "simple".hash(&mut hasher);
-        inputs.len().hash(&mut hasher);
-        get_function_id::<F>().hash(&mut hasher);
-        let circuit_id = hasher.finish() as usize;
-        self.call_sub_circuit(circuit_id, inputs, f)
-    }
-
-    pub fn constant<T: ToVariableOrValue<C::CircuitField>>(&mut self, value: T) -> Variable {
-        self.last_builder().convert_to_variable(value)
     }
 }
 

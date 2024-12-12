@@ -344,6 +344,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "circuit-std-rs"
+version = "0.1.0"
+dependencies = [
+ "arith",
+ "ark-std",
+ "circuit",
+ "config",
+ "expander_compiler",
+ "gf2",
+ "gkr",
+ "mersenne31",
+ "rand",
+]
+
+[[package]]
 name = "clang-sys"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

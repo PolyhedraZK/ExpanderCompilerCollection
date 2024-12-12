@@ -20,10 +20,10 @@ func (l *IntSeq) Less(i, j int) bool {
 }
 
 // SortIntSeq sorts an integer sequence using a given compare function
-func SortIntSeq(s []int, cmp func(int, int) bool) {
+func SortIntSeq(s []int, cmpLess func(int, int) bool) {
 	l := &IntSeq{
 		s:   s,
-		cmp: cmp,
+		cmp: cmpLess,
 	}
 	sort.Sort(l)
 }
