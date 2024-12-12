@@ -142,7 +142,8 @@ fn gen_assignment(
 
 #[test]
 fn test_sha256_gf2() {
-    let compile_result = compile_generic_cross_layer(&SHA256Circuit::default(), CompileOptions::default()).unwrap();
+    let compile_result =
+        compile_generic_cross_layer(&SHA256Circuit::default(), CompileOptions::default()).unwrap();
     let CompileResultCrossLayer {
         witness_solver,
         layered_circuit,

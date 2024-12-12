@@ -16,7 +16,11 @@ pub fn rotate_right(bits: &Vec<Variable>, k: usize) -> Vec<Variable> {
     new_bits
 }
 
-pub fn shift_right<C: Config, B: RootAPI<C>>(api: &mut B, bits: Vec<Variable>, k: usize) -> Vec<Variable> {
+pub fn shift_right<C: Config, B: RootAPI<C>>(
+    api: &mut B,
+    bits: Vec<Variable>,
+    k: usize,
+) -> Vec<Variable> {
     let n = bits.len();
     let s = k & (n - 1);
     let mut new_bits = bits[s as usize..].to_vec();
@@ -92,7 +96,7 @@ pub fn add_const<C: Config, B: RootAPI<C>>(api: &mut B, a: Vec<Variable>, b: u32
     c
 }
 
-fn add_brentkung<C: Config, B: RootAPI<C>>(
+pub fn add_brentkung<C: Config, B: RootAPI<C>>(
     api: &mut B,
     a: &Vec<Variable>,
     b: &Vec<Variable>,
@@ -163,7 +167,11 @@ fn brent_kung_adder_4_bits<C: Config, B: RootAPI<C>>(
     (sum, c[4])
 }
 
-pub fn add<C: Config, B: RootAPI<C>>(api: &mut B, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
+pub fn add<C: Config, B: RootAPI<C>>(
+    api: &mut B,
+    a: Vec<Variable>,
+    b: Vec<Variable>,
+) -> Vec<Variable> {
     add_brentkung(api, &a, &b)
 }
 
@@ -207,7 +215,11 @@ pub fn add_vanilla<C: Config, B: RootAPI<C>>(
     c
 }
 
-pub fn xor<C: Config, B: RootAPI<C>>(api: &mut B, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
+pub fn xor<C: Config, B: RootAPI<C>>(
+    api: &mut B,
+    a: Vec<Variable>,
+    b: Vec<Variable>,
+) -> Vec<Variable> {
     let nbits = a.len();
     let mut bits_res = vec![api.constant(0); nbits];
     for i in 0..nbits {
@@ -216,7 +228,11 @@ pub fn xor<C: Config, B: RootAPI<C>>(api: &mut B, a: Vec<Variable>, b: Vec<Varia
     bits_res
 }
 
-pub fn and<C: Config, B: RootAPI<C>>(api: &mut B, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
+pub fn and<C: Config, B: RootAPI<C>>(
+    api: &mut B,
+    a: Vec<Variable>,
+    b: Vec<Variable>,
+) -> Vec<Variable> {
     let nbits = a.len();
     let mut bits_res = vec![api.constant(0); nbits];
     for i in 0..nbits {

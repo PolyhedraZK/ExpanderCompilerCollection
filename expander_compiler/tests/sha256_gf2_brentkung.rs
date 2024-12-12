@@ -4,6 +4,7 @@ use arith::Field;
 use expander_compiler::frontend::*;
 
 mod sha256_utils;
+use extra::Serde;
 use rand::RngCore;
 use sha2::{Digest, Sha256};
 use sha256_utils::*;
@@ -143,7 +144,8 @@ fn gen_assignment(
 
 #[test]
 fn test_sha256_gf2() {
-    let compile_result = compile_generic_cross_layer(&SHA256Circuit::default(), CompileOptions::default()).unwrap();
+    let compile_result =
+        compile_generic_cross_layer(&SHA256Circuit::default(), CompileOptions::default()).unwrap();
     let CompileResultCrossLayer {
         witness_solver,
         layered_circuit,
@@ -154,6 +156,15 @@ fn test_sha256_gf2() {
     let mut assignments = gen_assignment(n_assignments, N_HASHES, rng);
 
     let witness = witness_solver.solve_witnesses(&assignments).unwrap();
+
+    let file = std::fs::File::create("circuit_gf2.txt").unwrap();
+    let writer = std::io::BufWriter::new(file);
+    layered_circuit.serialize_into(writer).unwrap();
+
+    let file = std::fs::File::create("witness_gf2.txt").unwrap();
+    let writer = std::io::BufWriter::new(file);
+    witness.serialize_into(writer).unwrap();
+
     let res = layered_circuit.run(&witness);
     let expected_res = vec![true; n_assignments];
     assert_eq!(res, expected_res);
