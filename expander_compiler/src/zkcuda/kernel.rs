@@ -1,11 +1,15 @@
-use crate::circuit::{
-    config::Config,
-    input_mapping::{InputMapping, EMPTY},
-    ir::{self, expr},
-    layered::Circuit as LayeredCircuit,
-};
+use crate::circuit::ir::common::Instruction;
 use crate::field::FieldArith;
 use crate::frontend::*;
+use crate::{
+    circuit::{
+        config::Config,
+        input_mapping::{InputMapping, EMPTY},
+        ir::{self, expr},
+        layered::Circuit as LayeredCircuit,
+    },
+    utils::misc::next_power_of_two,
+};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Kernel<C: Config> {
@@ -158,6 +162,20 @@ where
         re_c0.outputs.swap(off1 + i, off2 + i);
     }
     rl_c0.num_inputs -= n_out;
+    let hint_size = off1 - n_in - n_out;
+    let hint_io = if hint_size > 0 {
+        lc_in.push(LayeredCircuitInputVec {
+            len: hint_size,
+            offset: n_in + n_out,
+        });
+        Some(WitnessSolverIOVec {
+            len: hint_size,
+            input_offset: None,
+            output_offset: Some(n_in + n_out),
+        })
+    } else {
+        None
+    };
     let mut add_insns = vec![];
     for i in 0..n_out {
         add_insns.push(ir::hint_less::Instruction::LinComb(expr::LinComb {
@@ -172,7 +190,13 @@ where
     rl_c0.instructions = add_insns;
     assert_eq!(rl_c0.outputs.len(), n_in + n_out * 2);
     rl_c0.outputs.truncate(n_in + n_out);
-    let num_inputs_with_hint = rl_c0.num_inputs;
+    // reorder inputs
+    reorder_ir_inputs(&mut r_hint_less, &mut lc_in);
+    let rhl_c0 = r_hint_less.circuits.get_mut(&0).unwrap();
+    let num_inputs_with_hint_padded = rhl_c0.num_inputs;
+    for i in 1..=num_inputs_with_hint_padded {
+        rhl_c0.outputs.push(i);
+    }
     // compile step 2
     let (mut r_dest_opt, hl_im) =
         crate::compile::compile_step_2(r_hint_less, CompileOptions::default())?;
@@ -181,7 +205,9 @@ where
     }
     // remove outputs that used for prevent optimization
     let rd_c0 = r_dest_opt.circuits.get_mut(&0).unwrap();
-    rd_c0.outputs.truncate(rd_c0.outputs.len() - n_in - n_out);
+    rd_c0
+        .outputs
+        .truncate(rd_c0.outputs.len() - n_in - n_out - num_inputs_with_hint_padded);
     // compile step 3
     let (lc, dest_im) = crate::layering::compile(
         &r_dest_opt,
@@ -190,7 +216,7 @@ where
         },
     );
     for (i, x) in dest_im.mapping().iter().enumerate() {
-        if i < num_inputs_with_hint {
+        if i < num_inputs_with_hint_padded {
             assert_eq!(i, *x);
         } else {
             assert_eq!(*x, EMPTY);
@@ -205,20 +231,7 @@ where
     }
     let re_c0 = r_hint_exported_opt.circuits.get_mut(&0).unwrap();
     re_c0.outputs.truncate(off1);
-    let hint_size = re_c0.outputs.len() - n_in - n_out;
-    let hint_io = if hint_size > 0 {
-        lc_in.push(LayeredCircuitInputVec {
-            len: hint_size,
-            offset: n_in + n_out,
-        });
-        Some(WitnessSolverIOVec {
-            len: hint_size,
-            input_offset: None,
-            output_offset: Some(n_in + n_out),
-        })
-    } else {
-        None
-    };
+    println!("{:?}", lc_in);
 
     Ok(Kernel {
         witness_solver: r_hint_exported_opt,
@@ -227,6 +240,42 @@ where
         witness_solver_hint_input: hint_io,
         layered_circuit_input: lc_in,
     })
+}
+
+fn reorder_ir_inputs<C: Config>(
+    r: &mut ir::hint_less::RootCircuit<C>,
+    lc_in: &mut Vec<LayeredCircuitInputVec>,
+) {
+    // sort by size, pad to 2^n, then reorder
+    let mut sizes: Vec<(usize, usize)> =
+        lc_in.iter().enumerate().map(|(i, x)| (x.len, i)).collect();
+    sizes.sort_by(|a, b| b.cmp(a));
+    let r0 = r.circuits.get_mut(&0).unwrap();
+    let mut var_new_id = vec![0; r0.num_inputs + 1];
+    let mut var_max = 0;
+    for &(size, i) in sizes.iter() {
+        let n = next_power_of_two(size);
+        let prev = lc_in[i].offset;
+        lc_in[i].offset = var_max;
+        lc_in[i].len = n;
+        assert!(var_max % n == 0);
+        for j in 1..=size {
+            var_new_id[prev + j] = var_max + j;
+        }
+        var_max += n;
+    }
+    r0.num_inputs = var_max;
+    let mut new_insns = vec![];
+    for insn in r0.instructions.iter() {
+        new_insns.push(insn.replace_vars(|x| var_new_id[x]));
+        for _ in 0..insn.num_outputs() {
+            var_max += 1;
+            var_new_id.push(var_max);
+        }
+    }
+    r0.instructions = new_insns;
+    r0.constraints = r0.constraints.iter().map(|x| var_new_id[*x]).collect();
+    r0.outputs = r0.outputs.iter().map(|x| var_new_id[*x]).collect();
 }
 
 #[cfg(test)]

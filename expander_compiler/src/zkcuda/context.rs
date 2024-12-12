@@ -1,4 +1,5 @@
 use crate::field::FieldArith;
+use crate::utils::misc::next_power_of_two;
 use crate::{circuit::config::Config, utils::pool::Pool};
 
 use super::{kernel::Kernel, proving_system::ProvingSystem};
@@ -66,17 +67,26 @@ impl<C: Config, P: ProvingSystem<C>> Context<C, P> {
         if kernel.witness_solver_io.len() != is_broadcast.len() {
             panic!("Invalid number of is_broadcast");
         }
+        if parallel_count == 0 {
+            panic!("parallel_count must be at least 1");
+        }
+        // TODO: Is this necessary?
+        // If it's not needed to pad the parallel count to a power of 2, we need to change other parts of the code
+        /*if parallel_count & parallel_count - 1 != 0 {
+            panic!("parallel_count must be a power of 2");
+        }*/
         for i in 0..ios.len() {
             if is_broadcast[i] {
                 assert!(kernel.witness_solver_io[i].output_offset.is_none());
                 assert_eq!(
                     self.device_memories[ios[i].unwrap()].values.len(),
-                    kernel.witness_solver_io[i].len
+                    next_power_of_two(kernel.witness_solver_io[i].len)
                 );
             } else if kernel.witness_solver_io[i].input_offset.is_some() {
                 assert_eq!(
                     self.device_memories[ios[i].unwrap()].values.len(),
-                    kernel.witness_solver_io[i].len * parallel_count
+                    next_power_of_two(kernel.witness_solver_io[i].len)
+                        * next_power_of_two(parallel_count)
                 );
             }
         }
@@ -118,7 +128,7 @@ impl<C: Config, P: ProvingSystem<C>> Context<C, P> {
                     for (i, x) in device_memory
                         .values
                         .iter()
-                        .skip(parallel_i * ws_input.len)
+                        .skip(parallel_i * next_power_of_two(ws_input.len))
                         .take(ws_input.len)
                         .enumerate()
                     {
@@ -137,15 +147,21 @@ impl<C: Config, P: ProvingSystem<C>> Context<C, P> {
                 let offset = ws_input.output_offset.unwrap();
                 let values = &ws_outputs[offset..offset + ws_input.len];
                 output_vecs[i].extend_from_slice(values);
+                for _ in ws_input.len..next_power_of_two(ws_input.len) {
+                    output_vecs[i].push(C::CircuitField::zero());
+                }
             }
             if let Some(hint_io) = &kernel.witness_solver_hint_input {
                 let values = &ws_outputs
                     [hint_io.output_offset.unwrap()..hint_io.output_offset.unwrap() + hint_io.len];
                 hint_output_vec.extend_from_slice(values);
+                for _ in hint_io.len..next_power_of_two(hint_io.len) {
+                    hint_output_vec.push(C::CircuitField::zero());
+                }
             }
         }
 
-        for ((output, ws_input), ov) in ios
+        for ((output, ws_input), mut ov) in ios
             .iter_mut()
             .zip(kernel.witness_solver_io.iter())
             .zip(output_vecs.into_iter())
@@ -154,6 +170,7 @@ impl<C: Config, P: ProvingSystem<C>> Context<C, P> {
                 *output = None;
                 continue;
             }
+            ov.resize(next_power_of_two(ov.len()), C::CircuitField::zero());
             let commitment = P::commit(&ov);
             let device_memory = DeviceMemory {
                 values: ov,
@@ -165,6 +182,10 @@ impl<C: Config, P: ProvingSystem<C>> Context<C, P> {
             lc_is_broadcast.push(false);
         }
         if kernel.witness_solver_hint_input.is_some() {
+            hint_output_vec.resize(
+                next_power_of_two(hint_output_vec.len()),
+                C::CircuitField::zero(),
+            );
             let commitment = P::commit(&hint_output_vec);
             let device_memory = DeviceMemory {
                 values: hint_output_vec,
@@ -178,7 +199,12 @@ impl<C: Config, P: ProvingSystem<C>> Context<C, P> {
             .iter()
             .map(|&x| &self.device_memories[x].commitment)
             .collect();
-        let proof = P::prove(kernel, &commitment_refs, parallel_count, &lc_is_broadcast);
+        let proof = P::prove(
+            kernel,
+            &commitment_refs,
+            next_power_of_two(parallel_count),
+            &lc_is_broadcast,
+        );
         self.proofs.push(WrappedProof {
             proof,
             kernel_id,
@@ -212,7 +238,7 @@ impl<C: Config, P: ProvingSystem<C>> CombinedProof<C, P> {
                     .iter()
                     .map(|&x| &self.commitments[x])
                     .collect::<Vec<_>>(),
-                proof.parallel_count,
+                next_power_of_two(proof.parallel_count),
                 &proof.is_broadcast,
             ) {
                 return false;
