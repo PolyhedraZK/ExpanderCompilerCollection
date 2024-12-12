@@ -1,9 +1,8 @@
 // credit: https://github.com/PolyhedraZK/proof-arena/blob/main/problems/sha256_hash/expander-sha256/src/lib.rs
 //
 use expander_compiler::frontend::*;
-use rand::RngCore;
 
-pub fn int2bit<C: Config>(api: &mut API<C>, value: u32) -> Vec<Variable> {
+pub fn int2bit<C: Config, B: RootAPI<C>>(api: &mut B, value: u32) -> Vec<Variable> {
     return (0..32)
         .map(|x| api.constant(((value >> x) & 1) as u32))
         .collect();
@@ -17,7 +16,7 @@ pub fn rotate_right(bits: &Vec<Variable>, k: usize) -> Vec<Variable> {
     new_bits
 }
 
-pub fn shift_right<C: Config>(api: &mut API<C>, bits: Vec<Variable>, k: usize) -> Vec<Variable> {
+pub fn shift_right<C: Config, B: RootAPI<C>>(api: &mut B, bits: Vec<Variable>, k: usize) -> Vec<Variable> {
     let n = bits.len();
     let s = k & (n - 1);
     let mut new_bits = bits[s as usize..].to_vec();
@@ -26,8 +25,8 @@ pub fn shift_right<C: Config>(api: &mut API<C>, bits: Vec<Variable>, k: usize) -
 }
 
 // Ch function: (x AND y) XOR (NOT x AND z)
-pub fn ch<C: Config>(
-    api: &mut API<C>,
+pub fn ch<C: Config, B: RootAPI<C>>(
+    api: &mut B,
     x: Vec<Variable>,
     y: Vec<Variable>,
     z: Vec<Variable>,
@@ -40,8 +39,8 @@ pub fn ch<C: Config>(
 }
 
 // Maj function: (x AND y) XOR (x AND z) XOR (y AND z)
-pub fn maj<C: Config>(
-    api: &mut API<C>,
+pub fn maj<C: Config, B: RootAPI<C>>(
+    api: &mut B,
     x: Vec<Variable>,
     y: Vec<Variable>,
     z: Vec<Variable>,
@@ -55,7 +54,7 @@ pub fn maj<C: Config>(
 }
 
 // Sigma0 function: ROTR(x, 2) XOR ROTR(x, 13) XOR ROTR(x, 22)
-pub fn sigma0<C: Config>(api: &mut API<C>, x: Vec<Variable>) -> Vec<Variable> {
+pub fn sigma0<C: Config, B: RootAPI<C>>(api: &mut B, x: Vec<Variable>) -> Vec<Variable> {
     let rot2 = rotate_right(&x, 2);
     let rot13 = rotate_right(&x, 13);
     let rot22 = rotate_right(&x, 22);
@@ -65,7 +64,7 @@ pub fn sigma0<C: Config>(api: &mut API<C>, x: Vec<Variable>) -> Vec<Variable> {
 }
 
 // Sigma1 function: ROTR(x, 6) XOR ROTR(x, 11) XOR ROTR(x, 25)
-pub fn sigma1<C: Config>(api: &mut API<C>, x: Vec<Variable>) -> Vec<Variable> {
+pub fn sigma1<C: Config, B: RootAPI<C>>(api: &mut B, x: Vec<Variable>) -> Vec<Variable> {
     let rot6 = rotate_right(&x, 6);
     let rot11 = rotate_right(&x, 11);
     let rot25 = rotate_right(&x, 25);
@@ -74,7 +73,7 @@ pub fn sigma1<C: Config>(api: &mut API<C>, x: Vec<Variable>) -> Vec<Variable> {
     xor(api, tmp, rot25)
 }
 
-pub fn add_const<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: u32) -> Vec<Variable> {
+pub fn add_const<C: Config, B: RootAPI<C>>(api: &mut B, a: Vec<Variable>, b: u32) -> Vec<Variable> {
     let n = a.len();
     let mut c = a.clone();
     let mut ci = api.constant(0);
@@ -93,8 +92,8 @@ pub fn add_const<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: u32) -> Vec<V
     c
 }
 
-fn add_brentkung<C: Config>(
-    api: &mut API<C>,
+fn add_brentkung<C: Config, B: RootAPI<C>>(
+    api: &mut B,
     a: &Vec<Variable>,
     b: &Vec<Variable>,
 ) -> Vec<Variable> {
@@ -115,8 +114,8 @@ fn add_brentkung<C: Config>(
     c
 }
 
-fn brent_kung_adder_4_bits<C: Config>(
-    api: &mut API<C>,
+fn brent_kung_adder_4_bits<C: Config, B: RootAPI<C>>(
+    api: &mut B,
     a: &Vec<Variable>,
     b: &Vec<Variable>,
     carry_in: Variable,
@@ -164,12 +163,12 @@ fn brent_kung_adder_4_bits<C: Config>(
     (sum, c[4])
 }
 
-pub fn add<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
+pub fn add<C: Config, B: RootAPI<C>>(api: &mut B, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
     add_brentkung(api, &a, &b)
 }
 
-fn bit_add_with_carry<C: Config>(
-    api: &mut API<C>,
+fn bit_add_with_carry<C: Config, B: RootAPI<C>>(
+    api: &mut B,
     a: Variable,
     b: Variable,
     carry: Variable,
@@ -192,8 +191,8 @@ fn bit_add_with_carry<C: Config>(
     (sum, carry_next)
 }
 
-pub fn add_vanilla<C: Config>(
-    api: &mut API<C>,
+pub fn add_vanilla<C: Config, B: RootAPI<C>>(
+    api: &mut B,
     a: Vec<Variable>,
     b: Vec<Variable>,
 ) -> Vec<Variable> {
@@ -208,7 +207,7 @@ pub fn add_vanilla<C: Config>(
     c
 }
 
-pub fn xor<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
+pub fn xor<C: Config, B: RootAPI<C>>(api: &mut B, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
     let nbits = a.len();
     let mut bits_res = vec![api.constant(0); nbits];
     for i in 0..nbits {
@@ -217,7 +216,7 @@ pub fn xor<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> V
     bits_res
 }
 
-pub fn and<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
+pub fn and<C: Config, B: RootAPI<C>>(api: &mut B, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
     let nbits = a.len();
     let mut bits_res = vec![api.constant(0); nbits];
     for i in 0..nbits {
@@ -226,7 +225,7 @@ pub fn and<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> V
     bits_res
 }
 
-pub fn not<C: Config>(api: &mut API<C>, a: Vec<Variable>) -> Vec<Variable> {
+pub fn not<C: Config, B: RootAPI<C>>(api: &mut B, a: Vec<Variable>) -> Vec<Variable> {
     let mut bits_res = vec![api.constant(0); a.len()];
     for i in 0..a.len() {
         bits_res[i] = api.sub(1, a[i].clone());

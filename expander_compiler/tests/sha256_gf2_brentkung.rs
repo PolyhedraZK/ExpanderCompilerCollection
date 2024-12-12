@@ -1,5 +1,6 @@
-use arith::Field;
 // credit: https://github.com/PolyhedraZK/proof-arena/blob/main/problems/sha256_hash/expander-sha256/src/main.rs
+
+use arith::Field;
 use expander_compiler::frontend::*;
 
 mod sha256_utils;
@@ -14,8 +15,8 @@ declare_circuit!(SHA256Circuit {
     output: [[Variable; 256]; N_HASHES], // TODO: use public inputs
 });
 
-impl Define<GF2Config> for SHA256Circuit<Variable> {
-    fn define(&self, api: &mut API<GF2Config>) {
+impl GenericDefine<GF2Config> for SHA256Circuit<Variable> {
+    fn define<Builder: RootAPI<GF2Config>>(&self, api: &mut Builder) {
         for j in 0..N_HASHES {
             let out = compute_sha256(api, &self.input[j].to_vec());
             for i in 0..256 {
@@ -25,7 +26,7 @@ impl Define<GF2Config> for SHA256Circuit<Variable> {
     }
 }
 
-fn compute_sha256<C: Config>(api: &mut API<C>, input: &Vec<Variable>) -> Vec<Variable> {
+fn compute_sha256<C: Config, B: RootAPI<C>>(api: &mut B, input: &Vec<Variable>) -> Vec<Variable> {
     let h32: [u32; 8] = [
         0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab,
         0x5be0cd19,
@@ -142,7 +143,7 @@ fn gen_assignment(
 
 #[test]
 fn test_sha256_gf2() {
-    let compile_result = compile_cross_layer(&SHA256Circuit::default()).unwrap();
+    let compile_result = compile_generic_cross_layer(&SHA256Circuit::default(), CompileOptions::default()).unwrap();
     let CompileResultCrossLayer {
         witness_solver,
         layered_circuit,
