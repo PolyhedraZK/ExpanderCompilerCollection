@@ -650,6 +650,8 @@ dependencies = [
  "halo2curves",
  "mersenne31",
  "rand",
+ "rayon",
+ "sha2",
  "tiny-keccak",
 ]
 
