@@ -1,4 +1,3 @@
-use circuit_std_rs::byte_decomposition;
 use expander_compiler::frontend::*;
 use expander_compiler::{
     declare_circuit,
@@ -6,6 +5,8 @@ use expander_compiler::{
 };
 use halo2curves::bn256::Fr;
 use halo2curves::ff::Field;
+
+use crate::byte_decomposition;
 
 declare_circuit!(ByteDecompCircuit {
     input: Variable,
