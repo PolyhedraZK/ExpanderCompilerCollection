@@ -1,10 +1,9 @@
 use std::mem::transmute;
 
+use circuit_std_rs::{HEX_PER_LIMB, MASK120, MASK60, MASK8, N_LIMBS};
 use halo2curves::bn256::Fr;
 use num_bigint::BigUint;
 use rand::Rng;
-
-use crate::constants::{HEX_PER_LIMB, MASK120, MASK60, MASK8, N_LIMBS};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RSAFieldElement {

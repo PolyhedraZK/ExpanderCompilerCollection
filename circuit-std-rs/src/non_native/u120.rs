@@ -1,4 +1,16 @@
 use expander_compiler::frontend::{BN254Config, RootAPI, Variable};
+use halo2curves::bn256::Fr;
+
+use super::util;
+
+// 2^120 - 1
+pub const MASK120: u128 = (1 << 120) - 1;
+// 2^60 - 1
+pub const MASK60: u128 = (1 << 60) - 1;
+// 2^8 - 1
+pub const MASK8: u128 = (1 << 8) - 1;
+// 2^120 in Fr
+pub const BN_TWO_TO_120: Fr = Fr::from_raw([0, 1 << 56, 0, 0]);
 
 #[inline]
 // TODO:
@@ -102,7 +114,7 @@ pub(crate) fn is_less_than_u120<Builder: RootAPI<BN254Config>>(
     builder: &mut Builder,
 ) -> Variable {
     let diff = builder.sub(x, y);
-    let byte_decomp = crate::util::unconstrained_byte_decomposition(&diff, builder);
+    let byte_decomp = util::unconstrained_byte_decomposition(&diff, builder);
     let res = builder.unconstrained_lesser(x, y);
 
     // if res = 1: x < y, then diff will underflow so byte_decomp[31] will be non-zero

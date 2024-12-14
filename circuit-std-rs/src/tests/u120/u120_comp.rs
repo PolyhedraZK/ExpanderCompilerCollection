@@ -6,8 +6,8 @@ use expander_compiler::{
 use halo2curves::bn256::Fr;
 use std::mem::transmute;
 
-use crate::constants::MASK120;
 use crate::u120::is_less_than_u120;
+use crate::MASK120;
 
 declare_circuit!(LessThanCircuit {
     x: Variable,

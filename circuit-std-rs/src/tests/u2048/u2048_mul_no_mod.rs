@@ -1,18 +1,12 @@
-use std::mem::transmute;
-
 use expander_compiler::frontend::*;
 use expander_compiler::{
     declare_circuit,
     frontend::{BN254Config, Variable},
 };
-use extra::debug_eval;
 use halo2curves::bn256::Fr;
-use num_bigint::BigUint;
-use num_traits::Num;
 
-use crate::constants::{BN_TWO_TO_120, N_LIMBS};
-use crate::native::RSAFieldElement;
 use crate::u2048::U2048Variable;
+use crate::{BN_TWO_TO_120, N_LIMBS};
 
 declare_circuit!(MulNoModCircuit {
     x: [Variable; N_LIMBS],
@@ -62,6 +56,7 @@ impl MulNoModCircuit<Fr> {
         }
     }
 }
+
 #[test]
 fn test_mul_without_mod() {
     let compile_result =
@@ -255,117 +250,9 @@ fn test_mul_without_mod() {
         assert_eq!(output, vec![true]);
     }
 
-    {
-        let x = BigUint::from_str_radix(
-            "7f\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            000000000000000000000000000000",
-            16,
-        )
-        .unwrap();
-        let mut res = BigUint::from_str_radix(
-            "3fff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffffff\
-            ffffffffffffffffffffffffffff00\
-            000000000000000000000000000000\
-            000000000000000000000000000000\
-            000000000000000000000000000000\
-            000000000000000000000000000000\
-            000000000000000000000000000000\
-            000000000000000000000000000000\
-            000000000000000000000000000000\
-            000000000000000000000000000000\
-            000000000000000000000000000000\
-            000000000000000000000000000000\
-            000000000000000000000000000000\
-            000000000000000000000000000000\
-            000000000000000000000000000000\
-            000000000000000000000000000000\
-            000000000000000000000000000000\
-            000000000000000000000000000001\
-            000000000000000000000000000000\
-            000000000000000000000000000000",
-            16,
-        )
-        .unwrap();
-        assert_eq!(&x * &x, res);
-
-        let x = RSAFieldElement::from_big_uint(x);
-        let x = x
-            .data
-            .iter()
-            .map(|&x| unsafe {
-                let tmp = transmute::<u128, [u64; 2]>(x);
-                [tmp[0], tmp[1]]
-            })
-            .collect::<Vec<_>>();
-        let x = x.try_into().unwrap();
-
-        let mut result = [[0, 0]; 2 * N_LIMBS];
-        let two_to_120 = BigUint::from(1u64) << 120;
-        for i in 0..2 * N_LIMBS {
-            let tmp: BigUint = &res % &two_to_120;
-            res >>= 120;
-            let tmp = tmp.to_u64_digits();
-            match tmp.len() {
-                0 => {
-                    result[i] = [0, 0];
-                }
-                1 => {
-                    result[i] = [tmp[0], 0];
-                }
-                2 => {
-                    result[i] = [tmp[0], tmp[1]];
-                }
-                _ => panic!("Unexpected length"),
-            }
-        }
-
-        let assignment = MulNoModCircuit::<Fr>::create_circuit(x, x, result);
-
-        let witness = compile_result
-            .witness_solver
-            .solve_witness(&assignment)
-            .unwrap();
-        let output = compile_result.layered_circuit.run(&witness);
-
-        debug_eval(&MulNoModCircuit::default(), &assignment);
-
-        assert_eq!(output, vec![true]);
-    }
-
     // Negative test cases
     {
-        // Test case 10: Incorrect result
+        // Test case 9: Incorrect result
         let mut x = [[0, 0]; N_LIMBS];
         x[0] = [5, 0];
         let mut y = [[0, 0]; N_LIMBS];
@@ -383,7 +270,7 @@ fn test_mul_without_mod() {
     }
 
     {
-        // Test case 11: Missing carry
+        // Test case 10: Missing carry
         let mut x = [[0, 0]; N_LIMBS];
         x[0] = [(1u64 << 63), 0];
         let mut y = [[0, 0]; N_LIMBS];

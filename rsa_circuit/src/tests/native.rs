@@ -1,9 +1,7 @@
 use ark_std::test_rng;
+use circuit_std_rs::{MASK120, MASK8, N_LIMBS};
 
-use crate::{
-    constants::{MASK120, MASK8, N_LIMBS},
-    native::{self, RSAFieldElement},
-};
+use crate::native::{self, RSAFieldElement};
 
 #[test]
 fn test_rsa_field_serial() {

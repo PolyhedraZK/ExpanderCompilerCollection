@@ -1,9 +1,12 @@
 use expander_compiler::frontend::{BN254Config, RootAPI, Variable};
 
-use crate::{
-    constants::N_LIMBS,
-    u120::{self, add_u120, is_less_than_u120, mul_u120},
-};
+use super::u120;
+
+// we use 18 limbs, each with 120 bits, to store a 2048 bit integer
+pub const N_LIMBS: usize = 18;
+
+// Each 120 bits limb needs 30 hex number to store
+pub const HEX_PER_LIMB: usize = 30;
 
 #[derive(Debug, Clone, Copy)]
 pub struct U2048Variable {
@@ -63,7 +66,7 @@ impl U2048Variable {
         // Compare limbs from most significant to least significant
         for i in (0..N_LIMBS).rev() {
             // Compare current limbs using u120 comparison
-            let curr_less = is_less_than_u120(&self.limbs[i], &other.limbs[i], builder);
+            let curr_less = u120::is_less_than_u120(&self.limbs[i], &other.limbs[i], builder);
 
             // Check equality for current limbs
             let diff = builder.sub(self.limbs[i], other.limbs[i]);
@@ -254,10 +257,10 @@ impl U2048Variable {
 
                 // prod + mul_carry * 2^120 = x[i] * y[j]
                 let (xiyi_lo, xiyi_hi) =
-                    mul_u120(&x.limbs[i], &y.limbs[j], &zero, two_to_120, builder);
+                    u120::mul_u120(&x.limbs[i], &y.limbs[j], &zero, two_to_120, builder);
 
                 // update xiyi_lo to result[target]
-                let (sum, new_carry) = add_u120(
+                let (sum, new_carry) = u120::add_u120(
                     &local_res[target_position],
                     &xiyi_lo,
                     &zero,
@@ -270,7 +273,7 @@ impl U2048Variable {
                     builder.add(addition_carries[target_position + 1], new_carry);
 
                 // update mul_carry to result[target+1]
-                let (sum, new_carry) = add_u120(
+                let (sum, new_carry) = u120::add_u120(
                     &local_res[target_position + 1],
                     &xiyi_hi,
                     &zero,
@@ -291,7 +294,7 @@ impl U2048Variable {
         // integrate carries into result
         let mut cur_carry = builder.constant(0);
         for i in 0..2 * N_LIMBS {
-            (local_res[i], cur_carry) = add_u120(
+            (local_res[i], cur_carry) = u120::add_u120(
                 &local_res[i],
                 &addition_carries[i],
                 &cur_carry,

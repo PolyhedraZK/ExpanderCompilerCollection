@@ -5,8 +5,8 @@ use expander_compiler::{
 };
 use halo2curves::bn256::Fr;
 
-use crate::constants::N_LIMBS;
 use crate::u2048::U2048Variable;
+use crate::N_LIMBS;
 
 declare_circuit!(CompareCircuit {
     x: [Variable; N_LIMBS],

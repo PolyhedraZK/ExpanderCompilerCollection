@@ -1,11 +1,9 @@
 use ark_std::test_rng;
+use circuit_std_rs::{MASK120, MASK8, N_LIMBS};
 use num_bigint::BigUint;
 use rand::Rng;
 
-use crate::{
-    constants::{MASK120, MASK8, N_LIMBS},
-    native::RSAFieldElement,
-};
+use crate::native::RSAFieldElement;
 #[test]
 fn test_zero() {
     let zero = RSAFieldElement::new([0; N_LIMBS]);

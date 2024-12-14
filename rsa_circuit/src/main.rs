@@ -2,14 +2,11 @@
 // allow range loop for better readability
 #![allow(clippy::needless_range_loop)]
 
-mod constants;
 mod native;
-mod u120;
-mod u2048;
-mod util;
 
-use circuit_std_rs::{LogUpCircuit, LogUpParams, StdCircuit};
-use constants::N_LIMBS;
+use circuit_std_rs::{
+    LogUpCircuit, LogUpParams, StdCircuit, U2048Variable, BN_TWO_TO_120, N_LIMBS,
+};
 use expander_compiler::frontend::*;
 use expander_compiler::{
     declare_circuit,
@@ -19,7 +16,6 @@ use extra::Serde;
 use halo2curves::bn256::Fr;
 use native::RSAFieldElement;
 use num_bigint::BigUint;
-use u2048::U2048Variable;
 
 // A RSA signature verification requires to compute x^e mod n, where
 // - e is fixed to 2^16 + 1
@@ -69,7 +65,7 @@ pub fn build_rsa_traces(
 
 impl Define<BN254Config> for RSACircuit<Variable> {
     fn define(&self, builder: &mut API<BN254Config>) {
-        let two_to_120 = builder.constant(constants::BN_TWO_TO_120);
+        let two_to_120 = builder.constant(BN_TWO_TO_120);
         let x_var = U2048Variable::from_raw(self.x);
         let n_var = U2048Variable::from_raw(self.n);
         let x_power_vars = self

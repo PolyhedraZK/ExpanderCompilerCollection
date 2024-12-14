@@ -354,6 +354,7 @@ dependencies = [
  "expander_compiler",
  "gf2",
  "gkr",
+ "halo2curves",
  "mersenne31",
  "rand",
 ]
