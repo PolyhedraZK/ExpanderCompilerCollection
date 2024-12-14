@@ -1645,6 +1645,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "rand",
+ "sha2",
 ]
 
 [[package]]

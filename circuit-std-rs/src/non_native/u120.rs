@@ -15,7 +15,10 @@ pub const BN_TWO_TO_120: Fr = Fr::from_raw([0, 1 << 56, 0, 0]);
 #[inline]
 // TODO:
 // Assert the variable x is 120 bits, via LogUp
-pub fn range_proof_u120<Builder: RootAPI<BN254Config>>(_x: &Variable, _builder: &mut Builder) {}
+pub fn range_proof_u120<Builder: RootAPI<BN254Config>>(_x: &Variable, _builder: &mut Builder) {
+    // for now it is noop -- fix me!
+    // do not use in production
+}
 
 // Accumulate up to 2^120 variables
 pub fn accumulate_u120<Builder: RootAPI<BN254Config>>(

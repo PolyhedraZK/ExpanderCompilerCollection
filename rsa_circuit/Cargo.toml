@@ -7,9 +7,10 @@ edition = "2021"
 ark-std.workspace = true
 halo2curves.workspace = true
 itertools.workspace = true
-rand.workspace = true
 num-bigint.workspace = true
 num-traits.workspace = true
+rand.workspace = true
+sha2.workspace = true
 
 circuit-std-rs = { path = "../circuit-std-rs" }
 expander_compiler = { path = "../expander_compiler" }

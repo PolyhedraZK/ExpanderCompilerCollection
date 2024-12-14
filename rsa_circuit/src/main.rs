@@ -4,6 +4,7 @@
 
 mod native;
 
+use ark_std::test_rng;
 use circuit_std_rs::{
     LogUpCircuit, LogUpParams, StdCircuit, U2048Variable, BN_TWO_TO_120, N_LIMBS,
 };
@@ -16,8 +17,16 @@ use extra::Serde;
 use halo2curves::bn256::Fr;
 use native::RSAFieldElement;
 use num_bigint::BigUint;
+use rand::RngCore;
+use sha2::Digest;
 
-// A RSA signature verification requires to compute x^e mod n, where
+// see explanation in circuit declaration
+const HASH_INPUT_LEN: usize = 1504;
+const HASH_OUTPUT_LEN: usize = 1472;
+
+// A RSA signature verification requires to perform two tasks
+//
+// 1. compute x^e mod n, where
 // - e is fixed to 2^16 + 1
 // - x and n are both 2048 bits integers
 // - the intermediate results are stored in 16 2048 bits integers
@@ -29,12 +38,21 @@ use num_bigint::BigUint;
 //
 // also note: due to the limitation of the frontend, we have to pass those intermediate results as arguments
 // ideally we want to be able to generate them with hint function -- it is currently not supported
+//
+// 2. hash 1504 bytes of data using sha256
+// - takes the first 64 bytes inputs and produce 32 bytes output
+// - takes the next 32 bytes inputs, pre-fixed with the 32 bytes output from previous hash, and produce a 32 bytes output
+//    - this takes 45 iterations to hash all 1440 bytes
+// - requires 46 iterations to hash all 1504 bytes
+//    - produces 1472 bytes output, including the 32 bytes output from the last iteration
 declare_circuit!(RSACircuit {
     x: [Variable; N_LIMBS],
     n: [Variable; N_LIMBS],
     x_powers: [[Variable; N_LIMBS]; 17],
     mul_carries: [[Variable; N_LIMBS]; 17],
     result: [Variable; N_LIMBS],
+    hash_inputs: [Variable; HASH_INPUT_LEN],
+    hash_outputs: [Variable; HASH_OUTPUT_LEN],
 });
 
 // To build this circuit we will need to compute intermediate results:
@@ -44,7 +62,7 @@ declare_circuit!(RSACircuit {
 // - power of e-s
 // - carries of the multiplication
 // - carries for e * e^65536
-pub fn build_rsa_traces(
+fn build_rsa_traces(
     x: &RSAFieldElement,
     n: &RSAFieldElement,
     res: &RSAFieldElement,
@@ -63,60 +81,82 @@ pub fn build_rsa_traces(
     (x_powers, mul_carries)
 }
 
+fn build_hash_outputs(hash_inputs: &[u8]) -> [u8; HASH_OUTPUT_LEN] {
+    assert!(hash_inputs.len() == HASH_INPUT_LEN);
+
+    let mut hash_outputs = [0u8; HASH_OUTPUT_LEN];
+    let mut hash_input = hash_inputs[..64].to_vec();
+    for i in 0..46 {
+        let mut hasher = sha2::Sha256::default();
+        hasher.update(&hash_input);
+        let hash_output: [u8; 32] = hasher.finalize().try_into().unwrap();
+        hash_outputs[i * 32..(i + 1) * 32].copy_from_slice(&hash_output);
+        hash_input = [
+            hash_inputs[(i + 2) * 32..(i + 3) * 32].as_ref(),
+            hash_output.as_ref(),
+        ]
+        .concat();
+    }
+    hash_outputs
+}
+
 impl Define<BN254Config> for RSACircuit<Variable> {
     fn define(&self, builder: &mut API<BN254Config>) {
-        let two_to_120 = builder.constant(BN_TWO_TO_120);
-        let x_var = U2048Variable::from_raw(self.x);
-        let n_var = U2048Variable::from_raw(self.n);
-        let x_power_vars = self
-            .x_powers
-            .iter()
-            .map(|trace| U2048Variable::from_raw(*trace))
-            .collect::<Vec<_>>();
-        let mul_carry_vars = self
-            .mul_carries
-            .iter()
-            .map(|carry| U2048Variable::from_raw(*carry))
-            .collect::<Vec<_>>();
+        // task 1: compute x^e mod n
+        {
+            let two_to_120 = builder.constant(BN_TWO_TO_120);
+            let x_var = U2048Variable::from_raw(self.x);
+            let n_var = U2048Variable::from_raw(self.n);
+            let x_power_vars = self
+                .x_powers
+                .iter()
+                .map(|trace| U2048Variable::from_raw(*trace))
+                .collect::<Vec<_>>();
+            let mul_carry_vars = self
+                .mul_carries
+                .iter()
+                .map(|carry| U2048Variable::from_raw(*carry))
+                .collect::<Vec<_>>();
 
-        // compute x^2
-        U2048Variable::assert_mul(
-            &x_var,
-            &x_var,
-            &x_power_vars[0],
-            &mul_carry_vars[0],
-            &n_var,
-            &two_to_120,
-            builder,
-        );
-
-        // compute x^4, to x^65536
-        for i in 1..11 {
+            // compute x^2
             U2048Variable::assert_mul(
-                &x_power_vars[i - 1],
-                &x_power_vars[i - 1],
-                &x_power_vars[i],
-                &mul_carry_vars[i],
+                &x_var,
+                &x_var,
+                &x_power_vars[0],
+                &mul_carry_vars[0],
                 &n_var,
                 &two_to_120,
                 builder,
             );
-        }
 
-        // assert x_powers[16] = x^65537
-        U2048Variable::assert_mul(
-            &x_var,
-            &x_power_vars[15],
-            &x_power_vars[16],
-            &mul_carry_vars[16],
-            &n_var,
-            &two_to_120,
-            builder,
-        );
+            // compute x^4, to x^65536
+            for i in 1..11 {
+                U2048Variable::assert_mul(
+                    &x_power_vars[i - 1],
+                    &x_power_vars[i - 1],
+                    &x_power_vars[i],
+                    &mul_carry_vars[i],
+                    &n_var,
+                    &two_to_120,
+                    builder,
+                );
+            }
 
-        // assert result = x_powers[16]
-        for i in 0..N_LIMBS {
-            builder.assert_is_equal(x_power_vars[16].limbs[i], self.result[i]);
+            // assert x_powers[16] = x^65537
+            U2048Variable::assert_mul(
+                &x_var,
+                &x_power_vars[15],
+                &x_power_vars[16],
+                &mul_carry_vars[16],
+                &n_var,
+                &two_to_120,
+                builder,
+            );
+
+            // assert result = x_powers[16]
+            for i in 0..N_LIMBS {
+                builder.assert_is_equal(x_power_vars[16].limbs[i], self.result[i]);
+            }
         }
     }
 }
@@ -140,7 +180,10 @@ impl RSACircuit<Fr> {
         x_powers: [RSAFieldElement; 17],
         mul_carries: [RSAFieldElement; 17],
         result: &RSAFieldElement,
+        hash_inputs: &[u8],
     ) -> Self {
+        assert!(hash_inputs.len() == HASH_INPUT_LEN);
+
         let x: [Fr; N_LIMBS] = (*x).into();
         let n: [Fr; N_LIMBS] = (*n).into();
         let x_powers: [[Fr; N_LIMBS]; 17] = x_powers
@@ -156,17 +199,36 @@ impl RSACircuit<Fr> {
             .try_into()
             .unwrap();
         let result: [Fr; N_LIMBS] = (*result).into();
+
+        let hash_outputs = build_hash_outputs(hash_inputs);
+        let hash_inputs = hash_inputs
+            .iter()
+            .map(|x| Fr::from(*x as u64))
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
+        let hash_outputs = hash_outputs
+            .iter()
+            .map(|x| Fr::from(*x as u64))
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
+
         Self {
             x,
             n,
             x_powers,
             mul_carries,
             result,
+            hash_inputs,
+            hash_outputs,
         }
     }
 }
 
 fn main() {
+    let mut rng = test_rng();
+
     // build a dummy circuit
     let compile_result = compile(&RSACircuit::default()).unwrap();
 
@@ -175,6 +237,11 @@ fn main() {
     let x = BigUint::from(2u64);
     let n = (BigUint::from(1u64) << 120) + (BigUint::from(1u64) << 2047);
     let res = x.modpow(&pow, &n);
+    let hash_inputs = {
+        let mut tmp = [0u8; HASH_OUTPUT_LEN];
+        rng.fill_bytes(&mut tmp);
+        tmp
+    };
 
     let x = RSAFieldElement::from_big_uint(x);
     let n = RSAFieldElement::from_big_uint(n);
@@ -186,7 +253,7 @@ fn main() {
         println!("{:0x?}\n", mul_carries[i].to_big_uint());
     }
 
-    let assignment = RSACircuit::create_circuit(&x, &n, x_powers, mul_carries, &res);
+    let assignment = RSACircuit::create_circuit(&x, &n, x_powers, mul_carries, &res, &hash_inputs);
 
     // check the witnesses are correct
     let witness = compile_result
