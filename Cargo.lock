@@ -357,6 +357,7 @@ dependencies = [
  "halo2curves",
  "mersenne31",
  "rand",
+ "sha2",
 ]
 
 [[package]]

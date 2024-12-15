@@ -84,20 +84,22 @@ fn build_rsa_traces(
 fn build_hash_outputs(hash_inputs: &[u8]) -> [u8; HASH_OUTPUT_LEN] {
     assert!(hash_inputs.len() == HASH_INPUT_LEN);
 
-    let mut hash_outputs = [0u8; HASH_OUTPUT_LEN];
+    let mut hash_outputs = vec![];
     let mut hash_input = hash_inputs[..64].to_vec();
     for i in 0..46 {
         let mut hasher = sha2::Sha256::default();
         hasher.update(&hash_input);
         let hash_output: [u8; 32] = hasher.finalize().try_into().unwrap();
-        hash_outputs[i * 32..(i + 1) * 32].copy_from_slice(&hash_output);
+        hash_outputs.extend_from_slice(&hash_output);
         hash_input = [
             hash_inputs[(i + 2) * 32..(i + 3) * 32].as_ref(),
             hash_output.as_ref(),
         ]
         .concat();
     }
-    hash_outputs
+    assert!(hash_outputs.len() == HASH_OUTPUT_LEN);
+
+    hash_outputs.try_into().unwrap()
 }
 
 impl Define<BN254Config> for RSACircuit<Variable> {
