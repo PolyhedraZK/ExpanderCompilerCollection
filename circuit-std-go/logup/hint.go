@@ -34,14 +34,13 @@ func QueryCountBaseKeysHintFn(field *big.Int, inputs []*big.Int, outputs []*big.
 	tableSize := inputs[0].Int64()
 	table := inputs[1 : tableSize+1]
 	queryKeys := inputs[tableSize+1:]
+
+	tableMap := make(map[int64]int)
 	for i := 0; i < len(queryKeys); i++ {
-		queryKey := queryKeys[i].Int64()
-		//find the location of the query key in the table
-		for j := 0; j < len(table); j++ {
-			if table[j].Int64() == queryKey {
-				outputs[j].Add(outputs[j], big.NewInt(1))
-			}
-		}
+		tableMap[queryKeys[i].Int64()]++
+	}
+	for i := 0; i < len(table); i++ {
+		outputs[i].SetInt64(int64(tableMap[table[i].Int64()]))
 	}
 	return nil
 }
