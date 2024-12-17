@@ -1,5 +1,6 @@
 use builder::RootBuilder;
 
+use crate::circuit::layered::{CrossLayerInputType, NormalInputType};
 use crate::circuit::{ir, layered};
 
 mod api;
@@ -64,11 +65,6 @@ pub mod extra {
 #[cfg(test)]
 mod tests;
 
-pub struct CompileResult<C: Config> {
-    pub witness_solver: WitnessSolver<C>,
-    pub layered_circuit: layered::Circuit<C>,
-}
-
 fn build<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone>(
     circuit: &Cir,
 ) -> ir::source::RootCircuit<C> {
@@ -83,11 +79,21 @@ fn build<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + 
     root_builder.build()
 }
 
+pub struct CompileResult<C: Config> {
+    pub witness_solver: WitnessSolver<C>,
+    pub layered_circuit: layered::Circuit<C, NormalInputType>,
+}
+
+pub struct CompileResultCrossLayer<C: Config> {
+    pub witness_solver: WitnessSolver<C>,
+    pub layered_circuit: layered::Circuit<C, CrossLayerInputType>,
+}
+
 pub fn compile<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone>(
     circuit: &Cir,
 ) -> Result<CompileResult<C>, Error> {
     let root = build(circuit);
-    let (irw, lc) = crate::compile::compile::<C>(&root)?;
+    let (irw, lc) = crate::compile::compile::<C, _>(&root)?;
     Ok(CompileResult {
         witness_solver: WitnessSolver { circuit: irw },
         layered_circuit: lc,
@@ -119,8 +125,23 @@ pub fn compile_generic<
     options: CompileOptions,
 ) -> Result<CompileResult<C>, Error> {
     let root = build_generic(circuit);
-    let (irw, lc) = crate::compile::compile_with_options::<C>(&root, options)?;
+    let (irw, lc) = crate::compile::compile_with_options::<C, _>(&root, options)?;
     Ok(CompileResult {
+        witness_solver: WitnessSolver { circuit: irw },
+        layered_circuit: lc,
+    })
+}
+
+pub fn compile_generic_cross_layer<
+    C: Config,
+    Cir: internal::DumpLoadTwoVariables<Variable> + GenericDefine<C> + Clone,
+>(
+    circuit: &Cir,
+    options: CompileOptions,
+) -> Result<CompileResultCrossLayer<C>, Error> {
+    let root = build_generic(circuit);
+    let (irw, lc) = crate::compile::compile_with_options::<C, _>(&root, options)?;
+    Ok(CompileResultCrossLayer {
         witness_solver: WitnessSolver { circuit: irw },
         layered_circuit: lc,
     })
