@@ -18,6 +18,7 @@ gkr.workspace = true
 arith.workspace = true
 gf2.workspace = true
 mersenne31.workspace = true
+macros = {path = "./macros" }
 
 [[bin]]
 name = "trivial_circuit"

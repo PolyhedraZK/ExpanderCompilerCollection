@@ -10,6 +10,7 @@ use crate::{
     },
     utils::misc::next_power_of_two,
 };
+pub use macros::kernel;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Kernel<C: Config> {

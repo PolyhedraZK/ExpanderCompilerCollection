@@ -17,6 +17,18 @@ fn add_16<C: Config>(api: &mut API<C>, inputs: &mut Vec<Vec<Variable>>) {
     inputs[1][0] = sum;
 }
 
+type InputVariable = Variable;
+type OutputVariable = Variable;
+
+#[kernel]
+fn process_multidim<C: Config>(
+    api: &mut API<C>,
+    a: &[InputVariable; 2],
+    b: &mut [OutputVariable; 1],
+) {
+    b[0] = api.add(a[0], a[1]);
+}
+
 #[test]
 fn zkcuda_1() {
     let kernel_add_2: Kernel<M31Config> = compile_with_spec(
