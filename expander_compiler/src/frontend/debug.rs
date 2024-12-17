@@ -7,6 +7,7 @@ use crate::{
         },
     },
     field::FieldArith,
+    hints::registry::{hint_key_to_id, HintRegistry},
 };
 
 use super::{
@@ -17,6 +18,7 @@ use super::{
 
 pub struct DebugBuilder<C: Config> {
     values: Vec<C::CircuitField>,
+    hint_registry: HintRegistry<C::CircuitField>,
 }
 
 impl<C: Config> BasicAPI<C> for DebugBuilder<C> {
@@ -119,6 +121,25 @@ impl<C: Config> BasicAPI<C> for DebugBuilder<C> {
     fn get_random_value(&mut self) -> Variable {
         let v = C::CircuitField::random_unsafe(&mut rand::thread_rng());
         self.return_as_variable(v)
+    }
+    fn new_hint(
+        &mut self,
+        hint_key: &str,
+        inputs: &[Variable],
+        num_outputs: usize,
+    ) -> Vec<Variable> {
+        let inputs: Vec<C::CircuitField> =
+            inputs.iter().map(|v| self.convert_to_value(v)).collect();
+        match self
+            .hint_registry
+            .call(hint_key_to_id(hint_key), &inputs, num_outputs)
+        {
+            Ok(outputs) => outputs
+                .into_iter()
+                .map(|v| self.return_as_variable(v))
+                .collect(),
+            Err(e) => panic!("Hint error: {:?}", e),
+        }
     }
     fn constant(&mut self, x: impl ToVariableOrValue<<C as Config>::CircuitField>) -> Variable {
         let x = self.convert_to_value(x);
@@ -388,9 +409,11 @@ impl<C: Config> DebugBuilder<C> {
     pub fn new(
         inputs: Vec<C::CircuitField>,
         public_inputs: Vec<C::CircuitField>,
+        hint_registry: HintRegistry<C::CircuitField>,
     ) -> (Self, Vec<Variable>, Vec<Variable>) {
         let mut builder = DebugBuilder {
             values: vec![C::CircuitField::zero()],
+            hint_registry,
         };
         let vars = (1..=inputs.len()).map(new_variable).collect();
         let public_vars = (inputs.len() + 1..=inputs.len() + public_inputs.len())

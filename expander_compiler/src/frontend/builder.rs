@@ -13,7 +13,7 @@ use crate::{
         layered::Coef,
     },
     field::{Field, FieldArith},
-    hints,
+    hints::{self, registry::hint_key_to_id},
     utils::function_id::get_function_id,
 };
 
@@ -279,6 +279,20 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         self.new_var()
     }
 
+    fn new_hint(
+        &mut self,
+        hint_key: &str,
+        inputs: &[Variable],
+        num_outputs: usize,
+    ) -> Vec<Variable> {
+        self.instructions.push(SourceInstruction::Hint {
+            hint_id: hint_key_to_id(hint_key),
+            inputs: inputs.iter().map(|v| v.id).collect(),
+            num_outputs,
+        });
+        (0..num_outputs).map(|_| self.new_var()).collect()
+    }
+
     fn constant(&mut self, value: impl ToVariableOrValue<C::CircuitField>) -> Variable {
         self.convert_to_variable(value)
     }
@@ -414,6 +428,15 @@ impl<C: Config> BasicAPI<C> for RootBuilder<C> {
 
     fn get_random_value(&mut self) -> Variable {
         self.last_builder().get_random_value()
+    }
+
+    fn new_hint(
+        &mut self,
+        hint_key: &str,
+        inputs: &[Variable],
+        num_outputs: usize,
+    ) -> Vec<Variable> {
+        self.last_builder().new_hint(hint_key, inputs, num_outputs)
     }
 
     fn constant(&mut self, x: impl ToVariableOrValue<<C as Config>::CircuitField>) -> Variable {
