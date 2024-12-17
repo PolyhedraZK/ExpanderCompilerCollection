@@ -1,4 +1,4 @@
-use expander_compiler::frontend::*;
+use expander_compiler::{circuit::layered::InputUsize, frontend::*};
 
 declare_circuit!(Circuit {
     x: [Variable; 16],
@@ -6,8 +6,8 @@ declare_circuit!(Circuit {
     sum: Variable,
 });
 
-impl Define<M31Config> for Circuit<Variable> {
-    fn define(&self, builder: &mut API<M31Config>) {
+impl GenericDefine<M31Config> for Circuit<Variable> {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut sum = builder.constant(0);
         for i in 0..16 {
             for j in 0..512 {
@@ -20,17 +20,17 @@ impl Define<M31Config> for Circuit<Variable> {
 }
 
 fn mul_fanout_limit(limit: usize) {
-    let compile_result = compile_with_options(
+    let compile_result = compile_generic(
         &Circuit::default(),
         CompileOptions::default().with_mul_fanout_limit(limit),
     )
     .unwrap();
     let circuit = compile_result.layered_circuit;
     for segment in circuit.segments.iter() {
-        let mut ref_num = vec![0; segment.num_inputs];
+        let mut ref_num = vec![0; segment.num_inputs.get(0)];
         for m in segment.gate_muls.iter() {
-            ref_num[m.inputs[0]] += 1;
-            ref_num[m.inputs[1]] += 1;
+            ref_num[m.inputs[0].offset] += 1;
+            ref_num[m.inputs[1].offset] += 1;
         }
         for x in ref_num.iter() {
             assert!(*x <= limit);
