@@ -1,7 +1,8 @@
-mod common;
-
-use circuit_std_rs::{LogUpCircuit, LogUpParams};
 use expander_compiler::frontend::*;
+
+use crate::{LogUpCircuit, LogUpParams};
+
+use super::common;
 
 #[test]
 fn logup_test() {

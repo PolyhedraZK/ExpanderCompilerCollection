@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = [ "circuit-std-rs","expander_compiler", "expander_compiler/ec_go_lib"]
+members = [ "circuit-std-rs","expander_compiler", "expander_compiler/ec_go_lib", "rsa_circuit" ]
 
 [profile.test]
 opt-level = 3
@@ -11,11 +11,16 @@ opt-level = 3
 
 [workspace.dependencies]
 ark-std = "0.4.0"
-rand = "0.8.5"
 chrono = "0.4"
 clap = { version = "4.1", features = ["derive"] }
 ethnum = "1.5.0"
+num-bigint = "0.4.6"
+num-traits = "0.2.19"
+itertools = "0.13.0"
+rand = "0.8.5"
+sha2 = "0.10.8"
 tiny-keccak = { version = "2.0", features = ["keccak"] }
+
 halo2curves = { git = "https://github.com/PolyhedraZK/halo2curves", default-features = false, features = [
     "bits",
 ] }
