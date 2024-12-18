@@ -74,7 +74,6 @@ fn generate_unflatten_code(
         panic!("Expected array type");
     }
 
-    // 生成步长计算代码
     let mut steps = Vec::with_capacity(dims.len());
     let mut step = quote! { 1 };
     for &dim in dims.iter().rev().skip(1) {
@@ -83,12 +82,10 @@ fn generate_unflatten_code(
     }
     steps.reverse();
 
-    // 生成循环变量
     let loop_vars = (0..dims.len())
         .map(|i| format_ident!("i_{}", i))
         .collect::<Vec<_>>();
 
-    // 生成索引计算代码
     let mut index_calc = quote! { 0 };
     for (i, (step, var)) in steps.iter().zip(loop_vars.iter()).enumerate() {
         if i == 0 {
@@ -101,13 +98,11 @@ fn generate_unflatten_code(
         index_calc = quote! { #index_calc + #last_var };
     }
 
-    // 生成嵌套循环代码
     let array_access = generate_array_access(&loop_vars[..loop_vars.len() - 1]);
     let mut inner_code = quote! {
         #output_name #array_access.push(inputs[#array_index][#index_calc].clone());
     };
 
-    // 从内到外生成嵌套循环
     for (i, (var, &dim)) in loop_vars.iter().zip(dims.iter()).enumerate().rev() {
         let init_code = if i == loop_vars.len() - 1 {
             quote! {}
@@ -127,7 +122,6 @@ fn generate_unflatten_code(
         };
     }
 
-    // 生成最终代码
     quote! {
         let mut #output_name: Vec<_> = Vec::new();
         #inner_code
@@ -154,7 +148,6 @@ fn generate_flatten_code(
         panic!("Expected array type");
     }
 
-    // 生成步长计算代码
     let mut steps = Vec::with_capacity(dims.len());
     let mut step = quote! { 1 };
     for &dim in dims.iter().rev().skip(1) {
@@ -163,12 +156,10 @@ fn generate_flatten_code(
     }
     steps.reverse();
 
-    // 生成循环变量
     let loop_vars = (0..dims.len())
         .map(|i| format_ident!("i_{}", i))
         .collect::<Vec<_>>();
 
-    // 生成索引计算代码
     let mut index_calc = quote! { 0 };
     for (i, (step, var)) in steps.iter().zip(loop_vars.iter()).enumerate() {
         if i == 0 {
@@ -181,7 +172,6 @@ fn generate_flatten_code(
         index_calc = quote! { #index_calc + #last_var };
     }
 
-    // 生成嵌套循环代码
     let array_access = generate_array_access(&loop_vars);
     let mut loop_code = quote! {
         inputs[#array_index][#index_calc] = #input_name #array_access.clone();
@@ -195,7 +185,6 @@ fn generate_flatten_code(
         };
     }
 
-    // 生成最终代码，直接使用inputs
     quote! { #loop_code }
 }
 
@@ -210,7 +199,7 @@ pub fn kernel(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let mut specs = Vec::new();
     let mut arg_names = Vec::new();
-    let mut arg_mutability = Vec::new(); // 存储每个参数是否可变
+    let mut arg_mutability = Vec::new();
     let mut unflatten_code = Vec::new();
     let mut flatten_code = Vec::new();
     let mut current_index = 0;
@@ -228,7 +217,6 @@ pub fn kernel(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     let vec_type = replace_array_with_vec(&ref_type.elem);
                     let arg_name = quote! { #pat };
 
-                    // 获取最内层类型
                     let mut inner_ty = &*ref_type.elem;
                     while let Type::Array(arr) = inner_ty {
                         inner_ty = &*arr.elem;
@@ -246,14 +234,12 @@ pub fn kernel(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
                     arg_names.push(arg_name.clone());
 
-                    // 生成展开代码
                     unflatten_code.push(generate_unflatten_code(
                         current_index,
                         &arg_name,
                         &ref_type.elem
                     ));
 
-                    // 如果是输出变量，生成压平代码
                     if is_output {
                         flatten_code.push(generate_flatten_code(
                             current_index,
@@ -281,7 +267,6 @@ pub fn kernel(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     }).collect();
 
-    // 生成函数参数引用
     let fn_args = arg_names
         .iter()
         .zip(arg_mutability.iter())
