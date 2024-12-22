@@ -8,79 +8,38 @@ package wrapper
 import "C"
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
-	"os"
 	"path/filepath"
 	"runtime"
 	"sync"
-	"time"
 	"unsafe"
-
-	"github.com/consensys/gnark/logger"
 )
 
-const ABI_VERSION = 4
-
-func getCacheDir() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	cacheDir := filepath.Join(homeDir, ".cache", "ExpanderCompilerCollection")
-	err = os.MkdirAll(cacheDir, 0755)
-	return cacheDir, err
-}
+const ABI_VERSION = 5
 
 var compilePtr unsafe.Pointer = nil
 var proveCircuitFilePtr unsafe.Pointer = nil
 var verifyCircuitFilePtr unsafe.Pointer = nil
-var compilePtrLock sync.Mutex
+var freeObjectPtr unsafe.Pointer = nil
+var loadFieldArrayPtr unsafe.Pointer = nil
+var dumpFieldArrayPtr unsafe.Pointer = nil
+var loadWitnessSolverPtr unsafe.Pointer = nil
+var dumpWitnessSolverPtr unsafe.Pointer = nil
+var solveWitnessesPtr unsafe.Pointer = nil
 
-func downloadFile(url string, filepath string) error {
-	out, err := os.Create(filepath)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
+var functionsPtrLock sync.Mutex
 
-	resp, err := http.Get(url)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("bad status: %s", resp.Status)
-	}
-
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		return err
-	}
-
-	return nil
+type RustObj struct {
+	ptr unsafe.Pointer
 }
 
-func getUrl(url string) ([]byte, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("bad status: %s", resp.Status)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return body, nil
+func NewRustObj(ptr unsafe.Pointer) *RustObj {
+	res := &RustObj{ptr: ptr}
+	runtime.SetFinalizer(res, func(obj *RustObj) {
+		C.free_object(freeObjectPtr, obj.ptr)
+	})
+	return res
 }
 
 func getLibName() string {
@@ -97,66 +56,9 @@ func getLibName() string {
 	panic(fmt.Sprintf("unsupported platform %s %s", runtime.GOOS, runtime.GOARCH))
 }
 
-func downloadLib(path string) {
-	log := logger.Logger()
-	log.Info().Msg("Downloading rust libs ...")
-	err := downloadFile("https://github.com/PolyhedraZK/ExpanderCompilerCollection/raw/rust-built-libs/"+getLibName(), path)
-	if err != nil {
-		os.Remove(path)
-		panic(err)
-	}
-}
-
-type repoInfo struct {
-	Commit struct {
-		Commit struct {
-			Committer struct {
-				Date string `json:"date"`
-			} `json:"committer"`
-		} `json:"commit"`
-	} `json:"commit"`
-}
-
-func updateLib(path string) {
-	stat, err := os.Stat(path)
-	fileExists := !os.IsNotExist(err)
-	if err != nil && fileExists {
-		panic(err)
-	}
-	data, err := getUrl("https://api.github.com/repos/PolyhedraZK/ExpanderCompilerCollection/branches/rust-built-libs")
-	if err != nil {
-		if fileExists {
-			return
-		}
-		panic(err)
-	}
-	var repoInfo repoInfo
-	err = json.Unmarshal(data, &repoInfo)
-	if err != nil {
-		if fileExists {
-			return
-		}
-		panic(err)
-	}
-	remoteTime, err := time.Parse(time.RFC3339, repoInfo.Commit.Commit.Committer.Date)
-	if err != nil {
-		if fileExists {
-			return
-		}
-		panic(err)
-	}
-	if fileExists {
-		localTime := stat.ModTime()
-		if localTime.After(remoteTime) {
-			return
-		}
-	}
-	downloadLib(path)
-}
-
 func initCompilePtr() {
-	compilePtrLock.Lock()
-	defer compilePtrLock.Unlock()
+	functionsPtrLock.Lock()
+	defer functionsPtrLock.Unlock()
 	if compilePtr != nil {
 		return
 	}
@@ -165,7 +67,7 @@ func initCompilePtr() {
 		panic(fmt.Sprintf("failed to get cache dir: %v", err))
 	}
 	soPath := filepath.Join(cacheDir, getLibName())
-	updateLib(soPath)
+	//updateLib(soPath)
 	handle := C.dlopen(C.CString(soPath), C.RTLD_LAZY)
 	if handle == nil {
 		panic("failed to load libec_go_lib, you may need to install openmpi")
@@ -178,6 +80,8 @@ func initCompilePtr() {
 	if abiVersion != ABI_VERSION {
 		panic("abi_version mismatch, please consider update the go package")
 	}
+
+	// other functions
 	compilePtr = C.dlsym(handle, C.CString("compile"))
 	if compilePtr == nil {
 		panic("failed to load compile function")
@@ -190,6 +94,30 @@ func initCompilePtr() {
 	if verifyCircuitFilePtr == nil {
 		panic("failed to load verify_circuit_file function")
 	}
+	freeObjectPtr = C.dlsym(handle, C.CString("free_object"))
+	if freeObjectPtr == nil {
+		panic("failed to load free_object function")
+	}
+	loadFieldArrayPtr = C.dlsym(handle, C.CString("load_field_array"))
+	if loadFieldArrayPtr == nil {
+		panic("failed to load load_field_array function")
+	}
+	dumpFieldArrayPtr = C.dlsym(handle, C.CString("dump_field_array"))
+	if dumpFieldArrayPtr == nil {
+		panic("failed to load dump_field_array function")
+	}
+	loadWitnessSolverPtr = C.dlsym(handle, C.CString("load_witness_solver"))
+	if loadWitnessSolverPtr == nil {
+		panic("failed to load load_witness_solver function")
+	}
+	dumpWitnessSolverPtr = C.dlsym(handle, C.CString("dump_witness_solver"))
+	if dumpWitnessSolverPtr == nil {
+		panic("failed to load dump_witness_solver function")
+	}
+	solveWitnessesPtr = C.dlsym(handle, C.CString("solve_witnesses"))
+	if solveWitnessesPtr == nil {
+		panic("failed to load solve_witnesses function")
+	}
 }
 
 // from c to go
@@ -197,7 +125,7 @@ func goBytes(data *C.uint8_t, length C.uint64_t) []byte {
 	return bytes.Clone(unsafe.Slice((*byte)(data), length))
 }
 
-func CompileWithRustLib(s []byte, configId uint64) ([]byte, []byte, error) {
+func CompileWithRustLib(s []byte, configId uint64) (*RustObj, []byte, error) {
 	initCompilePtr()
 
 	in := C.ByteArray{data: (*C.uint8_t)(C.CBytes(s)), length: C.uint64_t(len(s))}
@@ -205,11 +133,10 @@ func CompileWithRustLib(s []byte, configId uint64) ([]byte, []byte, error) {
 
 	cr := C.compile(compilePtr, in, C.uint64_t(configId))
 
-	defer C.free(unsafe.Pointer(cr.ir_witness_gen.data))
 	defer C.free(unsafe.Pointer(cr.layered.data))
 	defer C.free(unsafe.Pointer(cr.error.data))
 
-	irWitnessGen := goBytes(cr.ir_witness_gen.data, cr.ir_witness_gen.length)
+	witnessSolver := NewRustObj(cr.witness_solver)
 	layered := goBytes(cr.layered.data, cr.layered.length)
 	errMsg := goBytes(cr.error.data, cr.error.length)
 
@@ -217,7 +144,7 @@ func CompileWithRustLib(s []byte, configId uint64) ([]byte, []byte, error) {
 		return nil, nil, errors.New(string(errMsg))
 	}
 
-	return irWitnessGen, layered, nil
+	return witnessSolver, layered, nil
 }
 
 func ProveCircuitFile(circuitFilename string, witness []byte, configId uint64) []byte {
@@ -242,4 +169,63 @@ func VerifyCircuitFile(circuitFilename string, witness []byte, proof []byte, con
 	pr := C.ByteArray{data: (*C.uint8_t)(C.CBytes(proof)), length: C.uint64_t(len(proof))}
 	defer C.free(unsafe.Pointer(pr.data))
 	return C.verify_circuit_file(verifyCircuitFilePtr, cf, wi, pr, C.uint64_t(configId)) != 0
+}
+
+func LoadFieldArray(data []byte, configId uint64) (*RustObj, error) {
+	initCompilePtr()
+	in := C.ByteArray{data: (*C.uint8_t)(C.CBytes(data)), length: C.uint64_t(len(data))}
+	defer C.free(unsafe.Pointer(in.data))
+	ptrRes := C.load_field_array(loadFieldArrayPtr, in, C.uint64_t(configId))
+	defer C.free(unsafe.Pointer(ptrRes.error.data))
+	if ptrRes.error.length > 0 {
+		return nil, errors.New(string(goBytes(ptrRes.error.data, ptrRes.error.length)))
+	}
+	return NewRustObj(ptrRes.pointer), nil
+}
+
+func DumpFieldArray(obj *RustObj, dataLen int, configId uint64) ([]byte, error) {
+	initCompilePtr()
+	in := C.ByteArray{data: (*C.uint8_t)(C.malloc(C.size_t(dataLen))), length: C.uint64_t(dataLen)}
+	defer C.free(unsafe.Pointer(in.data))
+	ptrRes := C.dump_field_array(dumpFieldArrayPtr, obj.ptr, in, C.uint64_t(configId))
+	defer C.free(unsafe.Pointer(ptrRes.error.data))
+	if ptrRes.error.length > 0 {
+		return nil, errors.New(string(goBytes(ptrRes.error.data, ptrRes.error.length)))
+	}
+	return goBytes(in.data, in.length), nil
+}
+
+func LoadWitnessSolver(data []byte, configId uint64) (*RustObj, error) {
+	initCompilePtr()
+	in := C.ByteArray{data: (*C.uint8_t)(C.CBytes(data)), length: C.uint64_t(len(data))}
+	defer C.free(unsafe.Pointer(in.data))
+	ptrRes := C.load_witness_solver(loadWitnessSolverPtr, in, C.uint64_t(configId))
+	defer C.free(unsafe.Pointer(ptrRes.error.data))
+	if ptrRes.error.length > 0 {
+		return nil, errors.New(string(goBytes(ptrRes.error.data, ptrRes.error.length)))
+	}
+	return NewRustObj(ptrRes.pointer), nil
+}
+
+func DumpWitnessSolver(obj *RustObj, dataLen int, configId uint64) ([]byte, error) {
+	initCompilePtr()
+	in := C.ByteArray{data: (*C.uint8_t)(C.malloc(C.size_t(dataLen))), length: C.uint64_t(dataLen)}
+	defer C.free(unsafe.Pointer(in.data))
+	ptrRes := C.dump_witness_solver(dumpWitnessSolverPtr, obj.ptr, in, C.uint64_t(configId))
+	defer C.free(unsafe.Pointer(ptrRes.error.data))
+	if ptrRes.error.length > 0 {
+		return nil, errors.New(string(goBytes(ptrRes.error.data, ptrRes.error.length)))
+	}
+	return goBytes(in.data, in.length), nil
+}
+
+func SolveWitnesses(ws *RustObj, raw_in *RustObj, n int, configId uint64) (*RustObj, error) {
+	initCompilePtr()
+	fmt.Printf("SolveWitnesses: %v %v %v\n", ws, raw_in, n)
+	ptrRes := C.solve_witnesses(solveWitnessesPtr, ws.ptr, raw_in.ptr, C.uint64_t(n), C.hintCallBack, C.uint64_t(configId))
+	defer C.free(unsafe.Pointer(ptrRes.error.data))
+	if ptrRes.error.length > 0 {
+		return nil, errors.New(string(goBytes(ptrRes.error.data, ptrRes.error.length)))
+	}
+	return NewRustObj(ptrRes.pointer), nil
 }

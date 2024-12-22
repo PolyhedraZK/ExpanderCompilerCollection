@@ -3,12 +3,10 @@ pub mod registry;
 
 pub use builtin::*;
 
-use registry::HintRegistry;
-
 use crate::{field::Field, utils::error::Error};
 
 pub fn safe_impl<F: Field>(
-    hint_registry: &mut HintRegistry<F>,
+    hint_registry: &mut impl registry::HintCaller<F>,
     hint_id: usize,
     inputs: &[F],
     num_outputs: usize,

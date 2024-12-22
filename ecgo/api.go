@@ -31,7 +31,7 @@ type API interface {
 // like the intermediate representation (IR) of the circuit, the WitnessGenerator, and the Layered Circuit.
 type CompileResult struct {
 	irs  *irsource.RootCircuit
-	irwg *irwg.RootCircuit
+	irwg *rust.WitnessSolver
 	lc   *layered.RootCircuit
 }
 
@@ -100,7 +100,7 @@ func (c *CompileResult) GetLayeredCircuit() *layered.RootCircuit {
 }
 
 // GetLayeredCircuit returns the Layered Circuit component of the compilation result as *layered.RootCircuit.
-func (c *CompileResult) GetInputSolver() *irwg.RootCircuit {
+func (c *CompileResult) GetInputSolver() *rust.WitnessSolver {
 	return c.irwg
 }
 
@@ -112,6 +112,7 @@ func DeserializeLayeredCircuit(buf []byte) *layered.RootCircuit {
 
 // DeserializeInputSolver takes a byte buffer and returns a pointer to an ir.InputSolver
 // which represents a deserialized input solver.
-func DeserializeInputSolver(buf []byte) *irwg.RootCircuit {
-	return irwg.DeserializeRootCircuit(buf)
+func DeserializeInputSolver(buf []byte) *rust.WitnessSolver {
+	//return irwg.DeserializeRootCircuit(buf)
+	return nil
 }

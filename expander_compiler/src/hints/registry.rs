@@ -50,3 +50,13 @@ impl<F: Field> HintRegistry<F> {
         }
     }
 }
+
+pub trait HintCaller<F: Field> {
+    fn call(&mut self, id: usize, args: &[F], num_outputs: usize) -> Result<Vec<F>, Error>;
+}
+
+impl<F: Field> HintCaller<F> for HintRegistry<F> {
+    fn call(&mut self, id: usize, args: &[F], num_outputs: usize) -> Result<Vec<F>, Error> {
+        self.call(id, args, num_outputs)
+    }
+}

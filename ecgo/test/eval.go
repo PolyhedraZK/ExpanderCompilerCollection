@@ -4,13 +4,13 @@ import (
 	"crypto/rand"
 	"math/big"
 
-	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/irwg"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/layered"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/rust"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/utils/customgates"
 )
 
 // check if first output is zero
-func CheckCircuit(rc *layered.RootCircuit, witness *irwg.Witness) bool {
+func CheckCircuit(rc *layered.RootCircuit, witness *rust.Witness) bool {
 	if witness.NumWitnesses != 1 {
 		panic("expected 1 witness, if you need to check multiple witnesses, use CheckCircuitMultiWitness")
 	}
@@ -23,7 +23,7 @@ func CheckCircuit(rc *layered.RootCircuit, witness *irwg.Witness) bool {
 	return true
 }
 
-func CheckCircuitMultiWitness(rc *layered.RootCircuit, witness *irwg.Witness) []bool {
+func CheckCircuitMultiWitness(rc *layered.RootCircuit, witness *rust.Witness) []bool {
 	if witness.NumWitnesses == 0 {
 		panic("expected at least 1 witness")
 	}
@@ -43,7 +43,7 @@ func CheckCircuitMultiWitness(rc *layered.RootCircuit, witness *irwg.Witness) []
 	return res
 }
 
-func EvalCircuit(rc *layered.RootCircuit, witness *irwg.Witness) []*big.Int {
+func EvalCircuit(rc *layered.RootCircuit, witness *rust.Witness) []*big.Int {
 	if witness.NumWitnesses != 1 {
 		panic("expected 1 witness, if you need to check multiple witnesses, use CheckCircuitMultiWitness")
 	}
