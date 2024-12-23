@@ -2,8 +2,10 @@ package irwg
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"reflect"
+	"time"
 
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/field"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/utils"
@@ -122,6 +124,7 @@ func (rc *RootCircuit) eval(inputs []constraint.Element, publicInputs []constrai
 }
 
 func (rc *RootCircuit) evalSub(circuitId uint64, inputs []constraint.Element, publicInputs []constraint.Element) ([]constraint.Element, error) {
+	startTime := time.Now()
 	values := append([]constraint.Element{{}}, inputs...)
 	for _, insn := range rc.Circuits[circuitId].Instructions {
 		switch insn.Type {
@@ -188,6 +191,7 @@ func (rc *RootCircuit) evalSub(circuitId uint64, inputs []constraint.Element, pu
 	for _, x := range rc.Circuits[circuitId].Outputs {
 		outputs = append(outputs, values[x])
 	}
+	fmt.Println("Eval time: ", time.Since(startTime))
 	return outputs, nil
 }
 
