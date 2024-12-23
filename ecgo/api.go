@@ -113,6 +113,9 @@ func DeserializeLayeredCircuit(buf []byte) *layered.RootCircuit {
 // DeserializeInputSolver takes a byte buffer and returns a pointer to an ir.InputSolver
 // which represents a deserialized input solver.
 func DeserializeInputSolver(buf []byte) *rust.WitnessSolver {
-	//return irwg.DeserializeRootCircuit(buf)
-	return nil
+	res, err := rust.LoadWitnessSolver(buf)
+	if err != nil {
+		panic(err)
+	}
+	return res
 }

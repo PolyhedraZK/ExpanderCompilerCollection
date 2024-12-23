@@ -67,7 +67,7 @@ func initCompilePtr() {
 		panic(fmt.Sprintf("failed to get cache dir: %v", err))
 	}
 	soPath := filepath.Join(cacheDir, getLibName())
-	//updateLib(soPath)
+	updateLib(soPath)
 	handle := C.dlopen(C.CString(soPath), C.RTLD_LAZY)
 	if handle == nil {
 		panic("failed to load libec_go_lib, you may need to install openmpi")
@@ -171,11 +171,11 @@ func VerifyCircuitFile(circuitFilename string, witness []byte, proof []byte, con
 	return C.verify_circuit_file(verifyCircuitFilePtr, cf, wi, pr, C.uint64_t(configId)) != 0
 }
 
-func LoadFieldArray(data []byte, configId uint64) (*RustObj, error) {
+func LoadFieldArray(data []byte, length uint64, configId uint64) (*RustObj, error) {
 	initCompilePtr()
 	in := C.ByteArray{data: (*C.uint8_t)(C.CBytes(data)), length: C.uint64_t(len(data))}
 	defer C.free(unsafe.Pointer(in.data))
-	ptrRes := C.load_field_array(loadFieldArrayPtr, in, C.uint64_t(configId))
+	ptrRes := C.load_field_array(loadFieldArrayPtr, in, C.uint64_t(length), C.uint64_t(configId))
 	defer C.free(unsafe.Pointer(ptrRes.error.data))
 	if ptrRes.error.length > 0 {
 		return nil, errors.New(string(goBytes(ptrRes.error.data, ptrRes.error.length)))
@@ -183,16 +183,15 @@ func LoadFieldArray(data []byte, configId uint64) (*RustObj, error) {
 	return NewRustObj(ptrRes.pointer), nil
 }
 
-func DumpFieldArray(obj *RustObj, dataLen int, configId uint64) ([]byte, error) {
+func DumpFieldArray(obj *RustObj, configId uint64) ([]byte, error) {
 	initCompilePtr()
-	in := C.ByteArray{data: (*C.uint8_t)(C.malloc(C.size_t(dataLen))), length: C.uint64_t(dataLen)}
-	defer C.free(unsafe.Pointer(in.data))
-	ptrRes := C.dump_field_array(dumpFieldArrayPtr, obj.ptr, in, C.uint64_t(configId))
-	defer C.free(unsafe.Pointer(ptrRes.error.data))
-	if ptrRes.error.length > 0 {
-		return nil, errors.New(string(goBytes(ptrRes.error.data, ptrRes.error.length)))
+	res := C.dump_field_array(dumpFieldArrayPtr, obj.ptr, C.uint64_t(configId))
+	defer C.free(unsafe.Pointer(res.result.data))
+	defer C.free(unsafe.Pointer(res.error.data))
+	if res.error.length > 0 {
+		return nil, errors.New(string(goBytes(res.error.data, res.error.length)))
 	}
-	return goBytes(in.data, in.length), nil
+	return goBytes(res.result.data, res.result.length), nil
 }
 
 func LoadWitnessSolver(data []byte, configId uint64) (*RustObj, error) {
@@ -207,25 +206,24 @@ func LoadWitnessSolver(data []byte, configId uint64) (*RustObj, error) {
 	return NewRustObj(ptrRes.pointer), nil
 }
 
-func DumpWitnessSolver(obj *RustObj, dataLen int, configId uint64) ([]byte, error) {
+func DumpWitnessSolver(obj *RustObj, configId uint64) ([]byte, error) {
 	initCompilePtr()
-	in := C.ByteArray{data: (*C.uint8_t)(C.malloc(C.size_t(dataLen))), length: C.uint64_t(dataLen)}
-	defer C.free(unsafe.Pointer(in.data))
-	ptrRes := C.dump_witness_solver(dumpWitnessSolverPtr, obj.ptr, in, C.uint64_t(configId))
-	defer C.free(unsafe.Pointer(ptrRes.error.data))
-	if ptrRes.error.length > 0 {
-		return nil, errors.New(string(goBytes(ptrRes.error.data, ptrRes.error.length)))
+	res := C.dump_witness_solver(dumpWitnessSolverPtr, obj.ptr, C.uint64_t(configId))
+	defer C.free(unsafe.Pointer(res.result.data))
+	defer C.free(unsafe.Pointer(res.error.data))
+	if res.error.length > 0 {
+		return nil, errors.New(string(goBytes(res.error.data, res.error.length)))
 	}
-	return goBytes(in.data, in.length), nil
+	return goBytes(res.result.data, res.result.length), nil
 }
 
-func SolveWitnesses(ws *RustObj, raw_in *RustObj, n int, configId uint64) (*RustObj, error) {
+func SolveWitnesses(ws *RustObj, raw_in *RustObj, n int, configId uint64) (*RustObj, int, int, error) {
 	initCompilePtr()
 	fmt.Printf("SolveWitnesses: %v %v %v\n", ws, raw_in, n)
 	ptrRes := C.solve_witnesses(solveWitnessesPtr, ws.ptr, raw_in.ptr, C.uint64_t(n), C.hintCallBack, C.uint64_t(configId))
 	defer C.free(unsafe.Pointer(ptrRes.error.data))
 	if ptrRes.error.length > 0 {
-		return nil, errors.New(string(goBytes(ptrRes.error.data, ptrRes.error.length)))
+		return nil, 0, 0, errors.New(string(goBytes(ptrRes.error.data, ptrRes.error.length)))
 	}
-	return NewRustObj(ptrRes.pointer), nil
+	return NewRustObj(ptrRes.witness_vec), int(ptrRes.num_inputs_per_witness), int(ptrRes.num_public_inputs_per_witness), nil
 }

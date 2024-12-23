@@ -2,7 +2,7 @@ use expander_compiler::{
     circuit::config, circuit::ir::hint_normalized::witness_solver::WitnessSolver, field::Field,
     hints::registry::HintCaller, utils::error::Error, utils::serde::Serde,
 };
-use libc::{c_ulong, c_void};
+use libc::{c_ulong, c_void, malloc};
 use std::slice;
 
 use super::*;
@@ -12,7 +12,7 @@ fn load_witness_solver_inner<C: config::Config>(
 ) -> Result<*mut c_void, String> {
     let witness_solver = WitnessSolver::<C>::deserialize_from(witness_solver)
         .map_err(|e| format!("failed to deserialize the witness solver: {}", e))?;
-    let witness_solver: Boxed = Box::new(witness_solver);
+    let witness_solver: BoxBoxed = Box::new(Box::new(witness_solver));
     Ok(Box::into_raw(witness_solver) as *mut c_void)
 }
 
@@ -29,33 +29,37 @@ pub extern "C" fn load_witness_solver(
 
 fn dump_witness_solver_inner<C: config::Config>(
     pointer: *mut c_void,
-    mut data: &mut [u8],
+    res_length: *mut c_ulong,
 ) -> Result<*mut c_void, String> {
-    // TODO: Fix this. Size is not known in advance.
-    panic!("TODO");
-    let pointer = pointer as *mut Boxed;
-    let pointer = unsafe { &mut *pointer };
-    let witness_solver = match pointer.downcast_ref::<WitnessSolver<C>>() {
-        Some(witness_solver) => witness_solver,
-        None => return Err("failed to downcast the witness solver".to_string()),
-    };
-    witness_solver
-        .serialize_into(&mut data)
-        .map_err(|e| format!("failed to dump the witness solver: {}", e))?;
-    if !data.is_empty() {
-        return Err("buffer too big".to_string());
-    }
-    Ok(std::ptr::null_mut())
+    let pointer: BoxBoxed = unsafe { Box::from_raw(pointer as *mut Boxed) };
+    let mut data = Vec::new();
+    let res = (|| {
+        let witness_solver = match pointer.downcast_ref::<WitnessSolver<C>>() {
+            Some(witness_solver) => witness_solver,
+            None => return Err("failed to downcast the witness solver".to_string()),
+        };
+        witness_solver
+            .serialize_into(&mut data)
+            .map_err(|e| format!("failed to dump the witness solver: {}", e))?;
+
+        unsafe {
+            res_length.write(data.len() as c_ulong);
+            let ptr = malloc(data.len() as usize) as *mut u8;
+            ptr.copy_from(data.as_ptr(), data.len());
+            Ok(ptr as *mut c_void)
+        }
+    })();
+    let _ = Box::into_raw(pointer);
+    res
 }
 
 #[no_mangle]
 pub extern "C" fn dump_witness_solver(
     pointer: *mut c_void,
-    data: ByteArray,
+    res_length: *mut c_ulong,
     config_id: c_ulong,
 ) -> PointerResult {
-    let mut data = unsafe { slice::from_raw_parts_mut(data.data, data.length as usize) };
-    let result = match_config_id!(config_id, dump_witness_solver_inner, (pointer, &mut data));
+    let result = match_config_id!(config_id, dump_witness_solver_inner, (pointer, res_length));
     result.into()
 }
 
@@ -120,47 +124,49 @@ fn solve_witnesses_inner<C: config::Config>(
     raw_inputs: *mut c_void,
     num_witnesses: c_ulong,
     hint_caller: GoHintCaller,
+    res_num_inputs_per_witness: *mut c_ulong,
+    res_num_public_inputs_per_witness: *mut c_ulong,
 ) -> Result<*mut c_void, String> {
-    println!(
-        "solve_witnesses_inner {:?} {:?} {:?} C={}",
-        witness_solver,
-        raw_inputs,
-        num_witnesses,
-        C::CONFIG_ID
-    );
-    unsafe {
-        let witness_solver_box: BoxBoxed = Box::from_raw(witness_solver as *mut Boxed);
-        let raw_inputs_box: BoxBoxed = Box::from_raw(raw_inputs as *mut Boxed);
-        let res = (|| {
-            let witness_solver = match witness_solver_box.downcast_ref::<WitnessSolver<C>>() {
-                Some(witness_solver) => witness_solver,
-                None => return Err("failed to downcast the witness solver".to_string()),
-            };
-            let raw_inputs = match raw_inputs_box.downcast_ref::<Vec<C::CircuitField>>() {
-                Some(raw_inputs) => raw_inputs,
-                None => return Err("failed to downcast the raw inputs".to_string()),
-            };
-            let a = witness_solver.circuit.circuits[&0].num_inputs;
-            let b = witness_solver.circuit.num_public_inputs;
-            if (a + b) * num_witnesses as usize != raw_inputs.len() {
-                return Err("invalid number of raw inputs".to_string());
-            }
-            let witness = witness_solver.solve_witnesses_from_raw_inputs(
+    let witness_solver_box: BoxBoxed = unsafe { Box::from_raw(witness_solver as *mut Boxed) };
+    let raw_inputs_box: BoxBoxed = unsafe { Box::from_raw(raw_inputs as *mut Boxed) };
+    let res = (|| {
+        let witness_solver = match witness_solver_box.downcast_ref::<WitnessSolver<C>>() {
+            Some(witness_solver) => witness_solver,
+            None => return Err("failed to downcast the witness solver".to_string()),
+        };
+        let raw_inputs = match raw_inputs_box.downcast_ref::<Vec<C::CircuitField>>() {
+            Some(raw_inputs) => raw_inputs,
+            None => return Err("failed to downcast the raw inputs".to_string()),
+        };
+        let a = witness_solver.circuit.circuits[&0].num_inputs;
+        let b = witness_solver.circuit.num_public_inputs;
+        if (a + b) * num_witnesses as usize != raw_inputs.len() {
+            return Err("invalid number of raw inputs".to_string());
+        }
+        let witness = witness_solver
+            .solve_witnesses_from_raw_inputs(
                 num_witnesses as usize,
                 |i| {
                     let (x, y) = raw_inputs[(a + b) * i..(a + b) * (i + 1)].split_at(a);
                     (x.to_vec(), y.to_vec())
                 },
                 &mut GoHintCallerWrapper::new(hint_caller, C::CONFIG_ID),
-            );
-            let witness: Boxed = Box::new(witness);
-            Ok(Box::into_raw(witness) as *mut c_void)
-        })();
-        println!("solve_witnesses_inner {:?}", res);
-        let _ = Box::into_raw(witness_solver_box);
-        let _ = Box::into_raw(raw_inputs_box);
-        res
-    }
+            )
+            .map_err(|e| format!("failed to solve the witnesses: {}", e))?;
+
+        unsafe {
+            res_num_inputs_per_witness.write(witness.num_inputs_per_witness as c_ulong);
+            res_num_public_inputs_per_witness
+                .write(witness.num_public_inputs_per_witness as c_ulong);
+        }
+
+        let witness_vals: BoxBoxed = Box::new(Box::new(witness.values));
+        Ok(Box::into_raw(witness_vals) as *mut c_void)
+    })();
+    println!("solve_witnesses_inner {:?}", res);
+    let _ = Box::into_raw(witness_solver_box);
+    let _ = Box::into_raw(raw_inputs_box);
+    res
 }
 
 #[no_mangle]
@@ -170,11 +176,20 @@ pub extern "C" fn solve_witnesses(
     num_witnesses: c_ulong,
     hint_caller: GoHintCaller,
     config_id: c_ulong,
+    res_num_inputs_per_witness: *mut c_ulong,
+    res_num_public_inputs_per_witness: *mut c_ulong,
 ) -> PointerResult {
     let result = match_config_id!(
         config_id,
         solve_witnesses_inner,
-        (witness_solver, raw_inputs, num_witnesses, hint_caller)
+        (
+            witness_solver,
+            raw_inputs,
+            num_witnesses,
+            hint_caller,
+            res_num_inputs_per_witness,
+            res_num_public_inputs_per_witness
+        )
     );
     result.into()
 }

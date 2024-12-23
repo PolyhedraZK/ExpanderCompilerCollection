@@ -333,8 +333,7 @@ func main() {
 		}
 	}
 
-	//is := ecgo.DeserializeInputSolver(cr.GetInputSolver().Serialize())
-	is := cr.GetInputSolver()
+	is := ecgo.DeserializeInputSolver(cr.GetInputSolver().Serialize())
 	wit, err := is.SolveInput(&circuit, 0)
 	if err != nil {
 		panic("gg")

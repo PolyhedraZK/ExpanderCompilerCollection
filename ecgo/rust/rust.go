@@ -5,6 +5,7 @@ import (
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/irsource"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/layered"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/rust/wrapper"
+	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/utils"
 )
 
 type WitnessSolver struct {
@@ -38,21 +39,36 @@ func VerifyFile(circuitFilename string, witnessBytes []byte, proofBytes []byte) 
 }
 
 func LoadFieldArray(data []byte, field_ field.Field) (*RustFieldArray, error) {
-	r, err := wrapper.LoadFieldArray(data, field.GetFieldId(field_))
+	n := len(data) / field_.SerializedLen()
+	r, err := wrapper.LoadFieldArray(data, uint64(n), field.GetFieldId(field_))
 	if err != nil {
 		return nil, err
 	}
-	return &RustFieldArray{r: r, field: field_, n: len(data) / field_.SerializedLen()}, nil
+	return &RustFieldArray{r: r, field: field_, n: n}, nil
 }
 
 func DumpFieldArray(rfa *RustFieldArray) ([]byte, error) {
-	return wrapper.DumpFieldArray(rfa.r, rfa.n, field.GetFieldId(rfa.field))
+	return wrapper.DumpFieldArray(rfa.r, field.GetFieldId(rfa.field))
 }
 
-func SolveWitnessesRaw(ws *WitnessSolver, raw_in *RustFieldArray, n int) (*RustFieldArray, error) {
-	r, err := wrapper.SolveWitnesses(ws.r, raw_in.r, n, field.GetFieldId(ws.field))
+func LoadWitnessSolver(data []byte) (*WitnessSolver, error) {
+	i := utils.NewInputBuf(data)
+	fieldId := i.ReadUint64()
+	r, err := wrapper.LoadWitnessSolver(data, fieldId)
 	if err != nil {
 		return nil, err
 	}
-	return &RustFieldArray{r: r, field: ws.field, n: n}, nil
+	return &WitnessSolver{r: r, field: field.GetFieldById(fieldId)}, nil
+}
+
+func DumpWitnessSolver(ws *WitnessSolver) ([]byte, error) {
+	return wrapper.DumpWitnessSolver(ws.r, field.GetFieldId(ws.field))
+}
+
+func SolveWitnessesRaw(ws *WitnessSolver, raw_in *RustFieldArray, n int) (*RustFieldArray, int, int, error) {
+	r, ni, npi, err := wrapper.SolveWitnesses(ws.r, raw_in.r, n, field.GetFieldId(ws.field))
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	return &RustFieldArray{r: r, field: ws.field, n: n}, ni, npi, nil
 }

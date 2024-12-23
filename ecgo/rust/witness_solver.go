@@ -1,7 +1,6 @@
 package rust
 
 import (
-	"fmt"
 	"math/big"
 	"reflect"
 
@@ -17,7 +16,7 @@ type Witness struct {
 	NumInputsPerWitness       int
 	NumPublicInputsPerWitness int
 	Field                     *big.Int
-	Values                    []*big.Int
+	Values                    *RustFieldArray
 }
 
 var TVariable reflect.Type
@@ -70,12 +69,11 @@ func (ws *WitnessSolver) SolveInputs(assignments []frontend.Circuit) (*Witness, 
 	vars := []constraint.Element{}
 	for _, assignment := range assignments {
 		vecPub, vecSec := GetCircuitVariables(assignment, ws.field)
-		vars = append(vars, vecPub...)
 		vars = append(vars, vecSec...)
+		vars = append(vars, vecPub...)
 	}
 	o := utils.OutputBuf{}
 	bnlen := ws.field.SerializedLen()
-	o.AppendUint64(uint64(len(vars)))
 	for _, v := range vars {
 		o.AppendBigInt(bnlen, ws.field.ToBigInt(v))
 	}
@@ -83,19 +81,51 @@ func (ws *WitnessSolver) SolveInputs(assignments []frontend.Circuit) (*Witness, 
 	if err != nil {
 		return nil, err
 	}
-	wit, err := SolveWitnessesRaw(ws, arr, len(assignments))
+	wit, ni, npi, err := SolveWitnessesRaw(ws, arr, len(assignments))
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(wit)
-	// TODO
-	return nil, nil
+	return &Witness{
+		NumWitnesses:              len(assignments),
+		NumInputsPerWitness:       ni,
+		NumPublicInputsPerWitness: npi,
+		Field:                     ws.field.Field(),
+		Values:                    wit,
+	}, nil
 }
 
 func (ws *WitnessSolver) Serialize() []byte {
-	panic("not implemented")
+	data, err := DumpWitnessSolver(ws)
+	if err != nil {
+		panic(err)
+	}
+	return data
 }
 
 func (w *Witness) Serialize() []byte {
-	panic("not implemented")
+	o := utils.OutputBuf{}
+	o.AppendUint64(uint64(w.NumWitnesses))
+	o.AppendUint64(uint64(w.NumInputsPerWitness))
+	o.AppendUint64(uint64(w.NumPublicInputsPerWitness))
+	o.AppendBigInt(32, w.Field)
+
+	bv, err := DumpFieldArray(w.Values)
+	if err != nil {
+		panic(err)
+	}
+	return append(o.Bytes(), bv...)
+}
+
+func (w *Witness) ValuesSlice() []*big.Int {
+	bv, err := DumpFieldArray(w.Values)
+	if err != nil {
+		panic(err)
+	}
+	bnlen := field.GetFieldFromOrder(w.Field).SerializedLen()
+	i := utils.NewInputBuf(bv)
+	res := make([]*big.Int, w.NumWitnesses*(w.NumInputsPerWitness+w.NumPublicInputsPerWitness))
+	for j := 0; j < len(res); j++ {
+		res[j] = i.ReadBigInt(bnlen)
+	}
+	return res
 }

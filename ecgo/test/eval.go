@@ -14,7 +14,8 @@ func CheckCircuit(rc *layered.RootCircuit, witness *rust.Witness) bool {
 	if witness.NumWitnesses != 1 {
 		panic("expected 1 witness, if you need to check multiple witnesses, use CheckCircuitMultiWitness")
 	}
-	out := evalCircuit(rc, witness.Values[:witness.NumInputsPerWitness], witness.Values[witness.NumInputsPerWitness:])
+	values := witness.ValuesSlice()
+	out := evalCircuit(rc, values[:witness.NumInputsPerWitness], values[witness.NumInputsPerWitness:])
 	for i := 0; i < rc.ExpectedNumOutputZeroes; i++ {
 		if out[i].Cmp(big.NewInt(0)) != 0 {
 			return false
@@ -27,11 +28,12 @@ func CheckCircuitMultiWitness(rc *layered.RootCircuit, witness *rust.Witness) []
 	if witness.NumWitnesses == 0 {
 		panic("expected at least 1 witness")
 	}
+	values := witness.ValuesSlice()
 	res := make([]bool, witness.NumWitnesses)
 	a := witness.NumInputsPerWitness
 	b := witness.NumPublicInputsPerWitness
 	for i := 0; i < witness.NumWitnesses; i++ {
-		out := evalCircuit(rc, witness.Values[i*(a+b):i*(a+b)+a], witness.Values[i*(a+b)+a:i*(a+b)+a+b])
+		out := evalCircuit(rc, values[i*(a+b):i*(a+b)+a], values[i*(a+b)+a:i*(a+b)+a+b])
 		res[i] = true
 		for j := 0; j < rc.ExpectedNumOutputZeroes; j++ {
 			if out[j].Cmp(big.NewInt(0)) != 0 {
@@ -47,7 +49,8 @@ func EvalCircuit(rc *layered.RootCircuit, witness *rust.Witness) []*big.Int {
 	if witness.NumWitnesses != 1 {
 		panic("expected 1 witness, if you need to check multiple witnesses, use CheckCircuitMultiWitness")
 	}
-	out := evalCircuit(rc, witness.Values[:witness.NumInputsPerWitness], witness.Values[witness.NumInputsPerWitness:])
+	values := witness.ValuesSlice()
+	out := evalCircuit(rc, values[:witness.NumInputsPerWitness], values[witness.NumInputsPerWitness:])
 	return out
 }
 
