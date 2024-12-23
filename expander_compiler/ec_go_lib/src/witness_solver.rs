@@ -114,7 +114,7 @@ impl<F: Field> HintCaller<F> for GoHintCallerWrapper {
                 std::str::from_utf8(slice).unwrap()
             )));
         }
-        let outputs_vec = unsafe { slice::from_raw_parts(outputs, num_outputs * F::SIZE as usize) };
+        let outputs_vec = unsafe { slice::from_raw_parts(outputs, num_outputs * F::SIZE) };
         let res = (|| {
             let mut res = Vec::with_capacity(num_outputs);
             for i in 0..num_outputs {
