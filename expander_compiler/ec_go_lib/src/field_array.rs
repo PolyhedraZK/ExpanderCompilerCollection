@@ -51,7 +51,7 @@ fn dump_field_array_inner<C: config::Config>(
 
         unsafe {
             res_length.write(data.len() as c_ulong);
-            let ptr = malloc(data.len() as usize) as *mut u8;
+            let ptr = malloc(data.len()) as *mut u8;
             ptr.copy_from(data.as_ptr(), data.len());
             Ok(ptr as *mut c_void)
         }

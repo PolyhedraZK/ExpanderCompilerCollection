@@ -219,7 +219,6 @@ func DumpWitnessSolver(obj *RustObj, configId uint64) ([]byte, error) {
 
 func SolveWitnesses(ws *RustObj, raw_in *RustObj, n int, configId uint64) (*RustObj, int, int, error) {
 	initCompilePtr()
-	fmt.Printf("SolveWitnesses: %v %v %v\n", ws, raw_in, n)
 	ptrRes := C.solve_witnesses(solveWitnessesPtr, ws.ptr, raw_in.ptr, C.uint64_t(n), C.hintCallBack, C.uint64_t(configId))
 	defer C.free(unsafe.Pointer(ptrRes.error.data))
 	if ptrRes.error.length > 0 {

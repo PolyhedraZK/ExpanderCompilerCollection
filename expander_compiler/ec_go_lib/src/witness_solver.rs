@@ -44,7 +44,7 @@ fn dump_witness_solver_inner<C: config::Config>(
 
         unsafe {
             res_length.write(data.len() as c_ulong);
-            let ptr = malloc(data.len() as usize) as *mut u8;
+            let ptr = malloc(data.len()) as *mut u8;
             ptr.copy_from(data.as_ptr(), data.len());
             Ok(ptr as *mut c_void)
         }
@@ -163,7 +163,6 @@ fn solve_witnesses_inner<C: config::Config>(
         let witness_vals: BoxBoxed = Box::new(Box::new(witness.values));
         Ok(Box::into_raw(witness_vals) as *mut c_void)
     })();
-    println!("solve_witnesses_inner {:?}", res);
     let _ = Box::into_raw(witness_solver_box);
     let _ = Box::into_raw(raw_inputs_box);
     res
