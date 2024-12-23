@@ -10,7 +10,6 @@ import (
 
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/builder"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/irsource"
-	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/irwg"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/layered"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/rust"
 	"github.com/consensys/gnark/frontend"
@@ -30,9 +29,9 @@ type API interface {
 // It contains unexported fields and provides methods to retrieve various components
 // like the intermediate representation (IR) of the circuit, the WitnessGenerator, and the Layered Circuit.
 type CompileResult struct {
-	irs  *irsource.RootCircuit
-	irwg *rust.WitnessSolver
-	lc   *layered.RootCircuit
+	irs *irsource.RootCircuit
+	wg  *rust.WitnessSolver
+	lc  *layered.RootCircuit
 }
 
 // Compile is similar to gnark's frontend.Compile. It compiles the given circuit and returns
@@ -50,7 +49,7 @@ func Compile(field *big.Int, circuit frontend.Circuit, opts ...frontend.CompileO
 	}
 
 	root := builder.NewRoot(field, opt)
-	schema.Walk(circuit, irwg.TVariable, func(f schema.LeafInfo, tInput reflect.Value) error {
+	schema.Walk(circuit, rust.TVariable, func(f schema.LeafInfo, tInput reflect.Value) error {
 		if tInput.CanSet() {
 			if f.Visibility == schema.Unset {
 				return errors.New("can't set val " + f.FullName() + " visibility is unset")
@@ -62,7 +61,7 @@ func Compile(field *big.Int, circuit frontend.Circuit, opts ...frontend.CompileO
 		}
 		return errors.New("can't set val " + f.FullName())
 	})
-	schema.Walk(circuit, irwg.TVariable, func(f schema.LeafInfo, tInput reflect.Value) error {
+	schema.Walk(circuit, rust.TVariable, func(f schema.LeafInfo, tInput reflect.Value) error {
 		if tInput.CanSet() {
 			if f.Visibility == schema.Unset {
 				return errors.New("can't set val " + f.FullName() + " visibility is unset")
@@ -82,11 +81,11 @@ func Compile(field *big.Int, circuit frontend.Circuit, opts ...frontend.CompileO
 	rc := root.Finalize()
 	_ = rc
 	//os.WriteFile("p1.txt", irsource.SerializeRootCircuit(rc), 0644)
-	irwg, lc, err := rust.Compile(rc)
+	wg, lc, err := rust.Compile(rc)
 	if err != nil {
 		return nil, err
 	}
-	return &CompileResult{irs: rc, irwg: irwg, lc: lc}, nil
+	return &CompileResult{irs: rc, wg: wg, lc: lc}, nil
 }
 
 // GetCircuitIr returns the intermediate representation (IR) of the compiled circuit as *ir.RootCircuit.
@@ -101,7 +100,7 @@ func (c *CompileResult) GetLayeredCircuit() *layered.RootCircuit {
 
 // GetLayeredCircuit returns the Layered Circuit component of the compilation result as *layered.RootCircuit.
 func (c *CompileResult) GetInputSolver() *rust.WitnessSolver {
-	return c.irwg
+	return c.wg
 }
 
 // DeserializeLayeredCircuit takes a byte buffer and returns a pointer to a layered.RootCircuit
