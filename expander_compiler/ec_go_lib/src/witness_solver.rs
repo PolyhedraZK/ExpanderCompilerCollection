@@ -2,7 +2,7 @@ use expander_compiler::{
     circuit::config, circuit::ir::hint_normalized::witness_solver::WitnessSolver, field::Field,
     hints::registry::HintCaller, utils::error::Error, utils::serde::Serde,
 };
-use libc::{c_ulong, c_void, malloc};
+use libc::{c_ulong, c_void, free, malloc};
 use std::slice;
 
 use super::*;
@@ -64,8 +64,14 @@ pub extern "C" fn dump_witness_solver(
 }
 
 // CallHint(hintId, inputs, outputs) -> err
-type GoHintCaller =
-    extern "C" fn(c_ulong, *mut c_uchar, c_ulong, *mut c_uchar, c_ulong, c_ulong) -> *mut c_uchar;
+type GoHintCaller = extern "C" fn(
+    c_ulong,           // hintId
+    *mut c_uchar,      // inputs
+    c_ulong,           // inputsLen
+    *mut *mut c_uchar, // outputs
+    c_ulong,           // outputsLen
+    c_ulong,           // configId
+) -> *mut c_uchar;
 
 struct GoHintCallerWrapper {
     caller: GoHintCaller,
@@ -81,17 +87,18 @@ impl GoHintCallerWrapper {
 impl<F: Field> HintCaller<F> for GoHintCallerWrapper {
     fn call(&mut self, id: usize, args: &[F], num_outputs: usize) -> Result<Vec<F>, Error> {
         let mut inputs_vec: Vec<u8> = vec![0; args.len() * F::SIZE];
-        let mut outputs_vec: Vec<u8> = vec![0; num_outputs * F::SIZE];
         for i in 0..args.len() {
             args[i]
                 .serialize_into(&mut inputs_vec[i * F::SIZE..(i + 1) * F::SIZE])
                 .unwrap();
         }
+        // let callee side allocate the outputs
+        let mut outputs: *mut c_uchar = std::ptr::null_mut();
         let result = (self.caller)(
             id as c_ulong,
             inputs_vec.as_mut_ptr(),
             args.len() as c_ulong,
-            outputs_vec.as_mut_ptr(),
+            &mut outputs,
             num_outputs as c_ulong,
             self.config_id as c_ulong,
         );
@@ -107,15 +114,27 @@ impl<F: Field> HintCaller<F> for GoHintCallerWrapper {
                 std::str::from_utf8(slice).unwrap()
             )));
         }
-        let mut res = Vec::with_capacity(num_outputs);
-        for i in 0..num_outputs {
-            res.push(
-                F::deserialize_from(&outputs_vec[i * F::SIZE..(i + 1) * F::SIZE]).map_err(|e| {
-                    Error::InternalError(format!("failed to deserialize the hint output: {}", e))
-                })?,
-            );
+        let outputs_vec = unsafe { slice::from_raw_parts(outputs, num_outputs * F::SIZE as usize) };
+        let res = (|| {
+            let mut res = Vec::with_capacity(num_outputs);
+            for i in 0..num_outputs {
+                res.push(
+                    F::deserialize_from(&outputs_vec[i * F::SIZE..(i + 1) * F::SIZE]).map_err(
+                        |e| {
+                            Error::InternalError(format!(
+                                "failed to deserialize the hint output: {}",
+                                e
+                            ))
+                        },
+                    )?,
+                );
+            }
+            Ok(res)
+        })();
+        unsafe {
+            free(outputs as *mut c_void);
         }
-        Ok(res)
+        res
     }
 }
 
