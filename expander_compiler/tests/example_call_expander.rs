@@ -1,9 +1,6 @@
 use arith::Field;
 use expander_compiler::frontend::*;
-use expander_config::{
-    BN254ConfigKeccak, BN254ConfigSha2, GF2ExtConfigKeccak, GF2ExtConfigSha2, M31ExtConfigKeccak,
-    M31ExtConfigSha2,
-};
+use gkr::executor::{BN254ConfigMIMC5, GF2ExtConfigSha2, M31ExtConfigSha2};
 
 declare_circuit!(Circuit {
     s: [Variable; 100],
@@ -20,11 +17,12 @@ impl<C: Config> Define<C> for Circuit<Variable> {
     }
 }
 
-fn example<C: Config, GKRC>()
+fn example<C: Config, GKRFieldC, GKRC>()
 where
-    GKRC: expander_config::GKRConfig<CircuitField = C::CircuitField>,
+    GKRFieldC: gkr_field_config::GKRFieldConfig<CircuitField = C::CircuitField>,
+    GKRC: expander_config::GKRConfig<FieldConfig = GKRFieldC>,
 {
-    let n_witnesses = <GKRC::SimdCircuitField as arith::SimdField>::pack_size();
+    let n_witnesses = <GKRFieldC::SimdCircuitField as arith::SimdField>::PACK_SIZE;
     println!("n_witnesses: {}", n_witnesses);
     let compile_result: CompileResult<C> = compile(&Circuit::default()).unwrap();
     let mut s = [C::CircuitField::zero(); 100];
@@ -47,48 +45,42 @@ where
 
     let mut expander_circuit = compile_result
         .layered_circuit
-        .export_to_expander::<GKRC>()
+        .export_to_expander::<GKRFieldC>()
         .flatten();
     let config = expander_config::Config::<GKRC>::new(
         expander_config::GKRScheme::Vanilla,
-        expander_config::MPIConfig::new(),
+        mpi_config::MPIConfig::new(),
     );
 
-    let (simd_input, simd_public_input) = witness.to_simd::<GKRC::SimdCircuitField>();
+    let (simd_input, simd_public_input) = witness.to_simd::<GKRFieldC::SimdCircuitField>();
     println!("{} {}", simd_input.len(), simd_public_input.len());
     expander_circuit.layers[0].input_vals = simd_input;
     expander_circuit.public_input = simd_public_input.clone();
 
     // prove
     expander_circuit.evaluate();
-    let mut prover = gkr::Prover::new(&config);
-    prover.prepare_mem(&expander_circuit);
-    let (claimed_v, proof) = prover.prove(&mut expander_circuit);
+    let (claimed_v, proof) = gkr::executor::prove(&mut expander_circuit, &config);
 
     // verify
-    let verifier = gkr::Verifier::new(&config);
-    assert!(verifier.verify(
+    assert!(gkr::executor::verify(
         &mut expander_circuit,
-        &simd_public_input,
-        &claimed_v,
-        &proof
+        &config,
+        &proof,
+        &claimed_v
     ));
 }
 
 #[test]
 fn example_gf2() {
-    example::<GF2Config, GF2ExtConfigSha2>();
-    example::<GF2Config, GF2ExtConfigKeccak>();
+    example::<GF2Config, gkr_field_config::GF2ExtConfig, GF2ExtConfigSha2>();
 }
 
 #[test]
 fn example_m31() {
-    example::<M31Config, M31ExtConfigSha2>();
-    example::<M31Config, M31ExtConfigKeccak>();
+    example::<M31Config, gkr_field_config::M31ExtConfig, M31ExtConfigSha2>();
 }
 
 #[test]
 fn example_bn254() {
-    example::<BN254Config, BN254ConfigSha2>();
-    example::<BN254Config, BN254ConfigKeccak>();
+    example::<BN254Config, gkr_field_config::BN254Config, BN254ConfigMIMC5>();
 }

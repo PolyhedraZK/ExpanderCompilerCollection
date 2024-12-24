@@ -282,11 +282,11 @@ fn keccak_gf2_full() {
     println!("test 3 passed");
 
     let mut expander_circuit = layered_circuit
-        .export_to_expander::<expander_config::GF2ExtConfigSha2>()
+        .export_to_expander::<gkr_field_config::GF2ExtConfig>()
         .flatten();
-    let config = expander_config::Config::<expander_config::GF2ExtConfigSha2>::new(
+    let config = expander_config::Config::<gkr::executor::GF2ExtConfigSha2>::new(
         expander_config::GKRScheme::Vanilla,
-        expander_config::MPIConfig::new(),
+        mpi_config::MPIConfig::new(),
     );
 
     let (simd_input, simd_public_input) = witness.to_simd::<gf2::GF2x8>();
@@ -296,16 +296,13 @@ fn keccak_gf2_full() {
 
     // prove
     expander_circuit.evaluate();
-    let mut prover = gkr::Prover::new(&config);
-    prover.prepare_mem(&expander_circuit);
-    let (claimed_v, proof) = prover.prove(&mut expander_circuit);
+    let (claimed_v, proof) = gkr::executor::prove(&mut expander_circuit, &config);
 
     // verify
-    let verifier = gkr::Verifier::new(&config);
-    assert!(verifier.verify(
+    assert!(gkr::executor::verify(
         &mut expander_circuit,
-        &simd_public_input,
-        &claimed_v,
-        &proof
+        &config,
+        &proof,
+        &claimed_v
     ));
 }

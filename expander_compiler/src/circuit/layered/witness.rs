@@ -33,18 +33,18 @@ impl<C: Config> Witness<C> {
     where
         T: arith::SimdField<Scalar = C::CircuitField>,
     {
-        match self.num_witnesses.cmp(&T::pack_size()) {
+        match self.num_witnesses.cmp(&T::PACK_SIZE) {
             std::cmp::Ordering::Less => {
                 println!(
                     "Warning: not enough witnesses, expect {}, got {}",
-                    T::pack_size(),
+                    T::PACK_SIZE,
                     self.num_witnesses
                 )
             }
             std::cmp::Ordering::Greater => {
                 println!(
                     "Warning: dropping additional witnesses, expect {}, got {}",
-                    T::pack_size(),
+                    T::PACK_SIZE,
                     self.num_witnesses
                 )
             }
@@ -55,10 +55,10 @@ impl<C: Config> Witness<C> {
         let mut res = Vec::with_capacity(ni);
         let mut res_public = Vec::with_capacity(np);
         for i in 0..ni + np {
-            let mut values: Vec<C::CircuitField> = (0..self.num_witnesses.min(T::pack_size()))
+            let mut values: Vec<C::CircuitField> = (0..self.num_witnesses.min(T::PACK_SIZE))
                 .map(|j| self.values[j * (ni + np) + i])
                 .collect();
-            values.resize(T::pack_size(), C::CircuitField::zero());
+            values.resize(T::PACK_SIZE, C::CircuitField::zero());
             let simd_value = T::pack(&values);
             if i < ni {
                 res.push(simd_value);
@@ -76,7 +76,7 @@ impl<C: Config> Serde for Witness<C> {
         let num_inputs_per_witness = usize::deserialize_from(&mut reader)?;
         let num_public_inputs_per_witness = usize::deserialize_from(&mut reader)?;
         let modulus = ethnum::U256::deserialize_from(&mut reader)?;
-        if modulus != C::CircuitField::modulus() {
+        if modulus != C::CircuitField::MODULUS {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "invalid modulus",
@@ -100,7 +100,7 @@ impl<C: Config> Serde for Witness<C> {
         self.num_inputs_per_witness.serialize_into(&mut writer)?;
         self.num_public_inputs_per_witness
             .serialize_into(&mut writer)?;
-        C::CircuitField::modulus().serialize_into(&mut writer)?;
+        C::CircuitField::MODULUS.serialize_into(&mut writer)?;
         for v in &self.values {
             v.serialize_into(&mut writer)?;
         }
