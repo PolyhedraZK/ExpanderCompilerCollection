@@ -3,13 +3,7 @@ use gf2::GF2;
 use rand::RngCore;
 use sha256_utils::*;
 
-use expander_compiler::{
-    declare_circuit,
-    frontend::{
-        compile, compile_cross_layer, BasicAPI, CompileResult, CompileResultCrossLayer, Define,
-        GF2Config, Variable, API,
-    },
-};
+use expander_compiler::{declare_circuit, frontend::*};
 
 declare_circuit!(VanillaAdder {
     a: [Variable; 32],
@@ -17,11 +11,20 @@ declare_circuit!(VanillaAdder {
     c: [Variable; 32],
 });
 
-impl Define<GF2Config> for VanillaAdder<Variable> {
-    fn define(&self, api: &mut API<GF2Config>) {
+impl<C: Config> Define<C> for VanillaAdder<Variable> {
+    fn define(&self, api: &mut API<C>) {
         let c_target = add_vanilla(api, self.a.to_vec(), self.b.to_vec());
         for i in 0..32 {
             api.assert_is_equal(self.c[i], c_target[i]);
+        }
+    }
+}
+
+impl<C: Config> GenericDefine<C> for VanillaAdder<Variable> {
+    fn define<Builder: RootAPI<C>>(&self, builder: &mut Builder) {
+        let c_target = add_vanilla(builder, self.a.to_vec(), self.b.to_vec());
+        for i in 0..32 {
+            builder.assert_is_equal(self.c[i], c_target[i]);
         }
     }
 }
@@ -48,7 +51,7 @@ fn test_add_vanilla() {
     }
 
     // layered circuit
-    let compile_result = compile(&VanillaAdder::default()).unwrap();
+    let compile_result: CompileResult<GF2Config> = compile(&VanillaAdder::default()).unwrap();
     let CompileResult {
         witness_solver,
         layered_circuit,
@@ -59,8 +62,9 @@ fn test_add_vanilla() {
     assert_eq!(res, expected_res);
 
     // crosslayer circuit
-    let compile_result = compile_cross_layer(&VanillaAdder::default()).unwrap();
-    let CompileResultCrossLayer {
+    let compile_result: CompileResultCrossLayer<GF2Config> =
+        compile_generic_cross_layer(&VanillaAdder::default(), CompileOptions::default()).unwrap();
+    let CompileResultCrossLayer::<GF2Config> {
         witness_solver,
         layered_circuit,
     } = compile_result;
