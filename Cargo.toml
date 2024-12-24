@@ -28,4 +28,5 @@ gkr = { git = "https://github.com/PolyhedraZK/Expander", rev = "1804a5ea3e554724
 gf2 = { git = "https://github.com/PolyhedraZK/Expander", rev = "1804a5ea3e5547247e2c19a769f2fc4e992ad290" }
 mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", rev = "1804a5ea3e5547247e2c19a769f2fc4e992ad290" }
 expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", rev = "1804a5ea3e5547247e2c19a769f2fc4e992ad290", package = "transcript" }
+crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", rev = "1804a5ea3e5547247e2c19a769f2fc4e992ad290"}
 

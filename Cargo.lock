@@ -541,6 +541,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22ec99545bb0ed0ea7bb9b8e1e9122ea386ff8a48c0922e43f36d45ab09e0e80"
 
 [[package]]
+name = "crosslayer_prototype"
+version = "0.1.0"
+source = "git+https://github.com/PolyhedraZK/Expander?rev=1804a5ea3e5547247e2c19a769f2fc4e992ad290#1804a5ea3e5547247e2c19a769f2fc4e992ad290"
+dependencies = [
+ "arith",
+ "config",
+ "env_logger",
+ "ethnum",
+ "gkr_field_config",
+ "log",
+ "polynomials",
+ "rand",
+ "sumcheck",
+ "thiserror",
+ "transcript",
+]
+
+[[package]]
 name = "crunchy"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -665,6 +683,7 @@ dependencies = [
  "circuit",
  "clap",
  "config",
+ "crosslayer_prototype",
  "ethnum",
  "gf2",
  "gkr",
@@ -674,6 +693,7 @@ dependencies = [
  "mpi_config",
  "rand",
  "tiny-keccak",
+ "transcript",
 ]
 
 [[package]]
