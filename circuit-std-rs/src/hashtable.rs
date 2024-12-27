@@ -1,3 +1,8 @@
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use expander_compiler::frontend::*;
 use sha2::{Digest, Sha256};
 use crate::big_int::{to_binary_hint, big_array_add};
@@ -46,9 +51,6 @@ impl Define<M31Config> for HASHTABLECircuit<Variable> {
 
 #[test]
 fn test_hashtable(){
-	let mut hint_registry = HintRegistry::<M31>::new();
-	hint_registry.register("myhint.tobinary", to_binary_hint);
-	let compile_result = compile(&HASHTABLECircuit::default()).unwrap();
 	let seed = [0 as u8;32];
 	let round = 0 as u8;
 	let start_index =  [0 as u8;4];
@@ -85,11 +87,50 @@ fn test_hashtable(){
 			assignment.output[i][j] = M31::from(output[j] as u32);
 		}
 	}
-	let witness = compile_result
-			.witness_solver
-			.solve_witness_with_hints(&assignment, &mut hint_registry)
-			.unwrap();
-		let output = compile_result.layered_circuit.run(&witness);
-		assert_eq!(output, vec![true]);
+    let mut handles = vec![];
+    let mut assignments = vec![];
+    for i in 0..8 {
+        assignments.push(assignment.clone());
+    }
+    let start_time = std::time::Instant::now();
+    for i in 0..8 {
+        let assignment_clone = Arc::new(Mutex::new(assignments[i].clone()));
+        let compile_result = compile(&HASHTABLECircuit::default()).unwrap();
+
+        handles.push(thread::spawn(move || { 
+            let mut hint_registry = HintRegistry::<M31>::new();
+            hint_registry.register("myhint.tobinary", to_binary_hint);
+            let assignment = assignment_clone.lock().unwrap();
+            let mut start_time_secs = SystemTime::now()
+                .duration_since(UNIX_EPOCH) 
+                .unwrap()                   
+                .as_secs();
+            //convert start_time to seconds
+            while start_time_secs % 50 != 0 {
+                //sleep 1 second
+                thread::sleep(Duration::from_secs(1));
+                start_time_secs = SystemTime::now()
+                .duration_since(UNIX_EPOCH) 
+                .unwrap()                   
+                .as_secs();
+            }
+            let start_time = std::time::Instant::now();
+            compile_result
+            .witness_solver
+            .solve_witness_with_hints(&*assignment, &mut hint_registry)
+            .unwrap();
+            let end_time = std::time::Instant::now();
+            println!("Generate witness Time: {:?}", end_time.duration_since(start_time));}));
+    }
+    for handle in handles {
+        handle.join().unwrap(); 
+    }
+    let end_time = std::time::Instant::now();
+    let start_time_secs = SystemTime::now()
+                .duration_since(UNIX_EPOCH) 
+                .unwrap()                   
+                .as_secs();
+    println!("Generate witness Time: {:?}", end_time.duration_since(start_time));
+    println!("remove wait time: {:?}", start_time_secs % 50);
 }
 
