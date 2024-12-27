@@ -1,44 +1,95 @@
-use arith::Field;
 use expander_compiler::frontend::*;
+use sha2::{Digest, Sha256};
+use crate::big_int::{to_binary_hint, big_array_add};
+use crate::sha2_m31::check_sha256;
 
-
+const SHA256LEN: usize = 32;
+const HASHTABLESIZE: usize = 64;
 #[derive(Clone, Copy, Debug)]
 pub struct HashTableParams {
     pub table_size: usize,
     pub hash_len: usize,
 }
-declare_circuit!(_HashTableCircuit {
-    shuffle_round: Variable,
-    start_index: [Variable;4],
-    seed: [Variable;32],
-    hash_outputs: [[Variable;32];64],
+
+declare_circuit!(HASHTABLECircuit {
+	shuffle_round: Variable,
+	start_index:   [Variable;4],
+	seed:      [PublicVariable; SHA256LEN],
+	output:  [[Variable;SHA256LEN];HASHTABLESIZE],
 });
-
-pub type HashTableCircuit = _HashTableCircuit<Variable>;
-
-
-impl<C: Config> Define<C> for HashTableCircuit {
-    fn define(&self, builder: &mut API<C>) {
-
-    let  mut  hash_inputs:Vec<Vec<Variable>> = Vec::new();
-    let mut cur_index = self.start_index.clone();
-    for i in 0..64 {
-        let mut cur_input:Vec<Variable> = Vec::new();
-        for j in 0..32 {
-            cur_input.push(self.seed[j]);
-        }
-        cur_input.push(self.shuffle_round);
-        for j in 0..4 {
-            cur_input.push(cur_index[j]);
-        }
-        hash_inputs.push(cur_input);
-        cur_index = common::ArrayBoundedAdd(builder, cur_index, [1, 0, 0, 0], 8);
-    }
-    let hash_res_array = hash::CalSpecialHashArray(builder, hash_inputs, opt);
-    for i in 0..64 {
-        for j in 0..32 {
-                builder.assert_is_equal(hash_res_array[i][j], self.hash_outputs[i][j]);
-        }
-    }
-    }
+impl Define<M31Config> for HASHTABLECircuit<Variable> {
+	fn define(&self, builder: &mut API<M31Config>) {
+		let mut indices = vec![Vec::<Variable>::new(); HASHTABLESIZE];
+		if HASHTABLESIZE > 256 {
+			panic!("HASHTABLESIZE > 256")
+		}
+		let var0 = builder.constant(0);
+		for i in 0..HASHTABLESIZE {
+			//assume HASHTABLESIZE is less than 2^8
+			let var_i = builder.constant(i as u32);
+			let index = big_array_add(builder, &self.start_index, &[var_i, var0, var0, var0], 8);
+			indices[i] = index.to_vec();
+		}
+		for i in 0..HASHTABLESIZE {
+			let mut cur_input = Vec::<Variable>::new();
+			cur_input.extend_from_slice(&self.seed);
+			cur_input.push(self.shuffle_round);
+			cur_input.extend_from_slice(&indices[i]);
+			let mut data = cur_input;
+			data.append(&mut self.output[i].to_vec());
+			builder.memorized_simple_call(check_sha256, &data);
+		}
+	}
 }
+
+
+
+#[test]
+fn test_hashtable(){
+	let mut hint_registry = HintRegistry::<M31>::new();
+	hint_registry.register("myhint.tobinary", to_binary_hint);
+	let compile_result = compile(&HASHTABLECircuit::default()).unwrap();
+	let seed = [0 as u8;32];
+	let round = 0 as u8;
+	let start_index =  [0 as u8;4];
+	let mut assignment:HASHTABLECircuit<M31> = HASHTABLECircuit::default();
+	for i in 0..32 {
+		assignment.seed[i] = M31::from(seed[i] as u32);
+	}
+	
+	assignment.shuffle_round = M31::from(round as u32);
+	for i in 0..4 {
+		assignment.start_index[i] = M31::from(start_index[i] as u32);
+	}
+	let mut inputs = vec![];
+	let mut cur_index = start_index;
+	for i in 0..HASHTABLESIZE{
+		let mut input = vec![];
+		input.extend_from_slice(&seed);
+		input.push(round);
+		input.extend_from_slice(&cur_index);
+		if cur_index[0] == 255 {
+			cur_index[0] = 0;
+			cur_index[1] += 1;
+		} else {
+			cur_index[0] += 1;
+		}
+		inputs.push(input);
+	}
+	for i in 0..HASHTABLESIZE{
+		let data = inputs[i].to_vec();
+		let mut hash = Sha256::new();
+		hash.update(&data);
+		let output = hash.finalize();
+		for j in 0..32 {
+			assignment.output[i][j] = M31::from(output[j] as u32);
+		}
+	}
+	let witness = compile_result
+			.witness_solver
+			.solve_witness_with_hints(&assignment, &mut hint_registry)
+			.unwrap();
+		let output = compile_result.layered_circuit.run(&witness);
+		assert_eq!(output, vec![true]);
+}
+

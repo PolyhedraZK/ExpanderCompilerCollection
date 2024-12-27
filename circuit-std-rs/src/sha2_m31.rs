@@ -1,9 +1,10 @@
+use std::cell::RefCell;
+
 use expander_compiler::frontend::*;
+use sha2::{Digest, Sha256};
+use crate::big_int::{to_binary_hint, big_endian_m31_array_put_uint32, bytes_to_bits, bit_array_to_m31, big_array_add, sigma0, sigma1, cap_sigma0, cap_sigma1, ch, maj, m31_to_bit_array};
 
-use crate::big_int::{to_binary, from_binary, to_binary_hint, big_endian_put_uint64, big_endian_m31_array_put_uint32, bytes_to_bits, bit_array_to_m31, big_array_add, sigma0, sigma1, cap_sigma0, cap_sigma1, ch, maj, m31_to_bit_array};
-
-const SIZE: usize = 32;
-const BLOCK_SIZE: usize = 64;
+const SHA256LEN: usize = 32;
 const CHUNK: usize = 64;
 const INIT0: u32 = 0x6A09E667;
 const INIT1: u32 = 0xBB67AE85;
@@ -96,7 +97,7 @@ const _K:[u32;64] = [
 	0xbef9a3f7,
 	0xc67178f2,
 ];	
-struct Digest {
+struct MyDigest {
 	h: [[Variable; 2]; 8],
 	x: [Variable; CHUNK],
 	nx: usize,
@@ -104,7 +105,7 @@ struct Digest {
 	var_len: Variable,
 	kbits: [[Variable;32]; 64],
 }
-impl Digest {
+impl MyDigest {
 	fn new<C: Config>(api: &mut API<C>) -> Self {
 		let mut h = [[api.constant(0); 2]; 8];
 		h[0][0] = api.constant(INIT00);
@@ -123,19 +124,19 @@ impl Digest {
 		h[6][1] = api.constant(INIT61);
 		h[7][0] = api.constant(INIT70);
 		h[7][1] = api.constant(INIT71);
-		/*
-		KBits = make([][]frontend.Variable, len(_K))
-	for i := 0; i < len(KBits); i++ {
-		KBits[i] = toBinary32(_K[i])
-	}
-		 */
+		let mut kbits_u8 = [[0;32];64];
+		for i in 0..64 {
+			for j in 0..32 {
+				kbits_u8[i][j] = ((_K[i] >> j) & 1) as u8;
+			}
+		}
 		let mut kbits = [[api.constant(0); 32]; 64];
 		for i in 0..64 {
-			let k_i = api.constant(_K[i]);
-			let mut tmp = to_binary(api, k_i, 32);
-			kbits[i] = tmp.as_slice().try_into().unwrap();
+			for j in 0..32 {
+				kbits[i][j] = api.constant(kbits_u8[i][j] as u32);
+			}
 		}
-		Digest {
+		MyDigest {
 			h,
 			x: [api.constant(0); CHUNK],
 			nx: 0,
@@ -167,82 +168,18 @@ impl Digest {
 		self.nx = 0;
 		self.len = 0;
 	}
-	fn write<C: Config>(&mut self, api: &mut API<C>,p: &[Variable]) {
-		self.len += p.len() as u64;
-		if self.nx > 0 {
-			let n = p.len();
-			let mut i = 0;
-			while self.nx < CHUNK && i < n {
-				self.x[self.nx] = p[i];
-				self.nx += 1;
-				i += 1;
-			}
-			if self.nx == CHUNK {
-				self.block(api, &self.h, &self.x);
-				self.nx = 0;
-			}
-			p = &p[i..];
-		}
-		if p.len() >= CHUNK {
-			let n = p.len() & !(CHUNK - 1);
-			self.block(api, &self.h, &p[..n]);
-			p = &p[n..];
-		}
-		if p.len() > 0 {
-			self.nx = 0;
-			let mut i = 0;
-			while i < p.len() {
-				self.x[self.nx] = p[i];
-				self.nx += 1;
-				i += 1;
-			}
-		}
-	}
 	//always write a chunk
 	fn chunk_write<C: Config>(&mut self, api: &mut API<C>, p: &[Variable]) {
 		if p.len() != CHUNK || self.nx != 0 {
 			panic!("p.len() != CHUNK || self.nx != 0");
 		}
 		self.len += CHUNK as u64;
-		self.block(api, &self.h, p);
+		let tmp_h = self.h.clone();
+		self.h = self.block(api, tmp_h, p);
 	}
-	fn check_sum<C: Config>(&mut self, api: &mut API<C>) -> [Variable;SIZE] {
-		let len = self.len;
-		// Padding. Add a 1 bit and 0 bits until 56 bytes mod 64.
-		let mut tmp = vec![api.constant(0); 64];
-		tmp[0] = api.constant(0x80);
-		if len % 64 < 56 {
-			self.write(api, &tmp[0..56-len as usize % 64]);
-		} else {
-			self.write(api, &tmp[0..64+56-len as usize % 64]);
-		}
+	fn return_sum<C: Config>(&mut self, api: &mut API<C>) -> [Variable;SHA256LEN] {
 
-		// Length in bits.
-		let mut len = len << 3;
-		let mut tmp = vec![api.constant(0); 64];
-		big_endian_put_uint64(api, &mut tmp, api.constant(len));
-		self.write(api,&tmp[0..8]);
-
-		if self.nx != 0 {
-			panic!("d.nx != 0");
-		}
-
-		let mut digest = [api.constant(0); SIZE];
-
-		big_endian_m31_array_put_uint32(api, &mut digest[0..], self.h[0]);
-		big_endian_m31_array_put_uint32(api, &mut digest[4..], self.h[1]);
-		big_endian_m31_array_put_uint32(api, &mut digest[8..], self.h[2]);
-		big_endian_m31_array_put_uint32(api, &mut digest[12..], self.h[3]);
-		big_endian_m31_array_put_uint32(api, &mut digest[16..], self.h[4]);
-		big_endian_m31_array_put_uint32(api, &mut digest[20..], self.h[5]);
-		big_endian_m31_array_put_uint32(api, &mut digest[24..], self.h[6]);
-		big_endian_m31_array_put_uint32(api, &mut digest[28..], self.h[7]);
-
-		digest
-	}
-	fn return_sum<C: Config>(&mut self, api: &mut API<C>) -> [Variable;SIZE] {
-
-		let mut digest = [api.constant(0); SIZE];
+		let mut digest = [api.constant(0); SHA256LEN];
 
 		big_endian_m31_array_put_uint32(api, &mut digest[0..], self.h[0]);
 		big_endian_m31_array_put_uint32(api, &mut digest[4..], self.h[1]);
@@ -254,8 +191,9 @@ impl Digest {
 		big_endian_m31_array_put_uint32(api, &mut digest[28..], self.h[7]);
 		digest
 	}
-	fn block<C: Config>(&mut self, api: &mut API<C>, hh: &mut [[Variable;2];8], p: &[Variable]) {
+	fn block<C: Config>(&mut self, api: &mut API<C>, h: [[Variable;2];8], p: &[Variable]) -> [[Variable;2];8] {
 	let mut p = p;
+	let mut hh = h;
 	while p.len() >= CHUNK {
 		let mut msg_schedule = vec![];
 		for t in 0..64 {
@@ -297,6 +235,7 @@ impl Digest {
 			t1_term1[1] = h[1];
 			let t1_term2_tmp = cap_sigma1(api, &e_bit);
 			let t1_term2 = bit_array_to_m31(api, &t1_term2_tmp);
+			let test = bit_array_to_m31(api, &g_bit);
 			let t1_term3_tmp = ch(api, &e_bit, &f_bit, &g_bit);
 			let t1_term3 = bit_array_to_m31(api, &t1_term3_tmp);
 			let t1_term4 = bit_array_to_m31(api, &self.kbits[t]); //rewrite to [2]frontend.Variable
@@ -315,20 +254,20 @@ impl Digest {
 			let new_a_bit = m31_to_bit_array(api, &new_a_bit_tmp)[..32].to_vec();
 			let new_e_bit_tmp = big_array_add(api, &d[..2], &t1, 30);
 			let new_e_bit = m31_to_bit_array(api, &new_e_bit_tmp)[..32].to_vec();
-			a = bit_array_to_m31(api, &new_a_bit).to_vec();
-			b = a.to_vec();
-			c = b.to_vec();
-			d = c.to_vec();
-			e = bit_array_to_m31(api, &new_e_bit).to_vec();
-			f = e.to_vec();
-			g = f.to_vec();
 			h = g.to_vec();
-			a_bit = new_a_bit.to_vec();
-			b_bit = a_bit.to_vec();
-			c_bit = b_bit.to_vec();
-			e_bit = new_e_bit.to_vec();
-			f_bit = e_bit.to_vec();
+			g = f.to_vec();
+			f = e.to_vec();
+			d = c.to_vec();
+			c = b.to_vec();
+			b = a.to_vec();
+			a = bit_array_to_m31(api, &new_a_bit).to_vec();
+			e = bit_array_to_m31(api, &new_e_bit).to_vec();
 			g_bit = f_bit.to_vec();
+			f_bit = e_bit.to_vec();
+			c_bit = b_bit.to_vec();
+			b_bit = a_bit.to_vec();
+			a_bit = new_a_bit.to_vec();
+			e_bit = new_e_bit.to_vec();
 		}
 		let hh0_tmp1 = big_array_add(api, &hh[0], &a, 30);
 		let hh0_tmp2 = m31_to_bit_array(api, &hh0_tmp1);
@@ -356,45 +295,77 @@ impl Digest {
 		hh[7] = bit_array_to_m31(api, &hh7_tmp2[..32].to_vec()).as_slice().try_into().unwrap();
 		p = &p[CHUNK..];
 	}
+	hh
 	}
 }
-/*
-pub fn Sum256For37Bytes<C: Config>(builder: &mut API<C>, orignData: &[Variable]) ->Vec<Variable> {
-	/*if len(orignData) != 32+1+4 {
-		panic("len(orignData) !=  32+1+4")
-	}
-	d := new(digest)
-	d.api = api
-	d.Reset()
-	data := orignData
-	n := len(data)
-	//make sure input is multiple of 64 bytes
-	prePad := make([]frontend.Variable, 64-n%64)
-	for i := 0; i < len(prePad); i++ {
-		prePad[i] = 0
-	}
-	prePad[0] = 128
-	prePad[len(prePad)-2] = (32 + 1 + 4) * 8 / 256
-	prePad[len(prePad)-1] = (32+1+4)*8 - 256
-	data = append(data, prePad...)
-	//update new length
-	d.Write(data[:])
-	res := d.returnSum()
-	return res
-	*/
-	let mut data = orignData.to_vec();
+
+pub fn sha256_37bytes<C: Config>(builder: &mut API<C>, orign_data: &[Variable]) ->Vec<Variable> {
+	let mut data = orign_data.to_vec();
 	let n = data.len();
 	if n != 32+1+4 {
 		panic!("len(orignData) !=  32+1+4")
 	}
-	let mut prePad = vec![builder.constant(0); 64-n%64];
-	prePad[0] = builder.constant(128);
-	prePad[prePad.len()-2] = builder.constant((32 + 1 + 4) * 8 / 256);
-	prePad[prePad.len()-1] = builder.constant((32+1+4)*8 - 256);
-	data.append(&mut prePad);
-	let mut d = Digest::<C>::new(builder);
-	d.Reset();
-	d.write(&data);
-	d.return_sum()
+	let mut pre_pad = vec![builder.constant(0); 64-37];
+	pre_pad[0] = builder.constant(128);	//0x80
+	pre_pad[64-37-2] = builder.constant((37) * 8 / 256);	//length byte
+	pre_pad[64-37-1] = builder.constant((32+1+4)*8 - 256);	//length byte
+	data.append(&mut pre_pad);	//append padding
+	let mut d = MyDigest::new(builder);
+	d.reset(builder);
+	d.chunk_write(builder, &data);
+	d.return_sum(builder).to_vec()
 }
-*/
+
+
+declare_circuit!(SHA25637BYTESCircuit {
+	input: [Variable;37],
+	output: [Variable;32],
+});
+pub fn check_sha256<C: Config>(builder: &mut API<C>, origin_data: &Vec<Variable>) ->Vec<Variable>{
+	let output = origin_data[37..].to_vec();
+	let result = sha256_37bytes(builder, &origin_data[..37]);
+	for i in 0..32 {
+		builder.assert_is_equal(result[i], output[i]);
+	}
+	result
+}
+impl Define<M31Config> for SHA25637BYTESCircuit<Variable> {
+	fn define(&self, builder: &mut API<M31Config>) {
+		for _ in 0..8 {
+			let mut data = self.input.to_vec();
+			data.append(&mut self.output.to_vec());
+			builder.memorized_simple_call(check_sha256, &data);
+		}
+	}
+}
+
+
+
+#[test]
+fn test_sha256_37bytes(){
+	let mut hint_registry = HintRegistry::<M31>::new();
+	hint_registry.register("myhint.tobinary", to_binary_hint);
+	let compile_result = compile(&SHA25637BYTESCircuit::default()).unwrap();
+	for i in 0..1{
+		let data = [i;37];
+		let mut hash = Sha256::new();
+		hash.update(&data);
+		let output = hash.finalize();
+		println!("{:?}", output);
+		let mut assignment = SHA25637BYTESCircuit::default();
+		for i in 0..37 {
+			assignment.input[i] = M31::from(data[i] as u32);
+		}
+		// assignment.output[0] = M31::from(319309485 as u32);
+		// assignment.output[1] = M31::from(0 as u32);
+		for i in 0..32 {
+			assignment.output[i] = M31::from(output[i] as u32);
+		}
+		let witness = compile_result
+			.witness_solver
+			.solve_witness_with_hints(&assignment, &mut hint_registry)
+			.unwrap();
+		let output = compile_result.layered_circuit.run(&witness);
+		assert_eq!(output, vec![true]);
+	}
+}
