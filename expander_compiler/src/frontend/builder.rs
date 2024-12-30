@@ -22,13 +22,20 @@ use super::api::{BasicAPI, DebugAPI, RootAPI, UnconstrainedAPI};
 pub struct Builder<C: Config> {
     instructions: Vec<SourceInstruction<C>>,
     constraints: Vec<SourceConstraint>,
-    var_max: usize,
+    var_const_id: Vec<usize>,
+    const_values: Vec<C::CircuitField>,
     num_inputs: usize,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Variable {
     id: usize,
+}
+
+impl Variable {
+    pub fn id(&self) -> usize {
+        self.id
+    }
 }
 
 pub fn new_variable(id: usize) -> Variable {
@@ -44,7 +51,7 @@ pub enum VariableOrValue<F: Field> {
     Value(F),
 }
 
-pub trait ToVariableOrValue<F: Field> {
+pub trait ToVariableOrValue<F: Field>: Clone {
     fn convert_to_variable_or_value(self) -> VariableOrValue<F>;
 }
 
@@ -53,7 +60,7 @@ impl NotVariable for u32 {}
 impl NotVariable for U256 {}
 impl<F: Field> NotVariable for F {}
 
-impl<F: Field, T: Into<F> + NotVariable> ToVariableOrValue<F> for T {
+impl<F: Field, T: Into<F> + NotVariable + Clone> ToVariableOrValue<F> for T {
     fn convert_to_variable_or_value(self) -> VariableOrValue<F> {
         VariableOrValue::Value(self.into())
     }
@@ -77,8 +84,9 @@ impl<C: Config> Builder<C> {
             Builder {
                 instructions: Vec::new(),
                 constraints: Vec::new(),
-                var_max: num_inputs,
                 num_inputs,
+                var_const_id: vec![0; num_inputs + 1],
+                const_values: vec![C::CircuitField::zero()],
             },
             (1..=num_inputs).map(|id| Variable { id }).collect(),
         )
@@ -99,15 +107,20 @@ impl<C: Config> Builder<C> {
             VariableOrValue::Value(v) => {
                 self.instructions
                     .push(SourceInstruction::ConstantLike(Coef::Constant(v)));
-                self.var_max += 1;
-                Variable { id: self.var_max }
+                self.var_const_id.push(self.const_values.len());
+                self.const_values.push(v);
+                Variable {
+                    id: self.var_const_id.len() - 1,
+                }
             }
         }
     }
 
     fn new_var(&mut self) -> Variable {
-        self.var_max += 1;
-        Variable { id: self.var_max }
+        self.var_const_id.push(0);
+        Variable {
+            id: self.var_const_id.len() - 1,
+        }
     }
 }
 
@@ -117,6 +130,11 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         x: impl ToVariableOrValue<C::CircuitField>,
         y: impl ToVariableOrValue<C::CircuitField>,
     ) -> Variable {
+        let xc = self.constant_value(x.clone());
+        let yc = self.constant_value(y.clone());
+        if xc.is_some() && yc.is_some() {
+            return self.constant(xc.unwrap() + yc.unwrap());
+        }
         let x = self.convert_to_variable(x);
         let y = self.convert_to_variable(y);
         self.instructions.push(SourceInstruction::LinComb(LinComb {
@@ -140,6 +158,11 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         x: impl ToVariableOrValue<C::CircuitField>,
         y: impl ToVariableOrValue<C::CircuitField>,
     ) -> Variable {
+        let xc = self.constant_value(x.clone());
+        let yc = self.constant_value(y.clone());
+        if xc.is_some() && yc.is_some() {
+            return self.constant(xc.unwrap() - yc.unwrap());
+        }
         let x = self.convert_to_variable(x);
         let y = self.convert_to_variable(y);
         self.instructions.push(SourceInstruction::LinComb(LinComb {
@@ -159,6 +182,10 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
     }
 
     fn neg(&mut self, x: impl ToVariableOrValue<C::CircuitField>) -> Variable {
+        let xc = self.constant_value(x.clone());
+        if let Some(xv) = xc {
+            return self.constant(-xv);
+        }
         let x = self.convert_to_variable(x);
         self.instructions.push(SourceInstruction::LinComb(LinComb {
             terms: vec![LinCombTerm {
@@ -175,6 +202,11 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         x: impl ToVariableOrValue<C::CircuitField>,
         y: impl ToVariableOrValue<C::CircuitField>,
     ) -> Variable {
+        let xc = self.constant_value(x.clone());
+        let yc = self.constant_value(y.clone());
+        if xc.is_some() && yc.is_some() {
+            return self.constant(xc.unwrap() * yc.unwrap());
+        }
         let x = self.convert_to_variable(x);
         let y = self.convert_to_variable(y);
         self.instructions
@@ -188,6 +220,21 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         y: impl ToVariableOrValue<C::CircuitField>,
         checked: bool,
     ) -> Variable {
+        let xc = self.constant_value(x.clone());
+        let yc = self.constant_value(y.clone());
+        if xc.is_some() && yc.is_some() {
+            let xv = xc.unwrap();
+            let yv = yc.unwrap();
+            let res = if yv.is_zero() {
+                if checked || !xv.is_zero() {
+                    panic!("division by zero");
+                }
+                C::CircuitField::zero()
+            } else {
+                xv * yv.inv().unwrap()
+            };
+            return self.constant(res);
+        }
         let x = self.convert_to_variable(x);
         let y = self.convert_to_variable(y);
         self.instructions.push(SourceInstruction::Div {
@@ -203,6 +250,15 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         x: impl ToVariableOrValue<C::CircuitField>,
         y: impl ToVariableOrValue<C::CircuitField>,
     ) -> Variable {
+        let xc = self.constant_value(x.clone());
+        let yc = self.constant_value(y.clone());
+        if xc.is_some() && yc.is_some() {
+            let xv = xc.unwrap();
+            let yv = yc.unwrap();
+            self.assert_is_bool(xv);
+            self.assert_is_bool(yv);
+            return self.constant(C::CircuitField::from((xv != yv) as u32));
+        }
         let x = self.convert_to_variable(x);
         let y = self.convert_to_variable(y);
         self.instructions.push(SourceInstruction::BoolBinOp {
@@ -218,6 +274,17 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         x: impl ToVariableOrValue<C::CircuitField>,
         y: impl ToVariableOrValue<C::CircuitField>,
     ) -> Variable {
+        let xc = self.constant_value(x.clone());
+        let yc = self.constant_value(y.clone());
+        if xc.is_some() && yc.is_some() {
+            let xv = xc.unwrap();
+            let yv = yc.unwrap();
+            self.assert_is_bool(xv);
+            self.assert_is_bool(yv);
+            return self.constant(C::CircuitField::from(
+                (!xv.is_zero() || !yv.is_zero()) as u32,
+            ));
+        }
         let x = self.convert_to_variable(x);
         let y = self.convert_to_variable(y);
         self.instructions.push(SourceInstruction::BoolBinOp {
@@ -233,6 +300,17 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         x: impl ToVariableOrValue<C::CircuitField>,
         y: impl ToVariableOrValue<C::CircuitField>,
     ) -> Variable {
+        let xc = self.constant_value(x.clone());
+        let yc = self.constant_value(y.clone());
+        if xc.is_some() && yc.is_some() {
+            let xv = xc.unwrap();
+            let yv = yc.unwrap();
+            self.assert_is_bool(xv);
+            self.assert_is_bool(yv);
+            return self.constant(C::CircuitField::from(
+                (!xv.is_zero() && !yv.is_zero()) as u32,
+            ));
+        }
         let x = self.convert_to_variable(x);
         let y = self.convert_to_variable(y);
         self.instructions.push(SourceInstruction::BoolBinOp {
@@ -244,12 +322,22 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
     }
 
     fn is_zero(&mut self, x: impl ToVariableOrValue<C::CircuitField>) -> Variable {
+        let xc = self.constant_value(x.clone());
+        if let Some(xv) = xc {
+            return self.constant(C::CircuitField::from(xv.is_zero() as u32));
+        }
         let x = self.convert_to_variable(x);
         self.instructions.push(SourceInstruction::IsZero(x.id));
         self.new_var()
     }
 
     fn assert_is_zero(&mut self, x: impl ToVariableOrValue<C::CircuitField>) {
+        let xc = self.constant_value(x.clone());
+        if let Some(xv) = xc {
+            if !xv.is_zero() {
+                panic!("assert_is_zero failed");
+            }
+        }
         let x = self.convert_to_variable(x);
         self.constraints.push(SourceConstraint {
             typ: source::ConstraintType::Zero,
@@ -258,6 +346,12 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
     }
 
     fn assert_is_non_zero(&mut self, x: impl ToVariableOrValue<C::CircuitField>) {
+        let xc = self.constant_value(x.clone());
+        if let Some(xv) = xc {
+            if xv.is_zero() {
+                panic!("assert_is_zero failed");
+            }
+        }
         let x = self.convert_to_variable(x);
         self.constraints.push(SourceConstraint {
             typ: source::ConstraintType::NonZero,
@@ -266,6 +360,12 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
     }
 
     fn assert_is_bool(&mut self, x: impl ToVariableOrValue<C::CircuitField>) {
+        let xc = self.constant_value(x.clone());
+        if let Some(xv) = xc {
+            if !xv.is_zero() && xv != C::CircuitField::one() {
+                panic!("assert_is_bool failed");
+            }
+        }
         let x = self.convert_to_variable(x);
         self.constraints.push(SourceConstraint {
             typ: source::ConstraintType::Bool,
@@ -281,6 +381,23 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
 
     fn constant(&mut self, value: impl ToVariableOrValue<C::CircuitField>) -> Variable {
         self.convert_to_variable(value)
+    }
+
+    fn constant_value(
+        &mut self,
+        x: impl ToVariableOrValue<<C as Config>::CircuitField>,
+    ) -> Option<<C as Config>::CircuitField> {
+        match x.convert_to_variable_or_value() {
+            VariableOrValue::Variable(v) => {
+                let t = self.var_const_id[v.id];
+                if t != 0 {
+                    Some(self.const_values[t])
+                } else {
+                    None
+                }
+            }
+            VariableOrValue::Value(v) => Some(v),
+        }
     }
 }
 
@@ -418,6 +535,13 @@ impl<C: Config> BasicAPI<C> for RootBuilder<C> {
 
     fn constant(&mut self, x: impl ToVariableOrValue<<C as Config>::CircuitField>) -> Variable {
         self.last_builder().constant(x)
+    }
+
+    fn constant_value(
+        &mut self,
+        x: impl ToVariableOrValue<<C as Config>::CircuitField>,
+    ) -> Option<<C as Config>::CircuitField> {
+        self.last_builder().constant_value(x)
     }
 }
 

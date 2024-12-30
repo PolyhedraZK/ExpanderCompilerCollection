@@ -124,6 +124,12 @@ impl<C: Config> BasicAPI<C> for DebugBuilder<C> {
         let x = self.convert_to_value(x);
         self.return_as_variable(x)
     }
+    fn constant_value(
+        &mut self,
+        x: impl ToVariableOrValue<<C as Config>::CircuitField>,
+    ) -> Option<<C as Config>::CircuitField> {
+        Some(self.convert_to_value(x))
+    }
 }
 
 impl<C: Config> UnconstrainedAPI<C> for DebugBuilder<C> {
