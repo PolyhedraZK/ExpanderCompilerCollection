@@ -6,7 +6,7 @@ edition = "2021"
 
 [dependencies]
 expander_compiler = { path = "../expander_compiler"}
-
+hex = "0.4"
 ark-std.workspace = true
 rand.workspace = true
 expander_config.workspace = true
@@ -16,3 +16,5 @@ arith.workspace = true
 gf2.workspace = true
 mersenne31.workspace = true
 sha2.workspace = true
+num-bigint.workspace = true
+num-traits.workspace = true

@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-
+use extra::*;
 use expander_compiler::frontend::*;
 use sha2::{Digest, Sha256};
 use crate::big_int::{to_binary_hint, big_endian_m31_array_put_uint32, bytes_to_bits, bit_array_to_m31, big_array_add, sigma0, sigma1, cap_sigma0, cap_sigma1, ch, maj, m31_to_bit_array};
@@ -106,7 +106,7 @@ struct MyDigest {
 	kbits: [[Variable;32]; 64],
 }
 impl MyDigest {
-	fn new<C: Config>(api: &mut API<C>) -> Self {
+	fn new<C: Config, B: RootAPI<C>>(api: &mut B) -> Self {
 		let mut h = [[api.constant(0); 2]; 8];
 		h[0][0] = api.constant(INIT00);
 		h[0][1] = api.constant(INIT01);
@@ -145,7 +145,7 @@ impl MyDigest {
 			kbits,
 		}
 	}
-	fn reset<C: Config>(&mut self, api: &mut API<C>) {
+	fn reset<C: Config, B: RootAPI<C>>(&mut self, api: &mut B) {
 		for i in 0..8 {
 			self.h[i] = [api.constant(0); 2];
 		}
@@ -169,7 +169,7 @@ impl MyDigest {
 		self.len = 0;
 	}
 	//always write a chunk
-	fn chunk_write<C: Config>(&mut self, api: &mut API<C>, p: &[Variable]) {
+	fn chunk_write<C: Config, B: RootAPI<C>>(&mut self, api: &mut B, p: &[Variable]) {
 		if p.len() != CHUNK || self.nx != 0 {
 			panic!("p.len() != CHUNK || self.nx != 0");
 		}
@@ -177,7 +177,7 @@ impl MyDigest {
 		let tmp_h = self.h.clone();
 		self.h = self.block(api, tmp_h, p);
 	}
-	fn return_sum<C: Config>(&mut self, api: &mut API<C>) -> [Variable;SHA256LEN] {
+	fn return_sum<C: Config, B: RootAPI<C>>(&mut self, api: &mut B) -> [Variable;SHA256LEN] {
 
 		let mut digest = [api.constant(0); SHA256LEN];
 
@@ -191,7 +191,7 @@ impl MyDigest {
 		big_endian_m31_array_put_uint32(api, &mut digest[28..], self.h[7]);
 		digest
 	}
-	fn block<C: Config>(&mut self, api: &mut API<C>, h: [[Variable;2];8], p: &[Variable]) -> [[Variable;2];8] {
+	fn block<C: Config, B: RootAPI<C>>(&mut self, api: &mut B, h: [[Variable;2];8], p: &[Variable]) -> [[Variable;2];8] {
 	let mut p = p;
 	let mut hh = h;
 	while p.len() >= CHUNK {
@@ -299,7 +299,7 @@ impl MyDigest {
 	}
 }
 
-pub fn sha256_37bytes<C: Config>(builder: &mut API<C>, orign_data: &[Variable]) ->Vec<Variable> {
+pub fn sha256_37bytes<C: Config, B:RootAPI<C>>(builder: &mut B, orign_data: &[Variable]) ->Vec<Variable> {
 	let mut data = orign_data.to_vec();
 	let n = data.len();
 	if n != 32+1+4 {
@@ -321,16 +321,17 @@ declare_circuit!(SHA25637BYTESCircuit {
 	input: [Variable;37],
 	output: [Variable;32],
 });
-pub fn check_sha256<C: Config>(builder: &mut API<C>, origin_data: &Vec<Variable>) ->Vec<Variable>{
+pub fn check_sha256<C: Config, B: RootAPI<C>>(builder: &mut B, origin_data: &Vec<Variable>) ->Vec<Variable>{
 	let output = origin_data[37..].to_vec();
 	let result = sha256_37bytes(builder, &origin_data[..37]);
 	for i in 0..32 {
+		println!("{}: {:?} {:?}", i, builder.value_of(result[i]), builder.value_of(output[i]));
 		builder.assert_is_equal(result[i], output[i]);
 	}
 	result
 }
-impl Define<M31Config> for SHA25637BYTESCircuit<Variable> {
-	fn define(&self, builder: &mut API<M31Config>) {
+impl GenericDefine<M31Config> for SHA25637BYTESCircuit<Variable> {
+	fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
 		for _ in 0..8 {
 			let mut data = self.input.to_vec();
 			data.append(&mut self.output.to_vec());
@@ -345,7 +346,7 @@ impl Define<M31Config> for SHA25637BYTESCircuit<Variable> {
 fn test_sha256_37bytes(){
 	let mut hint_registry = HintRegistry::<M31>::new();
 	hint_registry.register("myhint.tobinary", to_binary_hint);
-	let compile_result = compile(&SHA25637BYTESCircuit::default()).unwrap();
+	let compile_result = compile_generic(&SHA25637BYTESCircuit::default(),CompileOptions::default()).unwrap();
 	for i in 0..1{
 		let data = [i;37];
 		let mut hash = Sha256::new();
@@ -368,4 +369,28 @@ fn test_sha256_37bytes(){
 		let output = compile_result.layered_circuit.run(&witness);
 		assert_eq!(output, vec![true]);
 	}
+}
+#[test]
+fn debug_sha256_37bytes(){
+	let mut hint_registry = HintRegistry::<M31>::new();
+	hint_registry.register("myhint.tobinary", to_binary_hint);
+	let data = [255;37];
+		let mut hash = Sha256::new();
+		hash.update(&data);
+		let output = hash.finalize();
+		println!("{:?}", output);
+		let mut assignment = SHA25637BYTESCircuit::default();
+		for i in 0..37 {
+			assignment.input[i] = M31::from(data[i] as u32);
+		}
+		// assignment.output[0] = M31::from(319309485 as u32);
+		// assignment.output[1] = M31::from(0 as u32);
+		for i in 0..32 {
+			assignment.output[i] = M31::from(output[i] as u32);
+		}
+	debug_eval(
+        &SHA25637BYTESCircuit::default(),
+        &assignment,
+        hint_registry,
+    );
 }

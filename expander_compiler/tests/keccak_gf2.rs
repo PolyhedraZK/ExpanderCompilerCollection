@@ -223,6 +223,8 @@ impl GenericDefine<GF2Config> for Keccak256Circuit<Variable> {
             let out = api.memorized_simple_call(compute_keccak, &self.p[i].to_vec());
             //let out = compute_keccak(api, &self.p[i].to_vec());
             for j in 0..256 {
+                println!("{:?}", api.value_of(out[j]));
+                println!("{:?}", api.value_of(&out[j]));
                 api.assert_is_equal(out[j].clone(), self.out[i][j].clone());
             }
         }

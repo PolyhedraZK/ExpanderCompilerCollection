@@ -4,7 +4,7 @@ use crate::circuit::layered::{CrossLayerInputType, NormalInputType};
 use crate::circuit::{ir, layered};
 
 mod api;
-mod builder;
+pub mod builder;
 mod circuit;
 mod debug;
 mod variables;

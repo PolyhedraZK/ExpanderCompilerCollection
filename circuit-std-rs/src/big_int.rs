@@ -1,13 +1,14 @@
 use expander_compiler::frontend::*;
+use num_bigint::BigInt;
 
-pub fn bytes_to_bits<C: Config>(api: &mut API<C>, vals: &[Variable]) -> Vec<Variable> {
+pub fn bytes_to_bits<C: Config, B: RootAPI<C>>(api: &mut B, vals: &[Variable]) -> Vec<Variable> {
 	let mut ret = to_binary(api, vals[0], 8);
 	for i in 1..vals.len() {
 		ret = to_binary(api, vals[i], 8).into_iter().chain(ret.into_iter()).collect();
 	}
 	ret
 }
-pub fn right_shift<C: Config>(api: &mut API<C>, bits: &[Variable], shift: usize) -> Vec<Variable> {
+pub fn right_shift<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable], shift: usize) -> Vec<Variable> {
 	if bits.len() != 32 {
 		panic!("RightShift: len(bits) != 32");
 	}
@@ -25,7 +26,7 @@ pub fn rotate_right(bits: &[Variable], shift: usize) -> Vec<Variable> {
 	rotated_bits.extend_from_slice(&bits[..shift]);
 	rotated_bits
 }
-pub fn sigma0<C: Config>(api: &mut API<C>, bits: &[Variable]) -> Vec<Variable> {
+pub fn sigma0<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> Vec<Variable> {
 	if bits.len() != 32 {
 		panic!("Sigma0: len(bits) != 32");
 	}
@@ -42,7 +43,7 @@ pub fn sigma0<C: Config>(api: &mut API<C>, bits: &[Variable]) -> Vec<Variable> {
 	}
 	ret
 }
-pub fn sigma1<C: Config>(api: &mut API<C>, bits: &[Variable]) -> Vec<Variable> {
+pub fn sigma1<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> Vec<Variable> {
 	if bits.len() != 32 {
 		panic!("Sigma1: len(bits) != 32");
 	}
@@ -59,7 +60,7 @@ pub fn sigma1<C: Config>(api: &mut API<C>, bits: &[Variable]) -> Vec<Variable> {
 	}
 	ret
 }
-pub fn cap_sigma0<C: Config>(api: &mut API<C>, bits: &[Variable]) -> Vec<Variable> {
+pub fn cap_sigma0<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> Vec<Variable> {
 	if bits.len() != 32 {
 		panic!("CapSigma0: len(bits) != 32");
 	}
@@ -76,7 +77,7 @@ pub fn cap_sigma0<C: Config>(api: &mut API<C>, bits: &[Variable]) -> Vec<Variabl
 	}
 	ret
 }
-pub fn cap_sigma1<C: Config>(api: &mut API<C>, bits: &[Variable]) -> Vec<Variable> {
+pub fn cap_sigma1<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> Vec<Variable> {
 	if bits.len() != 32 {
 		panic!("CapSigma1: len(bits) != 32");
 	}
@@ -93,7 +94,7 @@ pub fn cap_sigma1<C: Config>(api: &mut API<C>, bits: &[Variable]) -> Vec<Variabl
 	}
 	ret
 }
-pub fn ch<C: Config>(api: &mut API<C>, x: &[Variable], y: &[Variable], z: &[Variable]) -> Vec<Variable> {
+pub fn ch<C: Config, B: RootAPI<C>>(api: &mut B, x: &[Variable], y: &[Variable], z: &[Variable]) -> Vec<Variable> {
 	if x.len() != 32 || y.len() != 32 || z.len() != 32 {
 		panic!("Ch: len(x) != 32 || len(y) != 32 || len(z) != 32");
 	}
@@ -106,7 +107,7 @@ pub fn ch<C: Config>(api: &mut API<C>, x: &[Variable], y: &[Variable], z: &[Vari
 	}
 	ret
 }
-pub fn maj<C: Config>(api: &mut API<C>, x: &[Variable], y: &[Variable], z: &[Variable]) -> Vec<Variable> {
+pub fn maj<C: Config, B: RootAPI<C>>(api: &mut B, x: &[Variable], y: &[Variable], z: &[Variable]) -> Vec<Variable> {
 	if x.len() != 32 || y.len() != 32 || z.len() != 32 {
 		panic!("Maj: len(x) != 32 || len(y) != 32 || len(z) != 32");
 	}
@@ -120,7 +121,7 @@ pub fn maj<C: Config>(api: &mut API<C>, x: &[Variable], y: &[Variable], z: &[Var
 	}
 	ret
 }
-pub fn big_array_add<C: Config>(api: &mut API<C>, a: &[Variable], b: &[Variable], nb_bits: usize) -> Vec<Variable> {
+pub fn big_array_add<C: Config, B: RootAPI<C>>(api: &mut B, a: &[Variable], b: &[Variable], nb_bits: usize) -> Vec<Variable> {
 	if a.len() != b.len() {
 		panic!("BigArrayAdd: length of a and b must be equal");
 	}
@@ -135,14 +136,14 @@ pub fn big_array_add<C: Config>(api: &mut API<C>, a: &[Variable], b: &[Variable]
 	}
 	c
 }
-pub fn bit_array_to_m31<C: Config>(api: &mut API<C>, bits: &[Variable]) -> [Variable; 2] {
+pub fn bit_array_to_m31<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> [Variable; 2] {
 	if bits.len() >= 60 {
 		panic!("BitArrayToM31: length of bits must be less than 60");
 	}
 	[from_binary(api, bits[..30].to_vec()), from_binary(api, bits[30..].to_vec())]
 }
 
-pub fn big_endian_m31_array_put_uint32<C: Config>(api: &mut API<C>, b: &mut [Variable], x: [Variable; 2]) {
+pub fn big_endian_m31_array_put_uint32<C: Config, B: RootAPI<C>>(api: &mut B, b: &mut [Variable], x: [Variable; 2]) {
 	let mut quo = x[0];
 	for i in (1..=3).rev() {
 		let (q, r) = idiv_mod_bit(api, quo, 8);
@@ -153,7 +154,7 @@ pub fn big_endian_m31_array_put_uint32<C: Config>(api: &mut API<C>, b: &mut [Var
 	b[0] = api.add(quo, shift);
 }
 
-pub fn big_endian_put_uint64<C: Config>(api: &mut API<C>, b: &mut [Variable], x: Variable) {
+pub fn big_endian_put_uint64<C: Config, B: RootAPI<C>>(api: &mut B, b: &mut [Variable], x: Variable) {
 	let mut quo = x;
 	for i in (1..=7).rev() {
 		let (q, r) = idiv_mod_bit(api, quo, 8);
@@ -162,18 +163,18 @@ pub fn big_endian_put_uint64<C: Config>(api: &mut API<C>, b: &mut [Variable], x:
 	}
 	b[0] = quo;
 }
-pub fn m31_to_bit_array<C: Config>(api: &mut API<C>, m31: &[Variable]) -> Vec<Variable> {
+pub fn m31_to_bit_array<C: Config, B: RootAPI<C>>(api: &mut B, m31: &[Variable]) -> Vec<Variable> {
 	let mut bits = vec![];
 	for i in 0..m31.len() {
 		bits.extend_from_slice(&to_binary(api, m31[i], 30));
 	}
 	bits
 }
-pub fn to_binary<C: Config>(api: &mut API<C>, x: Variable, n_bits: usize) -> Vec<Variable> {
+pub fn to_binary<C: Config, B: RootAPI<C>>(api: &mut B, x: Variable, n_bits: usize) -> Vec<Variable> {
     api.new_hint("myhint.tobinary", &vec![x], n_bits)
 }
 
-pub fn from_binary<C: Config>(api: &mut API<C>, bits: Vec<Variable>) -> Variable {
+pub fn from_binary<C: Config, B: RootAPI<C>>(api: &mut B, bits: Vec<Variable>) -> Variable {
     let mut res = api.constant(0);
     for i in 0..bits.len() {
         let coef = 1 << i;
@@ -191,7 +192,7 @@ pub fn to_binary_hint(x: &[M31], y: &mut [M31]) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn idiv_mod_bit<C: Config>(builder: &mut API<C>, a: Variable, b: u64) -> (Variable, Variable) {
+pub fn idiv_mod_bit<C: Config, B: RootAPI<C>>(builder: &mut B, a: Variable, b: u64) -> (Variable, Variable) {
 	let bits = to_binary(builder, a, 30);
 	let quotient = from_binary(builder, bits[b as usize..].to_vec());
 	let remainder = from_binary(builder, bits[..b as usize].to_vec());
@@ -272,4 +273,14 @@ fn test_bit_convert() {
 			.unwrap();
 	let output = compile_result.layered_circuit.run(&witness);
 	assert_eq!(output, vec![true]);
+}
+
+
+
+#[test]
+fn test_300() {
+    let hex_str = "ffffffffffffffff";
+	let hex_byte = hex_str.as_bytes();
+    let input = BigInt::parse_bytes(hex_byte, 16).unwrap();
+    println!("input: {}", input);
 }

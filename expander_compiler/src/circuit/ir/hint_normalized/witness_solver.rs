@@ -1,7 +1,7 @@
 use crate::{circuit::layered::witness::Witness, utils::serde::Serde};
 
 use super::*;
-
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct WitnessSolver<C: Config> {
     pub circuit: RootCircuit<C>,
 }
