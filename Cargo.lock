@@ -354,8 +354,10 @@ dependencies = [
  "expander_compiler",
  "gf2",
  "gkr",
+ "halo2curves",
  "mersenne31",
  "rand",
+ "sha2",
 ]
 
 [[package]]
@@ -1095,6 +1097,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1622,6 +1633,21 @@ name = "regex-syntax"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a66a03ae7c801facd77a29370b4faec201768915ac14a721ba36f20bc9c209b"
+
+[[package]]
+name = "rsa_circuit"
+version = "0.1.0"
+dependencies = [
+ "ark-std",
+ "circuit-std-rs",
+ "expander_compiler",
+ "halo2curves",
+ "itertools 0.13.0",
+ "num-bigint",
+ "num-traits",
+ "rand",
+ "sha2",
+]
 
 [[package]]
 name = "rustc-demangle"
