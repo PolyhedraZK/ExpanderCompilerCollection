@@ -1,7 +1,7 @@
 mod sha256_utils;
 use gf2::GF2;
 use rand::RngCore;
-use sha256_utils::*;
+use sha256_utils::add_vanilla;
 
 use expander_compiler::{declare_circuit, frontend::*};
 

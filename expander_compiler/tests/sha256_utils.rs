@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 // credit: https://github.com/PolyhedraZK/proof-arena/blob/main/problems/sha256_hash/expander-sha256/src/lib.rs
 //
 use expander_compiler::frontend::*;
