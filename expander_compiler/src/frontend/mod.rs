@@ -14,7 +14,8 @@ pub use circuit::declare_circuit;
 pub type API<C> = builder::RootBuilder<C>;
 pub use crate::circuit::config::*;
 pub use crate::compile::CompileOptions;
-pub use crate::field::{Field, BN254, GF2, M31};
+pub use crate::field::{Field, FieldArith, FieldModulus, BN254, GF2, M31};
+pub use crate::hints::registry::HintRegistry;
 pub use crate::utils::error::Error;
 pub use api::{BasicAPI, RootAPI};
 pub use builder::Variable;
@@ -33,6 +34,7 @@ pub mod internal {
 pub mod extra {
     pub use super::api::{DebugAPI, UnconstrainedAPI};
     pub use super::debug::DebugBuilder;
+    pub use crate::hints::registry::HintRegistry;
     pub use crate::utils::serde::Serde;
 
     use super::*;
@@ -44,6 +46,7 @@ pub mod extra {
     >(
         circuit: &Cir,
         assignment: &CA,
+        hint_registry: HintRegistry<C::CircuitField>,
     ) {
         let (num_inputs, num_public_inputs) = circuit.num_vars();
         let (a_num_inputs, a_num_public_inputs) = assignment.num_vars();
@@ -53,7 +56,7 @@ pub mod extra {
         let mut public_inputs = Vec::new();
         assignment.dump_into(&mut inputs, &mut public_inputs);
         let (mut root_builder, input_variables, public_input_variables) =
-            DebugBuilder::<C>::new(inputs, public_inputs);
+            DebugBuilder::<C>::new(inputs, public_inputs, hint_registry);
         let mut circuit = circuit.clone();
         let mut vars_ptr = input_variables.as_slice();
         let mut public_vars_ptr = public_input_variables.as_slice();

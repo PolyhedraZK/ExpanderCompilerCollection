@@ -50,6 +50,12 @@ pub trait BasicAPI<C: Config> {
         self.assert_is_non_zero(diff);
     }
     fn get_random_value(&mut self) -> Variable;
+    fn new_hint(
+        &mut self,
+        hint_key: &str,
+        inputs: &[Variable],
+        num_outputs: usize,
+    ) -> Vec<Variable>;
     fn constant(&mut self, x: impl ToVariableOrValue<C::CircuitField>) -> Variable;
 }
 
