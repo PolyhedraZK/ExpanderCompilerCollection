@@ -132,8 +132,10 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
     ) -> Variable {
         let xc = self.constant_value(x.clone());
         let yc = self.constant_value(y.clone());
-        if xc.is_some() && yc.is_some() {
-            return self.constant(xc.unwrap() + yc.unwrap());
+        if let Some(xv) = xc {
+            if let Some(yv) = yc {
+                return self.constant(xv + yv);
+            }
         }
         let x = self.convert_to_variable(x);
         let y = self.convert_to_variable(y);
@@ -160,8 +162,10 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
     ) -> Variable {
         let xc = self.constant_value(x.clone());
         let yc = self.constant_value(y.clone());
-        if xc.is_some() && yc.is_some() {
-            return self.constant(xc.unwrap() - yc.unwrap());
+        if let Some(xv) = xc {
+            if let Some(yv) = yc {
+                return self.constant(xv - yv);
+            }
         }
         let x = self.convert_to_variable(x);
         let y = self.convert_to_variable(y);
@@ -204,8 +208,10 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
     ) -> Variable {
         let xc = self.constant_value(x.clone());
         let yc = self.constant_value(y.clone());
-        if xc.is_some() && yc.is_some() {
-            return self.constant(xc.unwrap() * yc.unwrap());
+        if let Some(xv) = xc {
+            if let Some(yv) = yc {
+                return self.constant(xv * yv);
+            }
         }
         let x = self.convert_to_variable(x);
         let y = self.convert_to_variable(y);
@@ -222,18 +228,18 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
     ) -> Variable {
         let xc = self.constant_value(x.clone());
         let yc = self.constant_value(y.clone());
-        if xc.is_some() && yc.is_some() {
-            let xv = xc.unwrap();
-            let yv = yc.unwrap();
-            let res = if yv.is_zero() {
-                if checked || !xv.is_zero() {
-                    panic!("division by zero");
-                }
-                C::CircuitField::zero()
-            } else {
-                xv * yv.inv().unwrap()
-            };
-            return self.constant(res);
+        if let Some(xv) = xc {
+            if let Some(yv) = yc {
+                let res = if yv.is_zero() {
+                    if checked || !xv.is_zero() {
+                        panic!("division by zero");
+                    }
+                    C::CircuitField::zero()
+                } else {
+                    xv * yv.inv().unwrap()
+                };
+                return self.constant(res);
+            }
         }
         let x = self.convert_to_variable(x);
         let y = self.convert_to_variable(y);
@@ -252,12 +258,12 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
     ) -> Variable {
         let xc = self.constant_value(x.clone());
         let yc = self.constant_value(y.clone());
-        if xc.is_some() && yc.is_some() {
-            let xv = xc.unwrap();
-            let yv = yc.unwrap();
-            self.assert_is_bool(xv);
-            self.assert_is_bool(yv);
-            return self.constant(C::CircuitField::from((xv != yv) as u32));
+        if let Some(xv) = xc {
+            if let Some(yv) = yc {
+                self.assert_is_bool(xv);
+                self.assert_is_bool(yv);
+                return self.constant(C::CircuitField::from((xv != yv) as u32));
+            }
         }
         let x = self.convert_to_variable(x);
         let y = self.convert_to_variable(y);
@@ -276,14 +282,14 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
     ) -> Variable {
         let xc = self.constant_value(x.clone());
         let yc = self.constant_value(y.clone());
-        if xc.is_some() && yc.is_some() {
-            let xv = xc.unwrap();
-            let yv = yc.unwrap();
-            self.assert_is_bool(xv);
-            self.assert_is_bool(yv);
-            return self.constant(C::CircuitField::from(
-                (!xv.is_zero() || !yv.is_zero()) as u32,
-            ));
+        if let Some(xv) = xc {
+            if let Some(yv) = yc {
+                self.assert_is_bool(xv);
+                self.assert_is_bool(yv);
+                return self.constant(C::CircuitField::from(
+                    (!xv.is_zero() || !yv.is_zero()) as u32,
+                ));
+            }
         }
         let x = self.convert_to_variable(x);
         let y = self.convert_to_variable(y);
@@ -302,14 +308,14 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
     ) -> Variable {
         let xc = self.constant_value(x.clone());
         let yc = self.constant_value(y.clone());
-        if xc.is_some() && yc.is_some() {
-            let xv = xc.unwrap();
-            let yv = yc.unwrap();
-            self.assert_is_bool(xv);
-            self.assert_is_bool(yv);
-            return self.constant(C::CircuitField::from(
-                (!xv.is_zero() && !yv.is_zero()) as u32,
-            ));
+        if let Some(xv) = xc {
+            if let Some(yv) = yc {
+                self.assert_is_bool(xv);
+                self.assert_is_bool(yv);
+                return self.constant(C::CircuitField::from(
+                    (!xv.is_zero() && !yv.is_zero()) as u32,
+                ));
+            }
         }
         let x = self.convert_to_variable(x);
         let y = self.convert_to_variable(y);
