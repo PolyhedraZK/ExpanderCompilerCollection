@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
+use crate::gnark::emulated::field_bls12381::e2::print_e2;
+use crate::gnark::emulated::field_bls12381::e2::print_element;
 use crate::gnark::limbs::*;
 use crate::gnark::utils::*;
 use crate::gnark::emparam::FieldParams;
@@ -8,6 +10,10 @@ use expander_compiler::frontend::extra::*;
 use expander_compiler::{circuit::layered::InputType, frontend::*};
 use expander_compiler::frontend::builder::*;
 use num_bigint::BigInt;
+use num_traits::ToPrimitive;
+use num_traits::Zero;
+use num_traits::Signed; 
+
 pub struct mul_check<T: FieldParams> {
     a: Element<T>,
     b: Element<T>,
@@ -15,6 +21,68 @@ pub struct mul_check<T: FieldParams> {
     k: Element<T>,
     c: Element<T>,
     p: Element<T>,
+}
+impl <T: FieldParams>mul_check<T> {
+    pub fn eval_round1<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, at: Vec<Variable>) {
+        // println!("c");
+        // print_element(native, &self.c);
+        // println!("r");
+        // print_element(native, &self.r);
+        // println!("k");
+        // print_element(native, &self.k);
+        self.c = eval_with_challenge(native, self.c.clone(), at.clone());
+        self.r = eval_with_challenge(native,self.r.clone(), at.clone());
+        self.k = eval_with_challenge(native, self.k.clone(), at.clone());
+        if !self.p.is_empty() {
+            self.p = eval_with_challenge(native,self.p.clone(), at.clone());
+        }
+        println!("c:{:?}", native.value_of(self.c.evaluation));
+        println!("r:{:?}", native.value_of(self.r.evaluation));
+        println!("k:{:?}", native.value_of(self.k.evaluation));
+        println!("p:{:?}", native.value_of(self.p.evaluation));
+
+    }
+    pub fn eval_round2<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, at: Vec<Variable>) {
+        // println!("a");
+        // print_element(native, &self.a);
+        // println!("b");
+        // print_element(native, &self.b);
+        self.a = eval_with_challenge(native, self.a.clone(), at.clone());
+        self.b = eval_with_challenge(native, self.b.clone(), at.clone());
+        println!("a:{:?}", native.value_of(self.a.evaluation));
+        println!("b:{:?}", native.value_of(self.b.evaluation));
+    }
+    pub fn check<'a, C: Config, B: RootAPI<C>>(&self, native: &'a mut B, pval: Variable, ccoef: Variable) {
+        let mut new_peval = pval;
+        if !self.p.is_empty() {
+            new_peval = self.p.evaluation
+        };
+        let ls = native.mul(self.a.evaluation, self.b.evaluation);
+        let rs_tmp1 = native.mul(new_peval, self.k.evaluation);
+        println!("rs_tmp1:{:?}", native.value_of(rs_tmp1));
+        let rs_tmp2 = native.mul(self.c.evaluation, ccoef);
+        println!("rs_tmp2:{:?}", native.value_of(rs_tmp2));
+        let rs_tmp3 = native.add(self.r.evaluation, rs_tmp1);
+        println!("rs_tmp3:{:?}", native.value_of(rs_tmp3));
+        let rs = native.add(rs_tmp3, rs_tmp2);
+        println!("ls:{:?}", native.value_of(ls));
+        println!("rs:{:?}", native.value_of(rs));
+        native.assert_is_equal(ls, rs);
+    }
+    pub fn clean_evaluations(&mut self) {
+        self.a.evaluation = Variable::default();
+        self.a.is_evaluated = false;
+        self.b.evaluation = Variable::default();
+        self.b.is_evaluated = false;
+        self.r.evaluation = Variable::default();
+        self.r.is_evaluated = false;
+        self.k.evaluation = Variable::default();
+        self.k.is_evaluated = false;
+        self.c.evaluation = Variable::default();
+        self.c.is_evaluated = false;
+        self.p.evaluation = Variable::default();
+        self.p.is_evaluated = false;
+    }
 }
 pub struct Field<T: FieldParams> {
     f_params: T,
@@ -101,10 +169,22 @@ impl <T: FieldParams>Field<T> {
             return a;
         }
         let p = Element::<T>::default();
-        let (k, r, c) = self.call_mul_hint(native, &a, &self.one_const, true);
+        return self.mul_mod(native, a, self.one_const.clone(), 0, p);
+    }
+    pub fn mul_mod<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: Element<T>, b: Element<T>, _: usize, p: Element<T>) -> Element<T> {
+        self.enforce_width_conditional(native, &a);
+        self.enforce_width_conditional(native, &b);
+        // self.enforce_width_conditional(native, &p); //not needed
+        let (k, r, c) = self.call_mul_hint(native, &a, &b, true);
+        // println!("c after call_mul_hint");
+        // print_element(native, &c);
+        // println!("r after call_mul_hint");
+        // print_element(native, &r);
+        // println!("k after call_mul_hint");
+        // print_element(native, &k);
         let mc = mul_check{
             a: a,
-            b: self.one_const.clone(),
+            b: b,
             c: c,
             k: k,
             r: r.clone(),
@@ -136,7 +216,6 @@ impl <T: FieldParams>Field<T> {
         } else {
             next_overflow
         };
-        println!("next_overflow: {}", next_overflow);
         let nb_limbs = T::nb_limbs() as usize;
         let nb_bits = T::bits_per_limb() as usize;
         let modbits = T::modulus().bits() as usize;
@@ -185,8 +264,139 @@ impl <T: FieldParams>Field<T> {
         let ret = new_internal_element::<T>(limbs, next_overflow);
         ret
     }
+    pub fn sub<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: Element<T>, b: Element<T>) -> Element<T> {
+        self.enforce_width_conditional(native, &a.clone());
+        self.enforce_width_conditional(native, &b.clone());
+        let mut new_a = a.clone();
+        let mut new_b = b.clone();
+        if a.overflow + 1 > self.max_of {
+            new_a = self.reduce(native, a.clone(), false);
+        }
+        if b.overflow + 2 > self.max_of {   
+            new_b = self.reduce(native, b.clone(), false);
+        }
+        let next_overflow = std::cmp::max(new_a.overflow, new_b.overflow+1) + 1;
+        println!("next_overflow:{}", next_overflow);
+        let nb_limbs = std::cmp::max(new_a.limbs.len(), new_b.limbs.len());
+        let pad_limbs = sub_padding(&T::modulus(), T::bits_per_limb(), new_b.overflow, nb_limbs as u32);
+        let mut limbs = vec![native.constant(0); nb_limbs];
+        for i in 0..limbs.len() {
+            limbs[i] = native.constant(pad_limbs[i].to_u64().unwrap() as u32);
+            if i < new_a.limbs.len() {
+                limbs[i] = native.add(limbs[i], new_a.limbs[i]);
+            }
+            if i < new_b.limbs.len() {
+                limbs[i] = native.sub(limbs[i], new_b.limbs[i]);
+            }
+        }
+        let ret = new_internal_element::<T>(limbs, next_overflow);
+        ret
+    }
+    pub fn neg<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: Element<T>) -> Element<T> {
+        self.sub(native, self.zero_const.clone(), a)
+    }
+    pub fn mul<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: Element<T>, b: Element<T>) -> Element<T> {
+        self.enforce_width_conditional(native, &a.clone());
+        self.enforce_width_conditional(native, &b.clone());
+        let mut next_overflow = self.mul_pre_cond(a.clone(), b.clone());
+        let mut new_a = a.clone();
+        let mut new_b = b.clone();
+        if next_overflow > self.max_of {
+            if a.overflow < b.overflow {
+                new_a = a.clone();
+                new_b = self.reduce(native, b.clone(), false);
+            } else {
+                new_a = self.reduce(native, a.clone(), false);
+                new_b = b.clone();
+            }
+        }
+        next_overflow = self.mul_pre_cond(new_a.clone(), new_b.clone());
+        if next_overflow > self.max_of {
+            if new_a.overflow < new_b.overflow {
+                new_a = new_a.clone();
+                new_b = self.reduce(native, new_b.clone(), false);
+            } else {
+                new_a = self.reduce(native, new_a.clone(), false);
+                new_b = new_b.clone();
+            }
+        }
+        return self.mul_mod(native, new_a, new_b, 0, Element::<T>::default());
+    }
+    pub fn mul_const<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: Element<T>, c: BigInt) -> Element<T> {
+        if c.is_negative() {
+            let neg_a = self.neg(native, a.clone());
+            return self.mul_const(native, neg_a, -c);
+        } else if c.is_zero() {
+            return self.zero_const.clone();
+        }
+        let cbl = c.bits();
+        if cbl > self.max_overflow() {
+            panic!("constant bit length {} exceeds max {}", cbl, self.max_overflow());
+        }
+        let next_overflow = a.overflow + cbl as u32;
+        let mut new_a = a.clone();
+        if next_overflow > self.max_of {
+            new_a = self.reduce(native, a.clone(), false);
+        }
+        let mut limbs = vec![native.constant(0); new_a.limbs.len()];
+        for i in 0..new_a.limbs.len() {
+            limbs[i] = native.mul(new_a.limbs[i], c.to_u64().unwrap() as u32);
+        }
+        let ret = new_internal_element::<T>(limbs, new_a.overflow + cbl as u32);
+        return ret;
+    }
+    pub fn check_mul<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B) {
+        // let commitment = native.get_random_value();
+        let commitment = native.constant(1);
+        let mut coefs_len = T::nb_limbs() as usize;
+        for i in 0..self.mul_checks.len() {
+            coefs_len = std::cmp::max(coefs_len, self.mul_checks[i].a.limbs.len());
+            coefs_len = std::cmp::max(coefs_len, self.mul_checks[i].b.limbs.len());
+            coefs_len = std::cmp::max(coefs_len, self.mul_checks[i].c.limbs.len());
+            coefs_len = std::cmp::max(coefs_len, self.mul_checks[i].k.limbs.len());
+        }
+        let mut at = vec![commitment; coefs_len];
+        for i in 1..at.len() {
+            at[i] = native.mul(at[i-1], commitment);
+        }
+        for i in 0..self.mul_checks.len() {
+            self.mul_checks[i].eval_round1(native, at.clone());
+        }
+        for i in 0..self.mul_checks.len() {
+            self.mul_checks[i].eval_round2(native, at.clone());
+        }
+        let pval = eval_with_challenge(native, self.n_const.clone(), at.clone());
+        // println!("pval:{:?}", native.value_of(pval.evaluation));
+        let coef = BigInt::from(1) << T::bits_per_limb();
+        let ccoef = native.sub(coef.to_u64().unwrap() as u32, commitment);
+        for i in 0..self.mul_checks.len() {
+            self.mul_checks[i].check(native, pval.evaluation, ccoef);
+        }
+        for i in 0..self.mul_checks.len() {
+            self.mul_checks[i].clean_evaluations();
+        }
+    }
 }
-
+pub fn eval_with_challenge<'a, C: Config, B: RootAPI<C>, T: FieldParams>(native: &'a mut B, a: Element<T>, at: Vec<Variable>) -> Element<T> {
+    if a.is_evaluated {
+        return a;
+    }
+    if at.len() < a.limbs.len() - 1 {
+        panic!("evaluation powers less than limbs");
+    }
+    let mut sum = native.constant(0);
+    if a.limbs.len() > 0 {
+        sum = native.mul(a.limbs[0], 1);
+    }
+    for i in 1..a.limbs.len() {
+        let tmp = native.mul(a.limbs[i], at[i-1]);
+        sum = native.add(sum, tmp);
+    }
+    let mut ret = a.clone();
+    ret.is_evaluated = true;
+    ret.evaluation = sum;
+    ret
+}
 
 /*
 func (f *Field[T]) Add(a, b *Element[T]) *Element[T] {

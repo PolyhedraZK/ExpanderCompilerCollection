@@ -24,10 +24,6 @@ pub fn mul_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     let nb_limbs = inputs[1].to_u256().as_usize();
     let nb_a_len = inputs[2].to_u256().as_usize();
     let nb_quo_len = inputs[3].to_u256().as_usize();
-    println!("nb_bits{}", nb_bits);
-    println!("nb_limbs{}", nb_limbs);
-    println!("nb_a_len{}", nb_a_len);
-    println!("nb_quo_len{}", nb_quo_len);
     let nb_b_len = inputs.len() - 4 - nb_limbs - nb_a_len;
     let mut ptr = 4;
     let plimbs_m31 = &inputs[ptr..ptr + nb_limbs as usize];
@@ -43,26 +39,24 @@ pub fn mul_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     let blimbs:Vec<BigInt> = blimbs_u32.iter().map(|x| BigInt::from(*x)).collect();
 
     let nb_carry_len = std::cmp::max(nb_multiplication_res_limbs(nb_a_len, nb_b_len), nb_multiplication_res_limbs(nb_quo_len, nb_limbs)) - 1;
-    println!("nb_carry_len{}", nb_carry_len);
 
     let mut p = BigInt::default();
     let mut a = BigInt::default();
     let mut b = BigInt::default();
     p = recompose(plimbs.clone(), nb_bits as u32);
-    println!("alimbs {:?}", alimbs);
     a = recompose(alimbs.clone(), nb_bits as u32);
+    println!("a: {:?}", a);
+    println!("blimbs: {:?}", blimbs);
     b = recompose(blimbs.clone(), nb_bits as u32);
-    println!("a {}", a);
-    println!("b {}", b);
+    println!("b: {:?}", b);
     let mut quo = BigInt::default();
     let mut rem = BigInt::default();
     let mut ab = a.clone() * b.clone();
-    println!("ab{}", ab);
-    println!("p{}", p);
+    println!("ab: {:?}", ab);
     quo = ab.clone() / p.clone();
+    println!("quo: {:?}", quo);
     rem = ab.clone() % p.clone();
-    println!("quo: {}", quo);
-    println!("rem: {}", rem);
+    println!("rem: {:?}", rem);
     let mut quo_limbs = vec![BigInt::default(); nb_quo_len];
     if let Err(err) = decompose(&quo, nb_bits as u32, &mut quo_limbs) {
         panic!("decompose value: {}", err);
@@ -82,10 +76,6 @@ pub fn mul_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     }
     // we know compute the schoolbook multiprecision multiplication of a*b and
     // r+k*p
-    println!("nb_a_len: {}", nb_a_len);
-    println!("nb_b_len: {}", nb_b_len);
-    println!("alimbs: {:?}", alimbs);
-    println!("blimbs: {:?}", blimbs);
     for i in 0..nb_a_len {
         for j in 0..nb_b_len {
             tmp = alimbs[i].clone();
@@ -93,8 +83,6 @@ pub fn mul_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
             xp[i + j] += &tmp;
         }
     }
-    println!("xp: {:?}", xp);
-    println!("rem_limbs: {:?}", rem_limbs);
     for i in 0..nb_limbs {
         yp[i] += &rem_limbs[i];
         for j in 0..nb_quo_len {
@@ -103,7 +91,6 @@ pub fn mul_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
             yp[i + j] += &tmp;
         }
     }
-    println!("yp: {:?}", yp);
     let mut carry = BigInt::default();
     let mut carry_limbs = vec![BigInt::default(); nb_carry_len];
     for i in 0..carry_limbs.len() {
@@ -118,23 +105,22 @@ pub fn mul_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
         carry_limbs[i] = carry.clone();
     }
     //convert limbs to m31 output
+    // println!("quo_limbs: {:?}", quo_limbs);
     let mut outptr = 0;
     for i in 0..nb_quo_len {
         outputs[outptr+i] = M31::from(quo_limbs[i].to_u64().unwrap() as u32);
     }
+    // println!("rem_limbs: {:?}", rem_limbs);
     outptr += nb_quo_len;
     for i in 0..nb_limbs {
         outputs[outptr+i] = M31::from(rem_limbs[i].to_u64().unwrap() as u32);
     }
     outptr += nb_limbs;
+    // println!("carry_limbs: {:?}", carry_limbs);
     for i in 0..nb_carry_len {
-        println!("{}", i);
-        println!("{}", carry_limbs[i]);
         if carry_limbs[i] < BigInt::default() {
-            println!("negative");
             outputs[outptr+i] = -M31::from(carry_limbs[i].abs().to_u64().unwrap() as u32);
         } else {
-            println!("positive");
             outputs[outptr+i] = M31::from(carry_limbs[i].to_u64().unwrap() as u32);
         }
     }
@@ -144,9 +130,10 @@ pub fn mul_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
 pub fn simple_rangecheck_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     let nb_bits = inputs[0].to_u256().as_u32();
     let number = inputs[1].to_u256().as_f64();
-    let number_bit = number.log2().ceil() as u32;
+    let number_bit = if number > 1.0 {number.log2().ceil() as u32} else {1};
     if number_bit > nb_bits {
         panic!("number is out of range");
     } 
+    
     Ok(())
 }

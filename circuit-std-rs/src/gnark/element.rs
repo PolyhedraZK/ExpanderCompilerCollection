@@ -52,6 +52,9 @@ impl <T: FieldParams>Element<T> {
             _marker: std::marker::PhantomData,
         }
     }
+    pub fn is_empty(&self) -> bool {
+        self.limbs.is_empty()
+    }
 }
 pub fn value_of<'a, C: Config, B: RootAPI<C>, T: FieldParams>(api: &'a mut B, constant: Box<dyn Any>) -> Element<T> {
     let r:Element<T> = new_const_element::<C,B,T>(api, constant);
