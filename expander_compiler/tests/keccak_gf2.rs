@@ -354,7 +354,7 @@ fn keccak_gf2_debug() {
     debug_eval(
         &Keccak256Circuit::default(),
         &assignment,
-        HintRegistry::new(),
+        EmptyHintCaller::new(),
     );
 }
 
@@ -386,6 +386,6 @@ fn keccak_gf2_debug_error() {
     debug_eval(
         &Keccak256Circuit::default(),
         &assignment,
-        HintRegistry::new(),
+        EmptyHintCaller::new(),
     );
 }
