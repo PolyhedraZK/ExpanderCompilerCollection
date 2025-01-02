@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::field::FieldArith;
-use crate::hints::registry::HintRegistry;
+use crate::hints::registry::HintCaller;
 use crate::utils::error::Error;
 use crate::{
     circuit::{
@@ -207,7 +207,7 @@ impl<C: Config> Instruction<C> {
         &self,
         values: &[C::CircuitField],
         public_inputs: &[C::CircuitField],
-        hint_registry: &mut HintRegistry<C::CircuitField>,
+        hint_caller: &mut impl HintCaller<C::CircuitField>,
     ) -> EvalResult<C> {
         if let Instruction::ConstantLike(coef) = self {
             return match coef {
@@ -225,7 +225,7 @@ impl<C: Config> Instruction<C> {
         } = self
         {
             let inputs: Vec<C::CircuitField> = inputs.iter().map(|i| values[*i]).collect();
-            return match hints::safe_impl(hint_registry, *hint_id, &inputs, *num_outputs) {
+            return match hints::safe_impl(hint_caller, *hint_id, &inputs, *num_outputs) {
                 Ok(outputs) => EvalResult::Values(outputs),
                 Err(e) => EvalResult::Error(e),
             };
@@ -480,10 +480,10 @@ impl<C: Config> RootCircuit<C> {
         &self,
         inputs: Vec<C::CircuitField>,
         public_inputs: &[C::CircuitField],
-        hint_registry: &mut HintRegistry<C::CircuitField>,
+        hint_caller: &mut impl HintCaller<C::CircuitField>,
     ) -> Result<Vec<C::CircuitField>, Error> {
         assert_eq!(inputs.len(), self.input_size());
-        self.eval_sub_safe(&self.circuits[&0], inputs, public_inputs, hint_registry)
+        self.eval_sub_safe(&self.circuits[&0], inputs, public_inputs, hint_caller)
     }
 
     fn eval_sub_safe(
@@ -491,12 +491,12 @@ impl<C: Config> RootCircuit<C> {
         circuit: &Circuit<C>,
         inputs: Vec<C::CircuitField>,
         public_inputs: &[C::CircuitField],
-        hint_registry: &mut HintRegistry<C::CircuitField>,
+        hint_caller: &mut impl HintCaller<C::CircuitField>,
     ) -> Result<Vec<C::CircuitField>, Error> {
         let mut values = vec![C::CircuitField::zero(); 1];
         values.extend(inputs);
         for insn in circuit.instructions.iter() {
-            match insn.eval_safe(&values, public_inputs, hint_registry) {
+            match insn.eval_safe(&values, public_inputs, hint_caller) {
                 EvalResult::Value(v) => {
                     values.push(v);
                 }
@@ -508,7 +508,7 @@ impl<C: Config> RootCircuit<C> {
                         &self.circuits[&sub_circuit_id],
                         inputs.iter().map(|&i| values[i]).collect(),
                         public_inputs,
-                        hint_registry,
+                        hint_caller,
                     )?;
                     values.extend(res);
                 }

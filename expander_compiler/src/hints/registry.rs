@@ -50,3 +50,28 @@ impl<F: Field> HintRegistry<F> {
         }
     }
 }
+
+#[derive(Default)]
+pub struct EmptyHintCaller;
+
+impl EmptyHintCaller {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+pub trait HintCaller<F: Field>: 'static {
+    fn call(&mut self, id: usize, args: &[F], num_outputs: usize) -> Result<Vec<F>, Error>;
+}
+
+impl<F: Field + 'static> HintCaller<F> for HintRegistry<F> {
+    fn call(&mut self, id: usize, args: &[F], num_outputs: usize) -> Result<Vec<F>, Error> {
+        self.call(id, args, num_outputs)
+    }
+}
+
+impl<F: Field> HintCaller<F> for EmptyHintCaller {
+    fn call(&mut self, id: usize, _: &[F], _: usize) -> Result<Vec<F>, Error> {
+        Err(Error::UserError(format!("hint with id {} not found", id)))
+    }
+}
