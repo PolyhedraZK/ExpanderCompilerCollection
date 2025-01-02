@@ -5,6 +5,13 @@ use crate::field::Field;
 pub trait Config: Default + Clone + Ord + Debug + Hash + Copy + 'static {
     type CircuitField: Field;
 
+    type DefaultSimdField: arith::SimdField<Scalar = Self::CircuitField>;
+    type DefaultGKRFieldConfig: gkr_field_config::GKRFieldConfig<
+        CircuitField = Self::CircuitField,
+        SimdCircuitField = Self::DefaultSimdField,
+    >;
+    type DefaultGKRConfig: expander_config::GKRConfig<FieldConfig = Self::DefaultGKRFieldConfig>;
+
     const CONFIG_ID: usize;
 
     const COST_INPUT: usize = 1000;
@@ -22,6 +29,10 @@ pub struct M31Config {}
 impl Config for M31Config {
     type CircuitField = crate::field::M31;
 
+    type DefaultSimdField = mersenne31::M31x16;
+    type DefaultGKRFieldConfig = gkr_field_config::M31ExtConfig;
+    type DefaultGKRConfig = gkr::executor::M31ExtConfigSha2;
+
     const CONFIG_ID: usize = 1;
 }
 
@@ -31,6 +42,10 @@ pub struct BN254Config {}
 impl Config for BN254Config {
     type CircuitField = crate::field::BN254;
 
+    type DefaultSimdField = crate::field::BN254;
+    type DefaultGKRFieldConfig = gkr_field_config::BN254Config;
+    type DefaultGKRConfig = gkr::executor::BN254ConfigMIMC5;
+
     const CONFIG_ID: usize = 2;
 }
 
@@ -39,6 +54,10 @@ pub struct GF2Config {}
 
 impl Config for GF2Config {
     type CircuitField = crate::field::GF2;
+
+    type DefaultSimdField = gf2::GF2x8;
+    type DefaultGKRFieldConfig = gkr_field_config::GF2ExtConfig;
+    type DefaultGKRConfig = gkr::executor::GF2ExtConfigSha2;
 
     const CONFIG_ID: usize = 3;
 
