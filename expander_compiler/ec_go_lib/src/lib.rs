@@ -1,8 +1,6 @@
-use arith::FieldSerde;
 use expander_compiler::circuit::layered;
 use expander_compiler::circuit::layered::NormalInputType;
 use libc::{c_uchar, c_ulong, malloc};
-use std::io::Cursor;
 use std::ptr;
 use std::slice;
 
@@ -129,50 +127,25 @@ pub extern "C" fn compile(ir_source: ByteArray, config_id: c_ulong) -> CompileRe
     to_compile_result(result)
 }
 
-fn dump_proof_and_claimed_v<F: arith::Field + arith::FieldSerde>(
-    proof: &expander_transcript::Proof,
-    claimed_v: &F,
-) -> Vec<u8> {
-    let mut bytes = Vec::new();
-
-    proof.serialize_into(&mut bytes).unwrap(); // TODO: error propagation
-    claimed_v.serialize_into(&mut bytes).unwrap(); // TODO: error propagation
-
-    bytes
-}
-
-fn load_proof_and_claimed_v<F: arith::Field + arith::FieldSerde>(
-    bytes: &[u8],
-) -> Result<(expander_transcript::Proof, F), ()> {
-    let mut cursor = Cursor::new(bytes);
-
-    let proof = expander_transcript::Proof::deserialize_from(&mut cursor).map_err(|_| ())?;
-    let claimed_v = F::deserialize_from(&mut cursor).map_err(|_| ())?;
-
-    Ok((proof, claimed_v))
-}
-
 fn prove_circuit_file_inner<C: expander_config::GKRConfig, CC: config::Config>(
     circuit_filename: &str,
     witness: &[u8],
 ) -> Vec<u8>
 where
-    C::SimdCircuitField: arith::SimdField<Scalar = CC::CircuitField>,
+    <<C as expander_config::GKRConfig>::FieldConfig as gkr_field_config::GKRFieldConfig>::SimdCircuitField: arith::SimdField<Scalar = CC::CircuitField>,
 {
     let config = expander_config::Config::<C>::new(
         expander_config::GKRScheme::Vanilla,
-        expander_config::MPIConfig::new(),
+        mpi_config::MPIConfig::new(),
     );
-    let mut circuit = expander_circuit::Circuit::<C>::load_circuit(circuit_filename);
+    let mut circuit = expander_circuit::Circuit::<C::FieldConfig>::load_circuit(circuit_filename);
     let witness = layered::witness::Witness::<CC>::deserialize_from(witness).unwrap();
-    let (simd_input, simd_public_input) = witness.to_simd::<C::SimdCircuitField>();
+    let (simd_input, simd_public_input) = witness.to_simd::<<<C as expander_config::GKRConfig>::FieldConfig as gkr_field_config::GKRFieldConfig>::SimdCircuitField>();
     circuit.layers[0].input_vals = simd_input;
     circuit.public_input = simd_public_input;
     circuit.evaluate();
-    let mut prover = gkr::Prover::new(&config);
-    prover.prepare_mem(&circuit);
-    let (claimed_v, proof) = prover.prove(&mut circuit);
-    dump_proof_and_claimed_v(&proof, &claimed_v)
+    let (claimed_v, proof) = gkr::executor::prove(&mut circuit, &config);
+    gkr::executor::dump_proof_and_claimed_v(&proof, &claimed_v).unwrap()
 }
 
 fn verify_circuit_file_inner<C: expander_config::GKRConfig, CC: config::Config>(
@@ -181,25 +154,24 @@ fn verify_circuit_file_inner<C: expander_config::GKRConfig, CC: config::Config>(
     proof_and_claimed_v: &[u8],
 ) -> u8
 where
-    C::SimdCircuitField: arith::SimdField<Scalar = CC::CircuitField>,
+<<C as expander_config::GKRConfig>::FieldConfig as gkr_field_config::GKRFieldConfig>::SimdCircuitField: arith::SimdField<Scalar = CC::CircuitField>,
 {
     let config = expander_config::Config::<C>::new(
         expander_config::GKRScheme::Vanilla,
-        expander_config::MPIConfig::new(),
+        mpi_config::MPIConfig::new(),
     );
-    let mut circuit = expander_circuit::Circuit::<C>::load_circuit(circuit_filename);
+    let mut circuit = expander_circuit::Circuit::<C::FieldConfig>::load_circuit(circuit_filename);
     let witness = layered::witness::Witness::<CC>::deserialize_from(witness).unwrap();
-    let (simd_input, simd_public_input) = witness.to_simd::<C::SimdCircuitField>();
+    let (simd_input, simd_public_input) = witness.to_simd::<<<C as expander_config::GKRConfig>::FieldConfig as gkr_field_config::GKRFieldConfig>::SimdCircuitField>();
     circuit.layers[0].input_vals = simd_input;
     circuit.public_input = simd_public_input.clone();
-    let (proof, claimed_v) = match load_proof_and_claimed_v(proof_and_claimed_v) {
+    let (proof, claimed_v) = match gkr::executor::load_proof_and_claimed_v(proof_and_claimed_v) {
         Ok((proof, claimed_v)) => (proof, claimed_v),
         Err(_) => {
             return 0;
         }
     };
-    let verifier = gkr::Verifier::new(&config);
-    verifier.verify(&mut circuit, &simd_public_input, &claimed_v, &proof) as u8
+    gkr::executor::verify(&mut circuit, &config, &proof, &claimed_v) as u8
 }
 
 #[no_mangle]
@@ -214,15 +186,15 @@ pub extern "C" fn prove_circuit_file(
     };
     let witness = unsafe { slice::from_raw_parts(witness.data, witness.length as usize) };
     let proof = match config_id {
-        1 => prove_circuit_file_inner::<expander_config::M31ExtConfigSha2, config::M31Config>(
+        1 => prove_circuit_file_inner::<gkr::executor::M31ExtConfigSha2, config::M31Config>(
             circuit_filename,
             witness,
         ),
-        2 => prove_circuit_file_inner::<expander_config::BN254ConfigSha2, config::BN254Config>(
+        2 => prove_circuit_file_inner::<gkr::executor::BN254ConfigMIMC5, config::BN254Config>(
             circuit_filename,
             witness,
         ),
-        3 => prove_circuit_file_inner::<expander_config::GF2ExtConfigSha2, config::GF2Config>(
+        3 => prove_circuit_file_inner::<gkr::executor::GF2ExtConfigSha2, config::GF2Config>(
             circuit_filename,
             witness,
         ),
@@ -258,17 +230,17 @@ pub extern "C" fn verify_circuit_file(
     let witness = unsafe { slice::from_raw_parts(witness.data, witness.length as usize) };
     let proof = unsafe { slice::from_raw_parts(proof.data, proof.length as usize) };
     match config_id {
-        1 => verify_circuit_file_inner::<expander_config::M31ExtConfigSha2, config::M31Config>(
+        1 => verify_circuit_file_inner::<gkr::executor::M31ExtConfigSha2, config::M31Config>(
             circuit_filename,
             witness,
             proof,
         ),
-        2 => verify_circuit_file_inner::<expander_config::BN254ConfigSha2, config::BN254Config>(
+        2 => verify_circuit_file_inner::<gkr::executor::BN254ConfigMIMC5, config::BN254Config>(
             circuit_filename,
             witness,
             proof,
         ),
-        3 => verify_circuit_file_inner::<expander_config::GF2ExtConfigSha2, config::GF2Config>(
+        3 => verify_circuit_file_inner::<gkr::executor::GF2ExtConfigSha2, config::GF2Config>(
             circuit_filename,
             witness,
             proof,
