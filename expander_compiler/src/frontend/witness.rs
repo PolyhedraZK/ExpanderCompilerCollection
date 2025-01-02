@@ -1,5 +1,8 @@
 pub use crate::circuit::ir::hint_normalized::witness_solver::WitnessSolver;
-use crate::{circuit::layered::witness::Witness, hints::registry::HintRegistry};
+use crate::{
+    circuit::layered::witness::Witness,
+    hints::registry::{EmptyHintCaller, HintCaller},
+};
 
 use super::{internal, Config, Error};
 
@@ -8,31 +11,31 @@ impl<C: Config> WitnessSolver<C> {
         &self,
         assignment: &Cir,
     ) -> Result<Witness<C>, Error> {
-        self.solve_witness_with_hints(assignment, &mut HintRegistry::new())
+        self.solve_witness_with_hints(assignment, &mut EmptyHintCaller)
     }
 
     pub fn solve_witness_with_hints<Cir: internal::DumpLoadTwoVariables<C::CircuitField>>(
         &self,
         assignment: &Cir,
-        hint_registry: &mut HintRegistry<C::CircuitField>,
+        hint_caller: &mut impl HintCaller<C::CircuitField>,
     ) -> Result<Witness<C>, Error> {
         let mut vars = Vec::new();
         let mut public_vars = Vec::new();
         assignment.dump_into(&mut vars, &mut public_vars);
-        self.solve_witness_from_raw_inputs(vars, public_vars, hint_registry)
+        self.solve_witness_from_raw_inputs(vars, public_vars, hint_caller)
     }
 
     pub fn solve_witnesses<Cir: internal::DumpLoadTwoVariables<C::CircuitField>>(
         &self,
         assignments: &[Cir],
     ) -> Result<Witness<C>, Error> {
-        self.solve_witnesses_with_hints(assignments, &mut HintRegistry::new())
+        self.solve_witnesses_with_hints(assignments, &mut EmptyHintCaller)
     }
 
     pub fn solve_witnesses_with_hints<Cir: internal::DumpLoadTwoVariables<C::CircuitField>>(
         &self,
         assignments: &[Cir],
-        hint_registry: &mut HintRegistry<C::CircuitField>,
+        hint_caller: &mut impl HintCaller<C::CircuitField>,
     ) -> Result<Witness<C>, Error> {
         self.solve_witnesses_from_raw_inputs(
             assignments.len(),
@@ -42,7 +45,7 @@ impl<C: Config> WitnessSolver<C> {
                 assignments[i].dump_into(&mut vars, &mut public_vars);
                 (vars, public_vars)
             },
-            hint_registry,
+            hint_caller,
         )
     }
 }
