@@ -1,6 +1,11 @@
 use crate::{
     builder,
-    circuit::{config::Config, input_mapping::InputMapping, ir, layered},
+    circuit::{
+        config::Config,
+        input_mapping::InputMapping,
+        ir,
+        layered::{self, InputType},
+    },
     layering,
     utils::error::Error,
 };
@@ -107,7 +112,7 @@ pub fn compile_step_1<C: Config>(
     Ok((r_hint_normalized_opt, src_im))
 }
 
-pub fn compile_step_2<C: Config>(
+pub fn compile_step_2<C: Config, I: InputType>(
     r_hint_less: ir::hint_less::RootCircuit<C>,
     options: CompileOptions,
 ) -> Result<(ir::dest::RootCircuit<C>, InputMapping), Error> {
@@ -156,18 +161,21 @@ pub fn compile_step_2<C: Config>(
         .validate()
         .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
 
-    let r_dest_relaxed_p3 = layering::ir_split::split_to_single_layer(&r_dest_relaxed_p2);
-    r_dest_relaxed_p3
-        .validate()
-        .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
+    let r_dest_relaxed_p3 = if I::CROSS_LAYER_RELAY {
+        r_dest_relaxed_p2
+    } else {
+        let r = layering::ir_split::split_to_single_layer(&r_dest_relaxed_p2);
+        r.validate()
+            .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
 
-    let r_dest_relaxed_p3_opt = optimize_until_fixed_point(&r_dest_relaxed_p3, &mut hl_im, |r| {
-        let (mut r, im) = r.remove_unreachable();
-        r.reassign_duplicate_sub_circuit_outputs();
-        (r, im)
-    });
+        optimize_until_fixed_point(&r, &mut hl_im, |r| {
+            let (mut r, im) = r.remove_unreachable();
+            r.reassign_duplicate_sub_circuit_outputs();
+            (r, im)
+        })
+    };
 
-    let r_dest = r_dest_relaxed_p3_opt.solve_duplicates();
+    let r_dest = r_dest_relaxed_p3.solve_duplicates();
 
     let r_dest_opt = optimize_until_fixed_point(&r_dest, &mut hl_im, |r| {
         let (mut r, im) = r.remove_unreachable();
@@ -183,9 +191,9 @@ pub fn compile_step_2<C: Config>(
     Ok((r_dest_opt, hl_im))
 }
 
-pub fn compile_step_3<C: Config>(
-    mut lc: layered::Circuit<C>,
-) -> Result<layered::Circuit<C>, Error> {
+pub fn compile_step_3<C: Config, I: InputType>(
+    mut lc: layered::Circuit<C, I>,
+) -> Result<layered::Circuit<C, I>, Error> {
     lc.validate()
         .map_err(|e| e.prepend("layered circuit invalid"))?;
 
@@ -222,16 +230,16 @@ pub fn compile_step_4<C: Config>(
     Ok(r_hint_exported_opt)
 }
 
-pub fn compile<C: Config>(
+pub fn compile<C: Config, I: InputType>(
     r_source: &ir::source::RootCircuit<C>,
-) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C>), Error> {
+) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C, I>), Error> {
     compile_with_options(r_source, CompileOptions::default())
 }
 
-pub fn compile_with_options<C: Config>(
+pub fn compile_with_options<C: Config, I: InputType>(
     r_source: &ir::source::RootCircuit<C>,
     options: CompileOptions,
-) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C>), Error> {
+) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C, I>), Error> {
     let (r_hint_normalized_opt, mut src_im) = compile_step_1(r_source)?;
 
     let ho_stats = r_hint_normalized_opt.get_stats();
@@ -247,7 +255,7 @@ pub fn compile_with_options<C: Config>(
         .validate()
         .map_err(|e| e.prepend("hint exported circuit invalid"))?;
 
-    let (r_dest_opt, mut hl_im) = compile_step_2(r_hint_less, options.clone())?;
+    let (r_dest_opt, mut hl_im) = compile_step_2::<C, I>(r_hint_less, options.clone())?;
 
     let (lc, dest_im) = layering::compile(
         &r_dest_opt,

@@ -1,7 +1,12 @@
 use std::collections::HashMap;
 
 use crate::{
-    circuit::{config::Config, input_mapping::InputMapping, ir, layered},
+    circuit::{
+        config::Config,
+        input_mapping::InputMapping,
+        ir,
+        layered::{self, InputType, InputUsize},
+    },
     utils::pool::Pool,
 };
 
@@ -18,10 +23,10 @@ pub struct CompileOptions {
     pub allow_input_reorder: bool,
 }
 
-pub fn compile<C: Config>(
+pub fn compile<C: Config, I: InputType>(
     rc: &ir::dest::RootCircuit<C>,
     opts: CompileOptions,
-) -> (layered::Circuit<C>, InputMapping) {
+) -> (layered::Circuit<C, I>, InputMapping) {
     let mut ctx = compile::CompileContext {
         rc,
         circuits: HashMap::new(),
@@ -37,7 +42,8 @@ pub fn compile<C: Config>(
         opts,
     };
     ctx.compile();
-    let l0_size = ctx.compiled_circuits[ctx.layers[0]].num_inputs;
+    let t: &I::InputUsize = &ctx.compiled_circuits[ctx.layers[0]].num_inputs;
+    let l0_size = t.get(0);
     let output_zeroes = rc.expected_num_output_zeroes + ctx.root_has_constraints as usize;
     let output_all = rc.circuits[&0].outputs.len() + ctx.root_has_constraints as usize;
     (

@@ -9,7 +9,7 @@ pub struct Witness<C: Config> {
     pub values: Vec<C::CircuitField>,
 }
 
-impl<C: Config> Circuit<C> {
+impl<C: Config, I: InputType> Circuit<C, I> {
     pub fn run(&self, witness: &Witness<C>) -> Vec<bool> {
         if witness.num_witnesses == 0 {
             panic!("expected at least 1 witness")
