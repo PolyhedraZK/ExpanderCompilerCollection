@@ -1,6 +1,5 @@
 use arith::Field;
 use expander_compiler::frontend::*;
-use gkr::executor::{BN254ConfigMIMC5, GF2ExtConfigSha2, M31ExtConfigSha2};
 
 declare_circuit!(Circuit {
     s: [Variable; 100],
@@ -17,12 +16,8 @@ impl<C: Config> Define<C> for Circuit<Variable> {
     }
 }
 
-fn example<C: Config, GKRFieldC, GKRC>()
-where
-    GKRFieldC: gkr_field_config::GKRFieldConfig<CircuitField = C::CircuitField>,
-    GKRC: expander_config::GKRConfig<FieldConfig = GKRFieldC>,
-{
-    let n_witnesses = <GKRFieldC::SimdCircuitField as arith::SimdField>::PACK_SIZE;
+fn example<C: Config>() {
+    let n_witnesses = <C::DefaultSimdField as arith::SimdField>::PACK_SIZE;
     println!("n_witnesses: {}", n_witnesses);
     let compile_result: CompileResult<C> = compile(&Circuit::default()).unwrap();
     let mut s = [C::CircuitField::zero(); 100];
@@ -45,14 +40,14 @@ where
 
     let mut expander_circuit = compile_result
         .layered_circuit
-        .export_to_expander::<GKRFieldC>()
+        .export_to_expander::<C::DefaultGKRFieldConfig>()
         .flatten();
-    let config = expander_config::Config::<GKRC>::new(
+    let config = expander_config::Config::<C::DefaultGKRConfig>::new(
         expander_config::GKRScheme::Vanilla,
         mpi_config::MPIConfig::new(),
     );
 
-    let (simd_input, simd_public_input) = witness.to_simd::<GKRFieldC::SimdCircuitField>();
+    let (simd_input, simd_public_input) = witness.to_simd::<C::DefaultSimdField>();
     println!("{} {}", simd_input.len(), simd_public_input.len());
     expander_circuit.layers[0].input_vals = simd_input;
     expander_circuit.public_input = simd_public_input.clone();
@@ -72,15 +67,15 @@ where
 
 #[test]
 fn example_gf2() {
-    example::<GF2Config, gkr_field_config::GF2ExtConfig, GF2ExtConfigSha2>();
+    example::<GF2Config>();
 }
 
 #[test]
 fn example_m31() {
-    example::<M31Config, gkr_field_config::M31ExtConfig, M31ExtConfigSha2>();
+    example::<M31Config>();
 }
 
 #[test]
 fn example_bn254() {
-    example::<BN254Config, gkr_field_config::BN254Config, BN254ConfigMIMC5>();
+    example::<BN254Config>();
 }
