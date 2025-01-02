@@ -31,7 +31,7 @@ struct Rational {
     denominator: Variable,
 }
 
-fn add_rational<C: Config>(builder: &mut API<C>, v1: &Rational, v2: &Rational) -> Rational {
+fn add_rational<C: Config, B: RootAPI<C>>(builder: &mut B, v1: &Rational, v2: &Rational) -> Rational {
     let p1 = builder.mul(v1.numerator, v2.denominator);
     let p2 = builder.mul(v1.denominator, v2.numerator);
 
@@ -41,13 +41,13 @@ fn add_rational<C: Config>(builder: &mut API<C>, v1: &Rational, v2: &Rational) -
     }
 }
 
-fn assert_eq_rational<C: Config>(builder: &mut API<C>, v1: &Rational, v2: &Rational) {
+fn assert_eq_rational<C: Config, B: RootAPI<C>>(builder: &mut B, v1: &Rational, v2: &Rational) {
     let p1 = builder.mul(v1.numerator, v2.denominator);
     let p2 = builder.mul(v1.denominator, v2.numerator);
     builder.assert_is_equal(p1, p2);
 }
 
-fn sum_rational_vec<C: Config>(builder: &mut API<C>, vs: &[Rational]) -> Rational {
+fn sum_rational_vec<C: Config, B: RootAPI<C>>(builder: &mut B, vs: &[Rational]) -> Rational {
     if vs.is_empty() {
         return Rational {
             numerator: builder.constant(0),
@@ -124,8 +124,8 @@ fn combine_columns<C: Config>(
         .collect()
 }
 
-fn logup_poly_val<C: Config>(
-    builder: &mut API<C>,
+fn logup_poly_val<C: Config, B: RootAPI<C>>(
+    builder: &mut B,
     vals: &[Variable],
     counts: &[Variable],
     x: &Variable,
@@ -229,4 +229,186 @@ impl<C: Config> StdCircuit<C> for LogUpCircuit {
 
         assignment
     }
+}
+
+
+
+declare_circuit!(LogUpTestCircuit {
+    test: Variable
+});
+pub struct LogUpTable {
+    pub table_keys: Vec<Vec<Variable>>,
+    pub table_values: Vec<Vec<Variable>>,
+    pub query_keys: Vec<Vec<Variable>>,
+    pub query_results: Vec<Vec<Variable>>,
+}
+impl LogUpTable {
+    pub fn new() -> Self {
+        Self {
+            table_keys: vec![],
+            table_values: vec![],
+            query_keys: vec![],
+            query_results: vec![],
+        }
+    }
+    pub fn add_table_row(&mut self, key: Vec<Variable>, value: Vec<Variable>) {
+        self.table_keys.push(key);
+        self.table_values.push(value);
+    }
+    pub fn add_query(&mut self, key: Vec<Variable>, result: Vec<Variable>) {
+        self.query_keys.push(key);
+        self.query_results.push(result);
+    }
+}
+
+pub struct LogUpRangeProofTable {
+    pub table_keys: Vec<Variable>,
+    pub query_keys: Vec<Variable>,
+    pub rangeproof_bits: usize,
+}
+impl LogUpRangeProofTable {
+    pub fn new(nb_bits: usize) -> Self {
+        Self {
+            table_keys: vec![],
+            query_keys: vec![],
+            rangeproof_bits: nb_bits,
+        }
+    }
+    pub fn initial<C: Config, B: RootAPI<C>>(&mut self, builder: &mut B) {
+        for i in 0..1<<self.rangeproof_bits {
+            let key = builder.constant(i as u32);
+            self.add_table_row(key);
+        }
+    }
+    pub fn add_table_row(&mut self, key: Variable) {
+        self.table_keys.push(key);
+    }
+    pub fn add_query(&mut self, key: Variable) {
+        self.query_keys.push(key);
+    }
+    pub fn rangeproof<C: Config, B: RootAPI<C>>(&mut self, builder: &mut B, a: Variable, n: usize) {
+        //add a shift value
+        let mut n = n;
+        let mut new_a = a;
+        if n % self.rangeproof_bits != 0 {
+            let rem = n % self.rangeproof_bits;
+            let shift = self.rangeproof_bits - rem;
+            let constant = (1 << shift) - 1;
+            let mut mul_factor = 1;
+            println!("n:{}", n);
+            mul_factor = mul_factor << n;
+            let a_shift = builder.mul(constant, mul_factor);
+            new_a = builder.add(a, a_shift);
+            n = n + shift;
+        }
+        let hint_input = vec![builder.constant(n as u32), builder.constant(self.rangeproof_bits as u32), new_a];
+        let witnesses = builder.new_hint("myhint.rangeproofhint", &hint_input, n / self.rangeproof_bits);
+        let mut sum = witnesses[0];
+        for i in 1..witnesses.len() {
+            let constant = 1 << (self.rangeproof_bits * i);
+            let constant = builder.constant(constant);
+            let mul = builder.mul(witnesses[i], constant);
+            sum = builder.add(sum, mul);
+        }
+        builder.assert_is_equal(sum, new_a);
+        for i in 0..n / self.rangeproof_bits {
+            self.query_range(witnesses[i]);
+        }
+    }
+    pub fn rangeproof_onechunk<C: Config, B: RootAPI<C>>(&mut self, builder: &mut B, a: Variable, n: usize) {
+        //n must be less than self.rangeproof_bits, not need the hint 
+        if n > self.rangeproof_bits {
+            panic!("n must be less than self.rangeproof_bits");
+        }
+        //add a shift value
+        let mut new_a = a;
+        if n % self.rangeproof_bits != 0 {
+            let rem = n % self.rangeproof_bits;
+            let shift = self.rangeproof_bits - rem;
+            let constant = (1 << shift) - 1;
+            let mut mul_factor = 0;
+            mul_factor = mul_factor << n;
+            let a_shift = builder.mul(constant, mul_factor);
+            new_a = builder.add(a, a_shift);
+        }
+        self.query_range(a);
+    }
+    pub fn query_range(&mut self, key: Variable) {
+        self.query_keys.push(key);
+    }
+    pub fn final_check<C: Config, B: RootAPI<C>>(&mut self, builder: &mut B) {
+        let alpha = builder.get_random_value();
+        let inputs = self.query_keys.clone();
+        println!("table len: {}", self.table_keys.len());
+        let query_count = builder.new_hint("myhint.querycounthint", &inputs, self.table_keys.len());
+        let v_table = logup_poly_val(builder, &self.table_keys, &query_count, &alpha);
+
+        let one = builder.constant(1);
+        let v_query = logup_poly_val(
+            builder,
+            &self.query_keys,
+            &vec![one; self.query_keys.len()],
+            &alpha,
+        );
+        assert_eq_rational(builder, &v_table, &v_query);
+    } 
+}
+pub fn query_count_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+    let mut count = vec![0; outputs.len()];
+    println!("querycount");
+    for i in 0..inputs.len() {
+        let query_id = inputs[i].to_u256().as_usize();
+        count[query_id] += 1;
+    }
+    for i in 0..outputs.len() {
+        outputs[i] = M31::from(count[i] as u32);
+    }
+    Ok(())
+}
+pub fn rangeproof_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+    let n = inputs[0].to_u256().as_i64();
+    let m = inputs[1].to_u256().as_i64();
+    let mut a = inputs[2].to_u256().as_i64();
+    for i in 0..n / m {
+        let r = a % (1 << m);
+        // println!("r: {}", r);
+        a = a / (1 << m);
+        outputs[i as usize] = M31::from(r as u32);
+    }
+    Ok(())
+}
+impl GenericDefine<M31Config> for LogUpTestCircuit<Variable>  {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
+        let mut table = LogUpRangeProofTable::new(8);
+        table.initial(builder);
+        for i in 1..12 {
+            for j in (1 << (i - 1))..(1 << i) {
+                let key = builder.constant(j);
+                if i > 8 {
+                    table.rangeproof(builder,key, i);
+                } else {
+                    table.rangeproof_onechunk(builder,key, i);
+                }
+            }
+        }
+        table.final_check(builder);
+    }
+}
+
+#[test]
+fn logup_test() {
+    let mut hint_registry = HintRegistry::<M31>::new();
+	hint_registry.register("myhint.querycounthint", query_count_hint);
+	hint_registry.register("myhint.rangeproofhint", rangeproof_hint);
+	//compile and test
+	let compile_result = compile_generic(&LogUpTestCircuit::default(),CompileOptions::default()).unwrap();
+	let assignment = LogUpTestCircuit {
+        test: M31::from(0),
+	};
+	let witness = compile_result
+		.witness_solver
+		.solve_witness_with_hints(&assignment, &mut hint_registry)
+			.unwrap();
+	let output = compile_result.layered_circuit.run(&witness);
+	assert_eq!(output, vec![true]);
 }

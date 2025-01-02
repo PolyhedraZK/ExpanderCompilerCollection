@@ -6,6 +6,7 @@ use crate::gnark::limbs::*;
 use crate::gnark::utils::*;
 use crate::gnark::emparam::FieldParams;
 use crate::gnark::element::*;
+use crate::logup::LogUpRangeProofTable;
 use expander_compiler::frontend::extra::*;
 use expander_compiler::{circuit::layered::InputType, frontend::*};
 use expander_compiler::frontend::builder::*;
@@ -93,6 +94,7 @@ pub struct Field<T: FieldParams> {
     one_const: Element<T>,
     short_one_const: Element<T>,
     constrained_limbs: HashMap<usize, ()>,
+    pub table: LogUpRangeProofTable,
     //checker: Box<dyn Rangechecker>, we use lookup rangeproof instead
     mul_checks: Vec<mul_check<T>>,
 }
@@ -108,6 +110,7 @@ impl <T: FieldParams>Field<T> {
             one_const: Element::<T>::default(),
             short_one_const: Element::<T>::default(),
             constrained_limbs: HashMap::new(),
+            table: LogUpRangeProofTable::new(8),
             mul_checks: Vec::new(),
         };
         field.n_const = value_of::<C, B, T>( native, Box::new(T::modulus()));
@@ -115,6 +118,7 @@ impl <T: FieldParams>Field<T> {
         field.zero_const = value_of::<C, B, T>( native, Box::new(0));
         field.one_const = value_of::<C, B, T>( native, Box::new(1));
         field.short_one_const = new_internal_element::<T>( vec![native.constant(1);1], 0);
+        field.table.initial(native);
         field
     }
     pub fn max_overflow(&self) -> u64 {
@@ -137,20 +141,22 @@ impl <T: FieldParams>Field<T> {
         self.enforce_width(native, a, true);
         did_constrain
     }
-    pub fn enforce_width<'a, C: Config, B: RootAPI<C>>(&self, native: &'a mut B, a: &Element<T>, mod_width: bool) {
+    pub fn enforce_width<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: &Element<T>, mod_width: bool) {
         for i in 0..a.limbs.len() {
             let mut limb_nb_bits = T::bits_per_limb() as u64;
             if mod_width && i == a.limbs.len()-1 {
                 limb_nb_bits = ((T::modulus().bits() - 1) % T::bits_per_limb() as u64)  + 1;
             }
-            //f.checker.Check(a.Limbs[i], limbNbBits)
-            let mut inputs = vec![native.constant(limb_nb_bits as u32)];
-            inputs.push(a.limbs[i]);
-            native.new_hint("myhint.simple_rangecheck_hint", &inputs, 1);
+            if limb_nb_bits > 8 {
+                self.table.rangeproof(native, a.limbs[i], limb_nb_bits as usize);
+            } else {
+                self.table.rangeproof_onechunk(native, a.limbs[i], limb_nb_bits as usize);
+            }
+            // native.new_hint("myhint.simple_rangecheck_hint", &inputs, 1);
             //logup.RangeProof(f.api, a.Limbs[i], limbNbBits)
         }
     }
-    pub fn pack_limbs<'a, C: Config, B: RootAPI<C>>(&self, native: &'a mut B, limbs: Vec<Variable>, strict: bool) -> Element<T> {
+    pub fn pack_limbs<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, limbs: Vec<Variable>, strict: bool) -> Element<T> {
         let e = new_internal_element::<T>(limbs, 0);
         self.enforce_width(native, &e, strict);
         e
@@ -204,7 +210,7 @@ impl <T: FieldParams>Field<T> {
         next_overflow
     }
     pub fn call_mul_hint<'a, C: Config, B: RootAPI<C>>(
-        &self,
+        &mut self,
         native: &'a mut B,
         a: &Element<T>,
         b: &Element<T>,

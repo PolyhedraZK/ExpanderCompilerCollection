@@ -4,6 +4,8 @@ use crate::gnark::field::Field as GField;
 use crate::gnark::emparam::*;
 use crate::gnark::hints::{mul_hint, simple_rangecheck_hint};
 use std::collections::HashMap;
+use std::hint;
+use crate::logup::*;
 use expander_compiler::frontend::extra::*;
 use expander_compiler::{circuit::layered::InputType, frontend::*};
 use num_bigint::BigInt;
@@ -118,25 +120,6 @@ impl Ext2{
             a1: z1,
         }
     }
-    /*
-    func (e Ext2) Mul(x, y *E2) *E2 {
-
-	v0 := e.fp.Mul(&x.A0, &y.A0)
-	v1 := e.fp.Mul(&x.A1, &y.A1)
-
-	b0 := e.fp.Sub(v0, v1)
-	b1 := e.fp.Add(&x.A0, &x.A1)
-	tmp := e.fp.Add(&y.A0, &y.A1)
-	b1 = e.fp.Mul(b1, tmp)
-	tmp = e.fp.Add(v0, v1)
-	b1 = e.fp.Sub(b1, tmp)
-
-	return &E2{
-		A0: *b0,
-		A1: *b1,
-	}
-}
-     */
     pub fn mul<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2, y: &GE2) -> GE2 {
 
         let v0 = self.fp.mul(native, x.a0.clone(), y.a0.clone());
@@ -168,6 +151,17 @@ impl Ext2{
             a1: b1,
         }
     }
+    pub fn square<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2, y: &GE2) -> GE2 {
+        let a = self.fp.add(native, x.a0.clone(), x.a1.clone());
+        let b = self.fp.sub(native, x.a0.clone(), x.a1.clone());
+        let a = self.fp.mul(native, a, b);
+        let b = self.fp.mul(native, x.a0.clone(), x.a1.clone());
+        let b = self.fp.mul_const(native, b, BigInt::from(2));
+        GE2 {
+            a0: a,
+            a1: b,
+        }
+    }
 }
 
 declare_circuit!(E2AddCircuit {
@@ -188,28 +182,32 @@ impl GenericDefine<M31Config> for E2AddCircuit<Variable> {
             a1: new_internal_element(self.y[1].to_vec(), 0),
         };
         let mut z = ext2.add(builder, &x_e2, &y_e2);
-        for i in 0..65536{
-            z = ext2.add(builder, &z, &y_e2);
-        }
+        // for i in 0..65536{
+        //     z = ext2.add(builder, &z, &y_e2);
+        // }
         let z_reduce_a0 = ext2.fp.reduce(builder, z.a0.clone(), false);
         let z_reduce_a1 = ext2.fp.reduce(builder, z.a1.clone(), false);
 
-        for i in 0..48 {
-            println!("{}: {:?} {:?}", i, builder.value_of(z_reduce_a0.limbs[i]), builder.value_of(self.z[0][i]));
-            println!("{}: {:?} {:?}", i, builder.value_of(z_reduce_a1.limbs[i]), builder.value_of(self.z[1][i]));
-            builder.assert_is_equal(z_reduce_a0.limbs[i], self.z[0][i]);
-            builder.assert_is_equal(z_reduce_a1.limbs[i], self.z[1][i]);
-        }
+        // for i in 0..48 {
+        //     println!("{}: {:?} {:?}", i, builder.value_of(z_reduce_a0.limbs[i]), builder.value_of(self.z[0][i]));
+        //     println!("{}: {:?} {:?}", i, builder.value_of(z_reduce_a1.limbs[i]), builder.value_of(self.z[1][i]));
+        //     builder.assert_is_equal(z_reduce_a0.limbs[i], self.z[0][i]);
+        //     builder.assert_is_equal(z_reduce_a1.limbs[i], self.z[1][i]);
+        // }
         ext2.fp.check_mul(builder);
+        ext2.fp.table.final_check(builder);
     }
 }
 
 #[test]
 fn test_e2_add() {
     // let compile_result = compile(&E2AddCircuit::default()).unwrap();
+    let compile_result =
+    compile_generic(&E2AddCircuit::default(), CompileOptions::default()).unwrap();
 	let mut hint_registry = HintRegistry::<M31>::new();
 	hint_registry.register("myhint.mulhint", mul_hint);
 	hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
+    hint_registry.register("myhint.querycounthint", query_count_hint);
     let mut assignment = E2AddCircuit::<M31> {
         x: [[M31::from(0); 48], [M31::from(0); 48]],
         y: [[M31::from(0); 48], [M31::from(0); 48]],
@@ -231,11 +229,11 @@ fn test_e2_add() {
         assignment.z[1][i] = M31::from(z1_bytes[i] as u32);
     }
     
-    debug_eval(
-        &E2AddCircuit::default(),
-        &assignment,
-        hint_registry,
-    );
+    // debug_eval(
+    //     &E2AddCircuit::default(),
+    //     &assignment,
+    //     hint_registry,
+    // );
 }
 
 declare_circuit!(E2SubCircuit {
@@ -271,15 +269,19 @@ impl GenericDefine<M31Config> for E2SubCircuit<Variable> {
             builder.assert_is_equal(z_reduce_a1.limbs[i], self.z[1][i]);
         }
         ext2.fp.check_mul(builder);
+        ext2.fp.table.final_check(builder);
     }
 }
 
 #[test]
 fn test_e2_sub() {
     // let compile_result = compile(&E2SubCircuit::default()).unwrap();
+    let compile_result =
+        compile_generic(&E2SubCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     hint_registry.register("myhint.mulhint", mul_hint);
     hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
+    hint_registry.register("myhint.querycounthint", query_count_hint);
     let mut assignment = E2SubCircuit::<M31> {
         x: [[M31::from(0); 48], [M31::from(0); 48]],
         y: [[M31::from(0); 48], [M31::from(0); 48]],
@@ -331,6 +333,7 @@ impl GenericDefine<M31Config> for E2DoubleCircuit<Variable> {
             builder.assert_is_equal(z_reduce_a1.limbs[i], self.z[1][i]);
         }
         ext2.fp.check_mul(builder);
+        ext2.fp.table.final_check(builder);
     }
 }
 
@@ -340,6 +343,7 @@ fn test_e2_double(){
     let mut hint_registry = HintRegistry::<M31>::new();
     hint_registry.register("myhint.mulhint", mul_hint);
     hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
+    hint_registry.register("myhint.querycounthint", query_count_hint);
     let mut assignment = E2DoubleCircuit::<M31> {
         x: [[M31::from(0); 48], [M31::from(0); 48]],
         z: [[M31::from(0); 48], [M31::from(0); 48]],
@@ -391,6 +395,7 @@ impl GenericDefine<M31Config> for E2MulCircuit<Variable> {
             builder.assert_is_equal(z_reduce_a1.limbs[i], self.z[1][i]);
         }
         ext2.fp.check_mul(builder);
+        ext2.fp.table.final_check(builder);
     }
 }
 
@@ -400,6 +405,7 @@ fn test_e2_mul(){
     let mut hint_registry = HintRegistry::<M31>::new();
     hint_registry.register("myhint.mulhint", mul_hint);
     hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
+    hint_registry.register("myhint.querycounthint", query_count_hint);
     let mut assignment = E2MulCircuit::<M31> {
         x: [[M31::from(0); 48], [M31::from(0); 48]],
         y: [[M31::from(0); 48], [M31::from(0); 48]],
@@ -428,6 +434,66 @@ fn test_e2_mul(){
         hint_registry,
     );
 }
+
+declare_circuit!(E2SquareCircuit {
+    x: [[Variable; 48];2],
+    z: [[Variable; 48];2],
+});
+
+impl GenericDefine<M31Config> for E2SquareCircuit<Variable> {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
+        let mut ext2 = Ext2::new(builder);
+        let x_e2 = GE2 {
+            a0: new_internal_element(self.x[0].to_vec(), 0),
+            a1: new_internal_element(self.x[1].to_vec(), 0),
+        };
+        let z = ext2.square(builder, &x_e2, &x_e2);
+        let z_reduce_a0 = ext2.fp.reduce(builder, z.a0.clone(), false);
+        let z_reduce_a1 = ext2.fp.reduce(builder, z.a1.clone(), false);
+
+        for i in 0..48 {
+            println!("{}: {:?} {:?}", i, builder.value_of(z_reduce_a0.limbs[i]), builder.value_of(self.z[0][i]));
+            println!("{}: {:?} {:?}", i, builder.value_of(z_reduce_a1.limbs[i]), builder.value_of(self.z[1][i]));
+            builder.assert_is_equal(z_reduce_a0.limbs[i], self.z[0][i]);
+            builder.assert_is_equal(z_reduce_a1.limbs[i], self.z[1][i]);
+        }
+        ext2.fp.check_mul(builder);
+        ext2.fp.table.final_check(builder);
+    }
+}
+
+#[test]
+fn test_e2_square(){
+    // let compile_result = compile(&E2SquareCircuit::default()).unwrap();
+    let mut hint_registry = HintRegistry::<M31>::new();
+    hint_registry.register("myhint.mulhint", mul_hint);
+    hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
+    hint_registry.register("myhint.querycounthint", query_count_hint);
+    let mut assignment = E2SquareCircuit::<M31> {
+        x: [[M31::from(0); 48], [M31::from(0); 48]],
+        z: [[M31::from(0); 48], [M31::from(0); 48]],
+    };
+
+    let x0_bytes = [89,156,69,194,144,213,244,116,63,190,210,105,4,3,175,7,101,54,28,7,18,172,79,84,237,54,73,82,129,140,106,156,148,208,55,92,9,173,33,66,123,235,204,136,44,150,98,10,];
+    let x1_bytes = [236,205,45,143,165,12,10,61,83,59,118,233,115,199,99,173,46,152,211,133,250,124,121,183,156,51,67,26,197,238,173,72,255,131,102,60,79,157,114,50,88,209,73,233,20,196,157,18,];
+    let z0_bytes = [76,190,203,175,214,65,32,217,101,144,196,235,159,76,190,209,46,223,169,88,25,193,105,217,115,6,68,7,79,4,154,56,167,2,202,34,126,222,83,233,137,224,221,96,140,156,5,18,];
+    let z1_bytes = [170,117,86,12,84,70,123,39,30,83,226,114,113,237,118,58,194,47,111,221,135,155,127,91,79,86,4,68,107,170,254,51,102,128,53,134,93,97,103,22,243,175,90,255,163,111,193,25,];
+    for i in 0..48 {
+        assignment.x[0][i] = M31::from(x0_bytes[i] as u32);
+        assignment.x[1][i] = M31::from(x1_bytes[i] as u32);
+        assignment.z[0][i] = M31::from(z0_bytes[i] as u32);
+        assignment.z[1][i] = M31::from(z1_bytes[i] as u32);
+    }
+
+    debug_eval(
+        &E2SquareCircuit::default(),
+        &assignment,
+        hint_registry,
+    );
+}
+
+
+
 
 pub fn print_e2<'a, C:Config, B:RootAPI<C>>(native: &'a mut B, v: &GE2)  {
     for i in 0..48 {

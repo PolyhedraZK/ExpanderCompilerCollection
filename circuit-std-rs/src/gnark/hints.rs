@@ -10,6 +10,8 @@ use expander_compiler::frontend::builder::*;
 use num_bigint::BigInt;
 use num_traits::Signed;
 use num_traits::ToPrimitive;
+use ark_bls12_381::Fq;
+use ark_bls12_381::Fq2;
 
 // pub fn to_binary_hint(x: &[M31], y: &mut [M31]) -> Result<(), Error> {
 //     let t = x[0].to_u256();
@@ -126,6 +128,36 @@ pub fn mul_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     }
     Ok(())
 }
+
+/*
+func(mod *big.Int, inputs, outputs []*big.Int) error {
+			startTime := time.Now()
+			var a, b, c bls12381.E2
+
+			a.A0.SetBigInt(inputs[0])
+			a.A1.SetBigInt(inputs[1])
+			b.A0.SetBigInt(inputs[2])
+			b.A1.SetBigInt(inputs[3])
+
+			c.Inverse(&b).Mul(&c, &a)
+
+			c.A0.BigInt(outputs[0])
+			c.A1.BigInt(outputs[1])
+			fmt.Println("divE2Hint time: ", time.Since(startTime))
+			return nil
+		})
+*/
+// pub fn div_e2_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+//     let a = Fq2::new(Fq::from(inputs[0].to_u256().as_i64()), Fq::from(inputs[1].to_u256().as_i64()));
+//     let b = Fq2::new(Fq::from(inputs[2].to_u256().as_i64()), Fq::from(inputs[3].to_u256().as_i64()));
+//     let c = a / b;
+//     let c0 = c.c0;
+//     let c1 = c.c1;
+//     let c0_bigint = c0.0;
+//     outputs[0] = M31::from(c.a0().to_u256().as_u32());
+//     outputs[1] = M31::from(c.a1().to_u256().as_u32());
+//     Ok(())
+// }
 
 pub fn simple_rangecheck_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     let nb_bits = inputs[0].to_u256().as_u32();

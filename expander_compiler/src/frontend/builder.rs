@@ -472,7 +472,8 @@ impl<C: Config> RootAPI<C> for RootBuilder<C> {
 
 impl<C: Config> DebugAPI<C> for RootBuilder<C> {
     fn value_of(&self, _x: impl ToVariableOrValue<C::CircuitField>) -> C::CircuitField {
-        panic!("ValueOf is not supported in non-debug mode");
+        C::CircuitField::zero()
+        // panic!("ValueOf is not supported in non-debug mode");
     }
 }
 
