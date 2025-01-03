@@ -1,5 +1,6 @@
 use num_bigint::BigInt;
 use expander_compiler::{circuit::layered::InputType, frontend::*};
+use num_traits::ToPrimitive;
 pub fn recompose(inputs: Vec<BigInt>, nb_bits: u32) -> BigInt {
     if inputs.len() == 0 {
         panic!("zero length slice input");
@@ -11,7 +12,7 @@ pub fn recompose(inputs: Vec<BigInt>, nb_bits: u32) -> BigInt {
     }
     res
 }
-pub fn decompose(input: &BigInt, nb_bits: u32, res: &mut Vec<BigInt>) -> Result<(), String> {
+pub fn decompose(input: &BigInt, nb_bits: u32, res: &mut [BigInt]) -> Result<(), String> {
     // limb modulus
     if input.bits() > res.len() as u64 * nb_bits as u64 {
         return Err("decomposed integer does not fit into res".to_string());
@@ -25,3 +26,18 @@ pub fn decompose(input: &BigInt, nb_bits: u32, res: &mut Vec<BigInt>) -> Result<
     Ok(())
 }
 
+pub fn m31_to_bigint(input: M31) -> BigInt {
+    BigInt::from(input.to_u256().as_u32())
+}
+
+pub fn bigint_to_m31(input: &BigInt) -> M31 {
+    M31::from(input.to_u32().unwrap())
+}
+
+pub fn m31_to_bigint_array(input: &[M31]) -> Vec<BigInt> {
+    input.iter().map(|x| m31_to_bigint(*x)).collect()
+}
+
+pub fn bigint_to_m31_array(input: &[BigInt]) -> Vec<M31> {
+    input.iter().map(|x| bigint_to_m31(x)).collect()
+}

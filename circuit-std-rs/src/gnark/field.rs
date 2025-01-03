@@ -90,8 +90,8 @@ pub struct Field<T: FieldParams> {
     max_of: u32,
     n_const: Element<T>,
     nprev_const: Element<T>,
-    zero_const: Element<T>,
-    one_const: Element<T>,
+    pub zero_const: Element<T>,
+    pub one_const: Element<T>,
     short_one_const: Element<T>,
     constrained_limbs: HashMap<usize, ()>,
     pub table: LogUpRangeProofTable,
@@ -124,6 +124,79 @@ impl <T: FieldParams>Field<T> {
     pub fn max_overflow(&self) -> u64 {
         30 - 2 - 8
     }
+    pub fn is_zero<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: Element<T>) -> Variable {
+        let ca = self.reduce(native, a.clone(), false);
+        let mut res0 = native.constant(1);
+        let total_overflow = ca.limbs.len() as i32 - 1;
+        if total_overflow > self.max_overflow() as i32 {
+            res0 = native.is_zero(ca.limbs[0]);
+            for i in 1..ca.limbs.len() {
+                let tmp = native.is_zero(ca.limbs[i]);
+                res0 = native.mul(res0, tmp);
+            }
+        } else {
+            let mut limb_sum = ca.limbs[0];
+            for i in 1..ca.limbs.len() {
+                limb_sum = native.add(limb_sum, ca.limbs[i]);
+            }
+            res0 = native.is_zero(limb_sum);
+        }
+        res0
+    }
+    /*
+    func (f *Field[T]) Select(selector frontend.Variable, a, b *Element[T]) *Element[T] {
+	f.enforceWidthConditional(a)
+	f.enforceWidthConditional(b)
+	overflow := max(a.overflow, b.overflow)
+	nbLimbs := max(len(a.Limbs), len(b.Limbs))
+	e := f.newInternalElement(make([]frontend.Variable, nbLimbs), overflow)
+	normalize := func(limbs []frontend.Variable) []frontend.Variable {
+		if len(limbs) < nbLimbs {
+			tail := make([]frontend.Variable, nbLimbs-len(limbs))
+			for i := range tail {
+				tail[i] = 0
+			}
+			return append(limbs, tail...)
+		}
+		return limbs
+	}
+	aNormLimbs := normalize(a.Limbs)
+	bNormLimbs := normalize(b.Limbs)
+	for i := range e.Limbs {
+		e.Limbs[i] = f.api.Select(selector, aNormLimbs[i], bNormLimbs[i])
+	}
+	return e
+}
+     */
+    pub fn select<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, selector: Variable, a: &Element<T>, b: &Element<T>) -> Element<T> {
+        self.enforce_width_conditional(native, &a.clone());
+        self.enforce_width_conditional(native, &b.clone());
+        let overflow = std::cmp::max(a.overflow, b.overflow);
+        let nb_limbs = std::cmp::max(a.limbs.len(), b.limbs.len());
+        let mut limbs = vec![native.constant(0); nb_limbs];
+        let mut normalize = |limbs: Vec<Variable>| -> Vec<Variable> {
+            if limbs.len() < nb_limbs {
+                let mut tail = vec![native.constant(0); nb_limbs - limbs.len()];
+                for i in 0..tail.len() {
+                    tail[i] = native.constant(0);
+                }
+                return limbs.iter().chain(tail.iter()).cloned().collect();
+            }
+            limbs
+        };
+        let a_norm_limbs = normalize(a.limbs.clone());
+        let b_norm_limbs = normalize(b.limbs.clone());
+        for i in 0..limbs.len() {
+            limbs[i] = self.simple_select(native, selector, a_norm_limbs[i], b_norm_limbs[i]);
+        }
+        let e = new_internal_element::<T>(limbs, overflow);
+        e
+    }
+    pub fn simple_select<'a, C: Config, B: RootAPI<C>>(&self, native: &'a mut B, selector: Variable, a: Variable, b: Variable) -> Variable {
+        let tmp = native.sub(a, b);
+        let tmp2 = native.mul(tmp, selector);
+        native.add(b, tmp2)
+    }
     pub fn enforce_width_conditional<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: &Element<T>) -> bool{
         let mut did_constrain = false;
        if a.internal {
@@ -147,14 +220,34 @@ impl <T: FieldParams>Field<T> {
             if mod_width && i == a.limbs.len()-1 {
                 limb_nb_bits = ((T::modulus().bits() - 1) % T::bits_per_limb() as u64)  + 1;
             }
+            //range check
             if limb_nb_bits > 8 {
                 self.table.rangeproof(native, a.limbs[i], limb_nb_bits as usize);
             } else {
                 self.table.rangeproof_onechunk(native, a.limbs[i], limb_nb_bits as usize);
             }
-            // native.new_hint("myhint.simple_rangecheck_hint", &inputs, 1);
-            //logup.RangeProof(f.api, a.Limbs[i], limbNbBits)
         }
+    }
+    pub fn wrap_hint<'a, C: Config, B: RootAPI<C>>(&self, native: &'a mut B, nonnative_inputs: Vec<Element<T>>) -> Vec<Variable> {
+        let mut res = vec![native.constant(T::bits_per_limb() as u32), native.constant(T::nb_limbs() as u32)];
+        res.extend(self.n_const.limbs.clone());
+        res.push(native.constant(nonnative_inputs.len() as u32));
+        for i in 0..nonnative_inputs.len() {
+            res.push(native.constant(nonnative_inputs[i].limbs.len() as u32));
+            res.extend(nonnative_inputs[i].limbs.clone());
+        }
+        res
+    }
+    pub fn new_hint<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, hf_name: &str, nb_outputs: usize, inputs: Vec<Element<T>>) -> Vec<Element<T>> {
+        let native_inputs = self.wrap_hint(native, inputs);
+        let nb_native_outputs = T::nb_limbs() as usize * nb_outputs;
+        let native_outputs = native.new_hint(hf_name,  &native_inputs, nb_native_outputs);
+        let mut outputs = vec![];
+        for i in 0..nb_outputs {
+            let tmp_output = self.pack_limbs(native, native_outputs[i*T::nb_limbs() as usize..(i+1)*T::nb_limbs() as usize].to_vec(), true);
+            outputs.push(tmp_output);
+        }
+        outputs
     }
     pub fn pack_limbs<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, limbs: Vec<Variable>, strict: bool) -> Element<T> {
         let e = new_internal_element::<T>(limbs, 0);
@@ -245,6 +338,26 @@ impl <T: FieldParams>Field<T> {
         let carries = new_internal_element::<T>(ret[nb_quo_limbs + nb_rem_limbs..].to_vec(), 0);
         (quo, rem, carries)
     }
+    pub fn check_zero<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: Element<T>, p: Option<Element<T>>) {
+        self.enforce_width_conditional(native, &a.clone());
+        let b = self.short_one_const.clone();
+        let (k, r, c) = self.call_mul_hint(native, &a, &b, false);
+        let mc = mul_check{
+            a: a,
+            b: b,
+            c: c,
+            k: k,
+            r: r.clone(),
+            p: p.unwrap_or(Element::<T>::default()),
+        };
+        self.mul_checks.push(mc);
+    }
+    pub fn assert_isequal<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: &Element<T>, b: &Element<T>) {
+        self.enforce_width_conditional(native, &a.clone());
+        self.enforce_width_conditional(native, &b.clone());
+        let diff = self.sub(native, b.clone(), a.clone());
+        self.check_zero(native, diff, None);
+    }
     pub fn add<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: Element<T>, b: Element<T>) -> Element<T> {
         self.enforce_width_conditional(native, &a.clone());
         self.enforce_width_conditional(native, &b.clone());
@@ -328,10 +441,10 @@ impl <T: FieldParams>Field<T> {
         }
         return self.mul_mod(native, new_a, new_b, 0, Element::<T>::default());
     }
-    pub fn mul_const<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: Element<T>, c: BigInt) -> Element<T> {
+    pub fn mul_const<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: &Element<T>, c: BigInt) -> Element<T> {
         if c.is_negative() {
             let neg_a = self.neg(native, a.clone());
-            return self.mul_const(native, neg_a, -c);
+            return self.mul_const(native, &neg_a, -c);
         } else if c.is_zero() {
             return self.zero_const.clone();
         }
@@ -387,7 +500,8 @@ pub fn eval_with_challenge<'a, C: Config, B: RootAPI<C>, T: FieldParams>(native:
     if a.is_evaluated {
         return a;
     }
-    if at.len() < a.limbs.len() - 1 {
+    println!("a.limbs.len():{}", a.limbs.len());
+    if (at.len() as i64) < (a.limbs.len() as i64) - 1 {
         panic!("evaluation powers less than limbs");
     }
     let mut sum = native.constant(0);
@@ -403,57 +517,13 @@ pub fn eval_with_challenge<'a, C: Config, B: RootAPI<C>, T: FieldParams>(native:
     ret.evaluation = sum;
     ret
 }
-
-/*
-func (f *Field[T]) Add(a, b *Element[T]) *Element[T] {
-	return f.reduceAndOp(f.add, f.addPreCond, a, b)
-}
-
-func (f *Field[T]) reduceAndOp(op func(*Element[T], *Element[T], uint) *Element[T], preCond func(*Element[T], *Element[T]) (uint, error), a, b *Element[T]) *Element[T] {
-	f.enforceWidthConditional(a)
-	f.enforceWidthConditional(b)
-	var nextOverflow uint
-	var err error
-	var target overflowError
-
-	for nextOverflow, err = preCond(a, b); errors.As(err, &target); nextOverflow, err = preCond(a, b) {
-		if !target.reduceRight {
-			a = f.Reduce(a)
-		} else {
-			b = f.Reduce(b)
-		}
-	}
-	return op(a, b, nextOverflow)
-}
-
-func (f *Field[T]) addPreCond(a, b *Element[T]) (nextOverflow uint, err error) {
-	reduceRight := a.overflow < b.overflow
-	nextOverflow = max(a.overflow, b.overflow) + 1
-	if nextOverflow > f.maxOverflow() {
-		err = overflowError{op: "add", nextOverflow: nextOverflow, maxOverflow: f.maxOverflow(), reduceRight: reduceRight}
-	}
-	return
-}
-
-func (f *Field[T]) add(a, b *Element[T], nextOverflow uint) *Element[T] {
-	ba, aConst := f.constantValue(a)
-	bb, bConst := f.constantValue(b)
-	if aConst && bConst {
-		ba.Add(ba, bb).Mod(ba, f.fParams.Modulus())
-		return newConstElement[T](ba)
-	}
-
-	nbLimbs := max(len(a.Limbs), len(b.Limbs))
-	limbs := make([]frontend.Variable, nbLimbs)
-	for i := range limbs {
-		limbs[i] = 0
-		if i < len(a.Limbs) {
-			limbs[i] = f.api.Add(limbs[i], a.Limbs[i])
-		}
-		if i < len(b.Limbs) {
-			limbs[i] = f.api.Add(limbs[i], b.Limbs[i])
-		}
-	}
-	return f.newInternalElement(limbs, nextOverflow)
-}
-*/
+// pub fn normalize(limbs: Vec<Variable>) -> Vec<Variable> {
+//     if limbs.len() < nb_limbs {
+//         let mut tail = vec![native.constant(0); nb_limbs - limbs.len()];
+//         for i in 0..tail.len() {
+//             tail[i] = native.constant(0);
+//         }
+//         return limbs.iter().chain(tail.iter()).cloned().collect();
+//     }
+//     limbs
+// };

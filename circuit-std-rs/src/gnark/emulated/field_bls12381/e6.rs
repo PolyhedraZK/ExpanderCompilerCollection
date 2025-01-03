@@ -10,247 +10,360 @@ use expander_compiler::frontend::extra::*;
 use expander_compiler::{circuit::layered::InputType, frontend::*};
 use num_bigint::BigInt;
 
-pub type CurveF = GField<bls12381_fp>;
+use super::e2::*;
 #[derive(Default, Clone)]
-pub struct GE2 {
-    pub a0: Element<bls12381_fp>,
-    pub a1: Element<bls12381_fp>,
+pub struct GE6 {
+    pub b0: GE2,
+    pub b1: GE2,
+    pub b2: GE2,
 }
-impl GE2 {
+impl GE6 {
     pub fn clone(&self) -> Self {
-        GE2 {
-            a0: self.a0.clone(),
-            a1: self.a1.clone(),
+        GE6 {
+            b0: self.b0.clone(),
+            b1: self.b1.clone(),
+            b2: self.b2.clone(),
         }
     }
 }
-
-pub struct Ext2 {
-    pub fp: CurveF,
-    non_residues: HashMap<u32, HashMap<u32, GE2>>,
+pub struct Ext6 {
+    pub ext2: Ext2,
 }
 
-
-impl Ext2{
+impl Ext6{
     pub fn new<'a, C:Config, B:RootAPI<C>>(api: &'a mut B) -> Self {
-        let mut non_residues:HashMap<u32, HashMap<u32, GE2>> = HashMap::new();
-        let mut pwrs:HashMap<u32, HashMap<u32, GE2>> = HashMap::new();
-        let a1_1_0 = value_of::<C, B, bls12381_fp>(api, Box::new("3850754370037169011952147076051364057158807420970682438676050522613628423219637725072182697113062777891589506424760".to_string()));
-        let a1_1_1 = value_of::<C, B, bls12381_fp>(api, Box::new("151655185184498381465642749684540099398075398968325446656007613510403227271200139370504932015952886146304766135027".to_string()));
-        let a1_2_0 = value_of::<C, B, bls12381_fp>(api, Box::new("0".to_string()));
-        let a1_2_1 = value_of::<C, B, bls12381_fp>(api, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436".to_string()));
-        let a1_3_0 = value_of::<C, B, bls12381_fp>(api, Box::new("1028732146235106349975324479215795277384839936929757896155643118032610843298655225875571310552543014690878354869257".to_string()));
-        let a1_3_1 = value_of::<C, B, bls12381_fp>(api, Box::new("1028732146235106349975324479215795277384839936929757896155643118032610843298655225875571310552543014690878354869257".to_string()));
-        let a1_4_0 = value_of::<C, B, bls12381_fp>(api, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437".to_string()));
-        let a1_4_1 = value_of::<C, B, bls12381_fp>(api, Box::new("0".to_string()));
-        let a1_5_0 = value_of::<C, B, bls12381_fp>(api, Box::new("877076961050607968509681729531255177986764537961432449499635504522207616027455086505066378536590128544573588734230".to_string()));
-        let a1_5_1 = value_of::<C, B, bls12381_fp>(api, Box::new("3125332594171059424908108096204648978570118281977575435832422631601824034463382777937621250592425535493320683825557".to_string()));
-        let a2_1_0 = value_of::<C, B, bls12381_fp>(api, Box::new("793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620351".to_string()));
-        let a2_2_0 = value_of::<C, B, bls12381_fp>(api, Box::new("793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620350".to_string()));
-        let a2_3_0 = value_of::<C, B, bls12381_fp>(api, Box::new("4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559786".to_string()));
-        let a2_4_0 = value_of::<C, B, bls12381_fp>(api, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436".to_string()));
-        let a2_5_0 = value_of::<C, B, bls12381_fp>(api, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437".to_string()));
-        pwrs.insert(1, HashMap::new());
-        pwrs.get_mut(&1).unwrap().insert(1, GE2 {
-            a0: a1_1_0,
-            a1: a1_1_1,
-        });
-        pwrs.get_mut(&1).unwrap().insert(2, GE2 {
-            a0: a1_2_0,
-            a1: a1_2_1,
-        });
-        pwrs.get_mut(&1).unwrap().insert(3, GE2 {
-            a0: a1_3_0,
-            a1: a1_3_1,
-        });
-        pwrs.get_mut(&1).unwrap().insert(4, GE2 {
-            a0: a1_4_0,
-            a1: a1_4_1,
-        });
-        pwrs.get_mut(&1).unwrap().insert(5, GE2 {
-            a0: a1_5_0,
-            a1: a1_5_1,
-        });
-        pwrs.insert(2, HashMap::new());
-        let a_zero = value_of::<C, B, bls12381_fp>(api, Box::new("0".to_string()));
-        pwrs.get_mut(&2).unwrap().insert(1, GE2 {
-            a0: a2_1_0,
-            a1: a_zero,
-        });
-        let a_zero = value_of::<C, B, bls12381_fp>(api, Box::new("0".to_string()));
-        pwrs.get_mut(&2).unwrap().insert(2, GE2 {
-            a0: a2_2_0,
-            a1: a_zero,
-        });
-        let a_zero = value_of::<C, B, bls12381_fp>(api, Box::new("0".to_string()));
-        pwrs.get_mut(&2).unwrap().insert(3, GE2 {
-            a0: a2_3_0,
-            a1: a_zero,
-        });
-        let a_zero = value_of::<C, B, bls12381_fp>(api, Box::new("0".to_string()));
-        pwrs.get_mut(&2).unwrap().insert(4, GE2 {
-            a0: a2_4_0,
-            a1: a_zero,
-        });
-        let a_zero = value_of::<C, B, bls12381_fp>(api, Box::new("0".to_string()));
-        pwrs.get_mut(&2).unwrap().insert(5, GE2 {
-            a0: a2_5_0,
-            a1: a_zero,
-        });
-        let fp = CurveF::new(api, bls12381_fp{});
-        Ext2 {
-            fp,
-            non_residues: pwrs,
+        Self {
+            ext2: Ext2::new(api),
         }
     }
-    pub fn one(&mut self) -> GE2 {
-        let z0 = self.fp.one_const.clone();
-        let z1 = self.fp.zero_const.clone();
-        GE2 {
-            a0: z0,
-            a1: z1,
+    pub fn one(&mut self) -> GE6 {
+        let b0 = self.ext2.one();
+        let b1 = self.ext2.zero();
+        let b2 = self.ext2.zero();
+        GE6 {
+            b0,
+            b1,
+            b2
         }
     }
-    pub fn zero(&mut self) -> GE2 {
-        let z0 = self.fp.zero_const.clone();
-        let z1 = self.fp.zero_const.clone();
-        GE2 {
-            a0: z0,
-            a1: z1,
+    pub fn zero<'a, C:Config, B:RootAPI<C>>(&mut self) -> GE6 {
+        let b0 = self.ext2.zero();
+        let b1 = self.ext2.zero();
+        let b2 = self.ext2.zero();
+        GE6 {
+            b0,
+            b1,
+            b2
         }
     }
-    pub fn is_zero<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, z: &GE2) -> Variable {
-        let a0 = self.fp.is_zero(native, z.a0.clone());
-        let a1 = self.fp.is_zero(native, z.a1.clone());
-        native.and(a0, a1)
+    pub fn is_zero<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, z: &GE6) -> Variable {
+        let b0 = self.ext2.is_zero(native, &z.b0.clone());
+        let b1 = self.ext2.is_zero(native, &z.b1.clone());
+        let b2 = self.ext2.is_zero(native, &z.b2.clone());
+        let tmp = native.and(b0, b1);
+        native.and(tmp, b2)
     }
-    pub fn add<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2, y: &GE2) -> GE2 {
-        let z0 = self.fp.add(native, x.a0.clone(), y.a0.clone());
-        let z1 = self.fp.add(native,x.a1.clone(), y.a1.clone());
-        GE2 {
-            a0: z0,
-            a1: z1,
+    pub fn add<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE6, y: &GE6) -> GE6 {
+        let z0 = self.ext2.add(native, &x.b0.clone(), &y.b0.clone());
+        let z1 = self.ext2.add(native, &x.b1.clone(), &y.b1.clone());
+        let z2 = self.ext2.add(native, &x.b2.clone(), &y.b2.clone());
+        GE6 {
+            b0: z0,
+            b1: z1,
+            b2: z2,
         }
     }
-    pub fn sub<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2, y: &GE2) -> GE2 {
-        let z0 = self.fp.sub(native, x.a0.clone(), y.a0.clone());
-        let z1 = self.fp.sub(native,x.a1.clone(), y.a1.clone());
-        GE2 {
-            a0: z0,
-            a1: z1,
+    pub fn neg<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE6) -> GE6 {
+        let z0 = self.ext2.neg(native, &x.b0.clone());
+        let z1 = self.ext2.neg(native, &x.b1.clone());
+        let z2 = self.ext2.neg(native, &x.b2.clone());
+        GE6 {
+            b0: z0,
+            b1: z1,
+            b2: z2,
         }
     }
-    pub fn double<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
-        let two = BigInt::from(2);
-        let z0 = self.fp.mul_const(native, &x.a0, two.clone());
-        let z1 = self.fp.mul_const(native, &x.a1, two.clone());
-        GE2 {
-            a0: z0,
-            a1: z1,
+    pub fn sub<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE6, y: &GE6) -> GE6 {
+        let z0 = self.ext2.sub(native, &x.b0.clone(), &y.b0.clone());
+        let z1 = self.ext2.sub(native, &x.b1.clone(), &y.b1.clone());
+        let z2 = self.ext2.sub(native, &x.b2.clone(), &y.b2.clone());
+        GE6 {
+            b0: z0,
+            b1: z1,
+            b2: z2,
         }
     }
-    pub fn neg<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
-        let z0 = self.fp.neg(native, x.a0.clone());
-        let z1 = self.fp.neg(native, x.a1.clone());
-        GE2 {
-            a0: z0,
-            a1: z1,
+    pub fn double<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE6) -> GE6 {
+        let z0 = self.ext2.double(native, &x.b0.clone());
+        let z1 = self.ext2.double(native, &x.b1.clone());
+        let z2 = self.ext2.double(native, &x.b2.clone());
+        GE6 {
+            b0: z0,
+            b1: z1,
+            b2: z2,
         }
     }
-    pub fn mul<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2, y: &GE2) -> GE2 {
-
-        let v0 = self.fp.mul(native, x.a0.clone(), y.a0.clone());
-        let v1 = self.fp.mul(native, x.a1.clone(), y.a1.clone());
-        let b0 = self.fp.sub(native, v0.clone(), v1.clone());
-        let mut b1 = self.fp.add(native, x.a0.clone(), x.a1.clone());
-        let mut tmp = self.fp.add(native, y.a0.clone(), y.a1.clone());
-        b1 = self.fp.mul(native, b1, tmp);
-        tmp = self.fp.add(native, v0.clone(), v1.clone());
-        b1 = self.fp.sub(native, b1, tmp);
-        GE2 {
-            a0: b0,
-            a1: b1,
+    pub fn square<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE6) -> GE6 {
+        let c4 = self.ext2.mul(native, &x.b0.clone(), &x.b1.clone());
+        let c4 = self.ext2.double(native, &c4);
+        let c5 = self.ext2.square(native, &x.b2.clone());
+        let c1 = self.ext2.mul_by_non_residue(native, &c5);
+        let c1 = self.ext2.add(native, &c1, &c4);
+        let c2 = self.ext2.sub(native, &c4, &c5);
+        let c3 = self.ext2.square(native, &x.b0.clone());
+        let c4 = self.ext2.sub(native, &x.b0.clone(), &x.b1.clone());
+        let c4 = self.ext2.add(native, &c4, &x.b2.clone());
+        let c5 = self.ext2.mul(native, &x.b1.clone(), &x.b2.clone());
+        let c5 = self.ext2.double(native, &c5);
+        let c4 = self.ext2.square(native, &c4);
+        let c0 = self.ext2.mul_by_non_residue(native, &c5);
+        let c0 = self.ext2.add(native, &c0, &c3);
+        let z2 = self.ext2.add(native, &c2, &c4);
+        let z2 = self.ext2.add(native, &z2, &c5);
+        let z2 = self.ext2.sub(native, &z2, &c3);
+        let z0 = c0;
+        let z1 = c1;
+        GE6 {
+            b0: z0,
+            b1: z1,
+            b2: z2,
         }
     }
-    pub fn mul_by_element<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2, y: &Element<bls12381_fp>) -> GE2 {
-        let v0 = self.fp.mul(native, x.a0.clone(), y.clone());
-        let v1 = self.fp.mul(native, x.a1.clone(), y.clone());
-        GE2 {
-            a0: v0,
-            a1: v1,
+    pub fn mul_by_e2<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE6, y: &GE2) -> GE6 {
+        let z0 = self.ext2.mul(native, &x.b0.clone(), y);
+        let z1 = self.ext2.mul(native, &x.b1.clone(), y);
+        let z2 = self.ext2.mul(native, &x.b2.clone(), y);
+        GE6 {
+            b0: z0,
+            b1: z1,
+            b2: z2,
         }
     }
-    pub fn mul_by_non_residue<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
-        let a = self.fp.sub(native, x.a0.clone(), x.a1.clone());
-        let b = self.fp.add(native, x.a0.clone(), x.a1.clone());
-        GE2 {
-            a0: a,
-            a1: b,
+    pub fn mul_by_12<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE6, b1: &GE2, b2: &GE2) -> GE6 {
+        let t1 = self.ext2.mul(native, &x.b1.clone(), b1);
+        let t2 = self.ext2.mul(native, &x.b2.clone(), b2);
+        let mut c0 = self.ext2.add(native, &x.b1.clone(), &x.b2.clone());
+        let mut tmp = self.ext2.add(native, b1, b2);
+        c0 = self.ext2.mul(native, &c0, &tmp);
+        tmp = self.ext2.add(native, &t1, &t2);
+        c0 = self.ext2.sub(native, &c0, &tmp);
+        c0 = self.ext2.mul_by_non_residue(native, &c0);
+        let mut c1 = self.ext2.add(native, &x.b0.clone(), &x.b1.clone());
+        c1 = self.ext2.mul(native, &c1, b1);
+        c1 = self.ext2.sub(native, &c1, &t1);
+        tmp = self.ext2.mul_by_non_residue(native, &t2);
+        c1 = self.ext2.add(native, &c1, &tmp);
+        tmp = self.ext2.add(native, &x.b0.clone(), &x.b2.clone());
+        let mut c2 = self.ext2.mul(native, b2, &tmp);
+        c2 = self.ext2.sub(native, &c2, &t2);
+        c2 = self.ext2.add(native, &c2, &t1);
+        GE6 {
+            b0: c0,
+            b1: c1,
+            b2: c2,
         }
     }
-    pub fn square<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
-        let a = self.fp.add(native, x.a0.clone(), x.a1.clone());
-        let b = self.fp.sub(native, x.a0.clone(), x.a1.clone());
-        let a = self.fp.mul(native, a, b);
-        let b = self.fp.mul(native, x.a0.clone(), x.a1.clone());
-        let b = self.fp.mul_const(native, &b, BigInt::from(2));
-        GE2 {
-            a0: a,
-            a1: b,
+    pub fn mul_by_0<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, z: &GE6, c0: &GE2) -> GE6 {
+        let a = self.ext2.mul(native, &z.b0.clone(), c0);
+        let tmp = self.ext2.add(native, &z.b0.clone(), &z.b2.clone());
+        let mut t2 = self.ext2.mul(native, c0, &tmp);
+        t2 = self.ext2.sub(native, &t2, &a);
+        let tmp = self.ext2.add(native, &z.b0.clone(), &z.b1.clone());
+        let mut t1 = self.ext2.mul(native, c0, &tmp);
+        t1 = self.ext2.sub(native, &t1, &a);
+        GE6 {
+            b0: a,
+            b1: t1,
+            b2: t2,
         }
     }
-    pub fn div<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2, y: &GE2) -> GE2 {
-        let inputs = vec![x.a0.clone(), x.a1.clone(), y.a0.clone(), y.a1.clone()];
-        let output = self.fp.new_hint(native, "myhint.dive2hint", 2, inputs);
-        let div = GE2 {
-            a0: output[0].clone(),
-            a1: output[1].clone(),
+    pub fn mul_by_01<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, z: &GE6, c0: &GE2, c1: &GE2) -> GE6 {
+        let a = self.ext2.mul(native, &z.b0.clone(), c0);
+        let b = self.ext2.mul(native, &z.b1.clone(), c1);
+        let tmp = self.ext2.add(native, &z.b1.clone(), &z.b2.clone());
+        let mut t0 = self.ext2.mul(native, c1, &tmp);
+        t0 = self.ext2.sub(native, &t0, &b);
+        t0 = self.ext2.mul_by_non_residue(native, &t0);
+        t0 = self.ext2.add(native, &t0, &a);
+        let t2 = self.ext2.mul(native, &z.b2.clone(), c0);
+        t0 = self.ext2.add(native, &t2, &b);
+        let mut t1 = self.ext2.add(native, c0, c1);
+        let tmp = self.ext2.add(native, &z.b0.clone(), &z.b1.clone());
+        t1 = self.ext2.mul(native, &t1, &tmp);
+        let tmp = self.ext2.add(native, &a, &b);
+        t1 = self.ext2.sub(native, &t1, &tmp);
+        GE6 {
+            b0: t0,
+            b1: t1,
+            b2: t2,
+        }
+    }
+    pub fn mul_by_non_residue<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE6) -> GE6 {
+        let z0 = self.ext2.mul_by_non_residue(native, &x.b2.clone());
+        GE6 {
+            b0: z0,
+            b1: x.b0.clone(),
+            b2: x.b1.clone(),
+        }
+    }
+    pub fn assert_isequal<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE6, y: &GE6) {
+        self.ext2.assert_isequal(native, &x.b0, &y.b0);
+        self.ext2.assert_isequal(native, &x.b1, &y.b1);
+        self.ext2.assert_isequal(native, &x.b2, &y.b2);
+    }
+    pub fn select<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, selector: Variable, z1: &GE6, z0: &GE6) -> GE6 {
+        let b0 = self.ext2.select(native, selector, &z1.b0.clone(), &z0.b0.clone());
+        let b1 = self.ext2.select(native, selector, &z1.b1.clone(), &z0.b1.clone());
+        let b2 = self.ext2.select(native, selector, &z1.b2.clone(), &z0.b2.clone());
+        GE6 {
+            b0: b0,
+            b1: b1,
+            b2: b2,
+        }
+    }
+    pub fn mul_karatsuba_over_karatsuba<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE6, y: &GE6) -> GE6 {
+        let t0 = self.ext2.mul(native, &x.b0.clone(), &y.b0.clone());
+        let t1 = self.ext2.mul(native, &x.b1.clone(), &y.b1.clone());
+        let t2 = self.ext2.mul(native, &x.b2.clone(), &y.b2.clone());
+        let mut c0 = self.ext2.add(native, &x.b1.clone(), &x.b2.clone());
+        let mut tmp = self.ext2.add(native, &y.b1.clone(), &y.b2.clone());
+        c0 = self.ext2.mul(native, &c0, &tmp);
+        tmp = self.ext2.add(native, &t2, &t1);
+        c0 = self.ext2.sub(native, &c0, &tmp);
+        c0 = self.ext2.mul_by_non_residue(native, &c0);
+        c0 = self.ext2.add(native, &c0, &t0);
+        let mut c1 = self.ext2.add(native, &x.b0.clone(), &x.b1.clone());
+        tmp = self.ext2.add(native, &y.b0.clone(), &y.b1.clone());
+        c1 = self.ext2.mul(native, &c1, &tmp);
+        tmp = self.ext2.add(native, &t0, &t1);
+        c1 = self.ext2.sub(native, &c1, &tmp);
+        tmp = self.ext2.mul_by_non_residue(native, &t2);
+        c1 = self.ext2.add(native, &c1, &tmp);
+        let mut c2 = self.ext2.add(native, &x.b0.clone(), &x.b2.clone());
+        let mut tmp = self.ext2.add(native, &y.b0.clone(), &y.b2.clone());
+        c2 = self.ext2.mul(native, &c2, &tmp);
+        tmp = self.ext2.add(native, &t0, &t2);
+        c2 = self.ext2.sub(native, &c2, &tmp);
+        c2 = self.ext2.add(native, &c2, &t1);
+        GE6 {
+            b0: c0,
+            b1: c1,
+            b2: c2,
+        }
+    }
+    pub fn mul<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE6, y: &GE6) -> GE6 {
+        self.mul_karatsuba_over_karatsuba(native, x, y)
+    }
+    pub fn div<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE6, y: &GE6) -> GE6 {
+        let inputs = vec![x.b0.a0.clone(), x.b0.a1.clone(), x.b1.a0.clone(), x.b1.a1.clone(), x.b2.a0.clone(), x.b2.a1.clone(), y.b0.a0.clone(), y.b0.a1.clone(), y.b1.a0.clone(), y.b1.a1.clone(), y.b2.a0.clone(), y.b2.a1.clone()];
+        let output = self.ext2.fp.new_hint(native, "dive6hint", 6, inputs);
+        let div = GE6 {
+            b0: GE2 {
+                a0: output[0].clone(),
+                a1: output[1].clone(),
+            },
+            b1: GE2 {
+                a0: output[2].clone(),
+                a1: output[3].clone(),
+            },
+            b2: GE2 {
+                a0: output[4].clone(),
+                a1: output[5].clone(),
+            },
         };
         let _x = self.mul(native, &div, y);
-        self.assert_isequal(native, &x, &_x);
+        self.assert_isequal(native, &x.clone(), &_x);
         div
     }
-    pub fn inverse_div<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
-        self.div(native, &GE2 {
-            a0: self.fp.one_const.clone(),
-            a1: self.fp.zero_const.clone(),
-        }, x)
+    pub fn inverse_div<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE6) -> GE6 {
+        let one = self.one();
+        self.div(native, &one, x)
     }
-    pub fn inverse<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
-        let inputs = vec![x.a0.clone(), x.a1.clone()];
-        let output = self.fp.new_hint(native, "myhint.inversee2hint", 2, inputs);
-        let inv = GE2 {
-            a0: output[0].clone(),
-            a1: output[1].clone(),
+    pub fn inverse<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE6) -> GE6 {
+        let inputs = vec![x.b0.a0.clone(), x.b0.a1.clone(), x.b1.a0.clone(), x.b1.a1.clone(), x.b2.a0.clone(), x.b2.a1.clone()];
+        let output = self.ext2.fp.new_hint(native, "inversee6hint", 6, inputs);
+        let inv = GE6 {
+            b0: GE2 {
+                a0: output[0].clone(),
+                a1: output[1].clone(),
+            },
+            b1: GE2 {
+                a0: output[2].clone(),
+                a1: output[3].clone(),
+            },
+            b2: GE2 {
+                a0: output[4].clone(),
+                a1: output[5].clone(),
+            },
         };
-        let one = GE2 {
-            a0: self.fp.one_const.clone(),
-            a1: self.fp.zero_const.clone(),
-        };
+        let one = self.one();
         let _one = self.mul(native, &inv, x);
         self.assert_isequal(native, &one, &_one);
         inv
     }
-    pub fn assert_isequal<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2, y: &GE2) {
-        self.fp.assert_isequal(native, &x.a0, &y.a0);
-        self.fp.assert_isequal(native, &x.a1, &y.a1);
+    /*
+    func (e Ext6) divE6By6(x [6]*baseEl) [6]*baseEl {
+	res, err := e.fp.NewHint(divE6By6Hint, 6, x[0], x[1], x[2], x[3], x[4], x[5])
+	if err != nil {
+		// err is non-nil only for invalid number of inputs
+		panic(err)
+	}
+
+	y0 := *res[0]
+	y1 := *res[1]
+	y2 := *res[2]
+	y3 := *res[3]
+	y4 := *res[4]
+	y5 := *res[5]
+
+	// xi == 6 * yi
+	x0 := e.fp.MulConst(&y0, big.NewInt(6))
+	x1 := e.fp.MulConst(&y1, big.NewInt(6))
+	x2 := e.fp.MulConst(&y2, big.NewInt(6))
+	x3 := e.fp.MulConst(&y3, big.NewInt(6))
+	x4 := e.fp.MulConst(&y4, big.NewInt(6))
+	x5 := e.fp.MulConst(&y5, big.NewInt(6))
+	e.fp.AssertIsEqual(x[0], x0)
+	e.fp.AssertIsEqual(x[1], x1)
+	e.fp.AssertIsEqual(x[2], x2)
+	e.fp.AssertIsEqual(x[3], x3)
+	e.fp.AssertIsEqual(x[4], x4)
+	e.fp.AssertIsEqual(x[5], x5)
+
+	return [6]*baseEl{&y0, &y1, &y2, &y3, &y4, &y5}
+}
+     */
+    pub fn div_e6_by_6<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &[Element<bls12381_fp>; 6]) -> [Element<bls12381_fp>; 6] {
+        let inputs = vec![x[0].clone(), x[1].clone(), x[2].clone(), x[3].clone(), x[4].clone(), x[5].clone()];
+        let output = self.ext2.fp.new_hint(native, "dive6by6hint", 6, inputs);
+        let y0 = output[0].clone();
+        let y1 = output[1].clone();
+        let y2 = output[2].clone();
+        let y3 = output[3].clone();
+        let y4 = output[4].clone();
+        let y5 = output[5].clone();
+        let x0 = self.ext2.fp.mul_const(native, &y0, BigInt::from(6));
+        let x1 = self.ext2.fp.mul_const(native, &y1, BigInt::from(6));
+        let x2 = self.ext2.fp.mul_const(native, &y2, BigInt::from(6));
+        let x3 = self.ext2.fp.mul_const(native, &y3, BigInt::from(6));
+        let x4 = self.ext2.fp.mul_const(native, &y4, BigInt::from(6));
+        let x5 = self.ext2.fp.mul_const(native, &y5, BigInt::from(6));
+        self.ext2.fp.assert_isequal(native, &x[0], &x0);
+        self.ext2.fp.assert_isequal(native, &x[1], &x1);
+        self.ext2.fp.assert_isequal(native, &x[2], &x2);
+        self.ext2.fp.assert_isequal(native, &x[3], &x3);
+        self.ext2.fp.assert_isequal(native, &x[4], &x4);
+        self.ext2.fp.assert_isequal(native, &x[5], &x5);
+        [y0, y1, y2, y3, y4, y5]
     }
-    pub fn select<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, selector: Variable, z1: &GE2, z0: &GE2) -> GE2 {
-        let a0 = self.fp.select(native, selector.clone(), &z1.a0, &z0.a0);
-        let a1 = self.fp.select(native, selector.clone(), &z1.a1, &z0.a1);
-        GE2 {
-            a0: a0,
-            a1: a1,
-        }
-    }
-    pub fn conjugate<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
-        let z0 = x.a0.clone();
-        let z1 = self.fp.neg(native, x.a1.clone());
-        GE2 {
-            a0: z0,
-            a1: z1,
-        }
-    }
+    // pub fn conjugate<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
+    //     let z0 = x.a0.clone();
+    //     let z1 = self.fp.neg(native, x.a1.clone());
+    //     GE2 {
+    //         a0: z0,
+    //         a1: z1,
+    //     }
+    // }
 }
 
 declare_circuit!(E2AddCircuit {
