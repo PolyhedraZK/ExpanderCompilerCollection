@@ -27,8 +27,9 @@ halo2curves = { git = "https://github.com/PolyhedraZK/halo2curves", default-feat
 arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
 expander_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev", package = "config" }
 expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev", package = "circuit" }
+expander_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev", package = "gkr_field_config" }
+expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev", package = "transcript" }
 gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
 gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
 mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
-expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev", package = "transcript" }
-
+poly_commit = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev", package = "poly_commit" }
