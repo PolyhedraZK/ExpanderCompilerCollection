@@ -187,7 +187,7 @@ impl<C: Config> CircuitRelaxed<C> {
                     inputs,
                     num_outputs,
                 } => {
-                    let mut occured = HashSet::new();
+                    let mut occurred = HashSet::new();
                     let mut new_inputs = Vec::new();
                     for &i in inputs.iter() {
                         if !occured.contains(&i) {
