@@ -112,7 +112,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                                 num_outputs: 1,
                             })
                             .unwrap();
-                        let multy = self.push_mul(*y, inv);
+                        let multi = self.push_mul(*y, inv);
                         let sub1 = self.push_sub(multy, one);
                         self.assert((), sub1);
                         InsnOut::Mul(vec![*x, inv])
