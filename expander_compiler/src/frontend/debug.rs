@@ -7,6 +7,7 @@ use crate::{
         },
     },
     field::FieldArith,
+    hints::registry::{hint_key_to_id, HintCaller},
 };
 
 use super::{
@@ -15,11 +16,12 @@ use super::{
     Variable,
 };
 
-pub struct DebugBuilder<C: Config> {
+pub struct DebugBuilder<C: Config, H: HintCaller<C::CircuitField>> {
     values: Vec<C::CircuitField>,
+    hint_caller: H,
 }
 
-impl<C: Config> BasicAPI<C> for DebugBuilder<C> {
+impl<C: Config, H: HintCaller<C::CircuitField>> BasicAPI<C> for DebugBuilder<C, H> {
     fn add(
         &mut self,
         x: impl ToVariableOrValue<C::CircuitField>,
@@ -120,13 +122,32 @@ impl<C: Config> BasicAPI<C> for DebugBuilder<C> {
         let v = C::CircuitField::random_unsafe(&mut rand::thread_rng());
         self.return_as_variable(v)
     }
+    fn new_hint(
+        &mut self,
+        hint_key: &str,
+        inputs: &[Variable],
+        num_outputs: usize,
+    ) -> Vec<Variable> {
+        let inputs: Vec<C::CircuitField> =
+            inputs.iter().map(|v| self.convert_to_value(v)).collect();
+        match self
+            .hint_caller
+            .call(hint_key_to_id(hint_key), &inputs, num_outputs)
+        {
+            Ok(outputs) => outputs
+                .into_iter()
+                .map(|v| self.return_as_variable(v))
+                .collect(),
+            Err(e) => panic!("Hint error: {:?}", e),
+        }
+    }
     fn constant(&mut self, x: impl ToVariableOrValue<<C as Config>::CircuitField>) -> Variable {
         let x = self.convert_to_value(x);
         self.return_as_variable(x)
     }
 }
 
-impl<C: Config> UnconstrainedAPI<C> for DebugBuilder<C> {
+impl<C: Config, H: HintCaller<C::CircuitField>> UnconstrainedAPI<C> for DebugBuilder<C, H> {
     fn unconstrained_identity(&mut self, x: impl ToVariableOrValue<C::CircuitField>) -> Variable {
         self.constant(x)
     }
@@ -367,13 +388,13 @@ impl<C: Config> UnconstrainedAPI<C> for DebugBuilder<C> {
     }
 }
 
-impl<C: Config> DebugAPI<C> for DebugBuilder<C> {
+impl<C: Config, H: HintCaller<C::CircuitField>> DebugAPI<C> for DebugBuilder<C, H> {
     fn value_of(&self, x: impl ToVariableOrValue<C::CircuitField>) -> C::CircuitField {
         self.convert_to_value(x)
     }
 }
 
-impl<C: Config> RootAPI<C> for DebugBuilder<C> {
+impl<C: Config, H: HintCaller<C::CircuitField>> RootAPI<C> for DebugBuilder<C, H> {
     fn memorized_simple_call<F: Fn(&mut Self, &Vec<Variable>) -> Vec<Variable> + 'static>(
         &mut self,
         f: F,
@@ -384,13 +405,15 @@ impl<C: Config> RootAPI<C> for DebugBuilder<C> {
     }
 }
 
-impl<C: Config> DebugBuilder<C> {
+impl<C: Config, H: HintCaller<C::CircuitField>> DebugBuilder<C, H> {
     pub fn new(
         inputs: Vec<C::CircuitField>,
         public_inputs: Vec<C::CircuitField>,
+        hint_caller: H,
     ) -> (Self, Vec<Variable>, Vec<Variable>) {
         let mut builder = DebugBuilder {
             values: vec![C::CircuitField::zero()],
+            hint_caller,
         };
         let vars = (1..=inputs.len()).map(new_variable).collect();
         let public_vars = (inputs.len() + 1..=inputs.len() + public_inputs.len())

@@ -1,4 +1,4 @@
-use expander_compiler::frontend::*;
+use expander_compiler::{circuit::layered::InputUsize, frontend::*};
 
 declare_circuit!(Circuit {
     x: [Variable; 16],
@@ -27,10 +27,10 @@ fn mul_fanout_limit(limit: usize) {
     .unwrap();
     let circuit = compile_result.layered_circuit;
     for segment in circuit.segments.iter() {
-        let mut ref_num = vec![0; segment.num_inputs];
+        let mut ref_num = vec![0; segment.num_inputs.get(0)];
         for m in segment.gate_muls.iter() {
-            ref_num[m.inputs[0]] += 1;
-            ref_num[m.inputs[1]] += 1;
+            ref_num[m.inputs[0].offset] += 1;
+            ref_num[m.inputs[1].offset] += 1;
         }
         for x in ref_num.iter() {
             assert!(*x <= limit);

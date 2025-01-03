@@ -138,7 +138,11 @@ impl<C: Config, P: ProvingSystem<C>> Context<C, P> {
             }
             let ws_outputs = kernel
                 .witness_solver
-                .eval_with_public_inputs(ws_inputs, &[])
+                .eval_safe(
+                    ws_inputs,
+                    &[],
+                    &mut crate::hints::registry::HintRegistry::new(), // TODO: use null hint registry or enable hints
+                )
                 .unwrap(); // TODO: handle error
             for (i, ws_input) in kernel.witness_solver_io.iter().enumerate() {
                 if ws_input.output_offset.is_none() {

@@ -1,13 +1,12 @@
-use crate::circuit::ir::common::Instruction;
-use crate::field::FieldArith;
 use crate::frontend::*;
 use crate::{
     circuit::{
         config::Config,
         input_mapping::{InputMapping, EMPTY},
-        ir::{self, expr},
-        layered::Circuit as LayeredCircuit,
+        ir::{self, common::Instruction, expr},
+        layered::{Circuit as LayeredCircuit, NormalInputType},
     },
+    field::FieldArith,
     utils::misc::next_power_of_two,
 };
 pub use macros::kernel;
@@ -15,7 +14,7 @@ pub use macros::kernel;
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Kernel<C: Config> {
     pub witness_solver: ir::hint_normalized::RootCircuit<C>,
-    pub layered_circuit: LayeredCircuit<C>,
+    pub layered_circuit: LayeredCircuit<C, NormalInputType>,
     pub witness_solver_io: Vec<WitnessSolverIOVec>,
     pub witness_solver_hint_input: Option<WitnessSolverIOVec>,
     pub layered_circuit_input: Vec<LayeredCircuitInputVec>,
@@ -199,8 +198,10 @@ where
         rhl_c0.outputs.push(i);
     }
     // compile step 2
-    let (mut r_dest_opt, hl_im) =
-        crate::compile::compile_step_2(r_hint_less, CompileOptions::default())?;
+    let (mut r_dest_opt, hl_im) = crate::compile::compile_step_2::<C, NormalInputType>(
+        r_hint_less,
+        CompileOptions::default(),
+    )?;
     for (i, x) in hl_im.mapping().iter().enumerate() {
         assert_eq!(i, *x);
     }

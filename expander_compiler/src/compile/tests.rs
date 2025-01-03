@@ -1,6 +1,7 @@
 use crate::circuit::{
     config::{Config, M31Config as C},
     ir,
+    layered::NormalInputType,
 };
 
 type CField = <C as Config>::CircuitField;
@@ -25,7 +26,7 @@ fn simple_div() {
         },
     );
     assert_eq!(root.validate(), Ok(()));
-    let (input_solver, lc) = super::compile(&root).unwrap();
+    let (input_solver, lc) = super::compile::<_, NormalInputType>(&root).unwrap();
     assert_eq!(input_solver.circuits[&0].outputs.len(), 4);
     let (o, cond) = lc.eval_unsafe(vec![
         CField::from(2),
