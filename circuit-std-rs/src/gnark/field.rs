@@ -546,6 +546,7 @@ impl <T: FieldParams>Field<T> {
         let coef = BigInt::from(1) << T::bits_per_limb();
         let ccoef = native.sub(coef.to_u64().unwrap() as u32, commitment);
         for i in 0..self.mul_checks.len() {
+            println!("mul_check {}", i);
             self.mul_checks[i].check(native, pval.evaluation, ccoef);
         }
         for i in 0..self.mul_checks.len() {

@@ -71,7 +71,7 @@ impl Pairing {
         let f = self.miller_loop(native, p, q).unwrap();
         println!("f");
         print_e2(native, &f.c1.b0);
-        panic!("stop");
+        // panic!("stop");
         let buf = self.ext12.conjugate(native, &f);
         println!("buff");
         print_e2(native, &buf.c1.b0);
@@ -85,7 +85,7 @@ impl Pairing {
         println!("f");
         print_e2(native, &f.c1.b0);
 
-        panic!("stop");
+        // panic!("stop");
         self.ext12.assert_final_exponentiation_is_one(native, &f);
 
         Ok(())

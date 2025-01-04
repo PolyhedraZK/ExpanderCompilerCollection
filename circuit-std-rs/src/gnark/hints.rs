@@ -476,7 +476,6 @@ pub fn final_exp_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> 
         |inputs| {
             let biguint_inputs = inputs.iter().map(|x| x.to_biguint().unwrap()).collect::<Vec<_>>();
             println!("biguint_inputs: {:?}", biguint_inputs);
-            panic!("finalExpHint not implemented");
             let mut miller_loop = Fq12::default();
             miller_loop.c0.c0.c0 = Fq::from(biguint_inputs[0].clone());
             miller_loop.c0.c0.c1 = Fq::from(biguint_inputs[1].clone());
@@ -510,6 +509,7 @@ pub fn final_exp_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> 
             let exp_uint = exponent.to_biguint().unwrap();
             println!("exp_uint: {:?}", exp_uint);
             println!("miller_loop: {:?}", miller_loop);
+            println!("miller_loop: {:?}", miller_loop.to_string());
             root = miller_loop.pow(exp_uint.to_u64_digits().iter());
             println!("root: {:?}", root);
             if root.is_one() {
@@ -572,6 +572,8 @@ pub fn final_exp_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> 
             }
 
             scaling_factor = root_pth_inverse * root_27th_inverse;
+            println!("scaling_factor: {:?}", scaling_factor);
+            println!("scaling_factor: {:?}", scaling_factor.c0.c2.c1.to_string());
             miller_loop = miller_loop * scaling_factor;
 
             let mut lambda = BigInt::default();
@@ -581,6 +583,7 @@ pub fn final_exp_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> 
             println!("exponent: {:?}", exponent);
             residue_witness = miller_loop.pow(exponent.to_biguint().unwrap().to_u64_digits().iter());
             println!("residue_witness: {:?}", residue_witness);
+            println!("miller_loop: {:?}", residue_witness.to_string());
 
             let res_c0_b0_a0_bigint = residue_witness.c0.c0.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
             let res_c0_b0_a1_bigint = residue_witness.c0.c0.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
@@ -595,14 +598,19 @@ pub fn final_exp_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> 
             let res_c1_b2_a0_bigint = residue_witness.c1.c2.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
             let res_c1_b2_a1_bigint = residue_witness.c1.c2.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
 
-            let sca_c0_b0_a0_bigint = scaling_factor.c0.c0.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
-            let sca_c0_b0_a1_bigint = scaling_factor.c0.c0.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
-            let sca_c0_b1_a0_bigint = scaling_factor.c0.c1.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
-            let sca_c0_b1_a1_bigint = scaling_factor.c0.c1.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
-            let sca_c0_b2_a0_bigint = scaling_factor.c0.c2.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
-            let sca_c0_b2_a1_bigint = scaling_factor.c0.c2.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
+            let sca_c0_b0_a0_bigint = scaling_factor.c0.c0.c0.to_string().parse::<BigInt>().unwrap_or_else(|_| BigInt::zero());
+            let sca_c0_b0_a1_bigint = scaling_factor.c0.c0.c1.to_string().parse::<BigInt>().unwrap_or_else(|_| BigInt::zero());
+            let sca_c0_b1_a0_bigint = scaling_factor.c0.c1.c0.to_string().parse::<BigInt>().unwrap_or_else(|_| BigInt::zero());
+            let sca_c0_b1_a1_bigint = scaling_factor.c0.c1.c1.to_string().parse::<BigInt>().unwrap_or_else(|_| BigInt::zero());
+            let sca_c0_b2_a0_bigint = scaling_factor.c0.c2.c0.to_string().parse::<BigInt>().unwrap_or_else(|_| BigInt::zero());
+            let sca_c0_b2_a1_bigint = scaling_factor.c0.c2.c1.to_string().parse::<BigInt>().unwrap_or_else(|_| BigInt::zero());
             
-
+            println!("sca_c0_b0_a0_bigint{:?}", sca_c0_b0_a0_bigint);
+            println!("sca_c0_b0_a1_bigint{:?}", sca_c0_b0_a1_bigint);
+            println!("sca_c0_b1_a0_bigint{:?}", sca_c0_b1_a0_bigint);
+            println!("sca_c0_b1_a1_bigint{:?}", sca_c0_b1_a1_bigint);
+            println!("sca_c0_b2_a0_bigint{:?}", sca_c0_b2_a0_bigint);
+            println!("sca_c0_b2_a1_bigint{:?}", sca_c0_b2_a1_bigint);
             return vec![res_c0_b0_a0_bigint, res_c0_b0_a1_bigint, res_c0_b1_a0_bigint, 
                         res_c0_b1_a1_bigint, res_c0_b2_a0_bigint, res_c0_b2_a1_bigint, 
                         res_c1_b0_a0_bigint, res_c1_b0_a1_bigint, res_c1_b1_a0_bigint, 
