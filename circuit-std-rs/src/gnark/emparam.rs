@@ -1,6 +1,6 @@
 use num_bigint::BigInt;
 
-#[derive(Default,Clone)]
+#[derive(Default,Clone, Copy)]
 pub struct bls12381_fp {}
 impl bls12381_fp {
     pub fn nb_limbs() -> u32 {

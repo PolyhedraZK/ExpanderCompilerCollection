@@ -58,6 +58,8 @@ impl <T: FieldParams>mul_check<T> {
         if !self.p.is_empty() {
             new_peval = self.p.evaluation
         };
+        println!("ls_a:{:?}", native.value_of(self.a.evaluation));
+        println!("ls_b:{:?}", native.value_of(self.b.evaluation));
         let ls = native.mul(self.a.evaluation, self.b.evaluation);
         let rs_tmp1 = native.mul(new_peval, self.k.evaluation);
         println!("rs_tmp1:{:?}", native.value_of(rs_tmp1));
@@ -124,8 +126,8 @@ impl <T: FieldParams>Field<T> {
     pub fn max_overflow(&self) -> u64 {
         30 - 2 - 8
     }
-    pub fn is_zero<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: Element<T>) -> Variable {
-        let ca = self.reduce(native, a.clone(), false);
+    pub fn is_zero<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: &Element<T>) -> Variable {
+        let ca = self.reduce(native, a, false);
         let mut res0 = native.constant(1);
         let total_overflow = ca.limbs.len() as i32 - 1;
         if total_overflow > self.max_overflow() as i32 {
@@ -143,31 +145,6 @@ impl <T: FieldParams>Field<T> {
         }
         res0
     }
-    /*
-    func (f *Field[T]) Select(selector frontend.Variable, a, b *Element[T]) *Element[T] {
-	f.enforceWidthConditional(a)
-	f.enforceWidthConditional(b)
-	overflow := max(a.overflow, b.overflow)
-	nbLimbs := max(len(a.Limbs), len(b.Limbs))
-	e := f.newInternalElement(make([]frontend.Variable, nbLimbs), overflow)
-	normalize := func(limbs []frontend.Variable) []frontend.Variable {
-		if len(limbs) < nbLimbs {
-			tail := make([]frontend.Variable, nbLimbs-len(limbs))
-			for i := range tail {
-				tail[i] = 0
-			}
-			return append(limbs, tail...)
-		}
-		return limbs
-	}
-	aNormLimbs := normalize(a.Limbs)
-	bNormLimbs := normalize(b.Limbs)
-	for i := range e.Limbs {
-		e.Limbs[i] = f.api.Select(selector, aNormLimbs[i], bNormLimbs[i])
-	}
-	return e
-}
-     */
     pub fn select<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, selector: Variable, a: &Element<T>, b: &Element<T>) -> Element<T> {
         self.enforce_width_conditional(native, &a.clone());
         self.enforce_width_conditional(native, &b.clone());
@@ -232,8 +209,10 @@ impl <T: FieldParams>Field<T> {
         let mut res = vec![native.constant(T::bits_per_limb() as u32), native.constant(T::nb_limbs() as u32)];
         res.extend(self.n_const.limbs.clone());
         res.push(native.constant(nonnative_inputs.len() as u32));
+        println!("wrap_hint");
         for i in 0..nonnative_inputs.len() {
             res.push(native.constant(nonnative_inputs[i].limbs.len() as u32));
+            print_element(native, &nonnative_inputs[i]);
             res.extend(nonnative_inputs[i].limbs.clone());
         }
         res
@@ -257,42 +236,43 @@ impl <T: FieldParams>Field<T> {
     pub fn reduce<'a, C: Config, B: RootAPI<C>>(
         &mut self,
         native: &'a mut B,
-        a: Element<T>,
+        a: &Element<T>,
         strict: bool,
     ) -> Element<T> {
-        self.enforce_width_conditional(native, &a);
+        self.enforce_width_conditional(native, a);
         if a.mod_reduced {
-            return a;
+            return a.clone();
         }
         if !strict && a.overflow == 0 {
-            return a;
+            return a.clone();
         }
         let p = Element::<T>::default();
-        return self.mul_mod(native, a, self.one_const.clone(), 0, p);
+        let one = self.one_const.clone();
+        let res = self.mul_mod(native, a, &one, 0, &p).clone();
+        res
     }
-    pub fn mul_mod<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: Element<T>, b: Element<T>, _: usize, p: Element<T>) -> Element<T> {
+    pub fn mul_mod<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: &Element<T>, b: &Element<T>, _: usize, p: &Element<T>) -> Element<T> {
         self.enforce_width_conditional(native, &a);
         self.enforce_width_conditional(native, &b);
         // self.enforce_width_conditional(native, &p); //not needed
         let (k, r, c) = self.call_mul_hint(native, &a, &b, true);
-        // println!("c after call_mul_hint");
-        // print_element(native, &c);
-        // println!("r after call_mul_hint");
+        // println!("a,b after call_mul_hint");
+        // print_element(native, &a);
+        // print_element(native, &b);
         // print_element(native, &r);
-        // println!("k after call_mul_hint");
-        // print_element(native, &k);
+        // print_element(native, &c);
         let mc = mul_check{
-            a: a,
-            b: b,
+            a: a.clone(),
+            b: b.clone(),
             c: c,
             k: k,
             r: r.clone(),
-            p: p,
+            p: p.clone(),
         };
         self.mul_checks.push(mc);
         return r
     }
-    pub fn mul_pre_cond(&self, a: Element<T>, b: Element<T>) -> u32 {
+    pub fn mul_pre_cond(&self, a: &Element<T>, b: &Element<T>) -> u32 {
         let nb_res_limbs = nb_multiplication_res_limbs(a.limbs.len(), b.limbs.len());
         let nb_limbs_overflow = if nb_res_limbs > 0 {
             (nb_res_limbs as f64).log2().ceil() as u32
@@ -309,7 +289,7 @@ impl <T: FieldParams>Field<T> {
         b: &Element<T>,
         is_mul_mod: bool,
     ) -> (Element<T>, Element<T>, Element<T>) {
-        let next_overflow = self.mul_pre_cond(a.clone(), b.clone());
+        let next_overflow = self.mul_pre_cond(a, b);
         let next_overflow = if !is_mul_mod {
             a.overflow
         } else {
@@ -341,6 +321,9 @@ impl <T: FieldParams>Field<T> {
     pub fn check_zero<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: Element<T>, p: Option<Element<T>>) {
         self.enforce_width_conditional(native, &a.clone());
         let b = self.short_one_const.clone();
+        // println!("a,b after call_mul_hint");
+        // print_element(native, &a);
+        // print_element(native, &b);
         let (k, r, c) = self.call_mul_hint(native, &a, &b, false);
         let mc = mul_check{
             a: a,
@@ -353,21 +336,23 @@ impl <T: FieldParams>Field<T> {
         self.mul_checks.push(mc);
     }
     pub fn assert_isequal<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: &Element<T>, b: &Element<T>) {
-        self.enforce_width_conditional(native, &a.clone());
-        self.enforce_width_conditional(native, &b.clone());
-        let diff = self.sub(native, b.clone(), a.clone());
+        self.enforce_width_conditional(native, a);
+        self.enforce_width_conditional(native, b);
+        let diff = self.sub(native, b, a);
+        println!("diff");
+        print_element(native, &diff);
         self.check_zero(native, diff, None);
     }
-    pub fn add<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: Element<T>, b: Element<T>) -> Element<T> {
+    pub fn add<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: &Element<T>, b: &Element<T>) -> Element<T> {
         self.enforce_width_conditional(native, &a.clone());
         self.enforce_width_conditional(native, &b.clone());
         let mut new_a = a.clone();
         let mut new_b = b.clone();
         if a.overflow + 1 > self.max_of {
-            new_a = self.reduce(native, a.clone(), false);
+            new_a = self.reduce(native, a, false);
         }
         if b.overflow + 1 > self.max_of {   
-            new_b = self.reduce(native, b.clone(), false);
+            new_b = self.reduce(native, b, false);
         }
         let next_overflow = std::cmp::max(new_a.overflow, new_b.overflow) + 1;
         let nb_limbs = std::cmp::max(new_a.limbs.len(), new_b.limbs.len());
@@ -383,19 +368,18 @@ impl <T: FieldParams>Field<T> {
         let ret = new_internal_element::<T>(limbs, next_overflow);
         ret
     }
-    pub fn sub<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: Element<T>, b: Element<T>) -> Element<T> {
+    pub fn sub<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: &Element<T>, b: &Element<T>) -> Element<T> {
         self.enforce_width_conditional(native, &a.clone());
         self.enforce_width_conditional(native, &b.clone());
         let mut new_a = a.clone();
         let mut new_b = b.clone();
         if a.overflow + 1 > self.max_of {
-            new_a = self.reduce(native, a.clone(), false);
+            new_a = self.reduce(native, a, false);
         }
         if b.overflow + 2 > self.max_of {   
-            new_b = self.reduce(native, b.clone(), false);
+            new_b = self.reduce(native, b, false);
         }
         let next_overflow = std::cmp::max(new_a.overflow, new_b.overflow+1) + 1;
-        println!("next_overflow:{}", next_overflow);
         let nb_limbs = std::cmp::max(new_a.limbs.len(), new_b.limbs.len());
         let pad_limbs = sub_padding(&T::modulus(), T::bits_per_limb(), new_b.overflow, nb_limbs as u32);
         let mut limbs = vec![native.constant(0); nb_limbs];
@@ -411,39 +395,112 @@ impl <T: FieldParams>Field<T> {
         let ret = new_internal_element::<T>(limbs, next_overflow);
         ret
     }
-    pub fn neg<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: Element<T>) -> Element<T> {
-        self.sub(native, self.zero_const.clone(), a)
+    pub fn neg<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: &Element<T>) -> Element<T> {
+        let zero = self.zero_const.clone();
+        self.sub(native, &zero, a)
     }
-    pub fn mul<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: Element<T>, b: Element<T>) -> Element<T> {
-        self.enforce_width_conditional(native, &a.clone());
-        self.enforce_width_conditional(native, &b.clone());
-        let mut next_overflow = self.mul_pre_cond(a.clone(), b.clone());
+    pub fn mul<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: &Element<T>, b: &Element<T>) -> Element<T> {
+        self.enforce_width_conditional(native, a);
+        self.enforce_width_conditional(native, b);
+
+        //calculate a*b's overflow and reduce if necessary
+        let mut next_overflow = self.mul_pre_cond(a, b);
         let mut new_a = a.clone();
         let mut new_b = b.clone();
         if next_overflow > self.max_of {
             if a.overflow < b.overflow {
-                new_a = a.clone();
-                new_b = self.reduce(native, b.clone(), false);
+                new_b = self.reduce(native, b, false);
             } else {
-                new_a = self.reduce(native, a.clone(), false);
-                new_b = b.clone();
+                new_a = self.reduce(native, a, false);
             }
         }
-        next_overflow = self.mul_pre_cond(new_a.clone(), new_b.clone());
+        next_overflow = self.mul_pre_cond(&new_a, &new_b);
         if next_overflow > self.max_of {
             if new_a.overflow < new_b.overflow {
-                new_a = new_a.clone();
-                new_b = self.reduce(native, new_b.clone(), false);
+                new_b = self.reduce(native, &new_b, false);
             } else {
-                new_a = self.reduce(native, new_a.clone(), false);
-                new_b = new_b.clone();
+                new_a = self.reduce(native, &new_a, false);
             }
         }
-        return self.mul_mod(native, new_a, new_b, 0, Element::<T>::default());
+
+        //calculate a*b
+        return self.mul_mod(native, &new_a, &new_b, 0, &Element::<T>::default());
+    }
+    pub fn div<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: &Element<T>, b: &Element<T>) -> Element<T> {
+        self.enforce_width_conditional(native, a);
+        self.enforce_width_conditional(native, b);
+        //calculate a/b's overflow and reduce if necessary
+        let zero_element = self.zero_const.clone();
+        let mut mul_of = self.mul_pre_cond(&zero_element, b);
+        let mut new_a = a.clone();
+        let mut new_b = b.clone();
+        if mul_of > self.max_of {
+            new_b = self.reduce(native, &new_b, false);
+            mul_of = 0;
+        }
+        if new_a.overflow + 1 > self.max_of {
+            new_a = self.reduce(native, &new_a, false);
+        }
+        if mul_of + 2 > self.max_of {   
+            new_b = self.reduce(native, &new_b, false);
+        }
+        let next_overflow = std::cmp::max(new_a.overflow, new_b.overflow+1) + 1;
+
+        //calculate a/b
+        let div = self.compute_division_hint(native, a.limbs.clone(), b.limbs.clone());
+        let e = self.pack_limbs(native, div, true);
+        let res = self.mul(native, &e, &new_b);
+        self.assert_isequal(native, &res, &new_a);
+        e
+    }
+    /*
+    mulOf, err := f.mulPreCond(a, &Element[T]{Limbs: make([]frontend.Variable, f.fParams.NbLimbs()), overflow: 0}) // order is important, we want that reduce left side
+	if err != nil {
+		return mulOf, err
+	}
+	return f.subPreCond(&Element[T]{overflow: 0}, &Element[T]{overflow: mulOf})
+     */
+    pub fn inverse<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, b: &Element<T>) -> Element<T> {
+        self.enforce_width_conditional(native, b);
+        //calculate 1/b's overflow and reduce if necessary
+        let zero_element = self.zero_const.clone();
+        let mut mul_of = self.mul_pre_cond(&zero_element, b);
+        let mut new_b = b.clone();
+        if mul_of > self.max_of {
+            new_b = self.reduce(native, &new_b, false);
+            mul_of = 0;
+        }
+        if mul_of + 2 > self.max_of {   
+            new_b = self.reduce(native, &new_b, false);
+        }
+        // let next_overflow = std::cmp::max(new_a.overflow, new_b.overflow+1) + 1;
+
+        //calculate 1/b
+        let inv = self.compute_inverse_hint(native, b.limbs.clone());
+        let e = self.pack_limbs(native, inv, true);
+        let res = self.mul(native, &e, &new_b);
+        let one = self.one_const.clone();
+        self.assert_isequal(native, &res, &one);
+        e
+    }
+    pub fn compute_inverse_hint<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, in_limbs: Vec<Variable>) -> Vec<Variable> {
+        let mut hint_inputs = vec![native.constant(T::bits_per_limb() as u32), native.constant(T::nb_limbs() as u32)];
+        let modulus_limbs = self.n_const.limbs.clone();
+        hint_inputs.extend(modulus_limbs);
+        hint_inputs.extend(in_limbs);
+        native.new_hint("myhint.invhint", &hint_inputs, T::nb_limbs() as usize)
+    }
+    pub fn compute_division_hint<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, nom_limbs: Vec<Variable>, denom_limbs: Vec<Variable>) -> Vec<Variable> {
+        let mut hint_inputs = vec![native.constant(T::bits_per_limb() as u32), native.constant(T::nb_limbs() as u32), native.constant(denom_limbs.len() as u32), native.constant(nom_limbs.len() as u32)];
+        let modulus_limbs = self.n_const.limbs.clone();
+        hint_inputs.extend(modulus_limbs);
+        hint_inputs.extend(nom_limbs);
+        hint_inputs.extend(denom_limbs);
+        native.new_hint("myhint.divhint", &hint_inputs, T::nb_limbs() as usize)
     }
     pub fn mul_const<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: &Element<T>, c: BigInt) -> Element<T> {
         if c.is_negative() {
-            let neg_a = self.neg(native, a.clone());
+            let neg_a = self.neg(native, a);
             return self.mul_const(native, &neg_a, -c);
         } else if c.is_zero() {
             return self.zero_const.clone();
@@ -455,7 +512,7 @@ impl <T: FieldParams>Field<T> {
         let next_overflow = a.overflow + cbl as u32;
         let mut new_a = a.clone();
         if next_overflow > self.max_of {
-            new_a = self.reduce(native, a.clone(), false);
+            new_a = self.reduce(native, a, false);
         }
         let mut limbs = vec![native.constant(0); new_a.limbs.len()];
         for i in 0..new_a.limbs.len() {
@@ -466,7 +523,7 @@ impl <T: FieldParams>Field<T> {
     }
     pub fn check_mul<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B) {
         // let commitment = native.get_random_value();
-        let commitment = native.constant(1);
+        let commitment = native.constant(1); //TBD
         let mut coefs_len = T::nb_limbs() as usize;
         for i in 0..self.mul_checks.len() {
             coefs_len = std::cmp::max(coefs_len, self.mul_checks[i].a.limbs.len());
@@ -500,7 +557,6 @@ pub fn eval_with_challenge<'a, C: Config, B: RootAPI<C>, T: FieldParams>(native:
     if a.is_evaluated {
         return a;
     }
-    println!("a.limbs.len():{}", a.limbs.len());
     if (at.len() as i64) < (a.limbs.len() as i64) - 1 {
         panic!("evaluation powers less than limbs");
     }

@@ -120,21 +120,21 @@ impl Ext2{
         }
     }
     pub fn is_zero<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, z: &GE2) -> Variable {
-        let a0 = self.fp.is_zero(native, z.a0.clone());
-        let a1 = self.fp.is_zero(native, z.a1.clone());
+        let a0 = self.fp.is_zero(native, &z.a0);
+        let a1 = self.fp.is_zero(native, &z.a1);
         native.and(a0, a1)
     }
     pub fn add<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2, y: &GE2) -> GE2 {
-        let z0 = self.fp.add(native, x.a0.clone(), y.a0.clone());
-        let z1 = self.fp.add(native,x.a1.clone(), y.a1.clone());
+        let z0 = self.fp.add(native, &x.a0, &y.a0);
+        let z1 = self.fp.add(native,&x.a1, &y.a1);
         GE2 {
             a0: z0,
             a1: z1,
         }
     }
     pub fn sub<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2, y: &GE2) -> GE2 {
-        let z0 = self.fp.sub(native, x.a0.clone(), y.a0.clone());
-        let z1 = self.fp.sub(native,x.a1.clone(), y.a1.clone());
+        let z0 = self.fp.sub(native, &x.a0, &y.a0);
+        let z1 = self.fp.sub(native,&x.a1, &y.a1);
         GE2 {
             a0: z0,
             a1: z1,
@@ -143,15 +143,17 @@ impl Ext2{
     pub fn double<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
         let two = BigInt::from(2);
         let z0 = self.fp.mul_const(native, &x.a0, two.clone());
+        print_element(native, &z0);
         let z1 = self.fp.mul_const(native, &x.a1, two.clone());
+        print_element(native, &z1);
         GE2 {
             a0: z0,
             a1: z1,
         }
     }
     pub fn neg<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
-        let z0 = self.fp.neg(native, x.a0.clone());
-        let z1 = self.fp.neg(native, x.a1.clone());
+        let z0 = self.fp.neg(native, &x.a0);
+        let z1 = self.fp.neg(native, &x.a1);
         GE2 {
             a0: z0,
             a1: z1,
@@ -159,40 +161,48 @@ impl Ext2{
     }
     pub fn mul<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2, y: &GE2) -> GE2 {
 
-        let v0 = self.fp.mul(native, x.a0.clone(), y.a0.clone());
-        let v1 = self.fp.mul(native, x.a1.clone(), y.a1.clone());
-        let b0 = self.fp.sub(native, v0.clone(), v1.clone());
-        let mut b1 = self.fp.add(native, x.a0.clone(), x.a1.clone());
-        let mut tmp = self.fp.add(native, y.a0.clone(), y.a1.clone());
-        b1 = self.fp.mul(native, b1, tmp);
-        tmp = self.fp.add(native, v0.clone(), v1.clone());
-        b1 = self.fp.sub(native, b1, tmp);
+        let v0 = self.fp.mul(native, &x.a0, &y.a0);
+        let v1 = self.fp.mul(native, &x.a1, &y.a1);
+        let b0 = self.fp.sub(native, &v0, &v1);
+        let mut b1 = self.fp.add(native, &x.a0, &x.a1);
+        let mut tmp = self.fp.add(native, &y.a0, &y.a1);
+        b1 = self.fp.mul(native, &b1, &tmp);
+        tmp = self.fp.add(native, &v0, &v1);
+        b1 = self.fp.sub(native, &b1, &tmp);
         GE2 {
             a0: b0,
             a1: b1,
         }
     }
     pub fn mul_by_element<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2, y: &Element<bls12381_fp>) -> GE2 {
-        let v0 = self.fp.mul(native, x.a0.clone(), y.clone());
-        let v1 = self.fp.mul(native, x.a1.clone(), y.clone());
+        let v0 = self.fp.mul(native, &x.a0, y);
+        let v1 = self.fp.mul(native, &x.a1, y);
         GE2 {
             a0: v0,
             a1: v1,
         }
     }
+    pub fn mul_by_const_element<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2, y: &BigInt) -> GE2 {
+        let z0 = self.fp.mul_const(native, &x.a0, y.clone());
+        let z1 = self.fp.mul_const(native, &x.a1, y.clone());
+        GE2 {
+            a0: z0,
+            a1: z1,
+        }
+    }
     pub fn mul_by_non_residue<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
-        let a = self.fp.sub(native, x.a0.clone(), x.a1.clone());
-        let b = self.fp.add(native, x.a0.clone(), x.a1.clone());
+        let a = self.fp.sub(native, &x.a0, &x.a1);
+        let b = self.fp.add(native, &x.a0, &x.a1);
         GE2 {
             a0: a,
             a1: b,
         }
     }
     pub fn square<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
-        let a = self.fp.add(native, x.a0.clone(), x.a1.clone());
-        let b = self.fp.sub(native, x.a0.clone(), x.a1.clone());
-        let a = self.fp.mul(native, a, b);
-        let b = self.fp.mul(native, x.a0.clone(), x.a1.clone());
+        let a = self.fp.add(native, &x.a0, &x.a1);
+        let b = self.fp.sub(native, &x.a0, &x.a1);
+        let a = self.fp.mul(native, &a, &b);
+        let b = self.fp.mul(native, &x.a0, &x.a1);
         let b = self.fp.mul_const(native, &b, BigInt::from(2));
         GE2 {
             a0: a,
@@ -245,12 +255,108 @@ impl Ext2{
     }
     pub fn conjugate<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
         let z0 = x.a0.clone();
-        let z1 = self.fp.neg(native, x.a1.clone());
+        let z1 = self.fp.neg(native, &x.a1);
         GE2 {
             a0: z0,
             a1: z1,
         }
     }
+    pub fn mul_by_non_residue_generic<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2, power: u32, coef: u32) -> GE2 {
+        let y = self.non_residues.get(&power).unwrap().get(&coef).unwrap().clone();
+        let z = self.mul(native, x, &y);
+        z
+    }
+    pub fn mul_by_non_residue1_power1<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
+        self.mul_by_non_residue_generic(native, x, 1, 1)
+    }
+    pub fn mul_by_non_residue1_power2<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
+        let element = value_of::<C, B, bls12381_fp>(native, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436".to_string()));
+        let a = self.fp.mul(native, &x.a1, &element);
+        let a = self.fp.neg(native, &a);
+        let b = self.fp.mul(native, &x.a0, &element);
+        GE2 {
+            a0: a,
+            a1: b,
+        }
+    }
+    pub fn mul_by_non_residue1_power3<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
+        self.mul_by_non_residue_generic(native, x, 1, 3)
+    }
+    pub fn mul_by_non_residue1_power4<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
+        let element = value_of::<C, B, bls12381_fp>(native, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437".to_string()));
+        let a = self.fp.mul(native, &x.a0, &element);
+        let b = self.fp.mul(native, &x.a1, &element);
+        GE2 {
+            a0: a,
+            a1: b,
+        }
+    }
+    pub fn mul_by_non_residue1_power5<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
+        self.mul_by_non_residue_generic(native, x, 1, 5)
+    }
+    pub fn mul_by_non_residue2_power1<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
+        let element = value_of::<C, B, bls12381_fp>(native, Box::new("793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620351".to_string()));
+        let a = self.fp.mul(native, &x.a0, &element);
+        let b = self.fp.mul(native, &x.a1, &element);
+        GE2 {
+            a0: a,
+            a1: b,
+        }
+    }
+    pub fn mul_by_non_residue2_power2<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
+        let element = value_of::<C, B, bls12381_fp>(native, Box::new("793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620350".to_string()));
+        let a = self.fp.mul(native, &x.a0, &element);
+        let b = self.fp.mul(native, &x.a1, &element);
+        GE2 {
+            a0: a,
+            a1: b,
+        }
+    }
+    pub fn mul_by_non_residue2_power3<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
+        let element = value_of::<C, B, bls12381_fp>(native, Box::new("4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559786".to_string()));
+        let a = self.fp.mul(native, &x.a0, &element);
+        let b = self.fp.mul(native, &x.a1, &element);
+        GE2 {
+            a0: a,
+            a1: b,
+        }
+    }
+    pub fn mul_by_non_residue2_power4<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
+        let element = value_of::<C, B, bls12381_fp>(native, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436".to_string()));
+        let a = self.fp.mul(native, &x.a0, &element);
+        let b = self.fp.mul(native, &x.a1, &element);
+        GE2 {
+            a0: a,
+            a1: b,
+        }
+    }
+    pub fn mul_by_non_residue2_power5<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
+        let element = value_of::<C, B, bls12381_fp>(native, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437".to_string()));
+        let a = self.fp.mul(native, &x.a0, &element);
+        let b = self.fp.mul(native, &x.a1, &element);
+        GE2 {
+            a0: a,
+            a1: b,
+        }
+    }
+    pub fn non_residue<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B) -> GE2 {
+        let one = self.fp.one_const.clone();
+        GE2 {
+            a0: one.clone(),
+            a1: one.clone(),
+        }
+    }
+    pub fn copy<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
+        let inputs = vec![x.a0.clone(), x.a1.clone()];
+        let output = self.fp.new_hint(native, "myhint.copye2hint", 2, inputs);
+        let res = GE2 {
+            a0: output[0].clone(),
+            a1: output[1].clone(),
+        };
+        self.assert_isequal(native, x, &res);
+        res
+    }
+
 }
 
 declare_circuit!(E2AddCircuit {
@@ -274,8 +380,8 @@ impl GenericDefine<M31Config> for E2AddCircuit<Variable> {
         // for i in 0..65536{
         //     z = ext2.add(builder, &z, &y_e2);
         // }
-        let z_reduce_a0 = ext2.fp.reduce(builder, z.a0.clone(), false);
-        let z_reduce_a1 = ext2.fp.reduce(builder, z.a1.clone(), false);
+        let z_reduce_a0 = ext2.fp.reduce(builder, &z.a0, false);
+        let z_reduce_a1 = ext2.fp.reduce(builder, &z.a1, false);
 
         // for i in 0..48 {
         //     println!("{}: {:?} {:?}", i, builder.value_of(z_reduce_a0.limbs[i]), builder.value_of(self.z[0][i]));
@@ -348,8 +454,8 @@ impl GenericDefine<M31Config> for E2SubCircuit<Variable> {
             println!("{}", i);
             z = ext2.sub(builder, &z, &y_e2);
         }
-        let z_reduce_a0 = ext2.fp.reduce(builder, z.a0.clone(), false);
-        let z_reduce_a1 = ext2.fp.reduce(builder, z.a1.clone(), false);
+        let z_reduce_a0 = ext2.fp.reduce(builder, &z.a0, false);
+        let z_reduce_a1 = ext2.fp.reduce(builder, &z.a1, false);
 
         for i in 0..48 {
             println!("{}: {:?} {:?}", i, builder.value_of(z_reduce_a0.limbs[i]), builder.value_of(self.z[0][i]));
@@ -412,8 +518,8 @@ impl GenericDefine<M31Config> for E2DoubleCircuit<Variable> {
             a1: new_internal_element(self.x[1].to_vec(), 0),
         };
         let z = ext2.double(builder, &x_e2);
-        let z_reduce_a0 = ext2.fp.reduce(builder, z.a0.clone(), false);
-        let z_reduce_a1 = ext2.fp.reduce(builder, z.a1.clone(), false);
+        let z_reduce_a0 = ext2.fp.reduce(builder, &z.a0, false);
+        let z_reduce_a1 = ext2.fp.reduce(builder, &z.a1, false);
 
         for i in 0..48 {
             println!("{}: {:?} {:?}", i, builder.value_of(z_reduce_a0.limbs[i]), builder.value_of(self.z[0][i]));
@@ -476,8 +582,8 @@ impl GenericDefine<M31Config> for E2MulCircuit<Variable> {
             a1: new_internal_element(self.y[1].to_vec(), 0),
         };
         let z = ext2.mul(builder, &x_e2, &y_e2);
-        let z_reduce_a0 = ext2.fp.reduce(builder, z.a0.clone(), false);
-        let z_reduce_a1 = ext2.fp.reduce(builder, z.a1.clone(), false);
+        let z_reduce_a0 = ext2.fp.reduce(builder, &z.a0, false);
+        let z_reduce_a1 = ext2.fp.reduce(builder, &z.a1, false);
 
         for i in 0..48 {
             // println!("{}: {:?} {:?}", i, builder.value_of(z_reduce_a0.limbs[i]), builder.value_of(self.z[0][i]));
@@ -541,8 +647,8 @@ impl GenericDefine<M31Config> for E2SquareCircuit<Variable> {
             a1: new_internal_element(self.x[1].to_vec(), 0),
         };
         let z = ext2.square(builder, &x_e2);
-        let z_reduce_a0 = ext2.fp.reduce(builder, z.a0.clone(), false);
-        let z_reduce_a1 = ext2.fp.reduce(builder, z.a1.clone(), false);
+        let z_reduce_a0 = ext2.fp.reduce(builder, &z.a0, false);
+        let z_reduce_a1 = ext2.fp.reduce(builder, &z.a1, false);
 
         for i in 0..48 {
             println!("{}: {:?} {:?}", i, builder.value_of(z_reduce_a0.limbs[i]), builder.value_of(self.z[0][i]));
@@ -605,8 +711,8 @@ impl GenericDefine<M31Config> for E2DivCircuit<Variable> {
             a1: new_internal_element(self.y[1].to_vec(), 0),
         };
         let z = ext2.div(builder, &x_e2, &y_e2);
-        // let z_reduce_a0 = ext2.fp.reduce(builder, z.a0.clone(), false);
-        // let z_reduce_a1 = ext2.fp.reduce(builder, z.a1.clone(), false);
+        // let z_reduce_a0 = ext2.fp.reduce(builder, &z.a0, false);
+        // let z_reduce_a1 = ext2.fp.reduce(builder, &z.a1, false);
 
         for i in 0..48 {
             println!("{}: {:?} {:?}", i, builder.value_of(z.a0.limbs[i]), builder.value_of(self.z[0][i]));
@@ -672,8 +778,8 @@ impl GenericDefine<M31Config> for E2MulByElementCircuit<Variable> {
         };
         let b = new_internal_element(self.b.to_vec(), 0);
         let c = ext2.mul_by_element(builder, &a_e2, &b);
-        let c_reduce_a0 = ext2.fp.reduce(builder, c.a0.clone(), false);
-        let c_reduce_a1 = ext2.fp.reduce(builder, c.a1.clone(), false);
+        let c_reduce_a0 = ext2.fp.reduce(builder, &c.a0, false);
+        let c_reduce_a1 = ext2.fp.reduce(builder, &c.a1, false);
 
         for i in 0..48 {
             println!("{}: {:?} {:?}", i, builder.value_of(c_reduce_a0.limbs[i]), builder.value_of(self.c[0][i]));
@@ -737,8 +843,8 @@ impl GenericDefine<M31Config> for E2MulByNonResidueCircuit<Variable> {
             a1: new_internal_element(self.a[1].to_vec(), 0),
         };
         let c = ext2.mul_by_non_residue(builder, &a_e2);
-        let c_reduce_a0 = ext2.fp.reduce(builder, c.a0.clone(), false);
-        let c_reduce_a1 = ext2.fp.reduce(builder, c.a1.clone(), false);
+        let c_reduce_a0 = ext2.fp.reduce(builder, &c.a0, false);
+        let c_reduce_a1 = ext2.fp.reduce(builder, &c.a1, false);
 
         for i in 0..48 {
             println!("{}: {:?} {:?}", i, builder.value_of(c_reduce_a0.limbs[i]), builder.value_of(self.c[0][i]));
@@ -799,8 +905,8 @@ impl GenericDefine<M31Config> for E2NegCircuit<Variable> {
             a1: new_internal_element(self.a[1].to_vec(), 0),
         };
         let c = ext2.neg(builder, &a_e2);
-        let c_reduce_a0 = ext2.fp.reduce(builder, c.a0.clone(), false);
-        let c_reduce_a1 = ext2.fp.reduce(builder, c.a1.clone(), false);
+        let c_reduce_a0 = ext2.fp.reduce(builder, &c.a0, false);
+        let c_reduce_a1 = ext2.fp.reduce(builder, &c.a1, false);
 
         for i in 0..48 {
             println!("{}: {:?} {:?}", i, builder.value_of(c_reduce_a0.limbs[i]), builder.value_of(self.c[0][i]));
@@ -860,8 +966,8 @@ impl GenericDefine<M31Config> for E2ConjugateCircuit<Variable> {
             a1: new_internal_element(self.a[1].to_vec(), 0),
         };
         let c = ext2.conjugate(builder, &a_e2);
-        let c_reduce_a0 = ext2.fp.reduce(builder, c.a0.clone(), false);
-        let c_reduce_a1 = ext2.fp.reduce(builder, c.a1.clone(), false);
+        let c_reduce_a0 = ext2.fp.reduce(builder, &c.a0, false);
+        let c_reduce_a1 = ext2.fp.reduce(builder, &c.a1, false);
 
         for i in 0..48 {
             println!("{}: {:?} {:?}", i, builder.value_of(c_reduce_a0.limbs[i]), builder.value_of(self.c[0][i]));
@@ -921,8 +1027,8 @@ impl GenericDefine<M31Config> for E2InverseCircuit<Variable> {
             a1: new_internal_element(self.a[1].to_vec(), 0),
         };
         let c = ext2.inverse(builder, &a_e2);
-        let c_reduce_a0 = ext2.fp.reduce(builder, c.a0.clone(), false);
-        let c_reduce_a1 = ext2.fp.reduce(builder, c.a1.clone(), false);
+        let c_reduce_a0 = ext2.fp.reduce(builder, &c.a0, false);
+        let c_reduce_a1 = ext2.fp.reduce(builder, &c.a1, false);
 
         for i in 0..48 {
             println!("{}: {:?} {:?}", i, builder.value_of(c_reduce_a0.limbs[i]), builder.value_of(self.c[0][i]));
@@ -980,7 +1086,14 @@ pub fn print_e2<'a, C:Config, B:RootAPI<C>>(native: &'a mut B, v: &GE2)  {
     }
 }
 pub fn print_element<'a, C:Config, B:RootAPI<C>, T: FieldParams>(native: &'a mut B, v: &Element<T>)  {
-    for i in 0..48 {
-        println!("{}: {:?}", i, native.value_of(v.limbs[i]));
+    for i in 0..v.limbs.len() {
+        print!("{:?} ", native.value_of(v.limbs[i]));
     }
+    println!(" ");
+}
+pub fn print_element_new<'a, C:Config, B:RootAPI<C>, T: FieldParams>(native: &'a mut B, v: &Element<T>)  {
+    // for i in 0..v.limbs.len() {
+    //     print!("{:?} ", native.value_of(v.limbs[i]));
+    // }
+    // println!(" ");
 }

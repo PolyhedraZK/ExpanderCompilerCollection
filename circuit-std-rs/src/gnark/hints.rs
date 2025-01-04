@@ -5,6 +5,7 @@ use crate::gnark::limbs::*;
 use crate::gnark::utils::*;
 use crate::gnark::emparam::FieldParams;
 use crate::gnark::element::*;
+use crate::logup::query_count_hint;
 use ark_bls12_381::Fq12;
 use ark_bls12_381::Fq6;
 use ark_ff::Zero;
@@ -21,6 +22,24 @@ use ark_bls12_381::Fq2;
 use ark_ff::fields::Field;
 use num_traits::One;
 
+pub fn register_hint(hint_registry: &mut HintRegistry<M31>) {
+    hint_registry.register("myhint.mulhint", mul_hint);
+    hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
+    hint_registry.register("myhint.querycounthint", query_count_hint);
+    hint_registry.register("myhint.divhint", div_hint);
+    hint_registry.register("myhint.invhint", inv_hint);
+    hint_registry.register("myhint.dive2hint", div_e2_hint);
+    hint_registry.register("myhint.inverse2hint", inverse_e2_hint);
+    hint_registry.register("myhint.copye2hint", copy_e2_hint);
+    hint_registry.register("myhint.dive6hint", div_e6_hint);
+    hint_registry.register("myhint.inversee6hint", inverse_e6_hint);
+    hint_registry.register("myhint.dive6by6hint", div_e6_by_6_hint);
+    hint_registry.register("myhint.dive12hint", div_e12_hint);
+    hint_registry.register("myhint.inversee12hint", inverse_e12_hint);
+    hint_registry.register("myhint.copye12hint", copy_e12_hint);
+    hint_registry.register("myhint.finalexphint", final_exp_hint);
+
+}
 pub fn mul_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     let nb_bits = inputs[0].to_u256().as_usize();
     let nb_limbs = inputs[1].to_u256().as_usize();
@@ -47,18 +66,18 @@ pub fn mul_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     let mut b = BigInt::default();
     p = recompose(plimbs.clone(), nb_bits as u32);
     a = recompose(alimbs.clone(), nb_bits as u32);
-    println!("a: {:?}", a);
-    println!("blimbs: {:?}", blimbs);
+    // println!("a: {:?}", a);
+    // println!("blimbs: {:?}", blimbs);
     b = recompose(blimbs.clone(), nb_bits as u32);
-    println!("b: {:?}", b);
+    // println!("b: {:?}", b);
     let mut quo = BigInt::default();
     let mut rem = BigInt::default();
     let mut ab = a.clone() * b.clone();
-    println!("ab: {:?}", ab);
+    // println!("ab: {:?}", ab);
     quo = ab.clone() / p.clone();
-    println!("quo: {:?}", quo);
+    // println!("quo: {:?}", quo);
     rem = ab.clone() % p.clone();
-    println!("rem: {:?}", rem);
+    // println!("rem: {:?}", rem);
     let mut quo_limbs = vec![BigInt::default(); nb_quo_len];
     if let Err(err) = decompose(&quo, nb_bits as u32, &mut quo_limbs) {
         panic!("decompose value: {}", err);
@@ -128,7 +147,100 @@ pub fn mul_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     }
     Ok(())
 }
+pub fn div_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+    let nb_bits = inputs[0].to_u256().as_usize();
+    let nb_limbs = inputs[1].to_u256().as_usize();
+    let nb_denom_limbs = inputs[2].to_u256().as_usize();
+    let nb_nom_limbs = inputs[3].to_u256().as_usize();
+    let mut ptr = 4;
+    let plimbs_m31 = &inputs[ptr..ptr + nb_limbs as usize];
+    let plimbs_u32:Vec<u32> = (0..nb_limbs).map(|i| plimbs_m31[i].to_u256().as_u32()).collect();
+    let plimbs:Vec<BigInt> = plimbs_u32.iter().map(|x| BigInt::from(*x)).collect();
+    ptr += nb_limbs;
+    let nomlimbs_m31 = &inputs[ptr..ptr + nb_nom_limbs as usize];
+    let nomlimbs_u32:Vec<u32> = (0..nb_nom_limbs).map(|i| nomlimbs_m31[i].to_u256().as_u32()).collect();
+    let nomlimbs:Vec<BigInt> = nomlimbs_u32.iter().map(|x| BigInt::from(*x)).collect();
+    ptr += nb_nom_limbs;
+    let denomlimbs_m31 = &inputs[ptr..ptr + nb_denom_limbs as usize];
+    let denomlimbs_u32:Vec<u32> = (0..nb_denom_limbs).map(|i| denomlimbs_m31[i].to_u256().as_u32()).collect();
+    let denomlimbs:Vec<BigInt> = denomlimbs_u32.iter().map(|x| BigInt::from(*x)).collect();
 
+    let mut p = BigInt::default();
+    let mut nom = BigInt::default();
+    let mut denom = BigInt::default();
+    p = recompose(plimbs.clone(), nb_bits as u32);
+    nom = recompose(nomlimbs.clone(), nb_bits as u32);
+    denom = recompose(denomlimbs.clone(), nb_bits as u32);
+    let mut res = BigInt::default();
+    res = denom.clone().modinv(&p).unwrap();
+    res *= &nom;
+    res %= &p;
+    let mut res_limbs = vec![BigInt::default(); nb_limbs];
+    if let Err(err) = decompose(&res, nb_bits as u32, &mut res_limbs) {
+        panic!("decompose value: {}", err);
+    }
+    for i in 0..nb_limbs {
+        outputs[i] = M31::from(res_limbs[i].to_u64().unwrap() as u32);
+    }
+    Ok(())
+}
+/*
+func InverseHint(mod *big.Int, inputs []*big.Int, outputs []*big.Int) error {
+	if len(inputs) < 2 {
+		return fmt.Errorf("input must be at least two elements")
+	}
+	nbBits := uint(inputs[0].Uint64())
+	nbLimbs := int(inputs[1].Int64())
+	if len(inputs[2:]) < 2*nbLimbs {
+		return fmt.Errorf("inputs missing")
+	}
+	if len(outputs) != nbLimbs {
+		return fmt.Errorf("result does not fit into output")
+	}
+	p := new(big.Int)
+	if err := limbs.Recompose(inputs[2:2+nbLimbs], nbBits, p); err != nil {
+		return fmt.Errorf("recompose emulated order: %w", err)
+	}
+	x := new(big.Int)
+	if err := limbs.Recompose(inputs[2+nbLimbs:], nbBits, x); err != nil {
+		return fmt.Errorf("recompose value: %w", err)
+	}
+	if x.ModInverse(x, p) == nil {
+		return fmt.Errorf("input and modulus not relatively primes")
+	}
+	if err := limbs.Decompose(x, nbBits, outputs); err != nil {
+		return fmt.Errorf("decompose: %w", err)
+	}
+	return nil
+}
+ */
+pub fn inv_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+    let nb_bits = inputs[0].to_u256().as_usize();
+    let nb_limbs = inputs[1].to_u256().as_usize();
+    let mut ptr = 2;
+    let plimbs_m31 = &inputs[ptr..ptr + nb_limbs as usize];
+    let plimbs_u32:Vec<u32> = (0..nb_limbs).map(|i| plimbs_m31[i].to_u256().as_u32()).collect();
+    let plimbs:Vec<BigInt> = plimbs_u32.iter().map(|x| BigInt::from(*x)).collect();
+    ptr += nb_limbs;
+    let xlimbs_m31 = &inputs[ptr..ptr + nb_limbs as usize];
+    let xlimbs_u32:Vec<u32> = (0..nb_limbs).map(|i| xlimbs_m31[i].to_u256().as_u32()).collect();
+    let xlimbs:Vec<BigInt> = xlimbs_u32.iter().map(|x| BigInt::from(*x)).collect();
+
+    let mut p = BigInt::default();
+    let mut x = BigInt::default();
+    p = recompose(plimbs.clone(), nb_bits as u32);
+    x = recompose(xlimbs.clone(), nb_bits as u32);
+    let mut res = BigInt::default();
+    res = x.clone().modinv(&p).unwrap();
+    let mut res_limbs = vec![BigInt::default(); nb_limbs];
+    if let Err(err) = decompose(&res, nb_bits as u32, &mut res_limbs) {
+        panic!("decompose value: {}", err);
+    }
+    for i in 0..nb_limbs {
+        outputs[i] = M31::from(res_limbs[i].to_u64().unwrap() as u32);
+    }
+    Ok(())
+}
 pub fn div_e2_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     if let Err(err) = unwrap_hint(true, true, inputs, outputs, 
         //divE2Hint
@@ -169,6 +281,7 @@ pub fn div_e6_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
         //divE6Hint
         |inputs| {
             let biguint_inputs = inputs.iter().map(|x| x.to_biguint().unwrap()).collect::<Vec<_>>();
+            println!("biguint_inputs: {:?}", biguint_inputs);
             let a_b0 = Fq2::new(Fq::from(biguint_inputs[0].clone()), Fq::from(biguint_inputs[1].clone()));
             let a_b1 = Fq2::new(Fq::from(biguint_inputs[2].clone()), Fq::from(biguint_inputs[3].clone()));
             let a_b2 = Fq2::new(Fq::from(biguint_inputs[4].clone()), Fq::from(biguint_inputs[5].clone()));
@@ -184,6 +297,13 @@ pub fn div_e6_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
             let c_c1_c1_bigint = c.c1.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
             let c_c2_c0_bigint = c.c2.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
             let c_c2_c1_bigint = c.c2.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
+            println!("c0_bigint: {:?}", c_c0_c0_bigint);
+            println!("c1_bigint: {:?}", c_c0_c1_bigint);
+            println!("c2_bigint: {:?}", c_c1_c0_bigint);
+            println!("c3_bigint: {:?}", c_c1_c1_bigint);
+            println!("c4_bigint: {:?}", c_c2_c0_bigint);
+            println!("c5_bigint: {:?}", c_c2_c1_bigint);
+
             return vec![c_c0_c0_bigint, c_c0_c1_bigint, c_c1_c0_bigint, c_c1_c1_bigint, c_c2_c0_bigint, c_c2_c1_bigint];
         }
     ) {
@@ -291,45 +411,6 @@ pub fn div_e12_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     Ok(())
 }
 
-/*
-
-func inverseE12Hint(nativeMod *big.Int, nativeInputs, nativeOutputs []*big.Int) error {
-	return emulated.UnwrapHint(nativeInputs, nativeOutputs,
-		func(mod *big.Int, inputs, outputs []*big.Int) error {
-			var a, c bls12381.E12
-
-			a.C0.B0.A0.SetBigInt(inputs[0])
-			a.C0.B0.A1.SetBigInt(inputs[1])
-			a.C0.B1.A0.SetBigInt(inputs[2])
-			a.C0.B1.A1.SetBigInt(inputs[3])
-			a.C0.B2.A0.SetBigInt(inputs[4])
-			a.C0.B2.A1.SetBigInt(inputs[5])
-			a.C1.B0.A0.SetBigInt(inputs[6])
-			a.C1.B0.A1.SetBigInt(inputs[7])
-			a.C1.B1.A0.SetBigInt(inputs[8])
-			a.C1.B1.A1.SetBigInt(inputs[9])
-			a.C1.B2.A0.SetBigInt(inputs[10])
-			a.C1.B2.A1.SetBigInt(inputs[11])
-
-			c.Inverse(&a)
-
-			c.C0.B0.A0.BigInt(outputs[0])
-			c.C0.B0.A1.BigInt(outputs[1])
-			c.C0.B1.A0.BigInt(outputs[2])
-			c.C0.B1.A1.BigInt(outputs[3])
-			c.C0.B2.A0.BigInt(outputs[4])
-			c.C0.B2.A1.BigInt(outputs[5])
-			c.C1.B0.A0.BigInt(outputs[6])
-			c.C1.B0.A1.BigInt(outputs[7])
-			c.C1.B1.A0.BigInt(outputs[8])
-			c.C1.B1.A1.BigInt(outputs[9])
-			c.C1.B2.A0.BigInt(outputs[10])
-			c.C1.B2.A1.BigInt(outputs[11])
-
-			return nil
-		})
-}
-*/
 pub fn inverse_e12_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     if let Err(err) = unwrap_hint(true, true, inputs, outputs, 
         //inverseE12Hint
@@ -367,6 +448,17 @@ pub fn inverse_e12_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error
     }
     Ok(())
 }
+pub fn copy_e2_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+    if let Err(err) = unwrap_hint(true, true, inputs, outputs, 
+        //copyE2Hint
+        |inputs| {
+            return inputs;
+        }
+    ) {
+        panic!("copyE2Hint: {}", err);
+    }
+    Ok(())
+}
 pub fn copy_e12_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     if let Err(err) = unwrap_hint(true, true, inputs, outputs, 
         //copyE12Hint
@@ -378,127 +470,13 @@ pub fn copy_e12_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     }
     Ok(())
 }
-/*
-
-func finalExpHint(nativeMod *big.Int, nativeInputs, nativeOutputs []*big.Int) error {
-	// This is inspired from https://eprint.iacr.org/2024/640.pdf
-	// and based on a personal communication with the author Andrija Novakovic.
-	return emulated.UnwrapHint(nativeInputs, nativeOutputs,
-		func(mod *big.Int, inputs, outputs []*big.Int) error {
-			startTime := time.Now()
-			var millerLoop bls12381.E12
-
-			millerLoop.C0.B0.A0.SetBigInt(inputs[0])
-			millerLoop.C0.B0.A1.SetBigInt(inputs[1])
-			millerLoop.C0.B1.A0.SetBigInt(inputs[2])
-			millerLoop.C0.B1.A1.SetBigInt(inputs[3])
-			millerLoop.C0.B2.A0.SetBigInt(inputs[4])
-			millerLoop.C0.B2.A1.SetBigInt(inputs[5])
-			millerLoop.C1.B0.A0.SetBigInt(inputs[6])
-			millerLoop.C1.B0.A1.SetBigInt(inputs[7])
-			millerLoop.C1.B1.A0.SetBigInt(inputs[8])
-			millerLoop.C1.B1.A1.SetBigInt(inputs[9])
-			millerLoop.C1.B2.A0.SetBigInt(inputs[10])
-			millerLoop.C1.B2.A1.SetBigInt(inputs[11])
-
-			var root, rootPthInverse, root27thInverse, residueWitness, scalingFactor bls12381.E12
-			var order3rd, order3rdPower, exponent, exponentInv, finalExpFactor, polyFactor big.Int
-			// polyFactor = (1-x)/3
-			polyFactor.SetString("5044125407647214251", 10)
-			// finalExpFactor = ((q^12 - 1) / r) / (27 * polyFactor)
-			finalExpFactor.SetString("2366356426548243601069753987687709088104621721678962410379583120840019275952471579477684846670499039076873213559162845121989217658133790336552276567078487633052653005423051750848782286407340332979263075575489766963251914185767058009683318020965829271737924625612375201545022326908440428522712877494557944965298566001441468676802477524234094954960009227631543471415676620753242466901942121887152806837594306028649150255258504417829961387165043999299071444887652375514277477719817175923289019181393803729926249507024121957184340179467502106891835144220611408665090353102353194448552304429530104218473070114105759487413726485729058069746063140422361472585604626055492939586602274983146215294625774144156395553405525711143696689756441298365274341189385646499074862712688473936093315628166094221735056483459332831845007196600723053356837526749543765815988577005929923802636375670820616189737737304893769679803809426304143627363860243558537831172903494450556755190448279875942974830469855835666815454271389438587399739607656399812689280234103023464545891697941661992848552456326290792224091557256350095392859243101357349751064730561345062266850238821755009430903520645523345000326783803935359711318798844368754833295302563158150573540616830138810935344206231367357992991289265295323280", 10)
-
-			// 1. get pth-root inverse
-			exponent.Mul(&finalExpFactor, big.NewInt(27))
-			root.Exp(millerLoop, &exponent)
-			if root.IsOne() {
-				rootPthInverse.SetOne()
-			} else {
-				exponentInv.ModInverse(&exponent, &polyFactor)
-				exponent.Neg(&exponentInv).Mod(&exponent, &polyFactor)
-				rootPthInverse.Exp(root, &exponent)
-			}
-
-			// 2.1. get order of 3rd primitive root
-			var three big.Int
-			three.SetUint64(3)
-			exponent.Mul(&polyFactor, &finalExpFactor)
-			root.Exp(millerLoop, &exponent)
-			if root.IsOne() {
-				order3rdPower.SetUint64(0)
-			}
-			root.Exp(root, &three)
-			if root.IsOne() {
-				order3rdPower.SetUint64(1)
-			}
-			root.Exp(root, &three)
-			if root.IsOne() {
-				order3rdPower.SetUint64(2)
-			}
-			root.Exp(root, &three)
-			if root.IsOne() {
-				order3rdPower.SetUint64(3)
-			}
-
-			// 2.2. get 27th root inverse
-			if order3rdPower.Uint64() == 0 {
-				root27thInverse.SetOne()
-			} else {
-				order3rd.Exp(&three, &order3rdPower, nil)
-				exponent.Mul(&polyFactor, &finalExpFactor)
-				root.Exp(millerLoop, &exponent)
-				exponentInv.ModInverse(&exponent, &order3rd)
-				exponent.Neg(&exponentInv).Mod(&exponent, &order3rd)
-				root27thInverse.Exp(root, &exponent)
-			}
-
-			// 2.3. shift the Miller loop result so that millerLoop * scalingFactor
-			// is of order finalExpFactor
-			scalingFactor.Mul(&rootPthInverse, &root27thInverse)
-			millerLoop.Mul(&millerLoop, &scalingFactor)
-
-			// 3. get the witness residue
-			//
-			// lambda = q - u, the optimal exponent
-			var lambda big.Int
-			lambda.SetString("4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129030796414117214202539", 10)
-			exponent.ModInverse(&lambda, &finalExpFactor)
-			residueWitness.Exp(millerLoop, &exponent)
-
-			// return the witness residue
-			residueWitness.C0.B0.A0.BigInt(outputs[0])
-			residueWitness.C0.B0.A1.BigInt(outputs[1])
-			residueWitness.C0.B1.A0.BigInt(outputs[2])
-			residueWitness.C0.B1.A1.BigInt(outputs[3])
-			residueWitness.C0.B2.A0.BigInt(outputs[4])
-			residueWitness.C0.B2.A1.BigInt(outputs[5])
-			residueWitness.C1.B0.A0.BigInt(outputs[6])
-			residueWitness.C1.B0.A1.BigInt(outputs[7])
-			residueWitness.C1.B1.A0.BigInt(outputs[8])
-			residueWitness.C1.B1.A1.BigInt(outputs[9])
-			residueWitness.C1.B2.A0.BigInt(outputs[10])
-			residueWitness.C1.B2.A1.BigInt(outputs[11])
-
-			// return the scaling factor
-			scalingFactor.C0.B0.A0.BigInt(outputs[12])
-			scalingFactor.C0.B0.A1.BigInt(outputs[13])
-			scalingFactor.C0.B1.A0.BigInt(outputs[14])
-			scalingFactor.C0.B1.A1.BigInt(outputs[15])
-			scalingFactor.C0.B2.A0.BigInt(outputs[16])
-			scalingFactor.C0.B2.A1.BigInt(outputs[17])
-
-			fmt.Println("finalExpHint time: ", time.Since(startTime))
-			return nil
-		})
-}
-
-*/
 pub fn final_exp_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     if let Err(err) = unwrap_hint(true, true, inputs, outputs, 
         //finalExpHint
         |inputs| {
             let biguint_inputs = inputs.iter().map(|x| x.to_biguint().unwrap()).collect::<Vec<_>>();
-
+            println!("biguint_inputs: {:?}", biguint_inputs);
+            panic!("finalExpHint not implemented");
             let mut miller_loop = Fq12::default();
             miller_loop.c0.c0.c0 = Fq::from(biguint_inputs[0].clone());
             miller_loop.c0.c0.c1 = Fq::from(biguint_inputs[1].clone());
@@ -525,33 +503,28 @@ pub fn final_exp_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> 
             let mut final_exp_factor = BigInt::default();
             let mut poly_factor = BigInt::default();
             poly_factor = BigInt::from_str("5044125407647214251").expect("Invalid string for BigInt");
-            final_exp_factor= BigInt::from_str("23663564265482436010697539876877090881046217216789624
-            1037958312084001927595247157947768484667049903907687321355916284512198921765813
-            3790336552276567078487633052653005423051750848782286407340332979263075575489766
-            9632519141857670580096833180209658292717379246256123752015450223269084404285227
-            1287749455794496529856600144146867680247752423409495496000922763154347141567662
-            0753242466901942121887152806837594306028649150255258504417829961387165043999299
-            0714448876523755142774777198171759232890191813938037299262495070241219571843401
-            7946750210689183514422061140866509035310235319444855230442953010421847307011410
-            5759487413726485729058069746063140422361472585604626055492939586602274983146215
-            2946257741441563955534055257111436966897564412983652743411893856464990748627126
-            8847393609331562816609422173505648345933283184500719660072305335683752674954376
-            5815988577005929923802636375670820616189737737304893769679803809426304143627363
-            8602435585378311729034944505567551904482798759429748304698558356668154542713894
-            3858739973960765639981268928023410302346454589169794166199284855245632629079222
-            4091557256350095392859243101357349751064730561345062266850238821755009430903520
-            6455233450003267838039353597113187988443687548332953025631581505735406168301388
-            10935344206231367357992991289265295323280").expect("Invalid string for BigInt");
-
+            final_exp_factor= BigInt::from_str("2366356426548243601069753987687709088104621721678962410379583120840019275952471579477684846670499039076873213559162845121989217658133790336552276567078487633052653005423051750848782286407340332979263075575489766963251914185767058009683318020965829271737924625612375201545022326908440428522712877494557944965298566001441468676802477524234094954960009227631543471415676620753242466901942121887152806837594306028649150255258504417829961387165043999299071444887652375514277477719817175923289019181393803729926249507024121957184340179467502106891835144220611408665090353102353194448552304429530104218473070114105759487413726485729058069746063140422361472585604626055492939586602274983146215294625774144156395553405525711143696689756441298365274341189385646499074862712688473936093315628166094221735056483459332831845007196600723053356837526749543765815988577005929923802636375670820616189737737304893769679803809426304143627363860243558537831172903494450556755190448279875942974830469855835666815454271389438587399739607656399812689280234103023464545891697941661992848552456326290792224091557256350095392859243101357349751064730561345062266850238821755009430903520645523345000326783803935359711318798844368754833295302563158150573540616830138810935344206231367357992991289265295323280").expect("Invalid string for BigInt");
+            println!("final_exp_factor: {:?}", final_exp_factor);
             exponent = &final_exp_factor * 27;
+            println!("exponent: {:?}", exponent);
             let exp_uint = exponent.to_biguint().unwrap();
+            println!("exp_uint: {:?}", exp_uint);
+            println!("miller_loop: {:?}", miller_loop);
             root = miller_loop.pow(exp_uint.to_u64_digits().iter());
+            println!("root: {:?}", root);
             if root.is_one() {
                 root_pth_inverse.set_one();
             } else {
-                exponent_inv = mod_inverse(&BigInt::from(exponent.clone()), &poly_factor).unwrap();
-                exponent = -exponent_inv;
+                // exponent_inv = mod_inverse(&BigInt::from(exponent.clone()), &poly_factor).unwrap();
+                exponent_inv = BigInt::from(exponent.clone().modinv(&poly_factor).unwrap());
+                println!("exponent_inv: {:?}", exponent_inv);
+                if exponent_inv.abs() > poly_factor {
+                    exponent_inv = exponent_inv % &poly_factor;
+                }
+                exponent = &poly_factor - exponent_inv;
+                println!("exponent: {:?}", exponent);
                 exponent = exponent % &poly_factor;
+                println!("exponent: {:?}", exponent);
                 let exp_uint = exponent.to_biguint().unwrap();
                 root_pth_inverse = root.pow(exp_uint.to_u64_digits().iter());
             }
@@ -584,9 +557,16 @@ pub fn final_exp_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> 
                 exponent = &poly_factor * &final_exp_factor;
                 let exp_uint = exponent.to_biguint().unwrap();
                 root = miller_loop.pow(exp_uint.to_u64_digits().iter());
-                exponent_inv = mod_inverse(&exponent, &order3rd).unwrap();
-                exponent = -exponent_inv;
+                // exponent_inv = mod_inverse(&exponent, &order3rd).unwrap();
+                exponent_inv = exponent.modinv(&order3rd).unwrap();
+                println!("exponent_inv: {:?}", exponent_inv);
+                if exponent_inv.abs() > order3rd {
+                    exponent_inv = exponent_inv % &order3rd;
+                }
+                exponent = &order3rd - exponent_inv;
+                println!("exponent: {:?}", exponent);
                 exponent = exponent % &order3rd;
+                println!("exponent: {:?}", exponent);
                 let exp_uint = exponent.to_biguint().unwrap();
                 root_27th_inverse = root.pow(exp_uint.to_u64_digits().iter());
             }
@@ -596,23 +576,39 @@ pub fn final_exp_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> 
 
             let mut lambda = BigInt::default();
             lambda = BigInt::from_str("4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129030796414117214202539").expect("Invalid string for BigInt");
-            exponent = mod_inverse(&lambda, &final_exp_factor).unwrap();
+            // exponent = mod_inverse(&lambda, &final_exp_factor).unwrap();
+            exponent = lambda.modinv(&final_exp_factor).unwrap();
+            println!("exponent: {:?}", exponent);
             residue_witness = miller_loop.pow(exponent.to_biguint().unwrap().to_u64_digits().iter());
+            println!("residue_witness: {:?}", residue_witness);
 
-            let c_c0_b0_a0_bigint = residue_witness.c0.c0.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
-            let c_c0_b0_a1_bigint = residue_witness.c0.c0.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
-            let c_c0_b1_a0_bigint = residue_witness.c0.c1.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
-            let c_c0_b1_a1_bigint = residue_witness.c0.c1.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
-            let c_c0_b2_a0_bigint = residue_witness.c0.c2.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
-            let c_c0_b2_a1_bigint = residue_witness.c0.c2.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
-            let c_c1_b0_a0_bigint = residue_witness.c1.c0.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
-            let c_c1_b0_a1_bigint = residue_witness.c1.c0.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
-            let c_c1_b1_a0_bigint = residue_witness.c1.c1.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
-            let c_c1_b1_a1_bigint = residue_witness.c1.c1.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
-            let c_c1_b2_a0_bigint = residue_witness.c1.c2.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
-            let c_c1_b2_a1_bigint = residue_witness.c1.c2.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
+            let res_c0_b0_a0_bigint = residue_witness.c0.c0.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
+            let res_c0_b0_a1_bigint = residue_witness.c0.c0.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
+            let res_c0_b1_a0_bigint = residue_witness.c0.c1.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
+            let res_c0_b1_a1_bigint = residue_witness.c0.c1.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
+            let res_c0_b2_a0_bigint = residue_witness.c0.c2.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
+            let res_c0_b2_a1_bigint = residue_witness.c0.c2.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
+            let res_c1_b0_a0_bigint = residue_witness.c1.c0.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
+            let res_c1_b0_a1_bigint = residue_witness.c1.c0.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
+            let res_c1_b1_a0_bigint = residue_witness.c1.c1.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
+            let res_c1_b1_a1_bigint = residue_witness.c1.c1.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
+            let res_c1_b2_a0_bigint = residue_witness.c1.c2.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
+            let res_c1_b2_a1_bigint = residue_witness.c1.c2.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
 
-            return vec![c_c0_b0_a0_bigint, c_c0_b0_a1_bigint, c_c0_b1_a0_bigint, c_c0_b1_a1_bigint, c_c0_b2_a0_bigint, c_c0_b2_a1_bigint, c_c1_b0_a0_bigint, c_c1_b0_a1_bigint, c_c1_b1_a0_bigint, c_c1_b1_a1_bigint, c_c1_b2_a0_bigint, c_c1_b2_a1_bigint];
+            let sca_c0_b0_a0_bigint = scaling_factor.c0.c0.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
+            let sca_c0_b0_a1_bigint = scaling_factor.c0.c0.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
+            let sca_c0_b1_a0_bigint = scaling_factor.c0.c1.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
+            let sca_c0_b1_a1_bigint = scaling_factor.c0.c1.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
+            let sca_c0_b2_a0_bigint = scaling_factor.c0.c2.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
+            let sca_c0_b2_a1_bigint = scaling_factor.c0.c2.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
+            
+
+            return vec![res_c0_b0_a0_bigint, res_c0_b0_a1_bigint, res_c0_b1_a0_bigint, 
+                        res_c0_b1_a1_bigint, res_c0_b2_a0_bigint, res_c0_b2_a1_bigint, 
+                        res_c1_b0_a0_bigint, res_c1_b0_a1_bigint, res_c1_b1_a0_bigint, 
+                        res_c1_b1_a1_bigint, res_c1_b2_a0_bigint, res_c1_b2_a1_bigint,
+                        sca_c0_b0_a0_bigint, sca_c0_b0_a1_bigint, sca_c0_b1_a0_bigint,
+                        sca_c0_b1_a1_bigint, sca_c0_b2_a0_bigint, sca_c0_b2_a1_bigint];
         }
     ) {
         panic!("inverseE12Hint: {}", err);

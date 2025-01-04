@@ -355,7 +355,6 @@ impl LogUpRangeProofTable {
 }
 pub fn query_count_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     let mut count = vec![0; outputs.len()];
-    println!("querycount");
     for i in 0..inputs.len() {
         let query_id = inputs[i].to_u256().as_usize();
         count[query_id] += 1;
