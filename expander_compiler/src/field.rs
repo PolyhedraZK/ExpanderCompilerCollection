@@ -11,6 +11,8 @@ impl Field for BN254 {}
 impl Field for GF2 {}
 impl Field for M31 {}
 
+pub trait SimdFieldFor<F: Field>: arith::SimdField<Scalar = F> + Field {}
+
 impl<T: Field> Serde for T {
     fn serialize_into<W: std::io::Write>(&self, writer: W) -> Result<(), std::io::Error> {
         match <Self as FieldSerde>::serialize_into(self, writer) {

@@ -1,6 +1,6 @@
 use std::{fmt::Debug, hash::Hash};
 
-use crate::field::Field;
+use crate::field::{Field, SimdFieldFor};
 
 pub trait Config: Default + Clone + Ord + Debug + Hash + Copy + 'static {
     type CircuitField: Field;
@@ -15,6 +15,8 @@ pub trait Config: Default + Clone + Ord + Debug + Hash + Copy + 'static {
 
     const ENABLE_RANDOM_COMBINATION: bool = true;
 }
+
+pub trait SimdFieldForConfig<C: Config>: SimdFieldFor<C::CircuitField> {}
 
 #[derive(Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct M31Config {}
