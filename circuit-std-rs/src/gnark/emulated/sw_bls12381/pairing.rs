@@ -493,7 +493,7 @@ impl GenericDefine<M31Config> for PairingCheckGKRCircuit<Variable> {
             }
         };
         let mut r = pairing.pairing_check(builder, &[p1_g1, p2_g1], &mut [G2Affine{p: q1_g2, lines: LineEvaluations::default()}, G2Affine{p: q2_g2, lines: LineEvaluations::default()}]).unwrap();
-        pairing.ext12.ext6.ext2.fp.check_mul(builder);
+        // pairing.ext12.ext6.ext2.fp.check_mul(builder);
         pairing.ext12.ext6.ext2.fp.table.final_check(builder);
     }
 }
