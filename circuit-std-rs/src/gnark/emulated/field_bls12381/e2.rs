@@ -143,9 +143,7 @@ impl Ext2{
     pub fn double<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
         let two = BigInt::from(2);
         let z0 = self.fp.mul_const(native, &x.a0, two.clone());
-        print_element(native, &z0);
         let z1 = self.fp.mul_const(native, &x.a1, two.clone());
-        print_element(native, &z1);
         GE2 {
             a0: z0,
             a1: z1,
@@ -1080,20 +1078,14 @@ fn test_e2_inverse(){
 
 
 
-pub fn print_e2<'a, C:Config, B:RootAPI<C>>(native: &'a mut B, v: &GE2)  {
-    for i in 0..48 {
-        println!("{}: {:?} {:?}", i, native.value_of(v.a0.limbs[i]), native.value_of(v.a1.limbs[i]));
-    }
-}
-pub fn print_element<'a, C:Config, B:RootAPI<C>, T: FieldParams>(native: &'a mut B, v: &Element<T>)  {
-    for i in 0..v.limbs.len() {
-        print!("{:?} ", native.value_of(v.limbs[i]));
-    }
-    println!(" ");
-}
-pub fn print_element_new<'a, C:Config, B:RootAPI<C>, T: FieldParams>(native: &'a mut B, v: &Element<T>)  {
-    // for i in 0..v.limbs.len() {
-    //     print!("{:?} ", native.value_of(v.limbs[i]));
-    // }
-    // println!(" ");
-}
+// pub fn print_e2<'a, C:Config, B:RootAPI<C>>(native: &'a mut B, v: &GE2)  {
+//     for i in 0..48 {
+//         println!("{}: {:?} {:?}", i, native.value_of(v.a0.limbs[i]), native.value_of(v.a1.limbs[i]));
+//     }
+// }
+// pub fn print_element<'a, C:Config, B:RootAPI<C>, T: FieldParams>(native: &'a mut B, v: &Element<T>)  {
+//     for i in 0..v.limbs.len() {
+//         print!("{:?} ", native.value_of(v.limbs[i]));
+//     }
+//     println!(" ");
+// }

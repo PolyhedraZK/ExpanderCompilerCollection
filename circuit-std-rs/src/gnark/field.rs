@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
-use crate::gnark::emulated::field_bls12381::e2::print_e2;
-use crate::gnark::emulated::field_bls12381::e2::print_element;
+// use crate::gnark::emulated::field_bls12381::e2::print_e2;
+// use crate::gnark::emulated::field_bls12381::e2::print_element;
 use crate::gnark::limbs::*;
 use crate::gnark::utils::*;
 use crate::gnark::emparam::FieldParams;
@@ -37,10 +37,10 @@ impl <T: FieldParams>mul_check<T> {
         if !self.p.is_empty() {
             self.p = eval_with_challenge(native,self.p.clone(), at.clone());
         }
-        println!("c:{:?}", native.value_of(self.c.evaluation));
-        println!("r:{:?}", native.value_of(self.r.evaluation));
-        println!("k:{:?}", native.value_of(self.k.evaluation));
-        println!("p:{:?}", native.value_of(self.p.evaluation));
+        // println!("c:{:?}", native.value_of(self.c.evaluation));
+        // println!("r:{:?}", native.value_of(self.r.evaluation));
+        // println!("k:{:?}", native.value_of(self.k.evaluation));
+        // println!("p:{:?}", native.value_of(self.p.evaluation));
 
     }
     pub fn eval_round2<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, at: Vec<Variable>) {
@@ -50,26 +50,26 @@ impl <T: FieldParams>mul_check<T> {
         // print_element(native, &self.b);
         self.a = eval_with_challenge(native, self.a.clone(), at.clone());
         self.b = eval_with_challenge(native, self.b.clone(), at.clone());
-        println!("a:{:?}", native.value_of(self.a.evaluation));
-        println!("b:{:?}", native.value_of(self.b.evaluation));
+        // println!("a:{:?}", native.value_of(self.a.evaluation));
+        // println!("b:{:?}", native.value_of(self.b.evaluation));
     }
     pub fn check<'a, C: Config, B: RootAPI<C>>(&self, native: &'a mut B, pval: Variable, ccoef: Variable) {
         let mut new_peval = pval;
         if !self.p.is_empty() {
             new_peval = self.p.evaluation
         };
-        println!("ls_a:{:?}", native.value_of(self.a.evaluation));
-        println!("ls_b:{:?}", native.value_of(self.b.evaluation));
+        // println!("ls_a:{:?}", native.value_of(self.a.evaluation));
+        // println!("ls_b:{:?}", native.value_of(self.b.evaluation));
         let ls = native.mul(self.a.evaluation, self.b.evaluation);
         let rs_tmp1 = native.mul(new_peval, self.k.evaluation);
-        println!("rs_tmp1:{:?}", native.value_of(rs_tmp1));
+        // println!("rs_tmp1:{:?}", native.value_of(rs_tmp1));
         let rs_tmp2 = native.mul(self.c.evaluation, ccoef);
-        println!("rs_tmp2:{:?}", native.value_of(rs_tmp2));
+        // println!("rs_tmp2:{:?}", native.value_of(rs_tmp2));
         let rs_tmp3 = native.add(self.r.evaluation, rs_tmp1);
-        println!("rs_tmp3:{:?}", native.value_of(rs_tmp3));
+        // println!("rs_tmp3:{:?}", native.value_of(rs_tmp3));
         let rs = native.add(rs_tmp3, rs_tmp2);
-        println!("ls:{:?}", native.value_of(ls));
-        println!("rs:{:?}", native.value_of(rs));
+        // println!("ls:{:?}", native.value_of(ls));
+        // println!("rs:{:?}", native.value_of(rs));
         native.assert_is_equal(ls, rs);
     }
     pub fn clean_evaluations(&mut self) {
@@ -209,10 +209,8 @@ impl <T: FieldParams>Field<T> {
         let mut res = vec![native.constant(T::bits_per_limb() as u32), native.constant(T::nb_limbs() as u32)];
         res.extend(self.n_const.limbs.clone());
         res.push(native.constant(nonnative_inputs.len() as u32));
-        println!("wrap_hint");
         for i in 0..nonnative_inputs.len() {
             res.push(native.constant(nonnative_inputs[i].limbs.len() as u32));
-            print_element(native, &nonnative_inputs[i]);
             res.extend(nonnative_inputs[i].limbs.clone());
         }
         res
@@ -321,7 +319,7 @@ impl <T: FieldParams>Field<T> {
     pub fn check_zero<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: Element<T>, p: Option<Element<T>>) {
         self.enforce_width_conditional(native, &a.clone());
         let b = self.short_one_const.clone();
-        // println!("a,b after call_mul_hint");
+        // // println!("a,b after call_mul_hint");
         // print_element(native, &a);
         // print_element(native, &b);
         let (k, r, c) = self.call_mul_hint(native, &a, &b, false);
@@ -339,8 +337,6 @@ impl <T: FieldParams>Field<T> {
         self.enforce_width_conditional(native, a);
         self.enforce_width_conditional(native, b);
         let diff = self.sub(native, b, a);
-        println!("diff");
-        print_element(native, &diff);
         self.check_zero(native, diff, None);
     }
     pub fn add<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: &Element<T>, b: &Element<T>) -> Element<T> {
@@ -546,7 +542,7 @@ impl <T: FieldParams>Field<T> {
         let coef = BigInt::from(1) << T::bits_per_limb();
         let ccoef = native.sub(coef.to_u64().unwrap() as u32, commitment);
         for i in 0..self.mul_checks.len() {
-            println!("mul_check {}", i);
+            // println!("mul_check {}", i);
             self.mul_checks[i].check(native, pval.evaluation, ccoef);
         }
         for i in 0..self.mul_checks.len() {

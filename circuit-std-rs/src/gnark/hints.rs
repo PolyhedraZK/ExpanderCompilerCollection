@@ -184,36 +184,7 @@ pub fn div_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     }
     Ok(())
 }
-/*
-func InverseHint(mod *big.Int, inputs []*big.Int, outputs []*big.Int) error {
-	if len(inputs) < 2 {
-		return fmt.Errorf("input must be at least two elements")
-	}
-	nbBits := uint(inputs[0].Uint64())
-	nbLimbs := int(inputs[1].Int64())
-	if len(inputs[2:]) < 2*nbLimbs {
-		return fmt.Errorf("inputs missing")
-	}
-	if len(outputs) != nbLimbs {
-		return fmt.Errorf("result does not fit into output")
-	}
-	p := new(big.Int)
-	if err := limbs.Recompose(inputs[2:2+nbLimbs], nbBits, p); err != nil {
-		return fmt.Errorf("recompose emulated order: %w", err)
-	}
-	x := new(big.Int)
-	if err := limbs.Recompose(inputs[2+nbLimbs:], nbBits, x); err != nil {
-		return fmt.Errorf("recompose value: %w", err)
-	}
-	if x.ModInverse(x, p) == nil {
-		return fmt.Errorf("input and modulus not relatively primes")
-	}
-	if err := limbs.Decompose(x, nbBits, outputs); err != nil {
-		return fmt.Errorf("decompose: %w", err)
-	}
-	return nil
-}
- */
+
 pub fn inv_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     let nb_bits = inputs[0].to_u256().as_usize();
     let nb_limbs = inputs[1].to_u256().as_usize();
@@ -281,7 +252,6 @@ pub fn div_e6_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
         //divE6Hint
         |inputs| {
             let biguint_inputs = inputs.iter().map(|x| x.to_biguint().unwrap()).collect::<Vec<_>>();
-            println!("biguint_inputs: {:?}", biguint_inputs);
             let a_b0 = Fq2::new(Fq::from(biguint_inputs[0].clone()), Fq::from(biguint_inputs[1].clone()));
             let a_b1 = Fq2::new(Fq::from(biguint_inputs[2].clone()), Fq::from(biguint_inputs[3].clone()));
             let a_b2 = Fq2::new(Fq::from(biguint_inputs[4].clone()), Fq::from(biguint_inputs[5].clone()));
@@ -297,12 +267,6 @@ pub fn div_e6_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
             let c_c1_c1_bigint = c.c1.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
             let c_c2_c0_bigint = c.c2.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
             let c_c2_c1_bigint = c.c2.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
-            println!("c0_bigint: {:?}", c_c0_c0_bigint);
-            println!("c1_bigint: {:?}", c_c0_c1_bigint);
-            println!("c2_bigint: {:?}", c_c1_c0_bigint);
-            println!("c3_bigint: {:?}", c_c1_c1_bigint);
-            println!("c4_bigint: {:?}", c_c2_c0_bigint);
-            println!("c5_bigint: {:?}", c_c2_c1_bigint);
 
             return vec![c_c0_c0_bigint, c_c0_c1_bigint, c_c1_c0_bigint, c_c1_c1_bigint, c_c2_c0_bigint, c_c2_c1_bigint];
         }
@@ -425,7 +389,7 @@ pub fn inverse_e12_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error
             let a_c1_b1 = Fq2::new(Fq::from(biguint_inputs[8].clone()), Fq::from(biguint_inputs[9].clone()));
             let a_c1_b2 = Fq2::new(Fq::from(biguint_inputs[10].clone()), Fq::from(biguint_inputs[11].clone()));
             let a_c1 = Fq6::new(a_c1_b0, a_c1_b1, a_c1_b2);
-            let mut a = Fq12::new(a_c0, a_c1);
+            let a = Fq12::new(a_c0, a_c1);
 
             let c = a.inverse().unwrap();
             let c_c0_b0_a0_bigint = c.c0.c0.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
@@ -676,9 +640,7 @@ pub fn unwrap_hint(is_emulated_input: bool, is_emulated_output: bool, native_inp
                 return Err(format!("cannot read {}-th nonnative element", i));
             }
             let tmp_inputs = m31_to_bigint_array(native_inputs[read_ptr+1..read_ptr+1+current_input_len].to_vec().as_slice());
-            println!("tmp_inputs: {:?}", tmp_inputs);
             nonnative_inputs[i] = recompose(tmp_inputs, nb_bits);
-            println!("composed: {:?}", nonnative_inputs[i]);
             read_ptr += 1 + current_input_len;
         }
     } else {

@@ -471,11 +471,12 @@ impl Ext12{
         let z10 = self.ext6.ext2.conjugate(native, &x.c1.b0);
         let z11 = self.ext6.ext2.conjugate(native, &x.c1.b1);
         let z12 = self.ext6.ext2.conjugate(native, &x.c1.b2);
-        let z01 = self.ext6.ext2.mul_by_non_residue2_power2(native, &z01);
-        let z02 = self.ext6.ext2.mul_by_non_residue2_power4(native, &z02);
-        let z10 = self.ext6.ext2.mul_by_non_residue2_power1(native, &z10);
-        let z11 = self.ext6.ext2.mul_by_non_residue2_power3(native, &z11);
-        let z12 = self.ext6.ext2.mul_by_non_residue2_power5(native, &z12);
+
+        let z01 = self.ext6.ext2.mul_by_non_residue1_power2(native, &z01);
+        let z02 = self.ext6.ext2.mul_by_non_residue1_power4(native, &z02);
+        let z10 = self.ext6.ext2.mul_by_non_residue1_power1(native, &z10);
+        let z11 = self.ext6.ext2.mul_by_non_residue1_power3(native, &z11);
+        let z12 = self.ext6.ext2.mul_by_non_residue1_power5(native, &z12);
         GE12 {
             c0: GE6 {
                 b0: z00,
@@ -1831,8 +1832,6 @@ impl GenericDefine<M31Config> for E12MulBy014Circuit<Variable> {
         };
 
         let z = ext12.mul_by_014(builder, &a_e12, &b_e2, &c_e2);
-        println!("z");
-        print_e2(builder, &z.c0.b0);
         ext12.assert_isequal(builder, &z, &w_e12);
         ext12.ext6.ext2.fp.check_mul(builder);
         ext12.ext6.ext2.fp.table.final_check(builder);
@@ -1915,14 +1914,13 @@ fn test_e12_mul_by_014() {
 }
 
 
-pub fn print_e2<'a, C:Config, B:RootAPI<C>>(native: &'a mut B, v: &GE2)  {
-    // for i in 0..48 {
-    //     println!("{}: {:?} {:?}", i, native.value_of(v.a0.limbs[i]), native.value_of(v.a1.limbs[i]));
-    // }
-}
-pub fn print_element<'a, C:Config, B:RootAPI<C>, T: FieldParams>(native: &'a mut B, v: &Element<T>)  {
-    // for i in 0..48 {
-    //     print!("{}: {:?}", i, native.value_of(v.limbs[i]));
-    // }
-    println!();
-}
+// pub fn print_e2<'a, C:Config, B:RootAPI<C>>(native: &'a mut B, v: &GE2)  {
+//     print_element(native, &v.a0);
+//     print_element(native, &v.a1);
+// }
+// pub fn print_element<'a, C:Config, B:RootAPI<C>, T: FieldParams>(native: &'a mut B, v: &Element<T>)  {
+//     for i in 0..48 {
+//         print!("{:?}", native.value_of(v.limbs[i]));
+//     }
+//     println!();
+// }

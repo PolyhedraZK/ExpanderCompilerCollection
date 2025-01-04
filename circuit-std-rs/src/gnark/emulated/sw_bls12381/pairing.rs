@@ -1,8 +1,8 @@
 use crate::gnark::emparam::bls12381_fp;
 use crate::gnark::emulated::field_bls12381::e12::*;
 use crate::gnark::emulated::field_bls12381::e2::*;
-use crate::gnark::emulated::field_bls12381::e2::print_e2;
-use crate::gnark::emulated::field_bls12381::e2::print_element;
+// use crate::gnark::emulated::field_bls12381::e2::print_e2;
+// use crate::gnark::emulated::field_bls12381::e2::print_element;
 use crate::gnark::emulated::field_bls12381::e6::GE6;
 use crate::gnark::hints::register_hint;
 use crate::gnark::field::*;
@@ -43,49 +43,14 @@ impl Pairing {
             ext12,
         }
     }
-
-    /*
-    func (pr Pairing) PairingCheck(P []*G1Affine, Q []*G2Affine) error {
-	// pr.MillerLoopTest(P, Q)
-	f, err := pr.MillerLoop(P, Q)
-	// f, err := pr.MillerLoopOnlyLines(P, Q)
-	if err != nil {
-		return err
-	}
-	// We perform the easy part of the final exp to push f to the cyclotomic
-	// subgroup so that AssertFinalExponentiationIsOne is carried with optimized
-	// cyclotomic squaring (e.g. Karabina12345).
-	//
-	// f = f^(p⁶-1)(p²+1)
-	buf := pr.Conjugate(f)
-	buf = pr.DivUnchecked(buf, f)
-	f = pr.FrobeniusSquare(buf)
-	f = pr.Mul(f, buf)
-
-	pr.AssertFinalExponentiationIsOne(f)
-
-	return nil
-}
-     */
     pub fn pairing_check<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, p: &[G1Affine], q: &mut [G2Affine]) -> Result<(), Error> {
         let f = self.miller_loop(native, p, q).unwrap();
-        println!("f");
-        print_e2(native, &f.c1.b0);
-        // panic!("stop");
         let buf = self.ext12.conjugate(native, &f);
-        println!("buff");
-        print_e2(native, &buf.c1.b0);
+        
         let buf = self.ext12.div(native, &buf, &f);
-        println!("buff");
-        print_e2(native, &buf.c1.b0);
         let f = self.ext12.frobenius_square(native, &buf);
-        println!("f");
-        print_e2(native, &f.c1.b0);
         let f = self.ext12.mul(native, &f, &buf);
-        println!("f");
-        print_e2(native, &f.c1.b0);
 
-        // panic!("stop");
         self.ext12.assert_final_exponentiation_is_one(native, &f);
 
         Ok(())
@@ -100,13 +65,9 @@ impl Pairing {
             if q[i].lines.is_empty() {
                 let qlines = self.compute_lines_with_hint(native, &q[i].p);
                 q[i].lines = qlines;
-                let tmp_r0 = q[i].lines.0[0][0].as_ref().unwrap().r0.clone();
-                let tmp_r1 = q[i].lines.0[0][0].as_ref().unwrap().r1.clone();
-                // panic!("stop");
             }
             let line_evaluations = std::mem::take(&mut q[i].lines);
             lines.push(line_evaluations);
-            // lines.push(q[i].lines.clone());
         }
         self.miller_loop_lines_with_hint(native, p, lines)
     }
@@ -221,30 +182,15 @@ impl Pairing {
             }
         }
         res = self.ext12.conjugate(native, &copy_res);
-        // println!("res");
-        // print_e2(native, &res.c1.b0);
-        // print_e2(native, &res.c1.b1);
-        // print_e2(native, &res.c1.b2);
-        // panic!("stop");
         Ok(res)
     }
     pub fn compute_lines_with_hint<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, q: &G2AffP) -> LineEvaluations {
         // let mut c_lines = LineEvaluations::default();
         let mut c_lines: LineEvaluations = LineEvaluations::default();
-        let q_acc = q.clone();
+        let q_acc = q;
         let mut copy_q_acc = self.copy_g2_aff_p(native, q_acc);
         let n = loop_counter.len();
         let (q_acc, line1, line2) = self.triple_step(native, copy_q_acc);
-        println!("QACC##########");
-        print_e2(native, &q_acc.x);
-        print_e2(native, &q_acc.y);
-        let tmp_r0 = line1.as_ref().unwrap().r0.clone();
-        let tmp_r1 = line1.as_ref().unwrap().r1.clone();
-        println!("tmp_r0");
-        print_e2(native, &tmp_r0);
-        println!("tmp_r1");
-        print_e2(native, &tmp_r1);
-        // panic!("stop");
         c_lines.0[0][n-2] = line1;
         c_lines.0[1][n-2] = line2;
         copy_q_acc = self.copy_g2_aff_p(native, &q_acc);
@@ -422,38 +368,6 @@ impl Pairing {
 }
 
 
-/*
-type PairingCheckGKRCircuit struct {
-	In1G1 G1Affine
-	In2G1 G1Affine
-	In1G2 G2Affine
-	In2G2 G2Affine
-	// In3G2 G2Affine
-	// TmpRes [62 * 3]GTEl
-}
-
-func (c *PairingCheckGKRCircuit) Define(api frontend.API) error {
-	logup.Reset()
-	logup.NewRangeProof(12)
-	pairing, err := NewPairing(api)
-	if err != nil {
-		return fmt.Errorf("new pairing: %w", err)
-	}
-	// err = pairing.PairingCheck([]*G1Affine{&c.In1G1, &c.In1G1, &c.In2G1, &c.In2G1}, []*G2Affine{&c.In1G2, &c.In2G2, &c.In1G2, &c.In2G2})
-	// hintRes := make([]*GTEl, 62*3)
-	// for i := 0; i < 62*3; i++ {
-	// 	hintRes[i] = &c.TmpRes[i]
-	// }
-	err = pairing.PairingCheck([]*G1Affine{&c.In1G1, &c.In2G1}, []*G2Affine{&c.In1G2, &c.In2G2})
-	if err != nil {
-		return fmt.Errorf("pair: %w", err)
-	}
-	logup.FinalCheck(api, logup.ColumnCombineOption)
-	return nil
-}
-
-*/
-
 declare_circuit!(PairingCheckGKRCircuit {
     in1_g1: [[Variable;48];2],
     in2_g1: [[Variable;48];2],
@@ -493,7 +407,7 @@ impl GenericDefine<M31Config> for PairingCheckGKRCircuit<Variable> {
             }
         };
         let mut r = pairing.pairing_check(builder, &[p1_g1, p2_g1], &mut [G2Affine{p: q1_g2, lines: LineEvaluations::default()}, G2Affine{p: q2_g2, lines: LineEvaluations::default()}]).unwrap();
-        // pairing.ext12.ext6.ext2.fp.check_mul(builder);
+        pairing.ext12.ext6.ext2.fp.check_mul(builder);
         pairing.ext12.ext6.ext2.fp.table.final_check(builder);
     }
 }

@@ -178,8 +178,6 @@ impl Ext6{
         }
     }
     pub fn mul_by_01<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, z: &GE6, c0: &GE2, c1: &GE2) -> GE6 {
-        println!("mulby01 first element");
-        print_element(native, &z.b0.a0);
         let a = self.ext2.mul(native, &z.b0, c0);
         let b = self.ext2.mul(native, &z.b1, c1);
         let tmp = self.ext2.add(native, &z.b1.clone(), &z.b2.clone());
@@ -250,8 +248,11 @@ impl Ext6{
         c1 = self.ext2.sub(native, &c1, &tmp);
         tmp = self.ext2.mul_by_non_residue(native, &t2);
         c1 = self.ext2.add(native, &c1, &tmp);
-        let mut c2 = self.ext2.add(native, &x.b0.clone(), &x.b2.clone());
-        let mut tmp = self.ext2.add(native, &y.b0.clone(), &y.b2.clone());
+        let mut tmp = self.ext2.add(native, &x.b0.clone(), &x.b2.clone());
+        let mut c2 = self.ext2.add(native, &y.b0.clone(), &y.b2.clone());
+        // println!("special");
+        // print_e2(native, &c2);
+        // print_e2(native, &tmp);
         c2 = self.ext2.mul(native, &c2, &tmp);
         tmp = self.ext2.add(native, &t0, &t2);
         c2 = self.ext2.sub(native, &c2, &tmp);
@@ -1409,14 +1410,14 @@ fn test_e6_inverse() {
 }
 
 
-pub fn print_e2<'a, C:Config, B:RootAPI<C>>(native: &'a mut B, v: &GE2)  {
-    // for i in 0..48 {
-    //     println!("{}: {:?} {:?}", i, native.value_of(v.a0.limbs[i]), native.value_of(v.a1.limbs[i]));
-    // }
-}
-pub fn print_element<'a, C:Config, B:RootAPI<C>, T: FieldParams>(native: &'a mut B, v: &Element<T>)  {
-    // for i in 0..48 {
-    //     print!("{}: {:?}", i, native.value_of(v.limbs[i]));
-    // }
-    // println!();
-}
+// pub fn print_e2<'a, C:Config, B:RootAPI<C>>(native: &'a mut B, v: &GE2)  {
+//     for i in 0..48 {
+//         println!("{}: {:?} {:?}", i, native.value_of(v.a0.limbs[i]), native.value_of(v.a1.limbs[i]));
+//     }
+// }
+// pub fn print_element<'a, C:Config, B:RootAPI<C>, T: FieldParams>(native: &'a mut B, v: &Element<T>)  {
+//     // for i in 0..48 {
+//     //     print!("{}: {:?}", i, native.value_of(v.limbs[i]));
+//     // }
+//     // println!();
+// }
