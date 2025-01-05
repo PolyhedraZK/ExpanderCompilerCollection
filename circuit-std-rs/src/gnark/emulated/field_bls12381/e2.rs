@@ -23,6 +23,12 @@ impl GE2 {
             a1: self.a1.clone(),
         }
     }
+    pub fn from_vars(x: Vec<Variable>, y: Vec<Variable>) -> Self {
+        GE2 {
+            a0: Element::new(x, 0, false, false, false, Variable::default()),
+            a1: Element::new(y, 0, false, false, false, Variable::default()),
+        }
+    }
 }
 
 pub struct Ext2 {
@@ -1078,14 +1084,14 @@ fn test_e2_inverse(){
 
 
 
-// pub fn print_e2<'a, C:Config, B:RootAPI<C>>(native: &'a mut B, v: &GE2)  {
-//     for i in 0..48 {
-//         println!("{}: {:?} {:?}", i, native.value_of(v.a0.limbs[i]), native.value_of(v.a1.limbs[i]));
-//     }
-// }
-// pub fn print_element<'a, C:Config, B:RootAPI<C>, T: FieldParams>(native: &'a mut B, v: &Element<T>)  {
-//     for i in 0..v.limbs.len() {
-//         print!("{:?} ", native.value_of(v.limbs[i]));
-//     }
-//     println!(" ");
-// }
+pub fn print_e2<'a, C:Config, B:RootAPI<C>>(native: &'a mut B, v: &GE2)  {
+    for i in 0..48 {
+        println!("{}: {:?} {:?}", i, native.value_of(v.a0.limbs[i]), native.value_of(v.a1.limbs[i]));
+    }
+}
+pub fn print_element<'a, C:Config, B:RootAPI<C>, T: FieldParams>(native: &'a mut B, v: &Element<T>)  {
+    for i in 0..v.limbs.len() {
+        print!("{:?} ", native.value_of(v.limbs[i]));
+    }
+    println!(" ");
+}

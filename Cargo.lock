@@ -713,6 +713,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "efc"
+version = "0.1.0"
+dependencies = [
+ "arith",
+ "ark-bls12-381",
+ "ark-ec",
+ "ark-ff",
+ "ark-std",
+ "circuit",
+ "circuit-std-rs",
+ "config",
+ "expander_compiler",
+ "gf2",
+ "gkr",
+ "hex",
+ "mersenne31",
+ "num-bigint",
+ "num-traits",
+ "rand",
+ "sha2",
+]
+
+[[package]]
 name = "either"
 version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

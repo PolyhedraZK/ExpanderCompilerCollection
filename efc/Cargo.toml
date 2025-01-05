@@ -1,0 +1,24 @@
+[package]
+name = "efc"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+expander_compiler = { path = "../expander_compiler"}
+circuit-std-rs = { path = "../circuit-std-rs"}
+hex = "0.4"
+ark-std.workspace = true
+rand.workspace = true
+expander_config.workspace = true
+expander_circuit.workspace = true
+gkr.workspace = true
+arith.workspace = true
+gf2.workspace = true
+mersenne31.workspace = true
+sha2.workspace = true
+num-bigint.workspace = true
+num-traits.workspace = true
+ark-ec = "0.4.0"
+ark-ff = "0.4.0"
+ark-bls12-381 = "0.4.0"

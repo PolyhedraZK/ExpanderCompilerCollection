@@ -1,5 +1,6 @@
 use expander_compiler::frontend::*;
 use num_bigint::BigInt;
+use num_traits::cast::ToPrimitive;
 
 pub fn bytes_to_bits<C: Config, B: RootAPI<C>>(api: &mut B, vals: &[Variable]) -> Vec<Variable> {
 	let mut ret = to_binary(api, vals[0], 8);
@@ -197,6 +198,19 @@ pub fn idiv_mod_bit<C: Config, B: RootAPI<C>>(builder: &mut B, a: Variable, b: u
 	let quotient = from_binary(builder, bits[b as usize..].to_vec());
 	let remainder = from_binary(builder, bits[..b as usize].to_vec());
 	(quotient, remainder)
+}
+
+pub fn string_to_m31_array(s: &str, nb_bits: u32) -> [M31; 48] {
+    let mut res = [M31::from(0); 48];
+    let mut big = BigInt::parse_bytes(s.as_bytes(), 10).unwrap_or_else(|| panic!("Failed to parse BigInt"));
+    let mut res = [M31::from(0); 48];
+    let base = BigInt::from(1) << nb_bits;
+    for i in 0..48 {
+        let tmp = &big % &base;
+        res[i] = M31::from(tmp.to_u32().unwrap());
+        big = big >> nb_bits;
+    }
+    res
 }
 
 declare_circuit!(IDIVMODBITCircuit {

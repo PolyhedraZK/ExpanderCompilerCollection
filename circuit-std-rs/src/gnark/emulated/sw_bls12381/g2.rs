@@ -1,5 +1,6 @@
 use crate::gnark::emparam::bls12381_fp;
 use crate::gnark::emulated::field_bls12381::e2::CurveF;
+use crate::gnark::emulated::field_bls12381::e2::Ext2;
 use crate::gnark::emulated::field_bls12381::e2::GE2;
 use crate::gnark::hints::register_hint;
 use crate::gnark::limbs::*;
@@ -11,24 +12,41 @@ use expander_compiler::frontend::extra::*;
 use expander_compiler::{circuit::layered::InputType, frontend::*};
 use expander_compiler::frontend::builder::*;
 
-/*
-type g2AffP struct {
-	X, Y fields_bls12381.E2
-}
-type lineEvaluation struct {
-	R0, R1 fields_bls12381.E2
-}
-type lineEvaluations [2][len(bls12381.LoopCounter) - 1]*lineEvaluation
-// G2Affine represents G2 element with optional embedded line precomputations.
-type G2Affine struct {
-	P     g2AffP
-	Lines *lineEvaluations
-}
-*/
-
 pub struct G2AffP {
     pub x: GE2,
     pub y: GE2
+}
+
+impl G2AffP {
+    pub fn new(x: GE2, y: GE2) -> Self {
+        Self {
+            x,
+            y,
+        }
+    }
+    pub fn from_vars(x0: Vec<Variable>, y0: Vec<Variable>, x1: Vec<Variable>, y1: Vec<Variable>) -> Self {
+        Self {
+            x: GE2::from_vars(x0, y0),
+            y: GE2::from_vars(x1, y1),
+        }
+    }
+}
+
+pub struct G2 {
+    pub curve_f: Ext2,
+}
+
+impl G2 {
+    pub fn new<'a, C: Config, B: RootAPI<C>>(native: &'a mut B) -> Self {
+        let curve_f = Ext2::new(native);
+        Self {
+            curve_f,
+        }
+    }
+    pub fn neg<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, p: &G2AffP) -> G2AffP {
+        let yr = self.curve_f.neg(native, &p.y);
+        G2AffP::new(p.x.clone(), yr)
+    }
 }
 
 pub struct LineEvaluation {

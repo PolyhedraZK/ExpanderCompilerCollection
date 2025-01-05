@@ -4,9 +4,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use expander_compiler::frontend::*;
+use expander_config::M31ExtConfigSha2;
 use sha2::{Digest, Sha256};
-use crate::big_int::{to_binary_hint, big_array_add};
-use crate::sha2_m31::check_sha256;
+use circuit_std_rs::big_int::{to_binary_hint, big_array_add};
+use circuit_std_rs::sha2_m31::check_sha256;
+use crate::utils::run_circuit;
 
 const SHA256LEN: usize = 32;
 const HASHTABLESIZE: usize = 64;
@@ -114,3 +116,61 @@ fn test_hashtable(){
     println!("Generate witness Time: {:?}", end_time.duration_since(start_time));
 }
 
+#[test]
+fn run_expander_hashtable(){
+	let seed = [0 as u8;32];
+	let round = 0 as u8;
+	let start_index =  [0 as u8;4];
+	let mut assignment:HASHTABLECircuit<M31> = HASHTABLECircuit::default();
+	for i in 0..32 {
+		assignment.seed[i] = M31::from(seed[i] as u32);
+	}
+	
+	assignment.shuffle_round = M31::from(round as u32);
+	for i in 0..4 {
+		assignment.start_index[i] = M31::from(start_index[i] as u32);
+	}
+	let mut inputs = vec![];
+	let mut cur_index = start_index;
+	for i in 0..HASHTABLESIZE{
+		let mut input = vec![];
+		input.extend_from_slice(&seed);
+		input.push(round);
+		input.extend_from_slice(&cur_index);
+		if cur_index[0] == 255 {
+			cur_index[0] = 0;
+			cur_index[1] += 1;
+		} else {
+			cur_index[0] += 1;
+		}
+		inputs.push(input);
+	}
+	for i in 0..HASHTABLESIZE{
+		let data = inputs[i].to_vec();
+		let mut hash = Sha256::new();
+		hash.update(&data);
+		let output = hash.finalize();
+		for j in 0..32 {
+			assignment.output[i][j] = M31::from(output[j] as u32);
+		}
+	}
+	let test_time = 16;
+    let mut assignments = vec![];
+    for i in 0..test_time {
+        assignments.push(assignment.clone());
+    }
+
+	let compile_result = compile(&HASHTABLECircuit::default()).unwrap();
+	let mut hint_registry = HintRegistry::<M31>::new();
+	hint_registry.register("myhint.tobinary", to_binary_hint);
+    let start_time = std::time::Instant::now();
+	let witness = compile_result
+	.witness_solver
+	.solve_witnesses_with_hints(&assignments, &mut hint_registry)
+	.unwrap();
+	let end_time = std::time::Instant::now();
+	println!("Generate witness Time: {:?}", end_time.duration_since(start_time));
+	run_circuit::<M31Config, M31ExtConfigSha2>(&compile_result, witness);
+	let end_time = std::time::Instant::now();
+	println!("Generate witness Time: {:?}", end_time.duration_since(start_time));
+}

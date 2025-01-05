@@ -84,14 +84,14 @@ fn sum_rational_vec<C: Config, B: RootAPI<C>>(builder: &mut B, vs: &[Rational]) 
 }
 
 // TODO-Feature: poly randomness
-fn get_column_randomness<C: Config>(builder: &mut API<C>, n_columns: usize) -> Vec<Variable> {
-    let mut randomness = vec![];
-    randomness.push(builder.constant(1));
-    for _ in 1..n_columns {
-        randomness.push(builder.get_random_value());
-    }
-    randomness
-}
+// fn get_column_randomness<C: Config>(builder: &mut API<C>, n_columns: usize) -> Vec<Variable> {
+//     let mut randomness = vec![];
+//     randomness.push(builder.constant(1));
+//     for _ in 1..n_columns {
+//         randomness.push(builder.get_random_value());
+//     }
+//     randomness
+// }
 
 fn concat_d1(v1: &[Vec<Variable>], v2: &[Vec<Variable>]) -> Vec<Vec<Variable>> {
     v1.iter()
@@ -100,8 +100,16 @@ fn concat_d1(v1: &[Vec<Variable>], v2: &[Vec<Variable>]) -> Vec<Vec<Variable>> {
         .collect()
 }
 
-fn combine_columns<C: Config>(
-    builder: &mut API<C>,
+fn get_column_randomness<C: Config, B: RootAPI<C>>(builder: &mut B, n_columns: usize) -> Vec<Variable> {
+    let mut randomness = vec![];
+    randomness.push(builder.constant(1));
+    for _ in 1..n_columns {
+        randomness.push(builder.get_random_value());
+    }
+    randomness
+}
+fn combine_columns<C: Config, B: RootAPI<C>>(
+    builder: &mut B,
     vec_2d: &[Vec<Variable>],
     randomness: &[Variable],
 ) -> Vec<Variable> {
@@ -236,29 +244,93 @@ impl<C: Config> StdCircuit<C> for LogUpCircuit {
 declare_circuit!(LogUpTestCircuit {
     test: Variable
 });
-pub struct LogUpTable {
-    pub table_keys: Vec<Vec<Variable>>,
-    pub table_values: Vec<Vec<Variable>>,
-    pub query_keys: Vec<Vec<Variable>>,
+pub struct LogUpSingleKeyTable {
+    pub table: Vec<Vec<Variable>>,
+    pub query_keys: Vec<Variable>,
     pub query_results: Vec<Vec<Variable>>,
 }
-impl LogUpTable {
-    pub fn new() -> Self {
+impl LogUpSingleKeyTable {
+    pub fn new(nb_bits: usize) -> Self {
         Self {
-            table_keys: vec![],
-            table_values: vec![],
+            table: vec![],
             query_keys: vec![],
             query_results: vec![],
         }
     }
-    pub fn add_table_row(&mut self, key: Vec<Variable>, value: Vec<Variable>) {
-        self.table_keys.push(key);
-        self.table_values.push(value);
+    pub fn new_table(&mut self, key: Vec<Variable>, value: Vec<Vec<Variable>>) {
+        if key.len() != value.len() {
+            panic!("key and value should have the same length");
+        }
+        if self.table.len() != 0 {
+            panic!("table already exists");
+        }
+        for i in 0..key.len() {
+            let mut entry = vec![key[i].clone()];
+            entry.extend(value[i].clone());
+            self.table.push(entry);
+        }
     }
-    pub fn add_query(&mut self, key: Vec<Variable>, result: Vec<Variable>) {
+    pub fn add_table_row(&mut self, key: Variable, value: Vec<Variable>) {
+        let mut entry = vec![key.clone()];
+        entry.extend(value.clone());
+        self.table.push(entry);
+    }
+    fn add_query(&mut self, key: Variable, value: Vec<Variable>) {
+        let mut entry = vec![key.clone()];
+        entry.extend(value.clone());
         self.query_keys.push(key);
-        self.query_results.push(result);
+        self.query_results.push(entry);
     }
+    pub fn query(&mut self, key: Variable, value: Vec<Variable>) {
+        self.add_query(key, value);
+    }
+    pub fn batch_query(&mut self, keys: Vec<Variable>, values: Vec<Vec<Variable>>) {
+        for i in 0..keys.len() {
+            self.add_query(keys[i].clone(), values[i].clone());
+        }
+    }
+    pub fn final_check<C: Config, B: RootAPI<C>>(&mut self, builder: &mut B) {
+        if self.table.len() == 0 || self.query_keys.len() == 0 {
+            panic!("empty table or empty query");
+        }
+
+        let value_len = self.table[0].len();
+
+        let alpha = builder.get_random_value();
+        let randomness = get_column_randomness(builder, value_len);
+
+        let table_combined = combine_columns(
+            builder,
+            &self.table,
+            &randomness,
+        );
+        let mut inputs = vec![builder.constant(self.table.len() as u32)];
+        //append table keys
+        for i in 0..self.table.len() {
+            inputs.push(self.table[i][0]);
+        }
+        //append query keys
+        inputs.extend(self.query_keys.clone());
+
+        let query_count = builder.new_hint("myhint.querycountbykeyhint", &inputs, self.table.len());
+        
+        let v_table = logup_poly_val(builder, &table_combined, &query_count, &alpha);
+
+        let query_combined = combine_columns(
+            builder,
+            &self.query_results,
+            &randomness,
+        );
+        let one = builder.constant(1);
+        let v_query = logup_poly_val(
+            builder,
+            &query_combined,
+            &vec![one; query_combined.len()],
+            &alpha,
+        );
+
+        assert_eq_rational(builder, &v_table, &v_query);
+    } 
 }
 
 pub struct LogUpRangeProofTable {
@@ -339,7 +411,7 @@ impl LogUpRangeProofTable {
     pub fn final_check<C: Config, B: RootAPI<C>>(&mut self, builder: &mut B) {
         let alpha = builder.get_random_value();
         let inputs = self.query_keys.clone();
-        println!("table len: {}", self.table_keys.len());
+        // println!("table len: {}", self.table_keys.len());
         let query_count = builder.new_hint("myhint.querycounthint", &inputs, self.table_keys.len());
         let v_table = logup_poly_val(builder, &self.table_keys, &query_count, &alpha);
 

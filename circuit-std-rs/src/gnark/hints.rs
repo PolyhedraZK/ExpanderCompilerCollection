@@ -439,7 +439,6 @@ pub fn final_exp_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> 
         //finalExpHint
         |inputs| {
             let biguint_inputs = inputs.iter().map(|x| x.to_biguint().unwrap()).collect::<Vec<_>>();
-            println!("biguint_inputs: {:?}", biguint_inputs);
             let mut miller_loop = Fq12::default();
             miller_loop.c0.c0.c0 = Fq::from(biguint_inputs[0].clone());
             miller_loop.c0.c0.c1 = Fq::from(biguint_inputs[1].clone());
@@ -467,28 +466,18 @@ pub fn final_exp_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> 
             let mut poly_factor = BigInt::default();
             poly_factor = BigInt::from_str("5044125407647214251").expect("Invalid string for BigInt");
             final_exp_factor= BigInt::from_str("2366356426548243601069753987687709088104621721678962410379583120840019275952471579477684846670499039076873213559162845121989217658133790336552276567078487633052653005423051750848782286407340332979263075575489766963251914185767058009683318020965829271737924625612375201545022326908440428522712877494557944965298566001441468676802477524234094954960009227631543471415676620753242466901942121887152806837594306028649150255258504417829961387165043999299071444887652375514277477719817175923289019181393803729926249507024121957184340179467502106891835144220611408665090353102353194448552304429530104218473070114105759487413726485729058069746063140422361472585604626055492939586602274983146215294625774144156395553405525711143696689756441298365274341189385646499074862712688473936093315628166094221735056483459332831845007196600723053356837526749543765815988577005929923802636375670820616189737737304893769679803809426304143627363860243558537831172903494450556755190448279875942974830469855835666815454271389438587399739607656399812689280234103023464545891697941661992848552456326290792224091557256350095392859243101357349751064730561345062266850238821755009430903520645523345000326783803935359711318798844368754833295302563158150573540616830138810935344206231367357992991289265295323280").expect("Invalid string for BigInt");
-            println!("final_exp_factor: {:?}", final_exp_factor);
             exponent = &final_exp_factor * 27;
-            println!("exponent: {:?}", exponent);
             let exp_uint = exponent.to_biguint().unwrap();
-            println!("exp_uint: {:?}", exp_uint);
-            println!("miller_loop: {:?}", miller_loop);
-            println!("miller_loop: {:?}", miller_loop.to_string());
             root = miller_loop.pow(exp_uint.to_u64_digits().iter());
-            println!("root: {:?}", root);
             if root.is_one() {
                 root_pth_inverse.set_one();
             } else {
-                // exponent_inv = mod_inverse(&BigInt::from(exponent.clone()), &poly_factor).unwrap();
                 exponent_inv = BigInt::from(exponent.clone().modinv(&poly_factor).unwrap());
-                println!("exponent_inv: {:?}", exponent_inv);
                 if exponent_inv.abs() > poly_factor {
                     exponent_inv = exponent_inv % &poly_factor;
                 }
                 exponent = &poly_factor - exponent_inv;
-                println!("exponent: {:?}", exponent);
                 exponent = exponent % &poly_factor;
-                println!("exponent: {:?}", exponent);
                 let exp_uint = exponent.to_biguint().unwrap();
                 root_pth_inverse = root.pow(exp_uint.to_u64_digits().iter());
             }
@@ -521,33 +510,24 @@ pub fn final_exp_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> 
                 exponent = &poly_factor * &final_exp_factor;
                 let exp_uint = exponent.to_biguint().unwrap();
                 root = miller_loop.pow(exp_uint.to_u64_digits().iter());
-                // exponent_inv = mod_inverse(&exponent, &order3rd).unwrap();
                 exponent_inv = exponent.modinv(&order3rd).unwrap();
-                println!("exponent_inv: {:?}", exponent_inv);
                 if exponent_inv.abs() > order3rd {
                     exponent_inv = exponent_inv % &order3rd;
                 }
                 exponent = &order3rd - exponent_inv;
-                println!("exponent: {:?}", exponent);
                 exponent = exponent % &order3rd;
-                println!("exponent: {:?}", exponent);
                 let exp_uint = exponent.to_biguint().unwrap();
                 root_27th_inverse = root.pow(exp_uint.to_u64_digits().iter());
             }
 
             scaling_factor = root_pth_inverse * root_27th_inverse;
-            println!("scaling_factor: {:?}", scaling_factor);
-            println!("scaling_factor: {:?}", scaling_factor.c0.c2.c1.to_string());
             miller_loop = miller_loop * scaling_factor;
 
             let mut lambda = BigInt::default();
             lambda = BigInt::from_str("4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129030796414117214202539").expect("Invalid string for BigInt");
             // exponent = mod_inverse(&lambda, &final_exp_factor).unwrap();
             exponent = lambda.modinv(&final_exp_factor).unwrap();
-            println!("exponent: {:?}", exponent);
             residue_witness = miller_loop.pow(exponent.to_biguint().unwrap().to_u64_digits().iter());
-            println!("residue_witness: {:?}", residue_witness);
-            println!("miller_loop: {:?}", residue_witness.to_string());
 
             let res_c0_b0_a0_bigint = residue_witness.c0.c0.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
             let res_c0_b0_a1_bigint = residue_witness.c0.c0.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
@@ -569,12 +549,6 @@ pub fn final_exp_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> 
             let sca_c0_b2_a0_bigint = scaling_factor.c0.c2.c0.to_string().parse::<BigInt>().unwrap_or_else(|_| BigInt::zero());
             let sca_c0_b2_a1_bigint = scaling_factor.c0.c2.c1.to_string().parse::<BigInt>().unwrap_or_else(|_| BigInt::zero());
             
-            println!("sca_c0_b0_a0_bigint{:?}", sca_c0_b0_a0_bigint);
-            println!("sca_c0_b0_a1_bigint{:?}", sca_c0_b0_a1_bigint);
-            println!("sca_c0_b1_a0_bigint{:?}", sca_c0_b1_a0_bigint);
-            println!("sca_c0_b1_a1_bigint{:?}", sca_c0_b1_a1_bigint);
-            println!("sca_c0_b2_a0_bigint{:?}", sca_c0_b2_a0_bigint);
-            println!("sca_c0_b2_a1_bigint{:?}", sca_c0_b2_a1_bigint);
             return vec![res_c0_b0_a0_bigint, res_c0_b0_a1_bigint, res_c0_b1_a0_bigint, 
                         res_c0_b1_a1_bigint, res_c0_b2_a0_bigint, res_c0_b2_a1_bigint, 
                         res_c1_b0_a0_bigint, res_c1_b0_a1_bigint, res_c1_b1_a0_bigint, 

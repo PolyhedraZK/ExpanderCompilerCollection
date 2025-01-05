@@ -325,7 +325,7 @@ pub fn check_sha256<C: Config, B: RootAPI<C>>(builder: &mut B, origin_data: &Vec
 	let output = origin_data[37..].to_vec();
 	let result = sha256_37bytes(builder, &origin_data[..37]);
 	for i in 0..32 {
-		println!("{}: {:?} {:?}", i, builder.value_of(result[i]), builder.value_of(output[i]));
+		// println!("{}: {:?} {:?}", i, builder.value_of(result[i]), builder.value_of(output[i]));
 		builder.assert_is_equal(result[i], output[i]);
 	}
 	result

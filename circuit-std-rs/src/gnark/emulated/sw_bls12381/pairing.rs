@@ -1,13 +1,8 @@
 use crate::gnark::emparam::bls12381_fp;
 use crate::gnark::emulated::field_bls12381::e12::*;
 use crate::gnark::emulated::field_bls12381::e2::*;
-// use crate::gnark::emulated::field_bls12381::e2::print_e2;
-// use crate::gnark::emulated::field_bls12381::e2::print_element;
 use crate::gnark::emulated::field_bls12381::e6::GE6;
 use crate::gnark::hints::register_hint;
-use crate::gnark::field::*;
-use crate::gnark::limbs::*;
-use crate::gnark::utils::*;
 use crate::gnark::emparam::FieldParams;
 use crate::gnark::element::*;
 use crate::gnark::emulated::point;

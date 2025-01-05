@@ -14,6 +14,28 @@ pub struct G1Affine {
     pub x: Element<bls12381_fp>,
     pub y: Element<bls12381_fp>,
 }
+impl G1Affine {
+    pub fn new(x: Element<bls12381_fp>, y: Element<bls12381_fp>) -> Self {
+        Self {
+            x,
+            y,
+        }
+    }
+    pub fn from_vars(x: Vec<Variable>, y: Vec<Variable>) -> Self {
+        Self {
+            x: Element::new(x, 0, false, false, false, Variable::default()),
+            y: Element::new(y, 0, false, false, false, Variable::default()),
+        }
+    }
+    pub fn one<'a, C: Config, B: RootAPI<C>>(native: &'a mut B) -> Self {
+        //g1Gen.X.SetString("3685416753713387016781088315183077757961620795782546409894578378688607592378376318836054947676345821548104185464507")
+	    //g1Gen.Y.SetString("1339506544944476473020471379941921221584933875938349620426543736416511423956333506472724655353366534992391756441569")
+        Self {
+            x: value_of::<C, B, bls12381_fp>(native, Box::new("3685416753713387016781088315183077757961620795782546409894578378688607592378376318836054947676345821548104185464507".to_string())),
+            y: value_of::<C, B, bls12381_fp>(native, Box::new("1339506544944476473020471379941921221584933875938349620426543736416511423956333506472724655353366534992391756441569".to_string())),
+        }
+    }
+}
 pub struct G1 {
     pub curve_f: CurveF,
     pub w: Element<bls12381_fp>,
