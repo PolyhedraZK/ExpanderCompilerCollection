@@ -82,12 +82,12 @@ impl<C: Config> WitnessSolver<C> {
                 self.circuit
                     .eval_safe_simd(simd_inputs, &simd_public_inputs, hint_caller)?;
             let mut tmp_result = Vec::with_capacity(simd_result.len());
-            for k in 0..simd_result.len() {
-                tmp_result.push(simd_result[k].unpack());
+            for x in simd_result.iter() {
+                tmp_result.push(x.unpack());
             }
             for i in i_start..i_end {
-                for k in 0..tmp_result.len() {
-                    values.push(tmp_result[k][i - i_start]);
+                for x in tmp_result.iter() {
+                    values.push(x[i - i_start]);
                 }
                 values.extend(tmp_public_inputs[i - i_start].iter());
             }

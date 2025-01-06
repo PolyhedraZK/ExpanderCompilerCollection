@@ -618,7 +618,7 @@ impl<C: Config> RootCircuit<C> {
                     ..
                 } => {
                     self.eval_sub_safe_simd(
-                        &self.circuits[&sub_circuit_id],
+                        &self.circuits[sub_circuit_id],
                         inputs.iter().map(|&i| values[i]).collect(),
                         public_inputs,
                         hint_caller,
