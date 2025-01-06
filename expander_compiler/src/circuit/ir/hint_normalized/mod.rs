@@ -575,7 +575,7 @@ impl<C: Config> RootCircuit<C> {
                     inputs,
                     num_outputs,
                 } => {
-                    let mut inputs_scalar = vec![Vec::with_capacity(inputs.len()); SF::pack_size()];
+                    let mut inputs_scalar = vec![Vec::with_capacity(inputs.len()); SF::PACK_SIZE];
                     for x in inputs.iter().map(|i| values[*i]) {
                         let tmp = x.unpack();
                         for (i, y) in tmp.iter().enumerate() {
@@ -583,7 +583,7 @@ impl<C: Config> RootCircuit<C> {
                         }
                     }
                     let mut outputs_tmp =
-                        vec![C::CircuitField::zero(); num_outputs * SF::pack_size()];
+                        vec![C::CircuitField::zero(); num_outputs * SF::PACK_SIZE];
                     for (i, inputs) in inputs_scalar.iter().enumerate() {
                         let outputs =
                             match hints::safe_impl(hint_caller, *hint_id, inputs, *num_outputs) {
@@ -591,12 +591,12 @@ impl<C: Config> RootCircuit<C> {
                                 Err(e) => return Err(e),
                             };
                         for (j, x) in outputs.iter().enumerate() {
-                            outputs_tmp[j * SF::pack_size() + i] = *x;
+                            outputs_tmp[j * SF::PACK_SIZE + i] = *x;
                         }
                     }
                     for i in 0..*num_outputs {
                         values.push(SF::pack(
-                            &outputs_tmp[i * SF::pack_size()..(i + 1) * SF::pack_size()],
+                            &outputs_tmp[i * SF::PACK_SIZE..(i + 1) * SF::PACK_SIZE],
                         ));
                     }
                 }

@@ -291,10 +291,10 @@ fn eval_simd_random() {
         config.seed = i + 10000;
         let root = RootCircuit::<C>::random(&config);
         assert_eq!(root.validate(), Ok(()));
-        let mut inputs = vec![Vec::new(); SF::pack_size()];
+        let mut inputs = vec![Vec::new(); SF::PACK_SIZE];
         let mut inputs_simd = Vec::new();
         for _ in 0..root.input_size() {
-            let tmp: Vec<CField> = (0..SF::pack_size())
+            let tmp: Vec<CField> = (0..SF::PACK_SIZE)
                 .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
                 .collect();
             for (x, y) in tmp.iter().zip(inputs.iter_mut()) {
@@ -302,10 +302,10 @@ fn eval_simd_random() {
             }
             inputs_simd.push(SF::pack(&tmp));
         }
-        let mut public_inputs = vec![Vec::new(); SF::pack_size()];
+        let mut public_inputs = vec![Vec::new(); SF::PACK_SIZE];
         let mut public_inputs_simd = Vec::new();
         for _ in 0..root.num_public_inputs {
-            let tmp: Vec<CField> = (0..SF::pack_size())
+            let tmp: Vec<CField> = (0..SF::PACK_SIZE)
                 .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
                 .collect();
             for (x, y) in tmp.iter().zip(public_inputs.iter_mut()) {
@@ -314,7 +314,7 @@ fn eval_simd_random() {
             public_inputs_simd.push(SF::pack(&tmp));
         }
         let mut outputs = Vec::new();
-        for i in 0..SF::pack_size() {
+        for i in 0..SF::PACK_SIZE {
             let cur_outputs = root
                 .eval_safe(inputs[i].clone(), &public_inputs[i], &mut StubHintCaller)
                 .unwrap();
