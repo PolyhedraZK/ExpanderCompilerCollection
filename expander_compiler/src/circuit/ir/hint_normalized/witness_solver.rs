@@ -1,5 +1,7 @@
 use crate::{circuit::layered::witness::Witness, utils::serde::Serde};
 
+use arith::SimdField;
+
 use super::*;
 
 pub struct WitnessSolver<C: Config> {
@@ -47,11 +49,49 @@ impl<C: Config> WitnessSolver<C> {
     ) -> Result<Witness<C>, Error> {
         let mut values = Vec::new();
         let mut num_inputs_per_witness = 0;
-        for i in 0..num_witnesses {
-            let (a, b) = f(i);
-            let (a, num) = self.solve_witness_inner(a, b, hint_caller)?;
-            values.extend(a);
-            num_inputs_per_witness = num;
+        let pack_size = C::DefaultSimdField::PACK_SIZE;
+        let num_blocks = (num_witnesses + pack_size - 1) / pack_size;
+        for j in 0..num_blocks {
+            let i_start = j * pack_size;
+            let i_end = num_witnesses.min((j + 1) * pack_size);
+            let mut tmp_inputs = Vec::new();
+            let mut tmp_public_inputs = Vec::new();
+            for i in i_start..i_end {
+                let (a, b) = f(i);
+                assert_eq!(a.len(), self.circuit.input_size());
+                assert_eq!(b.len(), self.circuit.num_public_inputs);
+                tmp_inputs.push(a);
+                tmp_public_inputs.push(b);
+            }
+            let mut simd_inputs = Vec::with_capacity(self.circuit.input_size());
+            let mut simd_public_inputs = Vec::with_capacity(self.circuit.num_public_inputs);
+            let mut tmp: Vec<C::CircuitField> = vec![C::CircuitField::zero(); pack_size];
+            for k in 0..self.circuit.input_size() {
+                for i in i_start..i_end {
+                    tmp[i - i_start] = tmp_inputs[i - i_start][k];
+                }
+                simd_inputs.push(C::DefaultSimdField::pack(&tmp));
+            }
+            for k in 0..self.circuit.num_public_inputs {
+                for i in i_start..i_end {
+                    tmp[i - i_start] = tmp_public_inputs[i - i_start][k];
+                }
+                simd_public_inputs.push(C::DefaultSimdField::pack(&tmp));
+            }
+            let simd_result =
+                self.circuit
+                    .eval_safe_simd(simd_inputs, &simd_public_inputs, hint_caller)?;
+            let mut tmp_result = Vec::with_capacity(simd_result.len());
+            for k in 0..simd_result.len() {
+                tmp_result.push(simd_result[k].unpack());
+            }
+            for i in i_start..i_end {
+                for k in 0..tmp_result.len() {
+                    values.push(tmp_result[k][i - i_start]);
+                }
+                values.extend(tmp_public_inputs[i - i_start].iter());
+            }
+            num_inputs_per_witness = tmp_result.len();
         }
         Ok(Witness {
             num_witnesses,
