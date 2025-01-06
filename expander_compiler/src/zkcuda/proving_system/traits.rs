@@ -1,7 +1,13 @@
 use crate::circuit::config::Config;
 use super::super::kernel::Kernel;
 
-pub trait Commitment<C: Config>: Clone {}
+pub trait Commitment<C: Config>: Clone {
+    fn vals_ref(&self) -> &[C::CircuitField];
+
+    fn vals_len(&self) -> usize {
+        self.vals_ref().len()
+    }
+}
 
 pub trait Proof: Clone {}
 
