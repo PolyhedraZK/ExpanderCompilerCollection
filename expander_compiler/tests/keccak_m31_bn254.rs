@@ -315,7 +315,7 @@ fn keccak_big_field<C: Config, const N_WITNESSES: usize>(field_name: &str) {
         let out_compressed = compress_bits(out_bits);
         assert_eq!(out_compressed.len(), CHECK_PARTITIONS);
         for (i, x) in out_compressed.iter().enumerate() {
-            assert!(U256::from(*x as u64) < C::CircuitField::modulus());
+            assert!(U256::from(*x as u64) < C::CircuitField::MODULUS);
             assignment.out[k][i] = C::CircuitField::from(*x as u32);
         }
     }

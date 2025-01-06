@@ -8,6 +8,8 @@ crate-type = ["dylib"]
 
 [dependencies]
 rand.workspace = true
+gkr_field_config.workspace = true
+mpi_config.workspace = true
 expander_config.workspace = true
 expander_circuit.workspace = true
 gkr.workspace = true

@@ -284,38 +284,38 @@ pub fn u256_bit_length(x: U256) -> usize {
 }
 
 pub fn circom_shift_l_impl<F: Field>(x: U256, k: U256) -> U256 {
-    let top = F::modulus() / 2;
+    let top = F::MODULUS / 2;
     if k <= top {
         let shift = if (k >> U256::from(64u32)) == U256::ZERO {
             k.as_u64() as usize
         } else {
-            u256_bit_length(F::modulus())
+            u256_bit_length(F::MODULUS)
         };
         if shift >= 256 {
             return U256::ZERO;
         }
         let value = x << shift;
-        let mask = U256::from(1u32) << u256_bit_length(F::modulus());
+        let mask = U256::from(1u32) << u256_bit_length(F::MODULUS);
         let mask = mask - 1;
         value & mask
     } else {
-        circom_shift_r_impl::<F>(x, F::modulus() - k)
+        circom_shift_r_impl::<F>(x, F::MODULUS - k)
     }
 }
 
 pub fn circom_shift_r_impl<F: Field>(x: U256, k: U256) -> U256 {
-    let top = F::modulus() / 2;
+    let top = F::MODULUS / 2;
     if k <= top {
         let shift = if (k >> U256::from(64u32)) == U256::ZERO {
             k.as_u64() as usize
         } else {
-            u256_bit_length(F::modulus())
+            u256_bit_length(F::MODULUS)
         };
         if shift >= 256 {
             return U256::ZERO;
         }
         x >> shift
     } else {
-        circom_shift_l_impl::<F>(x, F::modulus() - k)
+        circom_shift_l_impl::<F>(x, F::MODULUS - k)
     }
 }
