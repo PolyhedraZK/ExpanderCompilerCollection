@@ -5,7 +5,7 @@ use crate::hints::registry::HintCaller;
 use crate::utils::error::Error;
 use crate::{
     circuit::{
-        config::{Config, SimdFieldForConfig},
+        config::Config,
         input_mapping::{InputMapping, EMPTY},
         layered::Coef,
     },
@@ -529,7 +529,7 @@ impl<C: Config> RootCircuit<C> {
         Ok(res)
     }
 
-    pub fn eval_safe_simd<SF: SimdFieldForConfig<C>>(
+    pub fn eval_safe_simd<SF: arith::SimdField<Scalar = C::CircuitField>>(
         &self,
         inputs: Vec<SF>,
         public_inputs: &[SF],
@@ -547,7 +547,7 @@ impl<C: Config> RootCircuit<C> {
         Ok(result_values)
     }
 
-    fn eval_sub_safe_simd<SF: SimdFieldForConfig<C>>(
+    fn eval_sub_safe_simd<SF: arith::SimdField<Scalar = C::CircuitField>>(
         &self,
         circuit: &Circuit<C>,
         inputs: Vec<SF>,
@@ -594,9 +594,9 @@ impl<C: Config> RootCircuit<C> {
                             outputs_tmp[j * SF::pack_size() + i] = *x;
                         }
                     }
-                    for i in 0..SF::pack_size() {
+                    for i in 0..*num_outputs {
                         values.push(SF::pack(
-                            &outputs_tmp[i * num_outputs..(i + 1) * num_outputs],
+                            &outputs_tmp[i * SF::pack_size()..(i + 1) * SF::pack_size()],
                         ));
                     }
                 }

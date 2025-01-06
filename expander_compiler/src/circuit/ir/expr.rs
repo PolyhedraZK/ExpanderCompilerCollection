@@ -4,9 +4,9 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use crate::circuit::config::Config;
 use crate::field::{FieldArith, FieldModulus};
 use crate::utils::serde::Serde;
-use crate::{circuit::config::Config, frontend::SimdFieldForConfig};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Term<C: Config> {
@@ -438,7 +438,7 @@ impl<C: Config> LinComb<C> {
         }
         res
     }
-    pub fn eval_simd<SF: SimdFieldForConfig<C>>(&self, values: &[SF]) -> SF {
+    pub fn eval_simd<SF: arith::SimdField<Scalar = C::CircuitField>>(&self, values: &[SF]) -> SF {
         let mut res = SF::one().scale(&self.constant);
         for term in self.terms.iter() {
             res += values[term.var].scale(&term.coef);

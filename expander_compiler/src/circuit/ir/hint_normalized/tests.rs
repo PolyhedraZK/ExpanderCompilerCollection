@@ -1,10 +1,11 @@
 use rand::{Rng, RngCore};
 
+use arith::SimdField;
+
 use super::{
     Instruction::{self, ConstantLike, LinComb, Mul},
     RootCircuit,
 };
-use crate::field::FieldArith;
 use crate::{
     circuit::{
         config::{Config, M31Config as C},
@@ -13,8 +14,10 @@ use crate::{
     },
     hints,
 };
+use crate::{field::FieldArith, hints::registry::StubHintCaller};
 
 type CField = <C as Config>::CircuitField;
+type SF = mersenne31::M31x16;
 
 #[test]
 fn remove_hints_simple() {
@@ -269,5 +272,62 @@ fn remove_and_export_random_2() {
         let (out2, cond2) = root_hint_less.eval_unsafe(out_ex);
         assert_eq!(out1, out2);
         assert_eq!(cond1, cond2);
+    }
+}
+
+#[test]
+fn eval_simd_random() {
+    let mut config = RandomCircuitConfig {
+        seed: 0,
+        num_circuits: RandomRange { min: 1, max: 10 },
+        num_inputs: RandomRange { min: 1, max: 10 },
+        num_instructions: RandomRange { min: 1, max: 10 },
+        num_constraints: RandomRange { min: 0, max: 10 },
+        num_outputs: RandomRange { min: 1, max: 10 },
+        num_terms: RandomRange { min: 1, max: 5 },
+        sub_circuit_prob: 0.5,
+    };
+    for i in 0..3000 {
+        config.seed = i + 10000;
+        let root = RootCircuit::<C>::random(&config);
+        assert_eq!(root.validate(), Ok(()));
+        let mut inputs = vec![Vec::new(); SF::pack_size()];
+        let mut inputs_simd = Vec::new();
+        for _ in 0..root.input_size() {
+            let tmp: Vec<CField> = (0..SF::pack_size())
+                .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
+                .collect();
+            for (x, y) in tmp.iter().zip(inputs.iter_mut()) {
+                y.push(*x);
+            }
+            inputs_simd.push(SF::pack(&tmp));
+        }
+        let mut public_inputs = vec![Vec::new(); SF::pack_size()];
+        let mut public_inputs_simd = Vec::new();
+        for _ in 0..root.num_public_inputs {
+            let tmp: Vec<CField> = (0..SF::pack_size())
+                .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
+                .collect();
+            for (x, y) in tmp.iter().zip(public_inputs.iter_mut()) {
+                y.push(*x);
+            }
+            public_inputs_simd.push(SF::pack(&tmp));
+        }
+        let mut outputs = Vec::new();
+        for i in 0..SF::pack_size() {
+            let cur_outputs = root
+                .eval_safe(inputs[i].clone(), &public_inputs[i], &mut StubHintCaller)
+                .unwrap();
+            outputs.push(cur_outputs);
+        }
+        let mut expected_outputs_simd = Vec::new();
+        for i in 0..outputs[0].len() {
+            let tmp: Vec<CField> = outputs.iter().map(|x| x[i]).collect();
+            expected_outputs_simd.push(SF::pack(&tmp));
+        }
+        let outputs_simd = root
+            .eval_safe_simd(inputs_simd, &public_inputs_simd, &mut StubHintCaller)
+            .unwrap();
+        assert_eq!(outputs_simd, expected_outputs_simd);
     }
 }
