@@ -8,4 +8,5 @@ libec_go_lib.*
 .idea
 .vscode
 .code
+*.log
 .DS_Store

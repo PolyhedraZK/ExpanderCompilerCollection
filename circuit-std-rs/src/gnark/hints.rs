@@ -26,6 +26,7 @@ pub fn register_hint(hint_registry: &mut HintRegistry<M31>) {
     hint_registry.register("myhint.mulhint", mul_hint);
     hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
     hint_registry.register("myhint.querycounthint", query_count_hint);
+    hint_registry.register("myhint.copyvarshint", copy_vars_hint);
     hint_registry.register("myhint.divhint", div_hint);
     hint_registry.register("myhint.invhint", inv_hint);
     hint_registry.register("myhint.dive2hint", div_e2_hint);
@@ -412,6 +413,12 @@ pub fn inverse_e12_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error
     }
     Ok(())
 }
+pub fn copy_vars_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+    for i in 0..outputs.len() {
+        outputs[i] = inputs[i];
+    }
+    Ok(())
+}
 pub fn copy_e2_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     if let Err(err) = unwrap_hint(true, true, inputs, outputs, 
         //copyE2Hint
@@ -647,31 +654,4 @@ pub fn unwrap_hint(is_emulated_input: bool, is_emulated_output: bool, native_inp
         native_outputs[i] = bigint_to_m31(&tmp_outputs[i]);
     }
     Ok(())
-}
-
-//TBD
-fn mod_inverse(g: &BigInt, n: &BigInt) -> Option<BigInt> {
-    let zero = BigInt::zero();
-    let one = BigInt::one();
-
-    let (mut old_r, mut r) = (n.clone(), g.clone());
-    let (mut old_t, mut t) = (zero.clone(), one.clone());
-
-    while !r.is_zero() {
-        let quotient = &old_r / &r;
-
-        let new_r = &old_r - &quotient * &r;
-        old_r = r;
-        r = new_r;
-
-        let new_t = &old_t - &quotient * &t;
-        old_t = t;
-        t = new_t;
-    }
-
-    if old_r != one {
-        None
-    } else {
-        Some((old_t % n + n) % n)
-    }
 }

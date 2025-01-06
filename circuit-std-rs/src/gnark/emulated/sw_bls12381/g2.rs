@@ -11,7 +11,7 @@ use crate::gnark::emulated::point;
 use expander_compiler::frontend::extra::*;
 use expander_compiler::{circuit::layered::InputType, frontend::*};
 use expander_compiler::frontend::builder::*;
-
+#[derive(Default,Clone)]
 pub struct G2AffP {
     pub x: GE2,
     pub y: GE2

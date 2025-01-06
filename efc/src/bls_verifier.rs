@@ -25,7 +25,7 @@ use crate::utils::run_circuit;
 declare_circuit!(PairingCircuit {
     pubkey: [[Variable;48];2],
     hm: [[[Variable;48];2];2],
-    sig: [[[Variable;48];2];2],
+    sig: [[[Variable;48];2];2]
 });
 
 impl GenericDefine<M31Config> for PairingCircuit<Variable> {

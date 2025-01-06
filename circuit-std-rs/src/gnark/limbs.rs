@@ -38,6 +38,6 @@ pub fn m31_to_bigint_array(input: &[M31]) -> Vec<BigInt> {
     input.iter().map(|x| m31_to_bigint(*x)).collect()
 }
 
-pub fn bigint_to_m31_array(input: &[BigInt]) -> Vec<M31> {
-    input.iter().map(|x| bigint_to_m31(x)).collect()
-}
+// pub fn bigint_to_m31_array(input: &[BigInt]) -> Vec<M31> {
+//     input.iter().map(|x| bigint_to_m31(x)).collect()
+// }

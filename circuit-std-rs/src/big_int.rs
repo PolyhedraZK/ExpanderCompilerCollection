@@ -174,7 +174,6 @@ pub fn m31_to_bit_array<C: Config, B: RootAPI<C>>(api: &mut B, m31: &[Variable])
 pub fn to_binary<C: Config, B: RootAPI<C>>(api: &mut B, x: Variable, n_bits: usize) -> Vec<Variable> {
     api.new_hint("myhint.tobinary", &vec![x], n_bits)
 }
-
 pub fn from_binary<C: Config, B: RootAPI<C>>(api: &mut B, bits: Vec<Variable>) -> Variable {
     let mut res = api.constant(0);
     for i in 0..bits.len() {
@@ -191,6 +190,61 @@ pub fn to_binary_hint(x: &[M31], y: &mut [M31]) -> Result<(), Error> {
         *k = M31::from_u256(t >> i as u32 & 1);
     }
     Ok(())
+}
+
+pub fn big_is_zero<C: Config, B: RootAPI<C>>(api: &mut B, k: usize, in_: &[Variable]) -> Variable {
+	let mut total = api.constant(k as u32);
+	for i in 0..k {
+		let tmp = api.is_zero(in_[i]);
+		total = api.sub(total, tmp);
+	}
+	api.is_zero(total)
+}
+
+pub fn bigint_to_m31_array<C: Config, B: RootAPI<C>>(api: &mut B, x: BigInt, n_bits: usize) -> Vec<Variable> {
+	let mut res = vec![];
+	let mut a = x.clone();
+	let mut mask = BigInt::from(1) << n_bits;
+	mask = mask - 1;
+	for _ in 0..n_bits {
+		let tmp = a.clone() & mask.clone();
+		let tmp = api.constant(tmp.to_u32().unwrap());
+		res.push(tmp);
+		a = a >> n_bits;
+	}
+	res
+}
+pub fn big_less_than<C: Config, B: RootAPI<C>>(api: &mut B, n: usize, k: usize, a: &Vec<Variable>, b: &Vec<Variable>) -> Variable {
+	let mut lt = vec![];
+	let mut eq = vec![];
+	for i in 0..k {
+		lt.push(my_is_less(api, n, a[i], b[i]));
+		let diff = api.sub(a[i], b[i]);	
+		eq.push(api.is_zero(diff));
+	}
+	let mut ors = vec![Variable::default(); k - 1];
+	let mut ands = vec![Variable::default(); k - 1];
+	let mut eq_ands = vec![Variable::default(); k - 1];
+	for i in (0..k-1).rev() {
+		if i == k - 2 {
+			ands.push(api.and(eq[k - 1], lt[k - 2]));
+			eq_ands.push(api.and(eq[k - 1], eq[k - 2]));
+			ors.push(api.or(lt[k - 1], ands[k-2]));
+		} else {
+			ands.push(api.and(eq_ands[i+1], lt[i]));
+			eq_ands.push(api.and(eq_ands[i+1], eq[i]));
+			ors.push(api.or(ors[i+1], ands[i]));
+		}
+	}
+	ors[0]
+}
+pub fn my_is_less<C: Config, B: RootAPI<C>>(api: &mut B, n: usize, a: Variable, b: Variable) -> Variable {
+	let neg_b = api.neg(b);
+	let tmp = api.add(a, 1 << n);
+	let tmp = api.add(tmp, neg_b);
+	let bi1 = to_binary(api, tmp, n + 1);
+	let one = api.constant(1);
+	api.sub(one, bi1[n])
 }
 
 pub fn idiv_mod_bit<C: Config, B: RootAPI<C>>(builder: &mut B, a: Variable, b: u64) -> (Variable, Variable) {

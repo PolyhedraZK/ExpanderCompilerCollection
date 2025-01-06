@@ -7,6 +7,7 @@ use crate::gnark::utils::*;
 use crate::gnark::emparam::FieldParams;
 use crate::gnark::element::*;
 use crate::logup::LogUpRangeProofTable;
+use crate::utils::simple_select;
 use expander_compiler::frontend::extra::*;
 use expander_compiler::{circuit::layered::InputType, frontend::*};
 use expander_compiler::frontend::builder::*;
@@ -164,15 +165,10 @@ impl <T: FieldParams>Field<T> {
         let a_norm_limbs = normalize(a.limbs.clone());
         let b_norm_limbs = normalize(b.limbs.clone());
         for i in 0..limbs.len() {
-            limbs[i] = self.simple_select(native, selector, a_norm_limbs[i], b_norm_limbs[i]);
+            limbs[i] = simple_select(native, selector, a_norm_limbs[i], b_norm_limbs[i]);
         }
         let e = new_internal_element::<T>(limbs, overflow);
         e
-    }
-    pub fn simple_select<'a, C: Config, B: RootAPI<C>>(&self, native: &'a mut B, selector: Variable, a: Variable, b: Variable) -> Variable {
-        let tmp = native.sub(a, b);
-        let tmp2 = native.mul(tmp, selector);
-        native.add(b, tmp2)
     }
     pub fn enforce_width_conditional<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: &Element<T>) -> bool{
         let mut did_constrain = false;
@@ -518,8 +514,8 @@ impl <T: FieldParams>Field<T> {
         return ret;
     }
     pub fn check_mul<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B) {
-        // let commitment = native.get_random_value();
-        let commitment = native.constant(1); //TBD
+        let commitment = native.get_random_value();
+        // let commitment = native.constant(1); //TBD
         let mut coefs_len = T::nb_limbs() as usize;
         for i in 0..self.mul_checks.len() {
             coefs_len = std::cmp::max(coefs_len, self.mul_checks[i].a.limbs.len());

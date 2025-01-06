@@ -10,6 +10,7 @@ use expander_compiler::frontend::extra::*;
 use expander_compiler::{circuit::layered::InputType, frontend::*};
 use expander_compiler::frontend::builder::*;
 
+#[derive(Default,Clone)]
 pub struct G1Affine {
     pub x: Element<bls12381_fp>,
     pub y: Element<bls12381_fp>,
