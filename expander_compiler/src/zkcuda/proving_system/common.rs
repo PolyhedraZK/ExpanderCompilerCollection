@@ -1,8 +1,8 @@
-use arith::Field;
 use crate::circuit::config::Config;
+use arith::Field;
 
-use super::Commitment;
 use super::super::kernel::Kernel;
+use super::Commitment;
 
 pub fn check_inputs<C: Config>(
     kernel: &Kernel<C>,

@@ -1,7 +1,7 @@
 use crate::circuit::config::Config;
 
-use super::{Commitment, ProvingSystem, Proof, check_inputs, prepare_inputs};
 use super::super::kernel::Kernel;
+use super::{check_inputs, prepare_inputs, Commitment, Proof, ProvingSystem};
 
 #[derive(Clone)]
 pub struct DummyCommitment<C: Config> {

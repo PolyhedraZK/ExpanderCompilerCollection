@@ -24,6 +24,7 @@ mersenne31.workspace = true
 macros = {path = "./macros" }
 poly_commit.workspace = true
 polynomials.workspace = true
+sumcheck.workspace = true
 
 [[bin]]
 name = "trivial_circuit"

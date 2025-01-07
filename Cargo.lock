@@ -676,6 +676,7 @@ dependencies = [
  "poly_commit",
  "polynomials",
  "rand",
+ "sumcheck",
  "tiny-keccak",
  "transcript",
 ]

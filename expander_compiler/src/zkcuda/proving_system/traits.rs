@@ -1,5 +1,5 @@
-use crate::circuit::config::Config;
 use super::super::kernel::Kernel;
+use crate::circuit::config::Config;
 
 pub trait Commitment<C: Config>: Clone {
     fn vals_ref(&self) -> &[C::CircuitField];
