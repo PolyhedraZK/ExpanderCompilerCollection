@@ -9,4 +9,5 @@ libec_go_lib.*
 .vscode
 .code
 *.log
+*.witness
 .DS_Store

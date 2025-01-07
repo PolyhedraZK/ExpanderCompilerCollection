@@ -1,9 +1,11 @@
 use std::thread;
 use std::cell::RefCell;
+use std::sync::Arc;
 use std::rc::Rc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use ark_bls12_381::g2;
 use circuit_std_rs::gnark::hints::register_hint;
+use expander_compiler::circuit::ir::hint_normalized::witness_solver;
 use expander_compiler::frontend::*;
 use expander_config::M31ExtConfigSha2;
 use num_bigint::BigInt;
@@ -124,7 +126,6 @@ fn run_expander_pairing(){
     for i in 0..test_time {
         assignments.push(assignment.clone());
     }
-
 	let compile_result = compile_generic(&PairingCircuit::default(),CompileOptions::default()).unwrap();
     let start_time = std::time::Instant::now();
 	let witness = compile_result
@@ -136,4 +137,86 @@ fn run_expander_pairing(){
 	run_circuit::<M31Config, M31ExtConfigSha2>(&compile_result, witness);
 	let end_time = std::time::Instant::now();
 	println!("Generate witness Time: {:?}", end_time.duration_since(start_time));
+}
+
+#[test]
+fn run_multi_pairing(){
+    /*
+    hm E([2128747184964102066453428909345807587167353354433686779055175069717994597853044053001604474195549116663962354781667+600928199043548865756890420428378235956589666349872943435617471245143322438124492345775032317976373712791854412075*u,2673014212711484998033216133821539885421138070306477264866327549730911573831074801525177859765712567167095903919303+843401639836709482028685764607129261791330643868212867532430090507242037514006427793603581220496836139166547085499*u])
+    sig E([963823355633972122114533498175662916621992470505354782789337615847591161145194281419366975300935939968232579346290+596907481049847637954275493859228934805964488037826922094320375977359016208358247522168009186501678750789366694831*u,1503040898615551538476187079486863259539849948567091887110583169943865184109068018840042625482669131770515482621711+3444166137003222945962463909857562676481832034105318967013156342862358108020440293426901361538632823324929201906078*u])
+    aggPubkey E([3103244252149090420124940058491173358275189586453938010595576928631997313493844448363005953641905183987079560513835,1296246409150097609953508557969533080097715407458068120115474713311006715865163545587973784795351244083056720382121])
+     */
+    let assignment = PairingCircuit::<M31> {
+        pubkey: [string_to_m31_array("3103244252149090420124940058491173358275189586453938010595576928631997313493844448363005953641905183987079560513835", 8), 
+                string_to_m31_array("1296246409150097609953508557969533080097715407458068120115474713311006715865163545587973784795351244083056720382121", 8)],
+        hm: [
+            [string_to_m31_array("2128747184964102066453428909345807587167353354433686779055175069717994597853044053001604474195549116663962354781667", 8), 
+            string_to_m31_array("600928199043548865756890420428378235956589666349872943435617471245143322438124492345775032317976373712791854412075", 8)], 
+            [string_to_m31_array("2673014212711484998033216133821539885421138070306477264866327549730911573831074801525177859765712567167095903919303", 8),
+            string_to_m31_array("843401639836709482028685764607129261791330643868212867532430090507242037514006427793603581220496836139166547085499", 8)]
+            ],
+        sig: [
+            [string_to_m31_array("963823355633972122114533498175662916621992470505354782789337615847591161145194281419366975300935939968232579346290", 8), 
+            string_to_m31_array("596907481049847637954275493859228934805964488037826922094320375977359016208358247522168009186501678750789366694831", 8),],
+            [string_to_m31_array("1503040898615551538476187079486863259539849948567091887110583169943865184109068018840042625482669131770515482621711", 8),
+            string_to_m31_array("3444166137003222945962463909857562676481832034105318967013156342862358108020440293426901361538632823324929201906078", 8)]
+        ]
+    };
+	let test_time = 2048;
+    let mut assignments = vec![];
+    let mut hint_registries = vec![];
+    for i in 0..test_time {
+        assignments.push(assignment.clone());
+    }
+    for i in 0..test_time/16 {
+        let mut hint_registry = HintRegistry::<M31>::new();
+        register_hint(&mut hint_registry);
+        hint_registries.push(hint_registry);
+    }
+
+    let assignment_chunks: Vec<Vec<PairingCircuit<M31>>> =
+        assignments.chunks(16).map(|x| x.to_vec()).collect();
+    let mut w_s: witness_solver::WitnessSolver::<M31Config>;
+    if std::fs::metadata("pairing.witness").is_ok() {
+        println!("The file exists!");
+        w_s = witness_solver::WitnessSolver::deserialize_from(std::fs::File::open("pairing.witness").unwrap()).unwrap();
+    } else {
+        println!("The file does not exist.");
+        let compile_result = compile_generic(&PairingCircuit::default(), CompileOptions::default()).unwrap();
+        compile_result.witness_solver.serialize_into(std::fs::File::create("pairing.witness").unwrap()).unwrap();
+        w_s = compile_result.witness_solver;
+    }
+    let witness_solver = Arc::new(w_s);
+    let start_time = std::time::Instant::now();
+    let handles = assignment_chunks
+        .into_iter()
+        .zip(hint_registries)
+        .map(|(assignments, hint_registry)| {
+            let witness_solver = Arc::clone(&witness_solver);
+            thread::spawn(move || {
+                let mut hint_registry1 = HintRegistry::<M31>::new();
+                register_hint(&mut hint_registry1);
+                witness_solver.solve_witnesses_with_hints(&assignments, &mut hint_registry1).unwrap();
+            }
+            )
+        })
+        .collect::<Vec<_>>();
+    // let handles = assignment_chunks
+    //     .into_iter()
+    //     .map(|assignments| {
+    //         let witness_solver = Arc::clone(&witness_solver);
+    //         let hint_register = Arc::clone(&share_hint_registry);
+    //         thread::spawn(move || witness_solver.solve_witnesses_with_hints(&assignments, &mut ).unwrap())
+    //     })
+    //     .collect::<Vec<_>>();
+    let mut results = Vec::new();
+    for handle in handles {
+        results.push(handle.join().unwrap());
+    }
+    let end_time = std::time::Instant::now();
+    println!("Generate witness Time: {:?}", end_time.duration_since(start_time));
+    // for result in results {
+    //     let output = compile_result.layered_circuit.run(&result);
+    //     assert_eq!(output, vec![true; 16]);
+    // }
 }

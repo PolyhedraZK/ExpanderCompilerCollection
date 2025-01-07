@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::str::FromStr;
+use crate::big_int::to_binary_hint;
 use crate::gnark::limbs::*;
 use crate::gnark::utils::*;
 use crate::gnark::emparam::FieldParams;
@@ -23,6 +24,7 @@ use ark_ff::fields::Field;
 use num_traits::One;
 
 pub fn register_hint(hint_registry: &mut HintRegistry<M31>) {
+    hint_registry.register("myhint.tobinary", to_binary_hint);
     hint_registry.register("myhint.mulhint", mul_hint);
     hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
     hint_registry.register("myhint.querycounthint", query_count_hint);

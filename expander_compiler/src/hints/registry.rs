@@ -37,7 +37,7 @@ impl<F: Field> HintRegistry<F> {
     ) {
         let id = hint_key_to_id(key);
         if self.hints.contains_key(&id) {
-            panic!("Hint with id {} already exists", id);
+            panic!("Hint with id {} already exists, key{}", id, key);
         }
         self.hints.insert(id, Box::new(hint));
     }
