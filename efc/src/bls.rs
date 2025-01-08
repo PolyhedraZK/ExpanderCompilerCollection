@@ -40,7 +40,7 @@ pub fn assert_public_key_and_bls<C: Config, B: RootAPI<C>>(api: &mut B, pubkey: 
     let is_infinity = api.mul(x_is_zero, y_is_zero);
 
     let half_fp = BigInt::from_str("4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787").unwrap() / 2;
-    let half_fp_var = bigint_to_m31_array(api, half_fp, K);
+    let half_fp_var = bigint_to_m31_array(api, half_fp, N, K);
     let lex_large = big_less_than(api, N, K, &half_fp_var, &public_key_bls.y.limbs);
     //
     // 0 0: mCompressedSmallest
@@ -56,7 +56,7 @@ pub fn assert_public_key_and_bls<C: Config, B: RootAPI<C>>(api: &mut B, pubkey: 
     let mut out_tmp = pubkey.clone();
     out_tmp[0] = api.sub(out_tmp[0], mask);
     // logup::range_proof_single_chunk(api, out_tmp[0], 5); //return the value, and logup it to the range of 5 after this function call
-    compare_two_scalars(api, &public_key_bls.x.limbs, K, &out_tmp, 8, empty_flag);
+    compare_two_scalars(api, &public_key_bls.x.limbs, N, &out_tmp, 8, empty_flag);
     out_tmp[0]
 }
 pub fn compare_two_scalars<C: Config, B: RootAPI<C>>(api: &mut B, scalar1: &Vec<Variable>, n_bit1: usize, scalar2: &Vec<Variable>, n_bit2: usize, empty_flag: Variable) {

@@ -3,6 +3,6 @@ pub use traits::StdCircuit;
 pub mod hashtable;
 pub mod utils;
 pub mod bls_verifier;
-// pub mod shuffle;
+pub mod shuffle;
 pub mod bls;
 pub mod validator;

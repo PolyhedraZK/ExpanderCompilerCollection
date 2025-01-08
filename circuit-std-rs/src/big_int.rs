@@ -201,12 +201,12 @@ pub fn big_is_zero<C: Config, B: RootAPI<C>>(api: &mut B, k: usize, in_: &[Varia
 	api.is_zero(total)
 }
 
-pub fn bigint_to_m31_array<C: Config, B: RootAPI<C>>(api: &mut B, x: BigInt, n_bits: usize) -> Vec<Variable> {
+pub fn bigint_to_m31_array<C: Config, B: RootAPI<C>>(api: &mut B, x: BigInt, n_bits: usize, limb_len: usize) -> Vec<Variable> {
 	let mut res = vec![];
 	let mut a = x.clone();
 	let mut mask = BigInt::from(1) << n_bits;
 	mask = mask - 1;
-	for _ in 0..n_bits {
+	for _ in 0..limb_len {
 		let tmp = a.clone() & mask.clone();
 		let tmp = api.constant(tmp.to_u32().unwrap());
 		res.push(tmp);

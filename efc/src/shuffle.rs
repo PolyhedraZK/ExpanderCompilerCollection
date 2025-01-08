@@ -6,6 +6,7 @@ use ark_bls12_381::g2;
 use circuit_std_rs::gnark::hints::register_hint;
 use circuit_std_rs::logup::LogUpRangeProofTable;
 use circuit_std_rs::utils::simple_select;
+use expander_compiler::circuit::ir::hint_normalized::witness_solver;
 use expander_compiler::frontend::*;
 use expander_config::M31ExtConfigSha2;
 use num_bigint::BigInt;
@@ -74,7 +75,7 @@ type ShuffleWithHashMapAggPubkeyCircuit struct {
 
 */
 // Define defines the circuit
-declare_circuit!(ShuffleWithHashMapAggPubkeyCircuit {
+declare_circuit!(ShuffleCircuit {
     start_index:         Variable,
     chunk_length:        Variable,
     shuffle_indices:     [Variable;VALIDATOR_CHUNK_SIZE],
@@ -87,10 +88,18 @@ declare_circuit!(ShuffleWithHashMapAggPubkeyCircuit {
     validator_hashes:    [[Variable;POSEIDON_HASH_LENGTH];VALIDATOR_CHUNK_SIZE],
     slot:               Variable,
     aggregation_bits:    [Variable;VALIDATOR_CHUNK_SIZE],
-    aggregated_pubkey:   G1Affine,
+    aggregated_pubkey:   [[Variable;48];2],
     attestation_balance: [Variable;8],
-    pubkeys_bls:      [G1Affine;VALIDATOR_CHUNK_SIZE],
-    validators:      [ValidatorSSZ;VALIDATOR_CHUNK_SIZE],
+    pubkeys_bls:      [[[Variable;48];2];VALIDATOR_CHUNK_SIZE],
+    // validators:      [ValidatorSSZ;VALIDATOR_CHUNK_SIZE],
+    public_key: [[Variable; 48];VALIDATOR_CHUNK_SIZE],
+    withdrawal_credentials: [[Variable; 32];VALIDATOR_CHUNK_SIZE],
+    effective_balance: [[Variable; 8];VALIDATOR_CHUNK_SIZE],
+    slashed: [[Variable; 1];VALIDATOR_CHUNK_SIZE],
+    activation_eligibility_epoch: [[Variable; 8];VALIDATOR_CHUNK_SIZE],
+    activation_epoch: [[Variable; 8];VALIDATOR_CHUNK_SIZE],
+    exit_epoch: [[Variable; 8];VALIDATOR_CHUNK_SIZE],
+    withdrawable_epoch: [[Variable; 8];VALIDATOR_CHUNK_SIZE],
 });
 
 /*
@@ -151,7 +160,7 @@ func (circuit *ShuffleWithHashMapAggPubkeyCircuit) Define(api frontend.API) erro
 }
 */
 
-impl GenericDefine<M31Config> for ShuffleWithHashMapAggPubkeyCircuit<Variable> {
+impl GenericDefine<M31Config> for ShuffleCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g1 = G1::new(builder);
 
@@ -185,8 +194,8 @@ impl GenericDefine<M31Config> for ShuffleWithHashMapAggPubkeyCircuit<Variable> {
         let mut pubkey_list = vec![];
         let mut acc_balance = vec![];
         for i in 0..self.committee_indices.len() {
-            pubkey_list.push(self.validators[i].public_key.clone());
-            acc_balance.push(self.validators[i].effective_balance.clone());
+            pubkey_list.push(self.public_key[i].clone());
+            acc_balance.push(self.effective_balance[i].clone());
         }
         let effect_balance = calculate_balance(builder, &mut acc_balance, &self.aggregation_bits);
         for i in 0..effect_balance.len() {
@@ -195,7 +204,8 @@ impl GenericDefine<M31Config> for ShuffleWithHashMapAggPubkeyCircuit<Variable> {
 
         let mut pubkey_list_bls = vec![];
         for i in 0..pubkey_list.len() {
-            let logup_var = check_pubkey_key_bls(builder, pubkey_list[i].to_vec(), &self.pubkeys_bls[i]);
+            let agg_pubkey_g1 = G1Affine::from_vars(self.pubkeys_bls[i][0].to_vec(), self.pubkeys_bls[i][1].to_vec());
+            let logup_var = check_pubkey_key_bls(builder, pubkey_list[i].to_vec(), &agg_pubkey_g1);
             g1.curve_f.table.rangeproof(builder, logup_var, 5);
         }
 
@@ -303,27 +313,18 @@ pub fn aggregate_attestation_public_key<C: Config, B: RootAPI<C>>(builder: &mut 
     // g1.curve_f.table.assert_is_equal(&aggregated_pubkey.y, &agg_pubkey.y);
 }
 
-// #[test]
-// fn test_shuffle_with_hash_map_agg_pubkey_circuit() {
-//     let mut rng = ark_std::test_rng();
-//     let mut builder = M31Config::default();
-//     let mut circuit = ShuffleWithHashMapAggPubkeyCircuit {
-//         start_index: builder.constant(0),
-//         chunk_length: builder.constant(0),
-//         shuffle_indices: [builder.constant(0); VALIDATOR_CHUNK_SIZE],
-//         committee_indices: [builder.constant(0); VALIDATOR_CHUNK_SIZE],
-//         pivots: [builder.constant(0); SHUFFLE_ROUND],
-//         index_count: builder.constant(0),
-//         position_results: [builder.constant(0); SHUFFLE_ROUND * VALIDATOR_CHUNK_SIZE],
-//         position_bit_results: [builder.constant(0); SHUFFLE_ROUND * VALIDATOR_CHUNK_SIZE],
-//         flip_results: [builder.constant(0); SHUFFLE_ROUND * VALIDATOR_CHUNK_SIZE],
-//         validator_hashes: [[builder.constant(0); POSEIDON_HASH_LENGTH]; VALIDATOR_CHUNK_SIZE],
-//         slot: builder.constant(0),
-//         aggregation_bits: [builder.constant(0); VALIDATOR_CHUNK_SIZE],
-//         aggregated_pubkey: G1Affine::default(),
-//         attestation_balance: [builder.constant(0); 8],
-//         pubkeys_bls: [G1Affine::default(); VALIDATOR_CHUNK_SIZE],
-//         validators: [ValidatorSSZ::new(); VALIDATOR_CHUNK_SIZE],
-//     };
-//     run_circuit::<M31Config, ShuffleWithHashMapAggPubkeyCircuit<Variable>>(&mut builder, &mut circuit);
-// }
+#[test]
+fn run_multi_shuffle() {
+    let mut rng = ark_std::test_rng();
+    let mut builder = M31Config::default();
+    let mut w_s: witness_solver::WitnessSolver::<M31Config>;
+    if std::fs::metadata("shuffle.witness").is_ok() {
+        println!("The file exists!");
+        w_s = witness_solver::WitnessSolver::deserialize_from(std::fs::File::open("shuffle.witness").unwrap()).unwrap();
+    } else {
+        println!("The file does not exist.");
+        let compile_result = compile_generic(&ShuffleCircuit::default(), CompileOptions::default()).unwrap();
+        compile_result.witness_solver.serialize_into(std::fs::File::create("shuffle.witness").unwrap()).unwrap();
+        w_s = compile_result.witness_solver;
+    }
+}
