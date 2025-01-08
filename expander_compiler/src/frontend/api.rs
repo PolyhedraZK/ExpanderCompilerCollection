@@ -57,6 +57,12 @@ pub trait BasicAPI<C: Config> {
         num_outputs: usize,
     ) -> Vec<Variable>;
     fn constant(&mut self, x: impl ToVariableOrValue<C::CircuitField>) -> Variable;
+    // try to get the value of a compile-time constant variable
+    // this function has different behavior in normal and debug mode, in debug mode it always returns Some(value)
+    fn constant_value(
+        &mut self,
+        x: impl ToVariableOrValue<C::CircuitField>,
+    ) -> Option<C::CircuitField>;
 }
 
 pub trait UnconstrainedAPI<C: Config> {
