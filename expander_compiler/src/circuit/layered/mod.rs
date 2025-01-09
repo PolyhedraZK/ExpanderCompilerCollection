@@ -268,7 +268,7 @@ pub struct Gate<C: Config, I: InputType, const INPUT_NUM: usize> {
 
 impl<C: Config, const INPUT_NUM: usize> Gate<C, NormalInputType, INPUT_NUM> {
     pub fn export_to_expander<
-        DestConfig: expander_config::GKRConfig<CircuitField = C::CircuitField>,
+        DestConfig: gkr_field_config::GKRFieldConfig<CircuitField = C::CircuitField>,
     >(
         &self,
     ) -> expander_circuit::Gate<DestConfig, INPUT_NUM> {
