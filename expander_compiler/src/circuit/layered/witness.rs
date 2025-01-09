@@ -203,12 +203,22 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         if witness.num_witnesses == 0 {
             panic!("expected at least 1 witness")
         }
-        let mut res = Vec::new();
-        for (inputs, public_inputs) in witness.iter_scalar() {
-            let (_, out) = self.eval_with_public_inputs(inputs, &public_inputs);
-            res.push(out);
+        if use_simd::<C>(witness.num_witnesses) {
+            let mut res = Vec::new();
+            for (inputs, public_inputs) in witness.iter_simd() {
+                let (_, out) = self.eval_with_public_inputs_simd(inputs, &public_inputs);
+                res.extend(out);
+            }
+            res.truncate(witness.num_witnesses);
+            res
+        } else {
+            let mut res = Vec::new();
+            for (inputs, public_inputs) in witness.iter_scalar() {
+                let (_, out) = self.eval_with_public_inputs(inputs, &public_inputs);
+                res.push(out);
+            }
+            res
         }
-        res
     }
 }
 
