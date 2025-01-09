@@ -10,13 +10,13 @@ use crate::{
     utils::serde::Serde,
 };
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum WitnessValues<C: Config> {
     Scalar(Vec<C::CircuitField>),
     Simd(Vec<C::DefaultSimdField>),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Witness<C: Config> {
     pub num_witnesses: usize,
     pub num_inputs_per_witness: usize,
@@ -314,5 +314,37 @@ impl<C: Config> Serde for Witness<C> {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::circuit::config::M31Config;
+    use crate::field::M31;
+
+    #[test]
+    fn basic_simd() {
+        let n = 29;
+        let a = 17;
+        let b = 5;
+        let mut v = Vec::new();
+        for _ in 0..n * (a + b) {
+            v.push(M31::random_unsafe(&mut rand::thread_rng()));
+        }
+        let w1: Witness<M31Config> = Witness {
+            num_witnesses: n,
+            num_inputs_per_witness: a,
+            num_public_inputs_per_witness: b,
+            values: WitnessValues::<M31Config>::Scalar(v),
+        };
+        let mut w2 = w1.clone();
+        w2.convert_to_simd();
+        let w1_iv_sc = w1.iter_scalar().collect::<Vec<_>>();
+        let w2_iv_sc = w2.iter_scalar().collect::<Vec<_>>();
+        let w1_iv_sm = w1.iter_simd().collect::<Vec<_>>();
+        let w2_iv_sm = w2.iter_simd().collect::<Vec<_>>();
+        assert_eq!(w1_iv_sc, w2_iv_sc);
+        assert_eq!(w1_iv_sm, w2_iv_sm);
     }
 }
