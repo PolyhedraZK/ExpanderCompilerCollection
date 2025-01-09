@@ -34,14 +34,14 @@ fn unpack_block<F: Field, SF: arith::SimdField<Scalar = F>>(
     for _ in 0..pack_size {
         res.push((Vec::with_capacity(a), Vec::with_capacity(b)));
     }
-    for i in 0..a {
-        let tmp = s[i].unpack();
+    for x in s.iter().take(a) {
+        let tmp = x.unpack();
         for j in 0..pack_size {
             res[j].0.push(tmp[j]);
         }
     }
-    for i in a..a + b {
-        let tmp = s[i].unpack();
+    for x in s.iter().skip(a).take(b) {
+        let tmp = x.unpack();
         for j in 0..pack_size {
             res[j].1.push(tmp[j]);
         }
@@ -87,10 +87,15 @@ fn use_simd<C: Config>(num_witnesses: usize) -> bool {
     num_witnesses > 1 && C::DefaultSimdField::PACK_SIZE > 1
 }
 
+type UnpackedBlock<C> = Vec<(
+    Vec<<C as Config>::CircuitField>,
+    Vec<<C as Config>::CircuitField>,
+)>;
+
 pub struct WitnessIteratorScalar<'a, C: Config> {
     witness: &'a Witness<C>,
     index: usize,
-    buf_unpacked: Vec<(Vec<C::CircuitField>, Vec<C::CircuitField>)>,
+    buf_unpacked: UnpackedBlock<C>,
 }
 
 impl<'a, C: Config> Iterator for WitnessIteratorScalar<'a, C> {
@@ -160,7 +165,7 @@ impl<'a, C: Config> Iterator for WitnessIteratorSimd<'a, C> {
 }
 
 impl<C: Config> Witness<C> {
-    pub fn iter_scalar<'a>(&'a self) -> WitnessIteratorScalar<'a, C> {
+    pub fn iter_scalar(&self) -> WitnessIteratorScalar<'_, C> {
         WitnessIteratorScalar {
             witness: self,
             index: 0,
@@ -168,7 +173,7 @@ impl<C: Config> Witness<C> {
         }
     }
 
-    pub fn iter_simd<'a>(&'a self) -> WitnessIteratorSimd<'a, C> {
+    pub fn iter_simd(&self) -> WitnessIteratorSimd<'_, C> {
         WitnessIteratorSimd {
             witness: self,
             index: 0,

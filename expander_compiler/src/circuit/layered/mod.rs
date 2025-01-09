@@ -859,8 +859,8 @@ impl<C: Config, I: InputType> Circuit<C, I> {
             }
             for i in 0..outputs[0].len() {
                 let mut tmp = Vec::with_capacity(SF::PACK_SIZE);
-                for j in 0..SF::PACK_SIZE {
-                    tmp.push(outputs[j][i]);
+                for x in outputs.iter() {
+                    tmp.push(x[i]);
                 }
                 let output = SF::pack(&tmp);
                 nxt[cu.output + i] +=
