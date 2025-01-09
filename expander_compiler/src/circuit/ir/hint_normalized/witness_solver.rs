@@ -1,4 +1,7 @@
-use crate::{circuit::layered::witness::Witness, utils::serde::Serde};
+use crate::{
+    circuit::layered::witness::{Witness, WitnessValues},
+    utils::serde::Serde,
+};
 
 use arith::SimdField;
 
@@ -35,7 +38,7 @@ impl<C: Config> WitnessSolver<C> {
             num_witnesses: 1,
             num_inputs_per_witness,
             num_public_inputs_per_witness: self.circuit.num_public_inputs,
-            values,
+            values: WitnessValues::Scalar(values),
         })
     }
 
@@ -97,7 +100,7 @@ impl<C: Config> WitnessSolver<C> {
             num_witnesses,
             num_inputs_per_witness,
             num_public_inputs_per_witness: self.circuit.num_public_inputs,
-            values,
+            values: WitnessValues::Scalar(values), //TODO: SIMD
         })
     }
 }
