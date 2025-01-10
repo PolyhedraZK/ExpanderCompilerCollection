@@ -1,4 +1,6 @@
-use std::thread;
+use std::fs::File;
+use std::io::BufRead;
+use std::{io, thread};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -23,6 +25,8 @@ use circuit_std_rs::gnark::element::*;
 use expander_compiler::frontend::extra::*;
 use circuit_std_rs::big_int::*;
 use expander_compiler::{circuit::layered::InputType, frontend::*};
+use serde::Deserialize;
+use serde_json::Value;
 
 use crate::utils::run_circuit;
 /*
@@ -91,7 +95,7 @@ declare_circuit!(ShuffleCircuit {
     aggregated_pubkey:   [[Variable;48];2],
     attestation_balance: [Variable;8],
     pubkeys_bls:      [[[Variable;48];2];VALIDATOR_CHUNK_SIZE],
-    // validators:      [ValidatorSSZ;VALIDATOR_CHUNK_SIZE],
+    // // validators:      [ValidatorSSZ;VALIDATOR_CHUNK_SIZE],
     public_key: [[Variable; 48];VALIDATOR_CHUNK_SIZE],
     withdrawal_credentials: [[Variable; 32];VALIDATOR_CHUNK_SIZE],
     effective_balance: [[Variable; 8];VALIDATOR_CHUNK_SIZE],
@@ -102,63 +106,6 @@ declare_circuit!(ShuffleCircuit {
     withdrawable_epoch: [[Variable; 8];VALIDATOR_CHUNK_SIZE],
 });
 
-/*
-func (circuit *ShuffleWithHashMapAggPubkeyCircuit) Define(api frontend.API) error {
-	logup.Reset()
-	curValidatorExp := int(math.Ceil(math.Log2(float64(MaxValidator))))
-	logup.NewRangeProof(curValidatorExp)
-
-	indicesChunk := GetIndiceChunk(api, circuit.StartIndex, circuit.ChunkLength, ValidatorChunkSize)
-
-	//set padding indices to 0
-	for i := 0; i < len(indicesChunk); i++ {
-		ignoreFlag := api.IsZero(api.Add(circuit.FlipResults[i], 1))
-		indicesChunk[i] = api.Select(ignoreFlag, 0, indicesChunk[i])
-	}
-	//flip the indices based on the hashbit
-	curIndices := make([]frontend.Variable, len(indicesChunk))
-	copy(curIndices, indicesChunk[:])
-	//flatten the loop to reduce the gkr layers
-	copyCurIndices := common.CopyArray(api, curIndices)
-	for i := 0; i < ShuffleRound; i++ {
-		//flip the indices based on the hashbit
-		curIndices = flipWithHashBits(api, circuit.Pivots[i], circuit.IndexCount, copyCurIndices, circuit.PositionResults[i*ValidatorChunkSize:(i+1)*ValidatorChunkSize], circuit.PositionBitResults[i*ValidatorChunkSize:(i+1)*ValidatorChunkSize], circuit.FlipResults[i*ValidatorChunkSize:(i+1)*ValidatorChunkSize])
-		copyCurIndices = common.CopyArray(api, curIndices)
-	}
-
-	//check the final curIndices, should be equal to the shuffleIndex
-	//cost: 3 * MaxValidator
-	for i := 0; i < len(circuit.ShuffleIndices); i++ {
-		isMinusOne := api.IsZero(api.Add(circuit.FlipResults[i], 1))
-		curIndices[i] = api.Select(isMinusOne, circuit.ShuffleIndices[i], curIndices[i])
-		// api.Println("ShuffleIndices", circuit.ShuffleIndices[i], curIndices[i])
-		tmpRes := api.IsZero(api.Sub(circuit.ShuffleIndices[i], curIndices[i]))
-		api.AssertIsEqual(tmpRes, 1)
-	}
-
-	//TODO: we need to use a lookup circuit to ensure that (shuffleIndices, committeeIndices) in the (shuffleindices, validatorIndices) table
-
-	//at the same time, we use the circuit.CommitteeIndice (contain a committee's indices) to lookup the pubkey list
-	pubkeyList, accBalance := LookupPubkeyListForCommitteeBySlot(api, circuit.CommitteeIndices[:], circuit.Slot, circuit.ValidatorHashes[:])
-	//later, we may need to check the realBalance by using aggregationBits
-	effectBalance := CalculateBalance(api, accBalance, circuit.AggregationBits[:])
-	//make the effectBalance public
-	for i := 0; i < len(effectBalance); i++ {
-		api.AssertIsEqual(effectBalance[i], circuit.AttestationBalance[i])
-	}
-
-	pubkeyListBLS := make([]sw_bls12381_m31.G1Affine, len(pubkeyList))
-	for i := 0; i < len(pubkeyList); i++ {
-		pubkeyListBLS[i] = bls.ConvertToPublicKeyBLS(api, pubkeyList[i])
-	}
-
-	//aggregate the pubkey list
-	attestation.AggregateAttestationPublicKey(api, pubkeyListBLS, circuit.AggregationBits[:], circuit.AggregatedPubkey)
-	logup.FinalCheck(api, logup.ColumnCombineOption)
-	// api.Println("Pass!")
-	return nil
-}
-*/
 
 impl GenericDefine<M31Config> for ShuffleCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
@@ -185,6 +132,8 @@ impl GenericDefine<M31Config> for ShuffleCircuit<Variable> {
         for i in 0..self.shuffle_indices.len() {
             let tmp = builder.add(self.flip_results[i], 1);
             let is_minus_one = builder.is_zero(tmp);
+            // println!("shuffle_indices:{:?}", builder.value_of(self.shuffle_indices[i]));
+            // println!("cur_indices:{:?}", builder.value_of(cur_indices[i]));
             cur_indices[i] = simple_select(builder, is_minus_one, self.shuffle_indices[i], cur_indices[i]);
             let tmp = builder.sub(self.shuffle_indices[i], cur_indices[i]);
             let tmp_res = builder.is_zero(tmp);
@@ -193,7 +142,7 @@ impl GenericDefine<M31Config> for ShuffleCircuit<Variable> {
 
         let mut pubkey_list = vec![];
         let mut acc_balance = vec![];
-        for i in 0..self.committee_indices.len() {
+        for i in 0..VALIDATOR_CHUNK_SIZE {
             pubkey_list.push(self.public_key[i].clone());
             acc_balance.push(self.effective_balance[i].clone());
         }
@@ -204,14 +153,46 @@ impl GenericDefine<M31Config> for ShuffleCircuit<Variable> {
 
         let mut pubkey_list_bls = vec![];
         for i in 0..pubkey_list.len() {
-            let agg_pubkey_g1 = G1Affine::from_vars(self.pubkeys_bls[i][0].to_vec(), self.pubkeys_bls[i][1].to_vec());
-            let logup_var = check_pubkey_key_bls(builder, pubkey_list[i].to_vec(), &agg_pubkey_g1);
+            let pubkey_g1 = G1Affine::from_vars(self.pubkeys_bls[i][0].to_vec(), self.pubkeys_bls[i][1].to_vec());
+            let logup_var = check_pubkey_key_bls(builder, pubkey_list[i].to_vec(), &pubkey_g1);
             g1.curve_f.table.rangeproof(builder, logup_var, 5);
+            pubkey_list_bls.push(pubkey_g1);
         }
 
-        let mut aggregated_pubkey = G1Affine::default();
+        let mut aggregated_pubkey = G1Affine::from_vars(self.aggregated_pubkey[0].to_vec(), self.aggregated_pubkey[1].to_vec());
         aggregate_attestation_public_key(builder, &mut g1, &pubkey_list_bls, &self.aggregation_bits, &mut aggregated_pubkey);
         
+        for index in 0..VALIDATOR_CHUNK_SIZE{
+            let mut validator = ValidatorSSZ::new();
+            for i in 0..48 {
+                validator.public_key[i] = self.public_key[index][i];
+            }
+            for i in 0..32 {
+                validator.withdrawal_credentials[i] = self.withdrawal_credentials[index][i];
+            }
+            for i in 0..8 {
+                validator.effective_balance[i] = self.effective_balance[index][i];
+            }
+            for i in 0..1 {
+                validator.slashed[i] = self.slashed[index][i];
+            }
+            for i in 0..8 {
+                validator.activation_eligibility_epoch[i] = self.activation_eligibility_epoch[index][i];
+            }
+            for i in 0..8 {
+                validator.activation_epoch[i] = self.activation_epoch[index][i];
+            }
+            for i in 0..8 {
+                validator.exit_epoch[i] = self.exit_epoch[index][i];
+            }
+            for i in 0..8 {
+                validator.withdrawable_epoch[i] = self.withdrawable_epoch[index][i];
+            }
+            let hash = validator.hash(builder);
+            for i in 0..8 {
+                builder.assert_is_equal(&hash[i], &self.validator_hashes[index][i]);
+            }
+        }
         g1.curve_f.check_mul(builder);
         g1.curve_f.table.final_check(builder);
     }
@@ -287,38 +268,24 @@ fn flip_with_hash_bits<C: Config, B: RootAPI<C>>(builder: &mut B, table: &mut Lo
     }
     res
 }
+
 pub fn aggregate_attestation_public_key<C: Config, B: RootAPI<C>>(builder: &mut B, g1: &mut G1, pub_key: &[G1Affine], validator_agg_bits: &[Variable], agg_pubkey: &mut G1Affine) {
-    // let mut g1 = G1::new(builder);
-    // let mut validator_bits_vec = validator_agg_bits.to_vec();
-    // let mut scalar = builder.constant(0);
-    // for j in 0..validator_agg_bits.len() {
-    //     pub_key[j].x = g1.curve_f.select(builder, validator_agg_bits[j], &pub_key[j].x, &pub_key[0].x);
-    //     pub_key[j].y = g1.curve_f.select(builder, validator_agg_bits[j], &pub_key[j].y, &pub_key[0].y);
-    //     scalar = builder.add(scalar, builder.xor(validator_agg_bits[j], 1));
-    // }
-    // let curve = g1.curve_f.curve.clone();
-    // let f = curve.fr.clone();
-    // let mut scalars = vec![builder.constant(0); 32];
-    // scalars[0] = scalar;
-    // let scalar_element = f.new_element(&scalars);
-    // let g1_minus = curve.scalar_mul(&pub_key[0], &scalar_element);
-
-    // let mut g1_add = g1_minus.clone();
-    // g1_add.y = g1.curve_f.table.neg(&g1_add.y);
-    // let mut aggregated_pubkey = g1_add.clone();
-    // for i in 0..validator_agg_bits.len() {
-    //     aggregated_pubkey = g1.curve_f.add(&aggregated_pubkey, &pub_key[i]);
-    // }
-    // g1.curve_f.table.assert_is_equal(&aggregated_pubkey.x, &agg_pubkey.x);
-    // g1.curve_f.table.assert_is_equal(&aggregated_pubkey.y, &agg_pubkey.y);
+    let mut validator_bits_vec = validator_agg_bits.to_vec();
+    let mut aggregated_pubkey = pub_key[0].clone();
+    for i in 1..validator_agg_bits.len() {
+        let tmp_agg_pubkey = g1.add(builder, &aggregated_pubkey, &pub_key[i]);
+        aggregated_pubkey.x = g1.curve_f.select(builder, validator_agg_bits[i], &tmp_agg_pubkey.x, &aggregated_pubkey.x);
+        aggregated_pubkey.y = g1.curve_f.select(builder, validator_agg_bits[i], &tmp_agg_pubkey.y, &aggregated_pubkey.y);
+    }
+    g1.curve_f.assert_isequal(builder, &aggregated_pubkey.x, &agg_pubkey.x);
+    g1.curve_f.assert_isequal(builder, &aggregated_pubkey.y, &agg_pubkey.y);
 }
-
 #[test]
 fn run_multi_shuffle() {
     let mut rng = ark_std::test_rng();
     let mut builder = M31Config::default();
     let mut w_s: witness_solver::WitnessSolver::<M31Config>;
-    if std::fs::metadata("shuffle.witness").is_ok() {
+    if std::fs::metadata("shuffle.witness1").is_ok() {
         println!("The file exists!");
         w_s = witness_solver::WitnessSolver::deserialize_from(std::fs::File::open("shuffle.witness").unwrap()).unwrap();
     } else {
@@ -327,4 +294,333 @@ fn run_multi_shuffle() {
         compile_result.witness_solver.serialize_into(std::fs::File::create("shuffle.witness").unwrap()).unwrap();
         w_s = compile_result.witness_solver;
     }
+}
+#[test]
+fn test_shuffle(){
+    let mut hint_registry = HintRegistry::<M31>::new();
+    register_hint(&mut hint_registry);
+    let my_strcut = read_assignment();
+    let mut assignment = ShuffleCircuit::<M31>::default();
+    assignment.start_index = M31::from(my_strcut.start_index);
+    assignment.chunk_length = M31::from(my_strcut.chunk_length);
+    for i in 0..VALIDATOR_CHUNK_SIZE {
+        assignment.shuffle_indices[i] = M31::from(my_strcut.shuffle_indices[i]);
+        assignment.committee_indices[i] = M31::from(my_strcut.committee_indices[i]);
+        assignment.aggregation_bits[i] = M31::from(my_strcut.aggregation_bits[i]);
+    }
+    assignment.aggregation_bits[255] = M31::from(1);
+    for i in 0..SHUFFLE_ROUND {
+        assignment.pivots[i] = M31::from(my_strcut.pivots[i]);
+    }
+    assignment.index_count = M31::from(my_strcut.index_count);
+    for i in 0..SHUFFLE_ROUND * VALIDATOR_CHUNK_SIZE {
+        assignment.position_results[i] = M31::from(my_strcut.position_results[i]);
+        assignment.position_bit_results[i] = M31::from(my_strcut.position_bit_results[i]);
+        assignment.flip_results[i] = M31::from(my_strcut.flip_results[i]);
+    }
+    assignment.slot = M31::from(my_strcut.slot);
+    let balance_unit:u64 = 32000000000;
+    let attestations_balance = balance_unit * 189;
+    //0xb3e763f6f0153e49d0b1a43805ec1382bc82922000fd51e8e48ea6f5e9bb73a7f34f46ade6efa052dd1651b5bf94cd9d
+    //[128 21 157 43 248 40 67 201 95 171 162 199 236 221 59 139 233 5 150 32 146 0 59 75 250 196 228 94 30 176 107 152 190 231 84 71 27 123 0 250 114 162 71 172 155 221 36 210] 
+    let first_public_key = [128, 21, 157, 43, 248, 40, 67, 201, 95, 171, 162, 199, 236, 221, 59, 139, 233, 5, 150, 32, 146, 0, 59, 75, 250, 196, 228, 94, 30, 176, 107, 152, 190, 231, 84, 71, 27, 123, 0, 250, 114, 162, 71, 172, 155, 221, 36, 210] ;
+
+    /*
+    publicKeyX [210 36 221 155 172 71 162 114 250 0 123 27 71 84 231 190 152 107 176 30 94 228 196 250 75 59 0 146 32 150 5 233 139 59 221 236 199 162 171 95 201 67 40 248 43 157 21 0]
+    publicKeyY [177 15 211 39 148 8 59 146 166 120 226 197 201 127 95 106 179 227 170 242 205 58 37 197 231 171 91 166 106 40 65 74 209 237 153 106 52 101 248 140 121 80 198 145 186 99 28 7]
+     */
+    let first_public_key_x = [210, 36, 221, 155, 172, 71, 162, 114, 250, 0, 123, 27, 71, 84, 231, 190, 152, 107, 176, 30, 94, 228, 196, 250, 75, 59, 0, 146, 32, 150, 5, 233, 139, 59, 221, 236, 199, 162, 171, 95, 201, 67, 40, 248, 43, 157, 21, 0];
+    let first_public_key_y = [177, 15, 211, 39, 148, 8, 59, 146, 166, 120, 226, 197, 201, 127, 95, 106, 179, 227, 170, 242, 205, 58, 37, 197, 231, 171, 91, 166, 106, 40, 65, 74, 209, 237, 153, 106, 52, 101, 248, 140, 121, 80, 198, 145, 186, 99, 28, 7];
+    //0xa4faba7e21a2ac4a29d9eef12433fd42f9baf0cafb2a046ff88c9ccdde20d88b0806673ab842664e15cdb7ad15f35d7f
+    //164 250 186 126 33 162 172 74 41 217 238 241 36 51 253 66 249 186 240 202 251 42 4 111 248 140 156 205 222 32 216 139 8 6 103 58 184 66 102 78 21 205 183 173 21 243 93 127
+    let test_public_key = [164, 250, 186, 126, 33, 162, 172, 74, 41, 217, 238, 241, 36, 51, 253, 66, 249, 186, 240, 202, 251, 42, 4, 111, 248, 140, 156, 205, 222, 32, 216, 139, 8, 6, 103, 58, 184, 66, 102, 78, 21, 205, 183, 173, 21, 243, 93, 127];
+
+    /*    
+    publicKeyX [127 93 243 21 173 183 205 21 78 102 66 184 58 103 6 8 139 216 32 222 205 156 140 248 111 4 42 251 202 240 186 249 66 253 51 36 241 238 217 41 74 172 162 33 126 186 250 4]
+    publicKeyY [51 13 26 217 22 45 18 90 186 52 62 107 99 217 229 41 130 56 203 244 17 6 76 101 51 175 182 141 180 51 62 48 131 181 119 251 168 6 32 100 119 93 209 34 47 103 169 22]
+     */
+    let test_public_key_x = [127, 93, 243, 21, 173, 183, 205, 21, 78, 102, 66, 184, 58, 103, 6, 8, 139, 216, 32, 222, 205, 156, 140, 248, 111, 4, 42, 251, 202, 240, 186, 249, 66, 253, 51, 36, 241, 238, 217, 41, 74, 172, 162, 33, 126, 186, 250, 4];
+    let test_public_key_y = [51, 13, 26, 217, 22, 45, 18, 90, 186, 52, 62, 107, 99, 217, 229, 41, 130, 56, 203, 244, 17, 6, 76, 101, 51, 175, 182, 141, 180, 51, 62, 48, 131, 181, 119, 251, 168, 6, 32, 100, 119, 93, 209, 34, 47, 103, 169, 22];
+    //af0d108afcac75a19408b2cad29aa2191fe50d78c5c53169b01a06782f915b2b3b8f1ec522e56bc4a8f534e2ac4665cb
+    //g1X:  [15 13 16 138 252 172 117 161 148 8 178 202 210 154 162 25 31 229 13 120 197 197 49 105 176 26 6 120 47 145 91 43 59 143 30 197 34 229 107 196 168 245 52 226 172 70 101 203]
+    // g1Y:  [15 241 33 173 55 244 176 235 253 79 17 193 221 109 21 30 240 157 245 192 50 206 229 223 215 207 75 100 113 159 204 21 227 73 211 33 57 229 110 153 15 206 136 196 190 200 107 129]
+    let aggregated_pubkey = [
+        [206,22,64,219,11,55,22,57,57,232,188,112,205,116,244,1,11,33,145,200,247,86,166,219,248,30,102,125,248,89,217,166,164,113,3,244,248,53,58,162,173,25,1,36,123,1,223,22,],
+        [114,93,129,62,49,1,167,235,229,203,35,20,88,219,86,119,129,178,63,173,207,204,36,252,39,184,165,77,235,165,150,163,194,112,93,194,123,40,249,143,70,190,21,68,140,138,18,14,]
+    ];
+    let balance_unit_byte = balance_unit.to_le_bytes();
+    let attestation_balance_byte = attestations_balance.to_le_bytes();
+    for i in 0..VALIDATOR_CHUNK_SIZE {
+        for j in 0..48 {
+            assignment.public_key[i][j] = M31::from(test_public_key[j] as u32);
+        }
+        for j in 0..8 {
+            assignment.effective_balance[i][j] = M31::from(balance_unit_byte[j] as u32);
+        }
+    }
+    for j in 0..48 {
+        assignment.public_key[0][j] = M31::from(first_public_key[j] as u32);
+    }
+    for i in 0..8 {
+        assignment.attestation_balance[i] = M31::from(attestation_balance_byte[i] as u32);
+    }
+    for i in 0..2 {
+        for j in 0..48 {
+            assignment.aggregated_pubkey[i][j] = M31::from(aggregated_pubkey[i][j] as u32);
+        }
+    }
+    for i in 0..VALIDATOR_CHUNK_SIZE {
+        for j in 0..48 {
+            assignment.pubkeys_bls[i][0][j] = M31::from(test_public_key_x[j] as u32);
+            assignment.pubkeys_bls[i][1][j] = M31::from(test_public_key_y[j] as u32);
+        }
+    }
+    for j in 0..48 {
+        assignment.pubkeys_bls[0][0][j] = M31::from(first_public_key_x[j] as u32);
+        assignment.pubkeys_bls[0][1][j] = M31::from(first_public_key_y[j] as u32);
+    }
+    /*
+    164 250 186 126 33 162 172 74 41 217 238 241 36 51 253 66 249 186 240 202 251 42 4 111 248 140 156 205 222 32 216 139 8 6 103 58 184 66 102 78 21 205 183 173 21 243 93 127
+    publicKeyX [127 93 243 21 173 183 205 21 78 102 66 184 58 103 6 8 139 216 32 222 205 156 140 248 111 4 42 251 202 240 186 249 66 253 51 36 241 238 217 41 74 172 162 33 126 186 250 4]
+    publicKeyY [51 13 26 217 22 45 18 90 186 52 62 107 99 217 229 41 130 56 203 244 17 6 76 101 51 175 182 141 180 51 62 48 131 181 119 251 168 6 32 100 119 93 209 34 47 103 169 22]
+     */
+    /*
+    validator {[164 250 186 126 33 162 172 74 41 217 238 241 36 51 253 66 249 186 240 202 251 42 4 111 248 140 156 205 222 32 216 139 8 6 103 58 184 66 102 78 21 205 183 173 21 243 93 127] [0 13 174 238 43 225 74 172 101 0 121 181 152 5 116 129 23 55 205 156 170 184 177 81 36 38 133 233 173 23 88 65] 32000000000 0 65505 65717 18446744073709551615 18446744073709551615}
+    validator {[128 21 157 43 248 40 67 201 95 171 162 199 236 221 59 139 233 5 150 32 146 0 59 75 250 196 228 94 30 176 107 152 190 231 84 71 27 123 0 250 114 162 71 172 155 221 36 210] [0 51 24 57 79 41 225 74 184 212 15 90 156 155 108 77 224 38 61 59 220 127 85 180 206 46 178 45 122 226 166 184] 32000000000 0 5028 9992 18446744073709551615 18446744073709551615}
+     */
+    let withdrawal_credentials = [0,13,174,238,43,225,74,172,101,0,121,181,152,5,116,129,23,55,205,156,170,184,177,81,36,38,133,233,173,23,88,65];
+    let effective_balance:u64 = 32000000000;
+    let effective_balance = effective_balance.to_le_bytes();
+    let slashed = 0;
+    let activation_eligibility_epoch:u64 = 65505;
+    let activation_eligibility_epoch = activation_eligibility_epoch.to_le_bytes();
+    let activation_epoch:u64 = 65717;
+    let activation_epoch = activation_epoch.to_le_bytes();
+    let exit_epoch:u64 = 18446744073709551615;
+    let exit_epoch = exit_epoch.to_le_bytes();
+    let withdrawable_epoch:u64 = 18446744073709551615;
+    let withdrawable_epoch = withdrawable_epoch.to_le_bytes();
+    for i in 0..VALIDATOR_CHUNK_SIZE {
+        for j in 0..32 {
+            assignment.withdrawal_credentials[i][j] = M31::from(withdrawal_credentials[j] as u32);
+        }
+        assignment.slashed[i][0] = M31::from(slashed as u32);
+        for j in 0..8 {
+            assignment.effective_balance[i][j] = M31::from(effective_balance[j] as u32);
+            assignment.activation_eligibility_epoch[i][j] = M31::from(activation_eligibility_epoch[j] as u32);
+            assignment.activation_epoch[i][j] = M31::from(activation_epoch[j] as u32);
+            assignment.exit_epoch[i][j] = M31::from(exit_epoch[j] as u32);
+            assignment.withdrawable_epoch[i][j] = M31::from(withdrawable_epoch[j] as u32);
+        }
+    }
+    let hash = [1420980358,366442127,1729325529,1809151733,1503635331,1698111119,932538623,570007530];
+    for i in 0..VALIDATOR_CHUNK_SIZE {
+        for j in 0..POSEIDON_HASH_LENGTH {
+            assignment.validator_hashes[i][j] = M31::from(hash[j] as u32);
+        }
+    }
+
+    let withdrawal_credentials = [0,51,24,57,79,41,225,74,184,212,15,90,156,155,108,77,224,38,61,59,220,127,85,180,206,46,178,45,122,226,166,184];
+    let effective_balance:u64 = 32000000000;
+    let effective_balance = effective_balance.to_le_bytes();
+    let slashed = 0;
+    let activation_eligibility_epoch:u64 = 5028;
+    let activation_eligibility_epoch = activation_eligibility_epoch.to_le_bytes();
+    let activation_epoch:u64 = 9992;
+    let activation_epoch = activation_epoch.to_le_bytes();
+    let exit_epoch:u64 = 18446744073709551615;
+    let exit_epoch = exit_epoch.to_le_bytes();
+    let withdrawable_epoch:u64 = 18446744073709551615;
+    let withdrawable_epoch = withdrawable_epoch.to_le_bytes();
+    for i in 0..1 {
+        for j in 0..32 {
+            assignment.withdrawal_credentials[i][j] = M31::from(withdrawal_credentials[j] as u32);
+        }
+        assignment.slashed[i][0] = M31::from(slashed as u32);
+        for j in 0..8 {
+            assignment.effective_balance[i][j] = M31::from(effective_balance[j] as u32);
+            assignment.activation_eligibility_epoch[i][j] = M31::from(activation_eligibility_epoch[j] as u32);
+            assignment.activation_epoch[i][j] = M31::from(activation_epoch[j] as u32);
+            assignment.exit_epoch[i][j] = M31::from(exit_epoch[j] as u32);
+            assignment.withdrawable_epoch[i][j] = M31::from(withdrawable_epoch[j] as u32);
+        }
+    }
+    let hash = [2114613924,997667299,213711641,1143404300,219133765,833923639,1195107857,116069398];
+    for i in 0..1 {
+        for j in 0..POSEIDON_HASH_LENGTH {
+            assignment.validator_hashes[i][j] = M31::from(hash[j] as u32);
+        }
+    }
+    stacker::grow(32 * 1024 * 1024 * 1024, ||    {debug_eval(&ShuffleCircuit::default(), &assignment, hint_registry)});
+}
+pub struct MyStruct { 
+    start_index:         u32,
+    chunk_length:        u32,
+    shuffle_indices:     [u32;VALIDATOR_CHUNK_SIZE],
+    committee_indices:   [u32;VALIDATOR_CHUNK_SIZE],
+    pivots:             [u32;SHUFFLE_ROUND],
+    index_count:         u32,
+    position_results:    [u32;SHUFFLE_ROUND * VALIDATOR_CHUNK_SIZE],
+    position_bit_results: [u32;SHUFFLE_ROUND * VALIDATOR_CHUNK_SIZE],
+    flip_results:        [u32;SHUFFLE_ROUND * VALIDATOR_CHUNK_SIZE],
+    slot:               u32,
+    aggregation_bits:    [u32;VALIDATOR_CHUNK_SIZE],
+}
+fn read_assignment() -> MyStruct {
+    let file_path = "test.json";
+
+    let file = File::open(file_path).unwrap();
+    let reader = io::BufReader::new(file);
+
+    let mut my_struct = MyStruct {
+        start_index: 0,
+        chunk_length: 0,
+        shuffle_indices: [0;VALIDATOR_CHUNK_SIZE],
+        committee_indices: [0;VALIDATOR_CHUNK_SIZE],
+        pivots: [0;SHUFFLE_ROUND],
+        index_count: 0,
+        position_results: [0;SHUFFLE_ROUND * VALIDATOR_CHUNK_SIZE],
+        position_bit_results: [0;SHUFFLE_ROUND * VALIDATOR_CHUNK_SIZE],
+        flip_results: [0;SHUFFLE_ROUND * VALIDATOR_CHUNK_SIZE],
+        slot: 0,
+        aggregation_bits: [0;VALIDATOR_CHUNK_SIZE],
+    };
+
+    for line in reader.lines() {
+        let line = line.unwrap();
+        let parts: Vec<&str> = line.split(':').collect();
+        if parts.len() == 2 {
+            let key = parts[0].trim();
+            let value = parts[1].trim();
+
+            match key {
+                "StartIndex" => {
+                    my_struct.start_index = value.parse::<u32>().unwrap_or_default();
+                    println!("Parsed StartIndex");
+                }
+                "ChunkLength" => {
+                    my_struct.chunk_length = value.parse::<u32>().unwrap_or_default();
+                    println!("Parsed ChunkLength");
+                }
+                "ShuffleIndices" => {
+                    if let Some(start) = value.find('[') {
+                        if let Some(end) = value.find(']') {
+                            let numbers = &value[start + 1..end];
+                            let result: Vec<u32> = numbers
+                                .split_whitespace()
+                                .filter_map(|num| num.parse::<u32>().ok())
+                                .collect();
+                
+                            println!("Parsed ShuffleIndices");
+                            my_struct.shuffle_indices = result.try_into().unwrap();
+                        }
+                    }
+                }
+                "CommitteeIndices" => {
+                    if let Some(start) = value.find('[') {
+                        if let Some(end) = value.find(']') {
+                            let numbers = &value[start + 1..end];
+                            let result: Vec<u32> = numbers
+                                .split_whitespace()
+                                .filter_map(|num| num.parse::<u32>().ok())
+                                .collect();
+                
+                            //println!("Parsed array: {:?}", result);
+                            println!("Parsed CommitteeIndices");
+                            my_struct.committee_indices = result.try_into().unwrap();
+                        }
+                    }
+                }
+                "Pivots" => {
+                    if let Some(start) = value.find('[') {
+                        if let Some(end) = value.find(']') {
+                            let numbers = &value[start + 1..end];
+                            let result: Vec<u32> = numbers
+                                .split_whitespace()
+                                .filter_map(|num| num.parse::<u32>().ok())
+                                .collect();
+                
+                            //println!("Parsed array: {:?}", result);
+                            println!("Parsed Pivots");
+                            my_struct.pivots = result.try_into().unwrap();
+                        }
+                    }
+                }
+                "IndexCount" => {
+                    my_struct.index_count = value.parse::<u32>().unwrap_or_default();
+                    println!("Parsed IndexCount");
+                }
+                "PositionResults" => {
+                    if let Some(start) = value.find('[') {
+                        if let Some(end) = value.find(']') {
+                            let numbers = &value[start + 1..end];
+                            let result: Vec<u32> = numbers
+                                .split_whitespace()
+                                .filter_map(|num| num.parse::<u32>().ok())
+                                .collect();
+                
+                            // println!("PositionResults: {:?}", result);
+                            println!("PositionResults");
+                            my_struct.position_results = result.try_into().unwrap();
+                        }
+                    }
+                }
+                "PositionBitResults" => {
+                    if let Some(start) = value.find('[') {
+                        if let Some(end) = value.find(']') {
+                            let numbers = &value[start + 1..end];
+                            let result: Vec<u32> = numbers
+                                .split_whitespace()
+                                .filter_map(|num| num.parse::<u32>().ok())
+                                .collect();
+                
+                            //println!("Parsed array: {:?}", result);
+                            println!("PositionBitResults");
+                            my_struct.position_bit_results = result.try_into().unwrap();
+                        }
+                    }
+                }
+                "FlipResults" => {
+                    if let Some(start) = value.find('[') {
+                        if let Some(end) = value.find(']') {
+                            let numbers = &value[start + 1..end];
+                            let result: Vec<u32> = numbers
+                                .split_whitespace()
+                                .filter_map(|num| num.parse::<u32>().ok())
+                                .collect();
+                
+                            //println!("Parsed array: {:?}", result);
+                            println!("FlipResults");
+                            my_struct.flip_results = result.try_into().unwrap();
+                        }
+                    }
+                }
+                "Slot" => {
+                    my_struct.slot = value.parse::<u32>().unwrap_or_default();
+                    println!("Slot");
+                }
+                "AggregationBits" => {
+                    if let Some(start) = value.find('[') {
+                        if let Some(end) = value.find(']') {
+                            let numbers = &value[start + 1..end];
+                            let result: Vec<u32> = numbers
+                                .split_whitespace()
+                                .filter_map(|num| num.parse::<u32>().ok())
+                                .collect();
+                
+                            //println!("Parsed array: {:?}", result);
+                            println!("AggregationBits");
+                            my_struct.aggregation_bits = result.try_into().unwrap();
+                        }
+                    }
+
+                }
+                _ => {
+                    eprintln!("Unknown key: {}", key);
+                }
+            }
+        }
+    }
+    println!("my_struct: {:?}", my_struct.shuffle_indices);
+    my_struct
 }

@@ -9,3 +9,4 @@ pub mod big_int;
 pub mod gnark;
 pub mod utils;
 pub mod poseidon_m31;
+pub mod poseidon_m31_var;

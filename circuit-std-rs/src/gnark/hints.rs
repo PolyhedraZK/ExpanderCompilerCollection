@@ -7,6 +7,8 @@ use crate::gnark::utils::*;
 use crate::gnark::emparam::FieldParams;
 use crate::gnark::element::*;
 use crate::logup::query_count_hint;
+use crate::logup::rangeproof_hint;
+use crate::poseidon_m31::poseidon_hint;
 use ark_bls12_381::Fq12;
 use ark_bls12_381::Fq6;
 use ark_ff::Zero;
@@ -41,6 +43,9 @@ pub fn register_hint(hint_registry: &mut HintRegistry<M31>) {
     hint_registry.register("myhint.inversee12hint", inverse_e12_hint);
     hint_registry.register("myhint.copye12hint", copy_e12_hint);
     hint_registry.register("myhint.finalexphint", final_exp_hint);
+	hint_registry.register("myhint.rangeproofhint", rangeproof_hint);
+	hint_registry.register("myhint.poseidonhint", poseidon_hint);
+    
 
 }
 pub fn mul_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {

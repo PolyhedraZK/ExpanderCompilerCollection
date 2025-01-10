@@ -227,13 +227,13 @@ pub fn big_less_than<C: Config, B: RootAPI<C>>(api: &mut B, n: usize, k: usize, 
 	let mut eq_ands = vec![Variable::default(); k - 1];
 	for i in (0..k-1).rev() {
 		if i == k - 2 {
-			ands.push(api.and(eq[k - 1], lt[k - 2]));
-			eq_ands.push(api.and(eq[k - 1], eq[k - 2]));
-			ors.push(api.or(lt[k - 1], ands[k-2]));
+			ands[i] = api.and(eq[k - 1], lt[k - 2]);
+			eq_ands[i] = api.and(eq[k - 1], eq[k - 2]);
+			ors[i] = api.or(lt[k - 1], ands[k-2]);
 		} else {
-			ands.push(api.and(eq_ands[i+1], lt[i]));
-			eq_ands.push(api.and(eq_ands[i+1], eq[i]));
-			ors.push(api.or(ors[i+1], ands[i]));
+			ands[i] = api.and(eq_ands[i+1], lt[i]);
+			eq_ands[i] = api.and(eq_ands[i+1], eq[i]);
+			ors[i] = api.or(ors[i+1], ands[i]);
 		}
 	}
 	ors[0]

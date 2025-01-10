@@ -55,7 +55,7 @@ impl<C: Config> Witness<C> {
         let mut res = Vec::with_capacity(ni);
         let mut res_public = Vec::with_capacity(np);
         for i in 0..ni + np {
-            let mut values: Vec<C::CircuitField> = (0..self.num_witnesses.min(T::pack_size()))
+            let mut values: Vec<C::CircuitField> = (0..self.num_witnesses.min(1))
                 .map(|j| self.values[j * (ni + np) + i])
                 .collect();
             values.resize(T::pack_size(), C::CircuitField::zero());

@@ -93,6 +93,7 @@ pub fn compare_two_scalars<C: Config, B: RootAPI<C>>(api: &mut B, scalar1: &Vec<
         let scalar_big_len = scalar1_big.len();
         for i in 0..scalar_big_len {
             scalar1_big[i] = simple_select(api, empty_flag, scalar2_big[scalar_big_len-i-1], scalar1_big[i]);
+
             api.assert_is_equal(scalar1_big[i], scalar2_big[scalar_big_len-i-1]);
         }
     }
