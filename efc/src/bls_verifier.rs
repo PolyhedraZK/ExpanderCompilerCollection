@@ -1,28 +1,57 @@
 use std::thread;
-use std::cell::RefCell;
 use std::sync::Arc;
-use std::rc::Rc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use ark_bls12_381::g2;
 use circuit_std_rs::gnark::hints::register_hint;
 use expander_compiler::circuit::ir::hint_normalized::witness_solver;
 use expander_compiler::frontend::*;
 use expander_config::M31ExtConfigSha2;
-use num_bigint::BigInt;
-use sha2::{Digest, Sha256};
-use circuit_std_rs::big_int::{to_binary_hint, big_array_add};
-use circuit_std_rs::sha2_m31::check_sha256;
-use circuit_std_rs::gnark::emulated::field_bls12381::*;
-use circuit_std_rs::gnark::emulated::field_bls12381::e2::*;
 use circuit_std_rs::gnark::emulated::sw_bls12381::pairing::*;
 use circuit_std_rs::gnark::emulated::sw_bls12381::g1::*;
 use circuit_std_rs::gnark::emulated::sw_bls12381::g2::*;
-use circuit_std_rs::gnark::element::*;
 use expander_compiler::frontend::extra::*;
 use circuit_std_rs::big_int::*;
-use expander_compiler::{circuit::layered::InputType, frontend::*};
 
-use crate::utils::run_circuit;
+use crate::utils::{ensure_directory_exists, read_from_json_file, run_circuit};
+use serde::Deserialize;
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct Limbs {
+    pub Limbs: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct Coordinate {
+    A0: Limbs,
+    A1: Limbs,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct Point {
+    X: Coordinate,
+    Y: Coordinate,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct G2Json {
+    P: Point,
+    Lines: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct G1Json {
+    pub X: Limbs,
+    pub Y: Limbs,
+}
+
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct PairingEntry {
+    pub Hm: G2Json,
+    pub PubKey: G1Json,
+    pub Signature: G2Json,
+}
+
+#[derive(Debug, Deserialize)]
+struct JsonRoot(Vec<PairingEntry>);
 
 declare_circuit!(PairingCircuit {
     pubkey: [[Variable;48];2],
@@ -30,6 +59,36 @@ declare_circuit!(PairingCircuit {
     sig: [[[Variable;48];2];2]
 });
 
+impl PairingCircuit<M31> {
+    pub fn from_entry(entry: &PairingEntry) -> Self {
+        fn convert_limbs(limbs: Vec<u8>) -> [M31; 48] {
+            let converted: Vec<M31> = limbs.into_iter().map(|x| M31::from(x as u32)).collect();
+            converted.try_into().expect("Limbs should have 48 elements")
+        }
+
+        fn convert_point(point: Coordinate) -> [[M31; 48]; 2] {
+            [
+                convert_limbs(point.A0.Limbs),
+                convert_limbs(point.A1.Limbs),
+            ]
+        }
+
+        PairingCircuit {
+            pubkey: [
+                convert_limbs(entry.PubKey.X.Limbs.clone()),
+                convert_limbs(entry.PubKey.Y.Limbs.clone()),
+            ],
+            hm: [
+                convert_point(entry.Hm.P.X.clone()),
+                convert_point(entry.Hm.P.Y.clone()),
+            ],
+            sig: [
+                convert_point(entry.Signature.P.X.clone()),
+                convert_point(entry.Signature.P.Y.clone()),
+            ],
+        }
+    }
+}
 impl GenericDefine<M31Config> for PairingCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut pairing = Pairing::new(builder);
@@ -219,4 +278,65 @@ fn run_multi_pairing(){
     //     let output = compile_result.layered_circuit.run(&result);
     //     assert_eq!(output, vec![true; 16]);
     // }
+}
+
+pub fn generate_pairing_witnesses(dir: &str){
+    println!("preparing solver...");
+    ensure_directory_exists("./witnesses/pairing");
+    let w_s: witness_solver::WitnessSolver::<M31Config>;
+    if std::fs::metadata("pairing.witness").is_ok() {
+        println!("The file exists!");
+        w_s = witness_solver::WitnessSolver::deserialize_from(std::fs::File::open("pairing.witness").unwrap()).unwrap();
+    } else {
+        println!("The file does not exist.");
+        let compile_result = compile_generic(&PairingCircuit::default(), CompileOptions::default()).unwrap();
+        compile_result.witness_solver.serialize_into(std::fs::File::create("pairing.witness").unwrap()).unwrap();
+        w_s = compile_result.witness_solver;
+    }
+
+    println!("Start generating witnesses...");
+    let start_time = std::time::Instant::now();
+	let file_path = format!("{}/pairing_assignment.json",dir);
+
+	let pairing_data: Vec<PairingEntry> = read_from_json_file(&file_path).unwrap();
+    let end_time = std::time::Instant::now();
+    println!("loaded pairing data time: {:?}", end_time.duration_since(start_time));
+	let mut assignments = vec![];
+	for i in 0..pairing_data.len(){
+		let pairing_assignment = PairingCircuit::from_entry(&pairing_data[i]);
+        assignments.push(pairing_assignment);
+	}
+    let end_time = std::time::Instant::now();
+    println!("assigned assignments time: {:?}", end_time.duration_since(start_time));
+	let assignment_chunks: Vec<Vec<PairingCircuit<M31>>> =
+        assignments.chunks(16).map(|x| x.to_vec()).collect();
+    let witness_solver = Arc::new(w_s);
+    let handles = assignment_chunks
+        .into_iter()
+		.enumerate()
+        .map(|(i, assignments)| {
+            let witness_solver = Arc::clone(&witness_solver);
+            thread::spawn(move || {
+                let mut hint_registry1 = HintRegistry::<M31>::new();
+                register_hint(&mut hint_registry1);
+                let witness = witness_solver.solve_witnesses_with_hints(&assignments, &mut hint_registry1).unwrap();
+				let file_name = format!("./witnesses/pairing/witness_{}.txt", i);
+				let file = std::fs::File::create(file_name).unwrap();
+    			let writer = std::io::BufWriter::new(file);
+				witness.serialize_into(writer).unwrap();
+            }
+            )
+        })
+        .collect::<Vec<_>>();
+    let mut results = Vec::new();
+    for handle in handles {
+        results.push(handle.join().unwrap());
+    }
+    let end_time = std::time::Instant::now();
+    println!("Generate pairing witness Time: {:?}", end_time.duration_since(start_time));
+}
+
+#[test]
+fn test_read_pairing_assignment(){
+    generate_pairing_witnesses("");
 }

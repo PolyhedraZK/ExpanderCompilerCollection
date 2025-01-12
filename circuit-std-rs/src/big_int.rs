@@ -31,9 +31,9 @@ pub fn sigma0<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> Vec<V
 	if bits.len() != 32 {
 		panic!("Sigma0: len(bits) != 32");
 	}
-	let mut bits1 = bits.to_vec();
-	let mut bits2 = bits.to_vec();
-	let mut bits3 = bits.to_vec();
+	let bits1 = bits.to_vec();
+	let bits2 = bits.to_vec();
+	let bits3 = bits.to_vec();
 	let v1 = rotate_right(&bits1, 7);
 	let v2 = rotate_right(&bits2, 18);
 	let v3 = right_shift(api, &bits3, 3);
@@ -48,9 +48,9 @@ pub fn sigma1<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> Vec<V
 	if bits.len() != 32 {
 		panic!("Sigma1: len(bits) != 32");
 	}
-	let mut bits1 = bits.to_vec();
-	let mut bits2 = bits.to_vec();
-	let mut bits3 = bits.to_vec();
+	let bits1 = bits.to_vec();
+	let bits2 = bits.to_vec();
+	let bits3 = bits.to_vec();
 	let v1 = rotate_right(&bits1, 17);
 	let v2 = rotate_right(&bits2, 19);
 	let v3 = right_shift(api, &bits3, 10);
@@ -65,9 +65,9 @@ pub fn cap_sigma0<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> V
 	if bits.len() != 32 {
 		panic!("CapSigma0: len(bits) != 32");
 	}
-	let mut bits1 = bits.to_vec();
-	let mut bits2 = bits.to_vec();
-	let mut bits3 = bits.to_vec();
+	let bits1 = bits.to_vec();
+	let bits2 = bits.to_vec();
+	let bits3 = bits.to_vec();
 	let v1 = rotate_right(&bits1, 2);
 	let v2 = rotate_right(&bits2, 13);
 	let v3 = rotate_right(&bits3, 22);
@@ -82,9 +82,9 @@ pub fn cap_sigma1<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> V
 	if bits.len() != 32 {
 		panic!("CapSigma1: len(bits) != 32");
 	}
-	let mut bits1 = bits.to_vec();
-	let mut bits2 = bits.to_vec();
-	let mut bits3 = bits.to_vec();
+	let bits1 = bits.to_vec();
+	let bits2 = bits.to_vec();
+	let bits3 = bits.to_vec();
 	let v1 = rotate_right(&bits1, 6);
 	let v2 = rotate_right(&bits2, 11);
 	let v3 = rotate_right(&bits3, 25);
@@ -255,7 +255,6 @@ pub fn idiv_mod_bit<C: Config, B: RootAPI<C>>(builder: &mut B, a: Variable, b: u
 }
 
 pub fn string_to_m31_array(s: &str, nb_bits: u32) -> [M31; 48] {
-    let mut res = [M31::from(0); 48];
     let mut big = BigInt::parse_bytes(s.as_bytes(), 10).unwrap_or_else(|| panic!("Failed to parse BigInt"));
     let mut res = [M31::from(0); 48];
     let base = BigInt::from(1) << nb_bits;

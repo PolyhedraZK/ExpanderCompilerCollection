@@ -1,13 +1,8 @@
-use crate::gnark::emparam::FieldParams;
 use crate::gnark::element::*;
-use crate::gnark::field::Field as GField;
 use crate::gnark::emparam::*;
 use crate::gnark::hints::*;
-use std::collections::HashMap;
-use std::hint;
-use crate::logup::*;
 use expander_compiler::frontend::extra::*;
-use expander_compiler::{circuit::layered::InputType, frontend::*};
+use expander_compiler::frontend::*;
 use num_bigint::BigInt;
 
 use super::e2::*;
@@ -327,7 +322,7 @@ impl Ext6{
         self.assert_isequal(native, &one, &_one);
         inv
     }
-    pub fn div_e6_by_6<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &[Element<bls12381_fp>; 6]) -> [Element<bls12381_fp>; 6] {
+    pub fn div_e6_by_6<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &[Element<Bls12381Fp>; 6]) -> [Element<Bls12381Fp>; 6] {
         let inputs = vec![x[0].clone(), x[1].clone(), x[2].clone(), x[3].clone(), x[4].clone(), x[5].clone()];
         let output = self.ext2.fp.new_hint(native, "myhint.dive6by6hint", 6, inputs);
         let y0 = output[0].clone();

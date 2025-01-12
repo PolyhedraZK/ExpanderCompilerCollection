@@ -1,5 +1,5 @@
 use expander_compiler::frontend::extra::*;
-use expander_compiler::{circuit::layered::InputType, frontend::*};
+use expander_compiler::frontend::*;
 
 
 pub fn simple_select<'a, C: Config, B: RootAPI<C>>(native: &'a mut B, selector: Variable, a: Variable, b: Variable) -> Variable {

@@ -1,14 +1,9 @@
-use crate::gnark::emparam::bls12381_fp;
+use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::emulated::field_bls12381::e12::*;
 use crate::gnark::emulated::field_bls12381::e2::*;
 use crate::gnark::emulated::field_bls12381::e6::GE6;
-use crate::gnark::hints::register_hint;
-use crate::gnark::emparam::FieldParams;
 use crate::gnark::element::*;
-use crate::gnark::emulated::point;
-use expander_compiler::frontend::extra::*;
-use expander_compiler::{circuit::layered::InputType, frontend::*};
-use expander_compiler::frontend::builder::*;
+use expander_compiler::frontend::*;
 use num_bigint::BigInt;
 
 use super::g1::G1Affine;
@@ -16,7 +11,8 @@ use super::g2::G2AffP;
 use super::g2::G2Affine;
 use super::g2::LineEvaluation;
 use super::g2::LineEvaluations;
-const loop_counter:[i8;64] = [
+
+const LOOP_COUNTER:[i8;64] = [
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -31,7 +27,7 @@ pub struct Pairing {
 
 impl Pairing {
     pub fn new<'a, C: Config, B: RootAPI<C>>(native: &'a mut B) -> Self {
-        let curve_f = CurveF::new(native, bls12381_fp{});
+        let curve_f = CurveF::new(native, Bls12381Fp{});
         let ext12 = Ext12::new(native);
         Self {
             curve_f,
@@ -144,7 +140,7 @@ impl Pairing {
             res = self.ext12.square(native, &copy_res);
             copy_res = self.ext12.copy(native, &res);
             for k in 0..n {
-                if loop_counter[i as usize] == 0 {
+                if LOOP_COUNTER[i as usize] == 0 {
                     if let Some(line_evaluation) = &lines[k].0[0][i as usize] {
                         let line = line_evaluation;
                         let tmp0 = self.ext12.ext6.ext2.mul_by_element(native, &line.r1, &y_inv[k]);
@@ -184,13 +180,13 @@ impl Pairing {
         let mut c_lines: LineEvaluations = LineEvaluations::default();
         let q_acc = q;
         let mut copy_q_acc = self.copy_g2_aff_p(native, q_acc);
-        let n = loop_counter.len();
+        let n = LOOP_COUNTER.len();
         let (q_acc, line1, line2) = self.triple_step(native, copy_q_acc);
         c_lines.0[0][n-2] = line1;
         c_lines.0[1][n-2] = line2;
         copy_q_acc = self.copy_g2_aff_p(native, &q_acc);
         for i in (1..=n-3).rev() {
-            if loop_counter[i] == 0 {
+            if LOOP_COUNTER[i] == 0 {
                 let (q_acc, c_lines_0_i) = self.double_step(native, copy_q_acc);
                 copy_q_acc = self.copy_g2_aff_p(native, &q_acc);
                 c_lines.0[0][i] = c_lines_0_i;
@@ -407,6 +403,10 @@ impl GenericDefine<M31Config> for PairingCheckGKRCircuit<Variable> {
     }
 }
 
+
+
+use crate::gnark::hints::register_hint;
+use expander_compiler::frontend::extra::*;
 #[test]
 fn test_pairing_check_gkr() {
     // let compile_result =

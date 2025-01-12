@@ -1,8 +1,7 @@
 use crate::gnark::emparam::FieldParams;
-use crate::gnark::emparam::{bls12381_fr, bls12381_fp};
+use crate::gnark::emparam::{bls12381_fr, Bls12381Fp};
 use crate::gnark::limbs::*;
-use expander_compiler::frontend::extra::*;
-use expander_compiler::{circuit::layered::InputType, frontend::*};
+use expander_compiler::frontend::*;
 use num_bigint::BigInt;
 use std::any::Any;
 use std::cmp::Ordering;
@@ -178,14 +177,14 @@ impl Define<M31Config> for VALUECircuit<Variable> {
         let v7 = "77777777777777777".to_string();
         let v8 = vec![8u8;4];
         let mut rs = vec![];
-        let r1 = value_of::<M31Config,_,bls12381_fp>(builder, Box::new(v1));
-        let r2 = value_of::<M31Config,_,bls12381_fp>(builder, Box::new(v2));
-        let r3 = value_of::<M31Config,_,bls12381_fp>(builder, Box::new(v3));
-        let r4 = value_of::<M31Config,_,bls12381_fp>(builder, Box::new(v4));
-        let r5 = value_of::<M31Config,_,bls12381_fp>(builder, Box::new(v5));
-        let r6 = value_of::<M31Config,_,bls12381_fp>(builder, Box::new(v6));
-        let r7 = value_of::<M31Config,_,bls12381_fp>(builder, Box::new(v7));
-        let r8 = value_of::<M31Config,_,bls12381_fp>(builder, Box::new(v8));
+        let r1 = value_of::<M31Config,_,Bls12381Fp>(builder, Box::new(v1));
+        let r2 = value_of::<M31Config,_,Bls12381Fp>(builder, Box::new(v2));
+        let r3 = value_of::<M31Config,_,Bls12381Fp>(builder, Box::new(v3));
+        let r4 = value_of::<M31Config,_,Bls12381Fp>(builder, Box::new(v4));
+        let r5 = value_of::<M31Config,_,Bls12381Fp>(builder, Box::new(v5));
+        let r6 = value_of::<M31Config,_,Bls12381Fp>(builder, Box::new(v6));
+        let r7 = value_of::<M31Config,_,Bls12381Fp>(builder, Box::new(v7));
+        let r8 = value_of::<M31Config,_,Bls12381Fp>(builder, Box::new(v8));
         rs = vec![r1, r2, r3, r4, r5, r6, r7, r8];
         for i in 0..rs.len() {
             for j in 0..rs[i].limbs.len() {

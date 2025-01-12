@@ -1,27 +1,36 @@
-use std::thread;
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use ark_bls12_381::g2;
 use circuit_std_rs::gnark::hints::register_hint;
 use circuit_std_rs::poseidon_m31::*;
 use circuit_std_rs::poseidon_m31_var::poseidon_variable_unsafe;
-use circuit_std_rs::utils::simple_select;
 use expander_compiler::frontend::*;
-use expander_config::M31ExtConfigSha2;
-use num_bigint::BigInt;
-use sha2::{Digest, Sha256};
-use circuit_std_rs::big_int::{to_binary_hint, big_array_add};
-use circuit_std_rs::sha2_m31::check_sha256;
-use circuit_std_rs::gnark::emulated::field_bls12381::*;
-use circuit_std_rs::gnark::emulated::field_bls12381::e2::*;
-use circuit_std_rs::gnark::emulated::sw_bls12381::pairing::*;
-use circuit_std_rs::gnark::emulated::sw_bls12381::g1::*;
-use circuit_std_rs::gnark::emulated::sw_bls12381::g2::*;
-use circuit_std_rs::gnark::element::*;
 use expander_compiler::frontend::extra::*;
-use circuit_std_rs::big_int::*;
-use expander_compiler::{circuit::layered::InputType, frontend::*};
+use serde::Deserialize;
+
+use crate::utils::read_from_json_file;
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ValidatorPlain {
+    #[serde(default)]
+    pub public_key: String,
+    #[serde(default)]
+    pub withdrawal_credentials: String,
+    #[serde(default)]
+    pub effective_balance: u64,
+    #[serde(default)]
+    pub slashed: bool,
+    #[serde(default)]
+    pub activation_eligibility_epoch: u64,
+    #[serde(default)]
+    pub activation_epoch: u64,
+    #[serde(default)]
+    pub exit_epoch: u64,
+    #[serde(default)]
+    pub withdrawable_epoch: u64,
+}
+pub fn read_validators(dir: &str) -> Vec<ValidatorPlain> {
+    let file_path = format!("{}/validatorList.json",dir);
+	let validaotrs: Vec<ValidatorPlain> = read_from_json_file(&file_path).unwrap();
+    validaotrs
+}
 
 #[derive(Clone, Copy)]
 pub struct ValidatorSSZ {

@@ -1,8 +1,8 @@
 use num_bigint::BigInt;
 
 #[derive(Default,Clone, Copy)]
-pub struct bls12381_fp {}
-impl bls12381_fp {
+pub struct Bls12381Fp {}
+impl Bls12381Fp {
     pub fn nb_limbs() -> u32 {
         48
     }
@@ -56,18 +56,18 @@ impl FieldParams for bls12381_fr {
     }
 }
 
-impl FieldParams for bls12381_fp {
+impl FieldParams for Bls12381Fp {
     fn nb_limbs() -> u32 {
-        bls12381_fp::nb_limbs()
+        Bls12381Fp::nb_limbs()
     }
     fn bits_per_limb() -> u32 {
-        bls12381_fp::bits_per_limb()
+        Bls12381Fp::bits_per_limb()
     }
     fn is_prime() -> bool {
-        bls12381_fp::is_prime()
+        Bls12381Fp::is_prime()
     }
     fn modulus() -> BigInt {
-        bls12381_fp::modulus()
+        Bls12381Fp::modulus()
     }
 }
 

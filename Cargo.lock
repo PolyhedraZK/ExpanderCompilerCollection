@@ -284,6 +284,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
 
 [[package]]
+name = "base64"
+version = "0.22.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
+
+[[package]]
 name = "bindgen"
 version = "0.69.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -724,8 +730,10 @@ dependencies = [
  "ark-ec",
  "ark-ff",
  "ark-std",
+ "base64 0.22.1",
  "circuit",
  "circuit-std-rs",
+ "clap",
  "config",
  "expander_compiler",
  "gf2",
@@ -735,6 +743,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "rand",
+ "rayon",
  "serde",
  "serde_json",
  "sha2",
@@ -1072,7 +1081,7 @@ version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06683b93020a07e3dbcf5f8c0f6d40080d725bea7936fc01ad345c01b97dc270"
 dependencies = [
- "base64",
+ "base64 0.21.7",
  "bytes",
  "headers-core",
  "http 0.2.12",

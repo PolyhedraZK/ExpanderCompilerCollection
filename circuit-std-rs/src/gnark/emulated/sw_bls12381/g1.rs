@@ -1,22 +1,17 @@
-use crate::gnark::emparam::bls12381_fp;
+use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::emulated::field_bls12381::e2::CurveF;
 use crate::gnark::hints::register_hint;
-use crate::gnark::limbs::*;
-use crate::gnark::utils::*;
-use crate::gnark::emparam::FieldParams;
 use crate::gnark::element::*;
-use crate::gnark::emulated::point;
 use expander_compiler::frontend::extra::*;
-use expander_compiler::{circuit::layered::InputType, frontend::*};
-use expander_compiler::frontend::builder::*;
+use expander_compiler::frontend::*;
 
 #[derive(Default,Clone)]
 pub struct G1Affine {
-    pub x: Element<bls12381_fp>,
-    pub y: Element<bls12381_fp>,
+    pub x: Element<Bls12381Fp>,
+    pub y: Element<Bls12381Fp>,
 }
 impl G1Affine {
-    pub fn new(x: Element<bls12381_fp>, y: Element<bls12381_fp>) -> Self {
+    pub fn new(x: Element<Bls12381Fp>, y: Element<Bls12381Fp>) -> Self {
         Self {
             x,
             y,
@@ -32,20 +27,20 @@ impl G1Affine {
         //g1Gen.X.SetString("3685416753713387016781088315183077757961620795782546409894578378688607592378376318836054947676345821548104185464507")
 	    //g1Gen.Y.SetString("1339506544944476473020471379941921221584933875938349620426543736416511423956333506472724655353366534992391756441569")
         Self {
-            x: value_of::<C, B, bls12381_fp>(native, Box::new("3685416753713387016781088315183077757961620795782546409894578378688607592378376318836054947676345821548104185464507".to_string())),
-            y: value_of::<C, B, bls12381_fp>(native, Box::new("1339506544944476473020471379941921221584933875938349620426543736416511423956333506472724655353366534992391756441569".to_string())),
+            x: value_of::<C, B, Bls12381Fp>(native, Box::new("3685416753713387016781088315183077757961620795782546409894578378688607592378376318836054947676345821548104185464507".to_string())),
+            y: value_of::<C, B, Bls12381Fp>(native, Box::new("1339506544944476473020471379941921221584933875938349620426543736416511423956333506472724655353366534992391756441569".to_string())),
         }
     }
 }
 pub struct G1 {
     pub curve_f: CurveF,
-    pub w: Element<bls12381_fp>,
+    pub w: Element<Bls12381Fp>,
 }
 
 impl G1 {
     pub fn new<'a, C: Config, B: RootAPI<C>>(native: &'a mut B) -> Self {
-        let curve_f = CurveF::new(native, bls12381_fp{});
-        let w = value_of::<C, B, bls12381_fp>( native, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436".to_string()));
+        let curve_f = CurveF::new(native, Bls12381Fp{});
+        let w = value_of::<C, B, Bls12381Fp>( native, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436".to_string()));
         
         Self {
             curve_f,

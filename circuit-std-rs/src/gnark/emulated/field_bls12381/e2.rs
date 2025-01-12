@@ -2,19 +2,17 @@ use crate::gnark::emparam::FieldParams;
 use crate::gnark::element::*;
 use crate::gnark::field::Field as GField;
 use crate::gnark::emparam::*;
-use crate::gnark::hints::{div_e2_hint, inverse_e2_hint, mul_hint, simple_rangecheck_hint};
+use crate::gnark::hints::register_hint;
 use std::collections::HashMap;
-use std::hint;
-use crate::logup::*;
 use expander_compiler::frontend::extra::*;
-use expander_compiler::{circuit::layered::InputType, frontend::*};
+use expander_compiler::frontend::*;
 use num_bigint::BigInt;
 
-pub type CurveF = GField<bls12381_fp>;
+pub type CurveF = GField<Bls12381Fp>;
 #[derive(Default, Clone)]
 pub struct GE2 {
-    pub a0: Element<bls12381_fp>,
-    pub a1: Element<bls12381_fp>,
+    pub a0: Element<Bls12381Fp>,
+    pub a1: Element<Bls12381Fp>,
 }
 impl GE2 {
     pub fn clone(&self) -> Self {
@@ -41,21 +39,21 @@ impl Ext2{
     pub fn new<'a, C:Config, B:RootAPI<C>>(api: &'a mut B) -> Self {
         let mut non_residues:HashMap<u32, HashMap<u32, GE2>> = HashMap::new();
         let mut pwrs:HashMap<u32, HashMap<u32, GE2>> = HashMap::new();
-        let a1_1_0 = value_of::<C, B, bls12381_fp>(api, Box::new("3850754370037169011952147076051364057158807420970682438676050522613628423219637725072182697113062777891589506424760".to_string()));
-        let a1_1_1 = value_of::<C, B, bls12381_fp>(api, Box::new("151655185184498381465642749684540099398075398968325446656007613510403227271200139370504932015952886146304766135027".to_string()));
-        let a1_2_0 = value_of::<C, B, bls12381_fp>(api, Box::new("0".to_string()));
-        let a1_2_1 = value_of::<C, B, bls12381_fp>(api, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436".to_string()));
-        let a1_3_0 = value_of::<C, B, bls12381_fp>(api, Box::new("1028732146235106349975324479215795277384839936929757896155643118032610843298655225875571310552543014690878354869257".to_string()));
-        let a1_3_1 = value_of::<C, B, bls12381_fp>(api, Box::new("1028732146235106349975324479215795277384839936929757896155643118032610843298655225875571310552543014690878354869257".to_string()));
-        let a1_4_0 = value_of::<C, B, bls12381_fp>(api, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437".to_string()));
-        let a1_4_1 = value_of::<C, B, bls12381_fp>(api, Box::new("0".to_string()));
-        let a1_5_0 = value_of::<C, B, bls12381_fp>(api, Box::new("877076961050607968509681729531255177986764537961432449499635504522207616027455086505066378536590128544573588734230".to_string()));
-        let a1_5_1 = value_of::<C, B, bls12381_fp>(api, Box::new("3125332594171059424908108096204648978570118281977575435832422631601824034463382777937621250592425535493320683825557".to_string()));
-        let a2_1_0 = value_of::<C, B, bls12381_fp>(api, Box::new("793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620351".to_string()));
-        let a2_2_0 = value_of::<C, B, bls12381_fp>(api, Box::new("793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620350".to_string()));
-        let a2_3_0 = value_of::<C, B, bls12381_fp>(api, Box::new("4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559786".to_string()));
-        let a2_4_0 = value_of::<C, B, bls12381_fp>(api, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436".to_string()));
-        let a2_5_0 = value_of::<C, B, bls12381_fp>(api, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437".to_string()));
+        let a1_1_0 = value_of::<C, B, Bls12381Fp>(api, Box::new("3850754370037169011952147076051364057158807420970682438676050522613628423219637725072182697113062777891589506424760".to_string()));
+        let a1_1_1 = value_of::<C, B, Bls12381Fp>(api, Box::new("151655185184498381465642749684540099398075398968325446656007613510403227271200139370504932015952886146304766135027".to_string()));
+        let a1_2_0 = value_of::<C, B, Bls12381Fp>(api, Box::new("0".to_string()));
+        let a1_2_1 = value_of::<C, B, Bls12381Fp>(api, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436".to_string()));
+        let a1_3_0 = value_of::<C, B, Bls12381Fp>(api, Box::new("1028732146235106349975324479215795277384839936929757896155643118032610843298655225875571310552543014690878354869257".to_string()));
+        let a1_3_1 = value_of::<C, B, Bls12381Fp>(api, Box::new("1028732146235106349975324479215795277384839936929757896155643118032610843298655225875571310552543014690878354869257".to_string()));
+        let a1_4_0 = value_of::<C, B, Bls12381Fp>(api, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437".to_string()));
+        let a1_4_1 = value_of::<C, B, Bls12381Fp>(api, Box::new("0".to_string()));
+        let a1_5_0 = value_of::<C, B, Bls12381Fp>(api, Box::new("877076961050607968509681729531255177986764537961432449499635504522207616027455086505066378536590128544573588734230".to_string()));
+        let a1_5_1 = value_of::<C, B, Bls12381Fp>(api, Box::new("3125332594171059424908108096204648978570118281977575435832422631601824034463382777937621250592425535493320683825557".to_string()));
+        let a2_1_0 = value_of::<C, B, Bls12381Fp>(api, Box::new("793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620351".to_string()));
+        let a2_2_0 = value_of::<C, B, Bls12381Fp>(api, Box::new("793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620350".to_string()));
+        let a2_3_0 = value_of::<C, B, Bls12381Fp>(api, Box::new("4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559786".to_string()));
+        let a2_4_0 = value_of::<C, B, Bls12381Fp>(api, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436".to_string()));
+        let a2_5_0 = value_of::<C, B, Bls12381Fp>(api, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437".to_string()));
         pwrs.insert(1, HashMap::new());
         pwrs.get_mut(&1).unwrap().insert(1, GE2 {
             a0: a1_1_0,
@@ -78,32 +76,32 @@ impl Ext2{
             a1: a1_5_1,
         });
         pwrs.insert(2, HashMap::new());
-        let a_zero = value_of::<C, B, bls12381_fp>(api, Box::new("0".to_string()));
+        let a_zero = value_of::<C, B, Bls12381Fp>(api, Box::new("0".to_string()));
         pwrs.get_mut(&2).unwrap().insert(1, GE2 {
             a0: a2_1_0,
             a1: a_zero,
         });
-        let a_zero = value_of::<C, B, bls12381_fp>(api, Box::new("0".to_string()));
+        let a_zero = value_of::<C, B, Bls12381Fp>(api, Box::new("0".to_string()));
         pwrs.get_mut(&2).unwrap().insert(2, GE2 {
             a0: a2_2_0,
             a1: a_zero,
         });
-        let a_zero = value_of::<C, B, bls12381_fp>(api, Box::new("0".to_string()));
+        let a_zero = value_of::<C, B, Bls12381Fp>(api, Box::new("0".to_string()));
         pwrs.get_mut(&2).unwrap().insert(3, GE2 {
             a0: a2_3_0,
             a1: a_zero,
         });
-        let a_zero = value_of::<C, B, bls12381_fp>(api, Box::new("0".to_string()));
+        let a_zero = value_of::<C, B, Bls12381Fp>(api, Box::new("0".to_string()));
         pwrs.get_mut(&2).unwrap().insert(4, GE2 {
             a0: a2_4_0,
             a1: a_zero,
         });
-        let a_zero = value_of::<C, B, bls12381_fp>(api, Box::new("0".to_string()));
+        let a_zero = value_of::<C, B, Bls12381Fp>(api, Box::new("0".to_string()));
         pwrs.get_mut(&2).unwrap().insert(5, GE2 {
             a0: a2_5_0,
             a1: a_zero,
         });
-        let fp = CurveF::new(api, bls12381_fp{});
+        let fp = CurveF::new(api, Bls12381Fp{});
         Ext2 {
             fp,
             non_residues: pwrs,
@@ -178,7 +176,7 @@ impl Ext2{
             a1: b1,
         }
     }
-    pub fn mul_by_element<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2, y: &Element<bls12381_fp>) -> GE2 {
+    pub fn mul_by_element<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2, y: &Element<Bls12381Fp>) -> GE2 {
         let v0 = self.fp.mul(native, &x.a0, y);
         let v1 = self.fp.mul(native, &x.a1, y);
         GE2 {
@@ -274,7 +272,7 @@ impl Ext2{
         self.mul_by_non_residue_generic(native, x, 1, 1)
     }
     pub fn mul_by_non_residue1_power2<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
-        let element = value_of::<C, B, bls12381_fp>(native, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436".to_string()));
+        let element = value_of::<C, B, Bls12381Fp>(native, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436".to_string()));
         let a = self.fp.mul(native, &x.a1, &element);
         let a = self.fp.neg(native, &a);
         let b = self.fp.mul(native, &x.a0, &element);
@@ -287,7 +285,7 @@ impl Ext2{
         self.mul_by_non_residue_generic(native, x, 1, 3)
     }
     pub fn mul_by_non_residue1_power4<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
-        let element = value_of::<C, B, bls12381_fp>(native, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437".to_string()));
+        let element = value_of::<C, B, Bls12381Fp>(native, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437".to_string()));
         let a = self.fp.mul(native, &x.a0, &element);
         let b = self.fp.mul(native, &x.a1, &element);
         GE2 {
@@ -299,7 +297,7 @@ impl Ext2{
         self.mul_by_non_residue_generic(native, x, 1, 5)
     }
     pub fn mul_by_non_residue2_power1<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
-        let element = value_of::<C, B, bls12381_fp>(native, Box::new("793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620351".to_string()));
+        let element = value_of::<C, B, Bls12381Fp>(native, Box::new("793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620351".to_string()));
         let a = self.fp.mul(native, &x.a0, &element);
         let b = self.fp.mul(native, &x.a1, &element);
         GE2 {
@@ -308,7 +306,7 @@ impl Ext2{
         }
     }
     pub fn mul_by_non_residue2_power2<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
-        let element = value_of::<C, B, bls12381_fp>(native, Box::new("793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620350".to_string()));
+        let element = value_of::<C, B, Bls12381Fp>(native, Box::new("793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620350".to_string()));
         let a = self.fp.mul(native, &x.a0, &element);
         let b = self.fp.mul(native, &x.a1, &element);
         GE2 {
@@ -317,7 +315,7 @@ impl Ext2{
         }
     }
     pub fn mul_by_non_residue2_power3<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
-        let element = value_of::<C, B, bls12381_fp>(native, Box::new("4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559786".to_string()));
+        let element = value_of::<C, B, Bls12381Fp>(native, Box::new("4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559786".to_string()));
         let a = self.fp.mul(native, &x.a0, &element);
         let b = self.fp.mul(native, &x.a1, &element);
         GE2 {
@@ -326,7 +324,7 @@ impl Ext2{
         }
     }
     pub fn mul_by_non_residue2_power4<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
-        let element = value_of::<C, B, bls12381_fp>(native, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436".to_string()));
+        let element = value_of::<C, B, Bls12381Fp>(native, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436".to_string()));
         let a = self.fp.mul(native, &x.a0, &element);
         let b = self.fp.mul(native, &x.a1, &element);
         GE2 {
@@ -335,7 +333,7 @@ impl Ext2{
         }
     }
     pub fn mul_by_non_residue2_power5<'a, C:Config, B:RootAPI<C>>(&mut self, native: &'a mut B, x: &GE2) -> GE2 {
-        let element = value_of::<C, B, bls12381_fp>(native, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437".to_string()));
+        let element = value_of::<C, B, Bls12381Fp>(native, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437".to_string()));
         let a = self.fp.mul(native, &x.a0, &element);
         let b = self.fp.mul(native, &x.a1, &element);
         GE2 {
@@ -404,9 +402,7 @@ fn test_e2_add() {
     let compile_result =
     compile_generic(&E2AddCircuit::default(), CompileOptions::default()).unwrap();
 	let mut hint_registry = HintRegistry::<M31>::new();
-	hint_registry.register("myhint.mulhint", mul_hint);
-	hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
-    hint_registry.register("myhint.querycounthint", query_count_hint);
+    register_hint(&mut hint_registry);
     let mut assignment = E2AddCircuit::<M31> {
         x: [[M31::from(0); 48], [M31::from(0); 48]],
         y: [[M31::from(0); 48], [M31::from(0); 48]],
@@ -478,9 +474,7 @@ fn test_e2_sub() {
     let compile_result =
         compile_generic(&E2SubCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
-    hint_registry.register("myhint.mulhint", mul_hint);
-    hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
-    hint_registry.register("myhint.querycounthint", query_count_hint);
+    register_hint(&mut hint_registry);
     let mut assignment = E2SubCircuit::<M31> {
         x: [[M31::from(0); 48], [M31::from(0); 48]],
         y: [[M31::from(0); 48], [M31::from(0); 48]],
@@ -542,9 +536,7 @@ fn test_e2_double(){
     let compile_result =
     compile_generic(&E2DoubleCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
-    hint_registry.register("myhint.mulhint", mul_hint);
-    hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
-    hint_registry.register("myhint.querycounthint", query_count_hint);
+    register_hint(&mut hint_registry);
     let mut assignment = E2DoubleCircuit::<M31> {
         x: [[M31::from(0); 48], [M31::from(0); 48]],
         z: [[M31::from(0); 48], [M31::from(0); 48]],
@@ -590,8 +582,6 @@ impl GenericDefine<M31Config> for E2MulCircuit<Variable> {
         let z_reduce_a1 = ext2.fp.reduce(builder, &z.a1, false);
 
         for i in 0..48 {
-            // println!("{}: {:?} {:?}", i, builder.value_of(z_reduce_a0.limbs[i]), builder.value_of(self.z[0][i]));
-            // println!("{}: {:?} {:?}", i, builder.value_of(z_reduce_a1.limbs[i]), builder.value_of(self.z[1][i]));
             builder.assert_is_equal(z_reduce_a0.limbs[i], self.z[0][i]);
             builder.assert_is_equal(z_reduce_a1.limbs[i], self.z[1][i]);
         }
@@ -606,9 +596,7 @@ fn test_e2_mul(){
     let compile_result =
     compile_generic(&E2MulCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
-    hint_registry.register("myhint.mulhint", mul_hint);
-    hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
-    hint_registry.register("myhint.querycounthint", query_count_hint);
+    register_hint(&mut hint_registry);
     let mut assignment = E2MulCircuit::<M31> {
         x: [[M31::from(0); 48], [M31::from(0); 48]],
         y: [[M31::from(0); 48], [M31::from(0); 48]],
@@ -671,9 +659,7 @@ fn test_e2_square(){
     let compile_result =
     compile_generic(&E2SquareCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
-    hint_registry.register("myhint.mulhint", mul_hint);
-    hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
-    hint_registry.register("myhint.querycounthint", query_count_hint);
+    register_hint(&mut hint_registry);
     let mut assignment = E2SquareCircuit::<M31> {
         x: [[M31::from(0); 48], [M31::from(0); 48]],
         z: [[M31::from(0); 48], [M31::from(0); 48]],
@@ -735,10 +721,7 @@ fn test_e2_div(){
     let compile_result =
     compile_generic(&E2DivCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
-    hint_registry.register("myhint.mulhint", mul_hint);
-    hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
-    hint_registry.register("myhint.querycounthint", query_count_hint);
-    hint_registry.register("myhint.dive2hint", div_e2_hint);
+    register_hint(&mut hint_registry);
     let mut assignment = E2DivCircuit::<M31> {
         x: [[M31::from(0); 48], [M31::from(0); 48]],
         y: [[M31::from(0); 48], [M31::from(0); 48]],
@@ -802,10 +785,7 @@ fn test_e2_mul_by_element(){
     let compile_result =
     compile_generic(&E2MulByElementCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
-    hint_registry.register("myhint.mulhint", mul_hint);
-    hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
-    hint_registry.register("myhint.querycounthint", query_count_hint);
-    hint_registry.register("myhint.dive2hint", div_e2_hint);
+    register_hint(&mut hint_registry);
     let mut assignment = E2MulByElementCircuit::<M31> {
         a: [[M31::from(0); 48], [M31::from(0); 48]],
         b: [M31::from(0); 48],
@@ -867,10 +847,7 @@ fn test_e2_mul_by_non_residue(){
     let compile_result =
     compile_generic(&E2MulByNonResidueCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
-    hint_registry.register("myhint.mulhint", mul_hint);
-    hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
-    hint_registry.register("myhint.querycounthint", query_count_hint);
-    hint_registry.register("myhint.dive2hint", div_e2_hint);
+    register_hint(&mut hint_registry);
     let mut assignment = E2MulByNonResidueCircuit::<M31> {
         a: [[M31::from(0); 48], [M31::from(0); 48]],
         c: [[M31::from(0); 48], [M31::from(0); 48]],
@@ -929,10 +906,7 @@ fn test_e2_neg(){
     let compile_result =
     compile_generic(&E2NegCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
-    hint_registry.register("myhint.mulhint", mul_hint);
-    hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
-    hint_registry.register("myhint.querycounthint", query_count_hint);
-    hint_registry.register("myhint.dive2hint", div_e2_hint);
+    register_hint(&mut hint_registry);
     let mut assignment = E2NegCircuit::<M31> {
         a: [[M31::from(0); 48], [M31::from(0); 48]],
         c: [[M31::from(0); 48], [M31::from(0); 48]],
@@ -990,10 +964,7 @@ fn test_e2_conjugate(){
     let compile_result =
     compile_generic(&E2ConjugateCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
-    hint_registry.register("myhint.mulhint", mul_hint);
-    hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
-    hint_registry.register("myhint.querycounthint", query_count_hint);
-    hint_registry.register("myhint.dive2hint", div_e2_hint);
+    register_hint(&mut hint_registry);
     let mut assignment = E2ConjugateCircuit::<M31> {
         a: [[M31::from(0); 48], [M31::from(0); 48]],
         c: [[M31::from(0); 48], [M31::from(0); 48]],
@@ -1050,11 +1021,7 @@ fn test_e2_inverse(){
     let compile_result =
     compile_generic(&E2InverseCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
-    hint_registry.register("myhint.mulhint", mul_hint);
-    hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
-    hint_registry.register("myhint.querycounthint", query_count_hint);
-    hint_registry.register("myhint.dive2hint", div_e2_hint);
-    hint_registry.register("myhint.inversee2hint", inverse_e2_hint);
+    register_hint(&mut hint_registry);
     let mut assignment = E2InverseCircuit::<M31> {
         a: [[M31::from(0); 48], [M31::from(0); 48]],
         c: [[M31::from(0); 48], [M31::from(0); 48]],
@@ -1079,19 +1046,3 @@ fn test_e2_inverse(){
     );
 }
 
-
-
-
-
-
-pub fn print_e2<'a, C:Config, B:RootAPI<C>>(native: &'a mut B, v: &GE2)  {
-    for i in 0..48 {
-        println!("{}: {:?} {:?}", i, native.value_of(v.a0.limbs[i]), native.value_of(v.a1.limbs[i]));
-    }
-}
-pub fn print_element<'a, C:Config, B:RootAPI<C>, T: FieldParams>(native: &'a mut B, v: &Element<T>)  {
-    for i in 0..v.limbs.len() {
-        print!("{:?} ", native.value_of(v.limbs[i]));
-    }
-    println!(" ");
-}

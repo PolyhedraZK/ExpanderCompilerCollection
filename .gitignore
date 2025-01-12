@@ -11,3 +11,4 @@ libec_go_lib.*
 *.log
 *.witness
 .DS_Store
+*.json

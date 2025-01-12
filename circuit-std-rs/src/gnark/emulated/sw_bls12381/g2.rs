@@ -1,16 +1,7 @@
-use crate::gnark::emparam::bls12381_fp;
-use crate::gnark::emulated::field_bls12381::e2::CurveF;
+use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::emulated::field_bls12381::e2::Ext2;
 use crate::gnark::emulated::field_bls12381::e2::GE2;
-use crate::gnark::hints::register_hint;
-use crate::gnark::limbs::*;
-use crate::gnark::utils::*;
-use crate::gnark::emparam::FieldParams;
-use crate::gnark::element::*;
-use crate::gnark::emulated::point;
-use expander_compiler::frontend::extra::*;
-use expander_compiler::{circuit::layered::InputType, frontend::*};
-use expander_compiler::frontend::builder::*;
+use expander_compiler::frontend::*;
 #[derive(Default,Clone)]
 pub struct G2AffP {
     pub x: GE2,
@@ -65,7 +56,7 @@ pub struct LineEvaluations(pub LineEvaluationArray);
 
 impl Default for LineEvaluations {
     fn default() -> Self {
-        LineEvaluations([[None; 63]; 2].map(|row:[Option<bls12381_fp>; 63] | row.map(|_| None)))
+        LineEvaluations([[None; 63]; 2].map(|row:[Option<Bls12381Fp>; 63] | row.map(|_| None)))
     }
 }
 impl LineEvaluations {

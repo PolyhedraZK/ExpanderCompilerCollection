@@ -1,11 +1,8 @@
-use std::cell::RefCell;
 use extra::*;
 use expander_compiler::frontend::*;
-use sha2::{Digest, Sha256};
-use crate::{big_int::{big_array_add, big_endian_m31_array_put_uint32, bit_array_to_m31, bytes_to_bits, cap_sigma0, cap_sigma1, ch, m31_to_bit_array, maj, sigma0, sigma1, to_binary_hint}, poseidon_m31::{poseidon_elements_unsafe, PoseidonParams}};
+use crate::poseidon_m31::{poseidon_elements_unsafe, PoseidonParams};
 
-const P:u64 = 2147483647;
-const PoseidonHashLength:usize = 8;
+const POSEIDON_HASH_LENGTH:usize = 8;
 #[derive(Default)]
 pub struct PoseidonInternalState {
     after_half_full_round: Vec<Variable>,
@@ -29,11 +26,11 @@ pub fn poseidon_variable_unsafe<C: Config, B: RootAPI<C>>(builder: &mut B, param
             let mut state = vec![Variable::default(); param.num_states];
             state.copy_from_slice(&input[i*param.num_states..(i+1)*param.num_states]);
             let output = poseidon_m31_with_internal_states_variable(builder, param, state, with_state);
-            input[i*PoseidonHashLength..(i+1)*PoseidonHashLength].copy_from_slice(&output[..PoseidonHashLength]);
+            input[i*POSEIDON_HASH_LENGTH..(i+1)*POSEIDON_HASH_LENGTH].copy_from_slice(&output[..POSEIDON_HASH_LENGTH]);
         }
         input = input[..input.len()/2].to_vec();
     }
-    input[..PoseidonHashLength].to_vec()
+    input[..POSEIDON_HASH_LENGTH].to_vec()
 }
 pub fn poseidon_m31_with_internal_states_variable<C: Config, B: RootAPI<C>>(builder: &mut B, param: &PoseidonParams, input: Vec<Variable>, with_state: bool) -> Vec<Variable> {
     if input.len() != param.num_states {
@@ -100,14 +97,14 @@ pub fn s_box<C: Config, B: RootAPI<C>>(builder: &mut B, f: Variable) -> Variable
 
 declare_circuit!(PoseidonCircuit{
     inputs: [Variable; 64],
-    outputs: [Variable; PoseidonHashLength],
+    outputs: [Variable; POSEIDON_HASH_LENGTH],
 }
 );
 
 impl GenericDefine<M31Config> for PoseidonCircuit<Variable> {
 	fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let outputs = poseidon_variable_unsafe(builder, &PoseidonParams::new(), self.inputs.to_vec(), false);
-        for i in 0..PoseidonHashLength {
+        for i in 0..POSEIDON_HASH_LENGTH {
             builder.assert_is_equal(self.outputs[i], outputs[i]);
         }
     }
@@ -116,7 +113,7 @@ impl GenericDefine<M31Config> for PoseidonCircuit<Variable> {
 
 #[test]
 fn test_poseidon_circuit(){
-	let mut hint_registry = HintRegistry::<M31>::new();
+	let hint_registry = HintRegistry::<M31>::new();
     let mut input = vec![];
     for i in 0..64 {
         input.push(i as u64);
@@ -126,7 +123,7 @@ fn test_poseidon_circuit(){
     for i in 0..64 {
         assignment.inputs[i] = M31::from(input[i].clone() as u32);
     }
-    for i in 0..PoseidonHashLength {
+    for i in 0..POSEIDON_HASH_LENGTH {
         assignment.outputs[i] = M31::from(output[i] as u32);
     }
     

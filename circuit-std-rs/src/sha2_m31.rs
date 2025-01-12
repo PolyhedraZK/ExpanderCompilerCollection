@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use extra::*;
 use expander_compiler::frontend::*;
 use sha2::{Digest, Sha256};

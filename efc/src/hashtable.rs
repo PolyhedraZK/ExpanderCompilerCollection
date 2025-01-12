@@ -1,29 +1,17 @@
 use std::thread;
-use std::cell::RefCell;
 use std::sync::Arc;
-use std::rc::Rc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use ark_bls12_381::g2;
 use circuit_std_rs::gnark::hints::register_hint;
 use expander_compiler::circuit::ir::hint_normalized::witness_solver;
 use expander_compiler::frontend::*;
 use expander_config::M31ExtConfigSha2;
-use num_bigint::BigInt;
+use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use circuit_std_rs::big_int::{to_binary_hint, big_array_add};
 use circuit_std_rs::sha2_m31::check_sha256;
-use circuit_std_rs::gnark::emulated::field_bls12381::*;
-use circuit_std_rs::gnark::emulated::field_bls12381::e2::*;
-use circuit_std_rs::gnark::emulated::sw_bls12381::pairing::*;
-use circuit_std_rs::gnark::emulated::sw_bls12381::g1::*;
-use circuit_std_rs::gnark::emulated::sw_bls12381::g2::*;
-use circuit_std_rs::gnark::element::*;
 use expander_compiler::frontend::extra::*;
-use circuit_std_rs::big_int::*;
-use expander_compiler::{circuit::layered::InputType, frontend::*};
-
+use ark_std::primitive::u8;
+use crate::utils::{ensure_directory_exists, read_from_json_file};
 use crate::utils::run_circuit;
-
 
 const SHA256LEN: usize = 32;
 const HASHTABLESIZE: usize = 64;
@@ -31,6 +19,17 @@ const HASHTABLESIZE: usize = 64;
 pub struct HashTableParams {
     pub table_size: usize,
     pub hash_len: usize,
+}
+#[derive(Debug, Deserialize)]
+pub struct HashTableJson{
+	pub Seed: Vec<u8>,
+	pub ShuffleRound: u8,
+	pub StartIndex: Vec<u8>,
+	pub HashOutputs: Vec<Vec<u8>>
+}
+#[derive(Debug, Deserialize)]
+pub struct HashTablesJson{
+	pub tables: Vec<HashTableJson>,
 }
 
 declare_circuit!(HASHTABLECircuit {
@@ -275,4 +274,78 @@ fn run_multi_hashtable(){
     }
     let end_time = std::time::Instant::now();
     println!("Generate witness Time: {:?}", end_time.duration_since(start_time));
+}
+
+pub fn generate_hash_witnesses(dir: &str){
+	println!("preparing solver...");
+	ensure_directory_exists("./witnesses/hashtable");
+    let mut w_s: witness_solver::WitnessSolver::<M31Config>;
+    if std::fs::metadata("hashtable.witness").is_ok() {
+        println!("The file exists!");
+        w_s = witness_solver::WitnessSolver::deserialize_from(std::fs::File::open("hashtable.witness").unwrap()).unwrap();
+    } else {
+        println!("The file does not exist.");
+        let compile_result = compile_generic(&HASHTABLECircuit::default(), CompileOptions::default()).unwrap();
+        compile_result.witness_solver.serialize_into(std::fs::File::create("hashtable.witness").unwrap()).unwrap();
+        w_s = compile_result.witness_solver;
+    }
+    let witness_solver = Arc::new(w_s);
+
+	println!("generating witnesses...");
+    let start_time = std::time::Instant::now();
+
+	let file_path = format!("{}/hash_assignment.json",dir);
+
+	let hashtable_data: Vec<HashTableJson> = read_from_json_file(&file_path).unwrap();
+	let mut assignments = vec![];
+	for i in 0..hashtable_data.len(){
+		let mut hash_assignment = HASHTABLECircuit::default();
+		for j in 0..32 {
+			hash_assignment.seed[j] = M31::from(hashtable_data[i].Seed[j] as u32);
+		}
+		hash_assignment.shuffle_round = M31::from(hashtable_data[i].ShuffleRound as u32);
+		for j in 0..4 {
+			hash_assignment.start_index[j] = M31::from(hashtable_data[i].StartIndex[j] as u32);
+		}
+		for j in 0..HASHTABLESIZE{
+			for k in 0..32 {
+				hash_assignment.output[j][k] = M31::from(hashtable_data[i].HashOutputs[j][k] as u32);
+			}
+		}
+		assignments.push(hash_assignment);
+	}
+
+    let end_time = std::time::Instant::now();
+    println!("assigned assignments time: {:?}", end_time.duration_since(start_time));
+	let assignment_chunks: Vec<Vec<HASHTABLECircuit<M31>>> =
+        assignments.chunks(16).map(|x| x.to_vec()).collect();
+
+    let handles = assignment_chunks
+        .into_iter()
+		.enumerate()
+        .map(|(i, assignments)| {
+            let witness_solver = Arc::clone(&witness_solver);
+            thread::spawn(move || {
+                let mut hint_registry1 = HintRegistry::<M31>::new();
+                register_hint(&mut hint_registry1);
+                let witness = witness_solver.solve_witnesses_with_hints(&assignments, &mut hint_registry1).unwrap();
+				let file_name = format!("./witnesses/hashtable/witness_{}.txt", i);
+				let file = std::fs::File::create(file_name).unwrap();
+    			let writer = std::io::BufWriter::new(file);
+				witness.serialize_into(writer).unwrap();
+            }
+            )
+        })
+        .collect::<Vec<_>>();
+    let mut results = Vec::new();
+    for handle in handles {
+        results.push(handle.join().unwrap());
+    }
+    let end_time = std::time::Instant::now();
+    println!("Generate hashtable witness Time: {:?}", end_time.duration_since(start_time));
+}
+
+#[test]
+fn test_read_hash_assignment(){
+	generate_hash_witnesses("");
 }

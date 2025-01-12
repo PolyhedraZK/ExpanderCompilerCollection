@@ -2,55 +2,20 @@ use num_bigint::BigInt;
 
 use crate::gnark::limbs::recompose;
 use crate::gnark::limbs::decompose;
+use crate::gnark::emparam::FieldParams;
+use crate::gnark::element::*;
+use crate::gnark::emulated::field_bls12381::e2::GE2;
+use expander_compiler::frontend::*;
 
 pub fn nb_multiplication_res_limbs(len_left: usize, len_right: usize) -> usize {
     let res = len_left + len_right - 1;
-    if res < 0 {
+    if len_left + len_right < 1 {
         0
     } else {
         res
     }
 }
 
-/*
-func subPadding(modulus *big.Int, bitsPerLimbs uint, overflow uint, nbLimbs uint) []*big.Int {
-	if modulus.Cmp(big.NewInt(0)) == 0 {
-		panic("modulus is zero")
-	}
-	// first, we build a number nLimbs, such that nLimbs > b;
-	// here b is defined by its bounds, that is b is an element with nbLimbs of (bitsPerLimbs+overflow)
-	// so a number nLimbs > b, is simply taking the next power of 2 over this bound .
-	nLimbs := make([]*big.Int, nbLimbs)
-	for i := 0; i < len(nLimbs); i++ {
-		nLimbs[i] = new(big.Int).SetUint64(1)
-		nLimbs[i].Lsh(nLimbs[i], overflow+bitsPerLimbs)
-	}
-
-	// recompose n as the sum of the coefficients weighted by the limbs
-	n := new(big.Int)
-	if err := limbs.Recompose(nLimbs, bitsPerLimbs, n); err != nil {
-		panic(fmt.Sprintf("recompose: %v", err))
-	}
-	fmt.Println("n", n)
-	// mod reduce n, and negate it
-	n.Mod(n, modulus)
-	n.Sub(modulus, n)
-
-	// construct pad such that:
-	// pad := n - neg(n mod p) == kp
-	pad := make([]*big.Int, nbLimbs)
-	for i := range pad {
-		pad[i] = new(big.Int)
-	}
-	if err := limbs.Decompose(n, bitsPerLimbs, pad); err != nil {
-		panic(fmt.Sprintf("decompose: %v", err))
-	}
-	for i := range pad {
-		pad[i].Add(pad[i], nLimbs[i])
-	}
-	return pad
-}
-*/
 pub fn sub_padding(modulus: &BigInt, bits_per_limbs: u32, overflow: u32, nb_limbs: u32) -> Vec<BigInt> {
     if modulus == &BigInt::default() {
         panic!("modulus is zero");
@@ -73,3 +38,14 @@ pub fn sub_padding(modulus: &BigInt, bits_per_limbs: u32, overflow: u32, nb_limb
     new_pad
 }
 
+pub fn print_e2<'a, C:Config, B:RootAPI<C>>(native: &'a mut B, v: &GE2)  {
+    for i in 0..48 {
+        println!("{}: {:?} {:?}", i, native.value_of(v.a0.limbs[i]), native.value_of(v.a1.limbs[i]));
+    }
+}
+pub fn print_element<'a, C:Config, B:RootAPI<C>, T: FieldParams>(native: &'a mut B, v: &Element<T>)  {
+    for i in 0..v.limbs.len() {
+        print!("{:?} ", native.value_of(v.limbs[i]));
+    }
+    println!(" ");
+}

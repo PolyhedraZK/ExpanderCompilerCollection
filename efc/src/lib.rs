@@ -6,3 +6,4 @@ pub mod bls_verifier;
 pub mod shuffle;
 pub mod bls;
 pub mod validator;
+pub mod end2end;

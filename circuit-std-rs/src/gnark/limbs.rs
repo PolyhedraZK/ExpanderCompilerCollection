@@ -1,5 +1,5 @@
 use num_bigint::BigInt;
-use expander_compiler::{circuit::layered::InputType, frontend::*};
+use expander_compiler::frontend::*;
 use num_traits::ToPrimitive;
 pub fn recompose(inputs: Vec<BigInt>, nb_bits: u32) -> BigInt {
     if inputs.len() == 0 {
@@ -37,7 +37,3 @@ pub fn bigint_to_m31(input: &BigInt) -> M31 {
 pub fn m31_to_bigint_array(input: &[M31]) -> Vec<BigInt> {
     input.iter().map(|x| m31_to_bigint(*x)).collect()
 }
-
-// pub fn bigint_to_m31_array(input: &[BigInt]) -> Vec<M31> {
-//     input.iter().map(|x| bigint_to_m31(x)).collect()
-// }

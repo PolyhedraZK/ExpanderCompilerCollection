@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use circuit_std_rs::gnark::emulated::sw_bls12381::g1::{G1Affine, G1};
+use circuit_std_rs::gnark::emulated::sw_bls12381::g1::G1Affine;
 use circuit_std_rs::utils::{simple_lookup2, simple_select};
 use expander_compiler::frontend::*;
 use num_bigint::BigInt;

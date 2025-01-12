@@ -1,9 +1,6 @@
-use arith::Field;
+use std::{fs, path::Path};
 use expander_compiler::{circuit::layered::witness::Witness, frontend::*};
-use expander_config::{
-    BN254ConfigKeccak, BN254ConfigSha2, GF2ExtConfigKeccak, GF2ExtConfigSha2, M31ExtConfigKeccak,
-    M31ExtConfigSha2,
-};
+use serde::de::DeserializeOwned;
 
 
 
@@ -48,4 +45,27 @@ where
         &claimed_v,
         &proof
     ));
+}
+
+
+
+pub fn read_from_json_file<T:DeserializeOwned + std::fmt::Debug>(file_path: &str) -> Result<T, Box<dyn std::error::Error>> {
+	
+    let json_content = fs::read_to_string(file_path)?;
+
+	
+    let data: T = serde_json::from_str(&json_content)?;
+
+    Ok(data)
+}
+
+pub fn ensure_directory_exists(dir: &str) {
+    let path = Path::new(dir);
+
+    if !path.exists() {
+        fs::create_dir_all(path).expect("Failed to create directory");
+        println!("Directory created: {}", dir);
+    } else {
+        println!("Directory already exists: {}", dir);
+    }
 }

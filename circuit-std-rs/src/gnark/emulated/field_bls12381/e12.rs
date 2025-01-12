@@ -1,14 +1,7 @@
-use crate::gnark::emparam::FieldParams;
 use crate::gnark::element::*;
-use crate::gnark::field::Field as GField;
-use crate::gnark::emparam::*;
 use crate::gnark::hints::register_hint;
-use std::collections::HashMap;
-use std::hint;
-use crate::logup::*;
 use expander_compiler::frontend::extra::*;
-use expander_compiler::{circuit::layered::InputType, frontend::*};
-use num_bigint::BigInt;
+use expander_compiler::frontend::*;
 
 use super::e2::*;
 use super::e6::*;

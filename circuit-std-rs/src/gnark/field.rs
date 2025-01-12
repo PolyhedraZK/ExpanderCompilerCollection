@@ -26,52 +26,28 @@ pub struct mul_check<T: FieldParams> {
 }
 impl <T: FieldParams>mul_check<T> {
     pub fn eval_round1<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, at: Vec<Variable>) {
-        // println!("c");
-        // print_element(native, &self.c);
-        // println!("r");
-        // print_element(native, &self.r);
-        // println!("k");
-        // print_element(native, &self.k);
         self.c = eval_with_challenge(native, self.c.clone(), at.clone());
         self.r = eval_with_challenge(native,self.r.clone(), at.clone());
         self.k = eval_with_challenge(native, self.k.clone(), at.clone());
         if !self.p.is_empty() {
             self.p = eval_with_challenge(native,self.p.clone(), at.clone());
         }
-        // println!("c:{:?}", native.value_of(self.c.evaluation));
-        // println!("r:{:?}", native.value_of(self.r.evaluation));
-        // println!("k:{:?}", native.value_of(self.k.evaluation));
-        // println!("p:{:?}", native.value_of(self.p.evaluation));
 
     }
     pub fn eval_round2<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, at: Vec<Variable>) {
-        // println!("a");
-        // print_element(native, &self.a);
-        // println!("b");
-        // print_element(native, &self.b);
         self.a = eval_with_challenge(native, self.a.clone(), at.clone());
         self.b = eval_with_challenge(native, self.b.clone(), at.clone());
-        // println!("a:{:?}", native.value_of(self.a.evaluation));
-        // println!("b:{:?}", native.value_of(self.b.evaluation));
     }
     pub fn check<'a, C: Config, B: RootAPI<C>>(&self, native: &'a mut B, pval: Variable, ccoef: Variable) {
         let mut new_peval = pval;
         if !self.p.is_empty() {
             new_peval = self.p.evaluation
         };
-        // println!("ls_a:{:?}", native.value_of(self.a.evaluation));
-        // println!("ls_b:{:?}", native.value_of(self.b.evaluation));
         let ls = native.mul(self.a.evaluation, self.b.evaluation);
         let rs_tmp1 = native.mul(new_peval, self.k.evaluation);
-        // println!("rs_tmp1:{:?}", native.value_of(rs_tmp1));
         let rs_tmp2 = native.mul(self.c.evaluation, ccoef);
-        // println!("rs_tmp2:{:?}", native.value_of(rs_tmp2));
         let rs_tmp3 = native.add(self.r.evaluation, rs_tmp1);
-        // println!("rs_tmp3:{:?}", native.value_of(rs_tmp3));
         let rs = native.add(rs_tmp3, rs_tmp2);
-        // println!("ls:{:?}", native.value_of(ls));
-        // println!("rs:{:?}", native.value_of(rs));
-        native.assert_is_equal(ls, rs);
     }
     pub fn clean_evaluations(&mut self) {
         self.a.evaluation = Variable::default();
@@ -315,15 +291,12 @@ impl <T: FieldParams>Field<T> {
     pub fn check_zero<'a, C: Config, B: RootAPI<C>>(&mut self, native: &'a mut B, a: Element<T>, p: Option<Element<T>>) {
         self.enforce_width_conditional(native, &a.clone());
         let b = self.short_one_const.clone();
-        // // println!("a,b after call_mul_hint");
-        // print_element(native, &a);
-        // print_element(native, &b);
         let (k, r, c) = self.call_mul_hint(native, &a, &b, false);
         let mc = mul_check{
-            a: a,
-            b: b,
-            c: c,
-            k: k,
+            a,
+            b,
+            c,
+            k,
             r: r.clone(),
             p: p.unwrap_or(Element::<T>::default()),
         };
@@ -436,7 +409,6 @@ impl <T: FieldParams>Field<T> {
         if mul_of + 2 > self.max_of {   
             new_b = self.reduce(native, &new_b, false);
         }
-        let next_overflow = std::cmp::max(new_a.overflow, new_b.overflow+1) + 1;
 
         //calculate a/b
         let div = self.compute_division_hint(native, a.limbs.clone(), b.limbs.clone());
@@ -566,13 +538,3 @@ pub fn eval_with_challenge<'a, C: Config, B: RootAPI<C>, T: FieldParams>(native:
     ret.evaluation = sum;
     ret
 }
-// pub fn normalize(limbs: Vec<Variable>) -> Vec<Variable> {
-//     if limbs.len() < nb_limbs {
-//         let mut tail = vec![native.constant(0); nb_limbs - limbs.len()];
-//         for i in 0..tail.len() {
-//             tail[i] = native.constant(0);
-//         }
-//         return limbs.iter().chain(tail.iter()).cloned().collect();
-//     }
-//     limbs
-// };
