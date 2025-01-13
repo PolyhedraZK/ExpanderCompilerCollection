@@ -19,14 +19,14 @@ tiny-keccak = { version = "2.0", features = ["keccak"] }
 halo2curves = { git = "https://github.com/PolyhedraZK/halo2curves", default-features = false, features = [
     "bits",
 ] }
-arith = { git = "https://github.com/PolyhedraZK/Expander", rev = "1804a5ea3e5547247e2c19a769f2fc4e992ad290" }
-mpi_config = { git = "https://github.com/PolyhedraZK/Expander", rev = "1804a5ea3e5547247e2c19a769f2fc4e992ad290" }
-gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", rev = "1804a5ea3e5547247e2c19a769f2fc4e992ad290" }
-expander_config = { git = "https://github.com/PolyhedraZK/Expander", rev = "1804a5ea3e5547247e2c19a769f2fc4e992ad290", package = "config" }
-expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", rev = "1804a5ea3e5547247e2c19a769f2fc4e992ad290", package = "circuit" }
-gkr = { git = "https://github.com/PolyhedraZK/Expander", rev = "1804a5ea3e5547247e2c19a769f2fc4e992ad290" }
-gf2 = { git = "https://github.com/PolyhedraZK/Expander", rev = "1804a5ea3e5547247e2c19a769f2fc4e992ad290" }
-mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", rev = "1804a5ea3e5547247e2c19a769f2fc4e992ad290" }
-expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", rev = "1804a5ea3e5547247e2c19a769f2fc4e992ad290", package = "transcript" }
-crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", rev = "1804a5ea3e5547247e2c19a769f2fc4e992ad290"}
+arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
+mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
+gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
+expander_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev", package = "config" }
+expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev", package = "circuit" }
+gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
+gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
+mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
+expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev", package = "transcript" }
+crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev"}
 
