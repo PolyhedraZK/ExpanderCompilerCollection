@@ -438,10 +438,10 @@ pub fn generate_shuffle_witnesses(dir: &str){
         ensure_directory_exists("./witnesses/shuffle");
         let w_s: witness_solver::WitnessSolver::<M31Config>;
         if std::fs::metadata("shuffle.witness").is_ok() {
-            println!("The file exists!");
+            println!("The solver exists!");
             w_s = witness_solver::WitnessSolver::deserialize_from(std::fs::File::open("shuffle.witness").unwrap()).unwrap();
         } else {
-            println!("The file does not exist.");
+            println!("The solver does not exist.");
             let compile_result = compile_generic(&ShuffleCircuit::default(), CompileOptions::default()).unwrap();
             compile_result.witness_solver.serialize_into(std::fs::File::create("shuffle.witness").unwrap()).unwrap();
             w_s = compile_result.witness_solver;

@@ -1,6 +1,7 @@
 
 use crate::bls_verifier::generate_pairing_witnesses;
 use crate::hashtable::generate_hash_witnesses;
+use crate::permutation::generate_permutation_hashes_witness;
 use crate::shuffle::generate_shuffle_witnesses;
 use std::thread;
 
@@ -22,9 +23,16 @@ pub fn end2end_witness(dir: &str) {
         generate_pairing_witnesses(&dir_str);
     });
 
+
+    let dir_str = dir.to_string();
+    let permutation_hash_thread = thread::spawn(move || {
+        generate_permutation_hashes_witness(&dir_str);
+    });
+
     shuffle_thread.join().expect("Shuffle thread panicked");
     hash_thread.join().expect("Hash thread panicked");
     pairing_thread.join().expect("Pairing thread panicked");
+    permutation_hash_thread.join().expect("Permutation hash thread panicked");
     let end_time = std::time::Instant::now();
     println!("generate end2end witness, time: {:?}", end_time.duration_since(start_time));
 }

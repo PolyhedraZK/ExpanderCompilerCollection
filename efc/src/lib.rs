@@ -7,3 +7,4 @@ pub mod shuffle;
 pub mod bls;
 pub mod validator;
 pub mod end2end;
+pub mod permutation;
