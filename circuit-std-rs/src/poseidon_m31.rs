@@ -2,7 +2,7 @@ use extra::*;
 use expander_compiler::frontend::*;
 
 const P:u64 = 2147483647;
-const POSEIDON_HASH_LENGTH:usize = 8;
+pub const POSEIDON_HASH_LENGTH:usize = 8;
 pub struct PoseidonParams {
     pub num_full_rounds: usize,
     pub num_half_full_rounds: usize,

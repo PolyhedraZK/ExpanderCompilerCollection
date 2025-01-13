@@ -2,8 +2,7 @@ use std::str::FromStr;
 use crate::big_int::to_binary_hint;
 use crate::gnark::limbs::*;
 use crate::gnark::utils::*;
-use crate::logup::query_count_hint;
-use crate::logup::rangeproof_hint;
+use crate::logup::{query_count_by_key_hint,rangeproof_hint,query_count_hint};
 use crate::poseidon_m31::poseidon_hint;
 use ark_bls12_381::Fq12;
 use ark_bls12_381::Fq6;
@@ -24,6 +23,7 @@ pub fn register_hint(hint_registry: &mut HintRegistry<M31>) {
     hint_registry.register("myhint.mulhint", mul_hint);
     hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
     hint_registry.register("myhint.querycounthint", query_count_hint);
+    hint_registry.register("myhint.querycountbykeyhint", query_count_by_key_hint);
     hint_registry.register("myhint.copyvarshint", copy_vars_hint);
     hint_registry.register("myhint.divhint", div_hint);
     hint_registry.register("myhint.invhint", inv_hint);

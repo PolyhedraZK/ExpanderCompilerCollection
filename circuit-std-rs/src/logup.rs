@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 use arith::Field;
 use expander_compiler::frontend::*;
+use num_bigint::BigInt;
 use rand::Rng;
 
 use crate::StdCircuit;
@@ -434,6 +437,30 @@ pub fn query_count_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error
     for i in 0..outputs.len() {
         outputs[i] = M31::from(count[i] as u32);
     }
+    Ok(())
+}
+pub fn query_count_by_key_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+    let mut outputs_u32 = vec![0; outputs.len()];
+
+    let table_size = inputs[0].to_u256().as_usize();
+    let table = &inputs[1..=table_size];
+    let query_keys = &inputs[(table_size + 1)..];
+
+    let mut table_map: HashMap<u32, usize> = HashMap::new();
+    for key in query_keys {
+        let key_value = key.to_u256().as_u32();
+        *table_map.entry(key_value).or_insert(0) += 1;
+    }
+
+    for (i, value) in table.iter().enumerate() {
+        let key_value = value.to_u256().as_u32();
+        let count = table_map.get(&key_value).copied().unwrap_or(0);
+        outputs_u32[i] = count as u32;
+    }
+    for i in 0..outputs.len() {
+        outputs[i] = M31::from(outputs_u32[i]);
+    }
+
     Ok(())
 }
 pub fn rangeproof_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
