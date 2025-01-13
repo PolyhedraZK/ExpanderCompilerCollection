@@ -4,8 +4,8 @@ use num_traits::cast::ToPrimitive;
 
 pub fn bytes_to_bits<C: Config, B: RootAPI<C>>(api: &mut B, vals: &[Variable]) -> Vec<Variable> {
     let mut ret = to_binary(api, vals[0], 8);
-    for i in 1..vals.len() {
-        ret = to_binary(api, vals[i], 8)
+    for val in vals.iter().skip(1) {
+        ret = to_binary(api, *val, 8)
             .into_iter()
             .chain(ret.into_iter())
             .collect();
@@ -199,8 +199,8 @@ pub fn big_endian_put_uint64<C: Config, B: RootAPI<C>>(
 }
 pub fn m31_to_bit_array<C: Config, B: RootAPI<C>>(api: &mut B, m31: &[Variable]) -> Vec<Variable> {
     let mut bits = vec![];
-    for i in 0..m31.len() {
-        bits.extend_from_slice(&to_binary(api, m31[i], 30));
+    for val in m31 {
+        bits.extend_from_slice(&to_binary(api, *val, 30));
     }
     bits
 }
@@ -209,13 +209,13 @@ pub fn to_binary<C: Config, B: RootAPI<C>>(
     x: Variable,
     n_bits: usize,
 ) -> Vec<Variable> {
-    api.new_hint("myhint.tobinary", &vec![x], n_bits)
+    api.new_hint("myhint.tobinary", &[x], n_bits)
 }
 pub fn from_binary<C: Config, B: RootAPI<C>>(api: &mut B, bits: Vec<Variable>) -> Variable {
     let mut res = api.constant(0);
-    for i in 0..bits.len() {
+    for (i, bit) in bits.iter().enumerate() {
         let coef = 1 << i;
-        let cur = api.mul(coef, bits[i]);
+        let cur = api.mul(coef, *bit);
         res = api.add(res, cur);
     }
     res
@@ -231,8 +231,8 @@ pub fn to_binary_hint(x: &[M31], y: &mut [M31]) -> Result<(), Error> {
 
 pub fn big_is_zero<C: Config, B: RootAPI<C>>(api: &mut B, k: usize, in_: &[Variable]) -> Variable {
     let mut total = api.constant(k as u32);
-    for i in 0..k {
-        let tmp = api.is_zero(in_[i]);
+    for val in in_.iter().take(k) {
+        let tmp = api.is_zero(val);
         total = api.sub(total, tmp);
     }
     api.is_zero(total)
@@ -247,12 +247,12 @@ pub fn bigint_to_m31_array<C: Config, B: RootAPI<C>>(
     let mut res = vec![];
     let mut a = x.clone();
     let mut mask = BigInt::from(1) << n_bits;
-    mask = mask - 1;
+    mask -= 1;
     for _ in 0..limb_len {
         let tmp = a.clone() & mask.clone();
         let tmp = api.constant(tmp.to_u32().unwrap());
         res.push(tmp);
-        a = a >> n_bits;
+        a >>= n_bits;
     }
     res
 }
@@ -260,8 +260,8 @@ pub fn big_less_than<C: Config, B: RootAPI<C>>(
     api: &mut B,
     n: usize,
     k: usize,
-    a: &Vec<Variable>,
-    b: &Vec<Variable>,
+    a: &[Variable],
+    b: &[Variable],
 ) -> Variable {
     let mut lt = vec![];
     let mut eq = vec![];
@@ -316,10 +316,10 @@ pub fn string_to_m31_array(s: &str, nb_bits: u32) -> [M31; 48] {
         BigInt::parse_bytes(s.as_bytes(), 10).unwrap_or_else(|| panic!("Failed to parse BigInt"));
     let mut res = [M31::from(0); 48];
     let base = BigInt::from(1) << nb_bits;
-    for i in 0..48 {
+    for cur_res in &mut res {
         let tmp = &big % &base;
-        res[i] = M31::from(tmp.to_u32().unwrap());
-        big = big >> nb_bits;
+        *cur_res = M31::from(tmp.to_u32().unwrap());
+        big >>= nb_bits;
     }
     res
 }
@@ -368,13 +368,13 @@ impl Define<M31Config> for BITCONVERTCircuit<Variable> {
     fn define(&self, builder: &mut API<M31Config>) {
         let mut big_int_bytes = [builder.constant(0); 8];
         big_endian_put_uint64(builder, &mut big_int_bytes, self.big_int);
-        for i in 0..8 {
-            builder.assert_is_equal(big_int_bytes[i], self.big_int_bytes[i]);
+        for (i, big_int_byte) in big_int_bytes.iter().enumerate() {
+            builder.assert_is_equal(big_int_byte, self.big_int_bytes[i]);
         }
         let mut big_int_m31 = [builder.constant(0); 4];
         big_endian_m31_array_put_uint32(builder, &mut big_int_m31, self.big_int_m31);
-        for i in 0..4 {
-            builder.assert_is_equal(big_int_m31[i], self.big_int_m31_bytes[i]);
+        for (i, val) in big_int_m31.iter().enumerate() {
+            builder.assert_is_equal(val, self.big_int_m31_bytes[i]);
         }
     }
 }

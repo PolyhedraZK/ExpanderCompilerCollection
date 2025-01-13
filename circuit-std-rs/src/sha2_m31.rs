@@ -114,7 +114,7 @@ impl MyDigest {
             panic!("p.len() != CHUNK || self.nx != 0");
         }
         self.len += CHUNK as u64;
-        let tmp_h = self.h.clone();
+        let tmp_h = self.h;
         self.h = self.block(api, tmp_h, p);
     }
     fn return_sum<C: Config, B: RootAPI<C>>(&mut self, api: &mut B) -> [Variable; SHA256LEN] {
@@ -173,7 +173,7 @@ impl MyDigest {
             let mut e_bit = m31_to_bit_array(api, &e)[..32].to_vec();
             let mut f_bit = m31_to_bit_array(api, &f)[..32].to_vec();
             let mut g_bit = m31_to_bit_array(api, &g)[..32].to_vec();
-            for t in 0..64 {
+            for (t, schedule) in msg_schedule.iter().enumerate().take(64) {
                 let mut t1_term1 = [api.constant(0); 2];
                 t1_term1[0] = h[0];
                 t1_term1[1] = h[1];
@@ -182,7 +182,7 @@ impl MyDigest {
                 let t1_term3_tmp = ch(api, &e_bit, &f_bit, &g_bit);
                 let t1_term3 = bit_array_to_m31(api, &t1_term3_tmp);
                 let t1_term4 = bit_array_to_m31(api, &self.kbits[t]); //rewrite to [2]frontend.Variable
-                let t1_term5 = bit_array_to_m31(api, &msg_schedule[t]);
+                let t1_term5 = bit_array_to_m31(api, schedule);
                 let tmp1 = big_array_add(api, &t1_term1, &t1_term2, 30);
                 let tmp2 = big_array_add(api, &t1_term3, &t1_term4, 30);
                 let tmp3 = big_array_add(api, &tmp1, &tmp2, 30);
@@ -214,49 +214,49 @@ impl MyDigest {
             }
             let hh0_tmp1 = big_array_add(api, &hh[0], &a, 30);
             let hh0_tmp2 = m31_to_bit_array(api, &hh0_tmp1);
-            hh[0] = bit_array_to_m31(api, &hh0_tmp2[..32].to_vec())
+            hh[0] = bit_array_to_m31(api, &hh0_tmp2[..32])
                 .as_slice()
                 .try_into()
                 .unwrap();
             let hh1_tmp1 = big_array_add(api, &hh[1], &b, 30);
             let hh1_tmp2 = m31_to_bit_array(api, &hh1_tmp1);
-            hh[1] = bit_array_to_m31(api, &hh1_tmp2[..32].to_vec())
+            hh[1] = bit_array_to_m31(api, &hh1_tmp2[..32])
                 .as_slice()
                 .try_into()
                 .unwrap();
             let hh2_tmp1 = big_array_add(api, &hh[2], &c, 30);
             let hh2_tmp2 = m31_to_bit_array(api, &hh2_tmp1);
-            hh[2] = bit_array_to_m31(api, &hh2_tmp2[..32].to_vec())
+            hh[2] = bit_array_to_m31(api, &hh2_tmp2[..32])
                 .as_slice()
                 .try_into()
                 .unwrap();
             let hh3_tmp1 = big_array_add(api, &hh[3], &d, 30);
             let hh3_tmp2 = m31_to_bit_array(api, &hh3_tmp1);
-            hh[3] = bit_array_to_m31(api, &hh3_tmp2[..32].to_vec())
+            hh[3] = bit_array_to_m31(api, &hh3_tmp2[..32])
                 .as_slice()
                 .try_into()
                 .unwrap();
             let hh4_tmp1 = big_array_add(api, &hh[4], &e, 30);
             let hh4_tmp2 = m31_to_bit_array(api, &hh4_tmp1);
-            hh[4] = bit_array_to_m31(api, &hh4_tmp2[..32].to_vec())
+            hh[4] = bit_array_to_m31(api, &hh4_tmp2[..32])
                 .as_slice()
                 .try_into()
                 .unwrap();
             let hh5_tmp1 = big_array_add(api, &hh[5], &f, 30);
             let hh5_tmp2 = m31_to_bit_array(api, &hh5_tmp1);
-            hh[5] = bit_array_to_m31(api, &hh5_tmp2[..32].to_vec())
+            hh[5] = bit_array_to_m31(api, &hh5_tmp2[..32])
                 .as_slice()
                 .try_into()
                 .unwrap();
             let hh6_tmp1 = big_array_add(api, &hh[6], &g, 30);
             let hh6_tmp2 = m31_to_bit_array(api, &hh6_tmp1);
-            hh[6] = bit_array_to_m31(api, &hh6_tmp2[..32].to_vec())
+            hh[6] = bit_array_to_m31(api, &hh6_tmp2[..32])
                 .as_slice()
                 .try_into()
                 .unwrap();
             let hh7_tmp1 = big_array_add(api, &hh[7], &h, 30);
             let hh7_tmp2 = m31_to_bit_array(api, &hh7_tmp1);
-            hh[7] = bit_array_to_m31(api, &hh7_tmp2[..32].to_vec())
+            hh[7] = bit_array_to_m31(api, &hh7_tmp2[..32])
                 .as_slice()
                 .try_into()
                 .unwrap();
