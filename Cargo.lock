@@ -513,6 +513,7 @@ version = "0.1.0"
 dependencies = [
  "arith",
  "ark-bls12-381",
+ "ark-ff",
  "ark-std 0.4.0",
  "big-int",
  "circuit",
