@@ -84,8 +84,8 @@ fn macro_kernel<C: Config>(
 }
 
 #[kernel]
-fn add_2_macro<C: Config>(api: &mut API<C>, a: &[InputVariable; 2], b: &mut [OutputVariable; 1]) {
-    b[0] = api.add(a[0], a[1]);
+fn add_2_macro<C: Config>(api: &mut API<C>, a: &[InputVariable; 2], b: &mut OutputVariable) {
+    *b = api.add(a[0], a[1]);
 }
 
 #[kernel]
