@@ -3,7 +3,6 @@ use crate::gnark::emparam::FieldParams;
 use crate::gnark::utils::*;
 use crate::logup::LogUpRangeProofTable;
 use crate::utils::simple_select;
-use expander_compiler::frontend::builder::*;
 use expander_compiler::frontend::*;
 use num_bigint::BigInt;
 use num_traits::Signed;
