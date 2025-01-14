@@ -160,7 +160,7 @@ impl<T: FieldParams> GField<T> {
             return false;
         }
         for i in 0..a.limbs.len() {
-            let value_id = get_variable_id(a.limbs[i]);
+            let value_id = a.limbs[i].id();
             if let std::collections::hash_map::Entry::Vacant(e) =
                 self.constrained_limbs.entry(value_id)
             {
