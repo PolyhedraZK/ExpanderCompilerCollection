@@ -3,7 +3,6 @@ use crate::gnark::emparam::FieldParams;
 use crate::gnark::utils::*;
 use crate::logup::LogUpRangeProofTable;
 use crate::utils::simple_select;
-use expander_compiler::frontend::builder::*;
 use expander_compiler::frontend::*;
 use num_bigint::BigInt;
 use num_traits::Signed;
@@ -160,7 +159,7 @@ impl<T: FieldParams> GField<T> {
             return false;
         }
         for i in 0..a.limbs.len() {
-            let value_id = get_variable_id(a.limbs[i]);
+            let value_id = a.limbs[i].id();
             if let std::collections::hash_map::Entry::Vacant(e) =
                 self.constrained_limbs.entry(value_id)
             {
