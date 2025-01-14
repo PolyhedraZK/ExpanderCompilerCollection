@@ -84,7 +84,7 @@ fn generate_unflatten_code(
 
     let mut steps = Vec::with_capacity(dims.len());
     let mut step = quote! { 1 };
-    for &dim in dims.iter().rev().skip(1) {
+    for &dim in dims.iter().skip(1).rev() {
         step = quote! { #dim * (#step) };
         steps.push(step.clone());
     }
@@ -112,7 +112,9 @@ fn generate_unflatten_code(
             #output_name #array_access.push(inputs[#array_index][#index_calc].clone());
         }
     } else {
-        quote! {}
+        quote! {
+            #output_name #array_access.push(Variable::default());
+        }
     };
 
     for (i, (var, &dim)) in loop_vars.iter().zip(dims.iter()).enumerate().rev() {
@@ -164,7 +166,7 @@ fn generate_flatten_code(
 
     let mut steps = Vec::with_capacity(dims.len());
     let mut step = quote! { 1 };
-    for &dim in dims.iter().rev().skip(1) {
+    for &dim in dims.iter().skip(1).rev() {
         step = quote! { #dim * (#step) };
         steps.push(step.clone());
     }
