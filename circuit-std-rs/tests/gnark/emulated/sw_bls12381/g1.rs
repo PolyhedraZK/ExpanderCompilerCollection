@@ -1,8 +1,7 @@
-use circuit_std_rs::gnark::{
+use circuit_std_rs::{gnark::{
     element::Element,
     emulated::sw_bls12381::g1::{G1Affine, G1},
-    hints::register_hint,
-};
+}, utils::register_hint};
 use expander_compiler::{
     compile::CompileOptions,
     declare_circuit,

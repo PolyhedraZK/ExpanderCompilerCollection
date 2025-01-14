@@ -1,14 +1,11 @@
-use crate::big_int::to_binary_hint;
 use crate::gnark::limbs::*;
 use crate::gnark::utils::*;
-use crate::logup::{query_count_by_key_hint, query_count_hint, rangeproof_hint};
 use ark_bls12_381::Fq;
 use ark_bls12_381::Fq12;
 use ark_bls12_381::Fq2;
 use ark_bls12_381::Fq6;
 use ark_ff::fields::Field;
 use ark_ff::Zero;
-use expander_compiler::frontend::extra::*;
 use expander_compiler::frontend::*;
 use num_bigint::BigInt;
 use num_bigint::BigUint;
@@ -17,27 +14,6 @@ use num_traits::Signed;
 use num_traits::ToPrimitive;
 use std::str::FromStr;
 
-pub fn register_hint(hint_registry: &mut HintRegistry<M31>) {
-    hint_registry.register("myhint.tobinary", to_binary_hint);
-    hint_registry.register("myhint.mulhint", mul_hint);
-    hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
-    hint_registry.register("myhint.querycounthint", query_count_hint);
-    hint_registry.register("myhint.querycountbykeyhint", query_count_by_key_hint);
-    hint_registry.register("myhint.copyvarshint", copy_vars_hint);
-    hint_registry.register("myhint.divhint", div_hint);
-    hint_registry.register("myhint.invhint", inv_hint);
-    hint_registry.register("myhint.dive2hint", div_e2_hint);
-    hint_registry.register("myhint.inversee2hint", inverse_e2_hint);
-    hint_registry.register("myhint.copye2hint", copy_e2_hint);
-    hint_registry.register("myhint.dive6hint", div_e6_hint);
-    hint_registry.register("myhint.inversee6hint", inverse_e6_hint);
-    hint_registry.register("myhint.dive6by6hint", div_e6_by_6_hint);
-    hint_registry.register("myhint.dive12hint", div_e12_hint);
-    hint_registry.register("myhint.inversee12hint", inverse_e12_hint);
-    hint_registry.register("myhint.copye12hint", copy_e12_hint);
-    hint_registry.register("myhint.finalexphint", final_exp_hint);
-    hint_registry.register("myhint.rangeproofhint", rangeproof_hint);
-}
 pub fn mul_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     let nb_bits = inputs[0].to_u256().as_usize();
     let nb_limbs = inputs[1].to_u256().as_usize();

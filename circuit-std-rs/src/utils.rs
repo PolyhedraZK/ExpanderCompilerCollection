@@ -1,5 +1,7 @@
 use expander_compiler::frontend::*;
 
+use crate::{big_int::to_binary_hint, gnark::hints::*, logup::*, poseidon_m31::poseidon_hint};
+
 pub fn simple_select<C: Config, B: RootAPI<C>>(
     native: &mut B,
     selector: Variable,
@@ -27,4 +29,29 @@ pub fn simple_lookup2<C: Config, B: RootAPI<C>>(
     let tmp0 = simple_select(native, selector0, i1, i0);
     let tmp1 = simple_select(native, selector0, i3, i2);
     simple_select(native, selector1, tmp1, tmp0)
+}
+
+
+
+pub fn register_hint(hint_registry: &mut HintRegistry<M31>) {
+    hint_registry.register("myhint.tobinary", to_binary_hint);
+    hint_registry.register("myhint.mulhint", mul_hint);
+    hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
+    hint_registry.register("myhint.querycounthint", query_count_hint);
+    hint_registry.register("myhint.querycountbykeyhint", query_count_by_key_hint);
+    hint_registry.register("myhint.copyvarshint", copy_vars_hint);
+    hint_registry.register("myhint.divhint", div_hint);
+    hint_registry.register("myhint.invhint", inv_hint);
+    hint_registry.register("myhint.dive2hint", div_e2_hint);
+    hint_registry.register("myhint.inversee2hint", inverse_e2_hint);
+    hint_registry.register("myhint.copye2hint", copy_e2_hint);
+    hint_registry.register("myhint.dive6hint", div_e6_hint);
+    hint_registry.register("myhint.inversee6hint", inverse_e6_hint);
+    hint_registry.register("myhint.dive6by6hint", div_e6_by_6_hint);
+    hint_registry.register("myhint.dive12hint", div_e12_hint);
+    hint_registry.register("myhint.inversee12hint", inverse_e12_hint);
+    hint_registry.register("myhint.copye12hint", copy_e12_hint);
+    hint_registry.register("myhint.finalexphint", final_exp_hint);
+    hint_registry.register("myhint.rangeproofhint", rangeproof_hint);
+	hint_registry.register("myhint.poseidonhint", poseidon_hint);
 }
