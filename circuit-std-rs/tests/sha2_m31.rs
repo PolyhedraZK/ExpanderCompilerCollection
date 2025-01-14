@@ -1,4 +1,4 @@
-use circuit_std_rs::{big_int::to_binary_hint, sha2_m31::sha256_37bytes};
+use circuit_std_rs::{big_int::to_binary_hint, sha2_m31::check_sha256};
 use expander_compiler::frontend::*;
 use extra::*;
 use sha2::{Digest, Sha256};
@@ -7,23 +7,12 @@ declare_circuit!(SHA25637BYTESCircuit {
     input: [Variable; 37],
     output: [Variable; 32],
 });
-pub fn check_sha256<C: Config, B: RootAPI<C>>(
-    builder: &mut B,
-    origin_data: &Vec<Variable>,
-) -> Vec<Variable> {
-    let output = origin_data[37..].to_vec();
-    let result = sha256_37bytes(builder, &origin_data[..37]);
-    for i in 0..32 {
-        builder.assert_is_equal(result[i], output[i]);
-    }
-    result
-}
 impl GenericDefine<M31Config> for SHA25637BYTESCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         for _ in 0..8 {
             let mut data = self.input.to_vec();
             data.append(&mut self.output.to_vec());
-            builder.memorized_simple_call(check_sha256, &data);
+            check_sha256(builder, &data);
         }
     }
 }
