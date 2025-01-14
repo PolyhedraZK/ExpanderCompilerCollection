@@ -9,3 +9,7 @@ libec_go_lib.*
 .vscode
 .code
 .DS_Store
+*.log
+*.txt
+*.json
+*.witness
