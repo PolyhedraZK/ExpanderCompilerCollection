@@ -74,8 +74,7 @@ fn generate_unflatten_code(
     if dims.is_empty() {
         if is_input {
             return quote! {
-                let mut #output_name: Variable = Variable::default();
-                #output_name = inputs[#array_index][0];
+                let mut #output_name: Variable = inputs[#array_index][0];
             };
         }
         return quote! {
@@ -316,6 +315,6 @@ pub fn kernel(_attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     // eprintln!("Expanded tokens: {:#?}", expanded);
-    eprintln!("Expanded code: {}", expanded);
+    // eprintln!("Expanded code: {}", expanded);
     TokenStream::from(expanded)
 }

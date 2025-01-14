@@ -71,19 +71,6 @@ fn zkcuda_1() {
 }
 
 #[kernel]
-fn macro_kernel<C: Config>(
-    api: &mut API<C>,
-    a: &[[InputVariable; 4]; 2],
-    b: &mut [[OutputVariable; 1]; 4],
-    c: &mut [[[InputOutputVariable; 2]; 1]; 4],
-) {
-    for i in 0..4 {
-        b[i][0] = api.add(a[0][i], a[1][i]);
-        c[i][0][0] = api.add(c[i][0][0], c[i][0][1]);
-    }
-}
-
-#[kernel]
 fn add_2_macro<C: Config>(api: &mut API<C>, a: &[InputVariable; 2], b: &mut OutputVariable) {
     *b = api.add(a[0], a[1]);
 }
