@@ -67,23 +67,21 @@ impl GenericDefine<M31Config> for HASHTABLECircuit<Variable> {
 pub fn generate_hash_witnesses(dir: &str) {
     println!("preparing solver...");
     ensure_directory_exists("./witnesses/hashtable");
-	let file_name = "hashtable.witness";
-	let w_s = if std::fs::metadata(file_name).is_ok() {
-		println!("The solver exists!");
-		witness_solver::WitnessSolver::deserialize_from(
-		std::fs::File::open(file_name).unwrap(),
-		)
-		.unwrap()
-	} else {
-		println!("The solver does not exist.");
-		let compile_result =
-			compile_generic(&HASHTABLECircuit::default(), CompileOptions::default()).unwrap();
-		compile_result
-			.witness_solver
-			.serialize_into(std::fs::File::create(file_name).unwrap())
-			.unwrap();
-		compile_result.witness_solver
-	};
+    let file_name = "hashtable.witness";
+    let w_s = if std::fs::metadata(file_name).is_ok() {
+        println!("The solver exists!");
+        witness_solver::WitnessSolver::deserialize_from(std::fs::File::open(file_name).unwrap())
+            .unwrap()
+    } else {
+        println!("The solver does not exist.");
+        let compile_result =
+            compile_generic(&HASHTABLECircuit::default(), CompileOptions::default()).unwrap();
+        compile_result
+            .witness_solver
+            .serialize_into(std::fs::File::create(file_name).unwrap())
+            .unwrap();
+        compile_result.witness_solver
+    };
     // let w_s: witness_solver::WitnessSolver<M31Config>;
     // if std::fs::metadata("hashtable.witness").is_ok() {
     //     println!("The solver exists!");

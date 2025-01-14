@@ -110,13 +110,17 @@ impl GenericDefine<M31Config> for PermutationIndicesValidatorHashesCircuit<Varia
             active_validator_16_bits,
             false,
         );
-        for (i, active_validator_hashbit) in active_validator_hash.iter().enumerate().take(POSEIDON_HASH_LENGTH) {
+        for (i, active_validator_hashbit) in active_validator_hash
+            .iter()
+            .enumerate()
+            .take(POSEIDON_HASH_LENGTH)
+        {
             builder.assert_is_equal(active_validator_hashbit, self.active_validator_bits_hash[i]);
         }
         //move inactive validators to the end
         let mut sorted_table_key = [Variable::default(); VALIDATOR_COUNT];
-        sorted_table_key[..VALIDATOR_COUNT].copy_from_slice(&self.real_keys[..VALIDATOR_COUNT]);//if active, use curKey, else use curInactiveKey
-        //for the first one, if active, use 0, else use -ValidatorCount
+        sorted_table_key[..VALIDATOR_COUNT].copy_from_slice(&self.real_keys[..VALIDATOR_COUNT]); //if active, use curKey, else use curInactiveKey
+                                                                                                 //for the first one, if active, use 0, else use -ValidatorCount
         let shift = simple_select(
             builder,
             self.active_validator_bits[0],
@@ -182,13 +186,16 @@ pub fn generate_permutation_hashes_witness(dir: &str) {
         let w_s = if std::fs::metadata(&file_name).is_ok() {
             println!("The solver exists!");
             witness_solver::WitnessSolver::deserialize_from(
-            std::fs::File::open(&file_name).unwrap(),
+                std::fs::File::open(&file_name).unwrap(),
             )
             .unwrap()
         } else {
             println!("The solver does not exist.");
-            let compile_result =
-                compile_generic(&PermutationIndicesValidatorHashesCircuit::default(), CompileOptions::default()).unwrap();
+            let compile_result = compile_generic(
+                &PermutationIndicesValidatorHashesCircuit::default(),
+                CompileOptions::default(),
+            )
+            .unwrap();
             compile_result
                 .witness_solver
                 .serialize_into(std::fs::File::create(&file_name).unwrap())

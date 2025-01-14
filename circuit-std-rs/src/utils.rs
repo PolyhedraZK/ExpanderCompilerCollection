@@ -31,8 +31,6 @@ pub fn simple_lookup2<C: Config, B: RootAPI<C>>(
     simple_select(native, selector1, tmp1, tmp0)
 }
 
-
-
 pub fn register_hint(hint_registry: &mut HintRegistry<M31>) {
     hint_registry.register("myhint.tobinary", to_binary_hint);
     hint_registry.register("myhint.mulhint", mul_hint);
@@ -53,5 +51,5 @@ pub fn register_hint(hint_registry: &mut HintRegistry<M31>) {
     hint_registry.register("myhint.copye12hint", copy_e12_hint);
     hint_registry.register("myhint.finalexphint", final_exp_hint);
     hint_registry.register("myhint.rangeproofhint", rangeproof_hint);
-	hint_registry.register("myhint.poseidonhint", poseidon_hint);
+    hint_registry.register("myhint.poseidonhint", poseidon_hint);
 }

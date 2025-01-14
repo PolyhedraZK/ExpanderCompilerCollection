@@ -188,7 +188,9 @@ impl GenericDefine<M31Config> for ShuffleCircuit<Variable> {
                 &self.flip_results[i * VALIDATOR_CHUNK_SIZE..(i + 1) * VALIDATOR_CHUNK_SIZE],
             );
             for diff in diffs {
-                g1.curve_f.table.rangeproof(builder, diff, MAX_VALIDATOR_EXP);
+                g1.curve_f
+                    .table
+                    .rangeproof(builder, diff, MAX_VALIDATOR_EXP);
             }
             copy_cur_indices =
                 builder.new_hint("myhint.copyvarshint", &cur_indices, cur_indices.len());

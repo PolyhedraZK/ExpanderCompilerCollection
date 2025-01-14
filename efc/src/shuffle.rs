@@ -29,23 +29,38 @@ pub struct ShuffleJson {
     pub chunk_length: u32,
     #[serde(rename = "ShuffleIndices", deserialize_with = "deserialize_1d_u32_m31")]
     pub shuffle_indices: Vec<u32>,
-    #[serde(rename = "CommitteeIndices", deserialize_with = "deserialize_1d_u32_m31")]
+    #[serde(
+        rename = "CommitteeIndices",
+        deserialize_with = "deserialize_1d_u32_m31"
+    )]
     pub committee_indices: Vec<u32>,
     #[serde(rename = "Pivots", deserialize_with = "deserialize_1d_u32_m31")]
     pub pivots: Vec<u32>,
     #[serde(rename = "IndexCount")]
     pub index_count: u32,
-    #[serde(rename = "PositionResults", deserialize_with = "deserialize_1d_u32_m31")]
+    #[serde(
+        rename = "PositionResults",
+        deserialize_with = "deserialize_1d_u32_m31"
+    )]
     pub position_results: Vec<u32>,
-    #[serde(rename = "PositionBitResults", deserialize_with = "deserialize_1d_u32_m31")]
+    #[serde(
+        rename = "PositionBitResults",
+        deserialize_with = "deserialize_1d_u32_m31"
+    )]
     pub position_bit_results: Vec<u32>,
     #[serde(rename = "FlipResults", deserialize_with = "deserialize_1d_u32_m31")]
     pub flip_results: Vec<u32>,
     #[serde(rename = "Slot")]
     pub slot: u32,
-    #[serde(rename = "ValidatorHashes", deserialize_with = "deserialize_2d_u32_m31")]
+    #[serde(
+        rename = "ValidatorHashes",
+        deserialize_with = "deserialize_2d_u32_m31"
+    )]
     pub validator_hashes: Vec<Vec<u32>>,
-    #[serde(rename = "AggregationBits", deserialize_with = "deserialize_1d_u32_m31")]
+    #[serde(
+        rename = "AggregationBits",
+        deserialize_with = "deserialize_1d_u32_m31"
+    )]
     pub aggregation_bits: Vec<u32>,
     #[serde(rename = "AggregatedPubkey")]
     pub aggregated_pubkey: G1Json,
@@ -194,7 +209,9 @@ impl ShuffleCircuit<M31> {
             //assign withdrawal_credentials
             let raw_withdrawal_credentials = validator.withdrawal_credentials.clone();
             let withdrawal_credentials = STANDARD.decode(raw_withdrawal_credentials).unwrap();
-            for (j, withdrawal_credentials_byte) in withdrawal_credentials.iter().enumerate().take(32) {
+            for (j, withdrawal_credentials_byte) in
+                withdrawal_credentials.iter().enumerate().take(32)
+            {
                 self.withdrawal_credentials[i][j] = M31::from(*withdrawal_credentials_byte as u32);
             }
             //assign effective_balance
@@ -207,13 +224,15 @@ impl ShuffleCircuit<M31> {
             self.slashed[i][0] = M31::from(slashed);
             //assign activation_eligibility_epoch
             let activation_eligibility_epoch = validator.activation_eligibility_epoch.to_le_bytes();
-            for (j, activation_eligibility_epoch_byte) in activation_eligibility_epoch.iter().enumerate() {
+            for (j, activation_eligibility_epoch_byte) in
+                activation_eligibility_epoch.iter().enumerate()
+            {
                 self.activation_eligibility_epoch[i][j] =
                     M31::from(*activation_eligibility_epoch_byte as u32);
             }
             //assign activation_epoch
             let activation_epoch = validator.activation_epoch.to_le_bytes();
-            for (j, activation_epoch_byte) in activation_epoch.iter().enumerate(){
+            for (j, activation_epoch_byte) in activation_epoch.iter().enumerate() {
                 self.activation_epoch[i][j] = M31::from(*activation_epoch_byte as u32);
             }
             //assign exit_epoch
@@ -223,7 +242,7 @@ impl ShuffleCircuit<M31> {
             }
             //assign withdrawable_epoch
             let withdrawable_epoch = validator.withdrawable_epoch.to_le_bytes();
-            for (j, withdrawable_epoch_byte) in withdrawable_epoch.iter().enumerate()  {
+            for (j, withdrawable_epoch_byte) in withdrawable_epoch.iter().enumerate() {
                 self.withdrawable_epoch[i][j] = M31::from(*withdrawable_epoch_byte as u32);
             }
         }
@@ -256,8 +275,7 @@ impl GenericDefine<M31Config> for ShuffleCircuit<Variable> {
         for (i, chunk) in indices_chunk.iter_mut().enumerate() {
             let tmp = builder.add(self.flip_results[i], 1);
             let ignore_flag = builder.is_zero(tmp);
-            *chunk =
-                simple_select(builder, ignore_flag, zero_var, *chunk);
+            *chunk = simple_select(builder, ignore_flag, zero_var, *chunk);
         }
         //flip the indices based on the hashbit
         let mut cur_indices = indices_chunk.clone();
@@ -275,22 +293,23 @@ impl GenericDefine<M31Config> for ShuffleCircuit<Variable> {
                 &self.flip_results[i * VALIDATOR_CHUNK_SIZE..(i + 1) * VALIDATOR_CHUNK_SIZE],
             );
             for diff in diffs {
-                g1.curve_f.table.rangeproof(builder, diff, MAX_VALIDATOR_EXP);
+                g1.curve_f
+                    .table
+                    .rangeproof(builder, diff, MAX_VALIDATOR_EXP);
             }
             copy_cur_indices =
                 builder.new_hint("myhint.copyvarshint", &cur_indices, cur_indices.len());
         }
 
         //check the final curIndices, should be equal to the shuffleIndex
-        for (i, cur_index) in cur_indices.iter_mut().enumerate().take(self.shuffle_indices.len()) {
+        for (i, cur_index) in cur_indices
+            .iter_mut()
+            .enumerate()
+            .take(self.shuffle_indices.len())
+        {
             let tmp = builder.add(self.flip_results[i], 1);
             let is_minus_one = builder.is_zero(tmp);
-            *cur_index = simple_select(
-                builder,
-                is_minus_one,
-                self.shuffle_indices[i],
-                *cur_index,
-            );
+            *cur_index = simple_select(builder, is_minus_one, self.shuffle_indices[i], *cur_index);
             let tmp = builder.sub(self.shuffle_indices[i], *cur_index);
             let tmp_res = builder.is_zero(tmp);
             builder.assert_is_equal(tmp_res, 1);
@@ -402,12 +421,8 @@ pub fn calculate_balance<C: Config, B: RootAPI<C>>(
     //set the balance to 0 if aggregationBits[i] = 0
     for i in 0..aggregation_bits.len() {
         for j in 0..acc_balance[i].len() {
-            acc_balance[i][j] = simple_select(
-                builder,
-                aggregation_bits[i],
-                acc_balance[i][j],
-                zero_var,
-            );
+            acc_balance[i][j] =
+                simple_select(builder, aggregation_bits[i], acc_balance[i][j], zero_var);
         }
     }
     //since balance is [8]frontend.Variable, we need to support Array addition
@@ -514,10 +529,8 @@ pub fn generate_shuffle_witnesses(dir: &str) {
         let file_name = "shuffle.witness";
         let w_s = if std::fs::metadata(file_name).is_ok() {
             println!("The solver exists!");
-            witness_solver::WitnessSolver::deserialize_from(
-            std::fs::File::open(file_name).unwrap(),
-            )
-            .unwrap()
+            witness_solver::WitnessSolver::deserialize_from(std::fs::File::open(file_name).unwrap())
+                .unwrap()
         } else {
             println!("The solver does not exist.");
             let compile_result =

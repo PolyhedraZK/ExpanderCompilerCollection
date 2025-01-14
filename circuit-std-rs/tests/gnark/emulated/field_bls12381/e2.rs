@@ -1,7 +1,10 @@
-use circuit_std_rs::{gnark::{
-    element::new_internal_element,
-    emulated::field_bls12381::e2::{Ext2, GE2},
-}, utils::register_hint};
+use circuit_std_rs::{
+    gnark::{
+        element::new_internal_element,
+        emulated::field_bls12381::e2::{Ext2, GE2},
+    },
+    utils::register_hint,
+};
 use expander_compiler::frontend::compile_generic;
 use expander_compiler::{
     compile::CompileOptions,

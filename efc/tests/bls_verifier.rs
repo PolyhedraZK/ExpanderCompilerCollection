@@ -79,7 +79,9 @@ impl GenericDefine<M31Config> for PairingCircuit<Variable> {
                 lines: LineEvaluations::default(),
             },
         ];
-        pairing.pairing_check(builder, &p_array, &mut q_array).unwrap();
+        pairing
+            .pairing_check(builder, &p_array, &mut q_array)
+            .unwrap();
         pairing.ext12.ext6.ext2.curve_f.check_mul(builder);
         pairing.ext12.ext6.ext2.curve_f.table.final_check(builder);
         pairing.ext12.ext6.ext2.curve_f.table.final_check(builder);
@@ -235,7 +237,7 @@ fn run_multi_pairing() {
     let start_time = std::time::Instant::now();
     let handles = assignment_chunks
         .into_iter()
-        .map(|assignments | {
+        .map(|assignments| {
             let witness_solver = Arc::clone(&witness_solver);
             thread::spawn(move || {
                 let mut hint_registry1 = HintRegistry::<M31>::new();

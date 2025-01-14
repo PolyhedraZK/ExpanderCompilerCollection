@@ -136,7 +136,9 @@ impl GenericDefine<M31Config> for PairingCircuit<Variable> {
                 lines: LineEvaluations::default(),
             },
         ];
-        pairing.pairing_check(builder, &p_array, &mut q_array).unwrap();
+        pairing
+            .pairing_check(builder, &p_array, &mut q_array)
+            .unwrap();
         pairing.ext12.ext6.ext2.curve_f.check_mul(builder);
         pairing.ext12.ext6.ext2.curve_f.table.final_check(builder);
         pairing.ext12.ext6.ext2.curve_f.table.final_check(builder);
@@ -148,22 +150,20 @@ pub fn generate_pairing_witnesses(dir: &str) {
     println!("preparing solver...");
     ensure_directory_exists("./witnesses/pairing");
     let file_name = "pairing.witness";
-	let w_s = if std::fs::metadata(file_name).is_ok() {
-		println!("The solver exists!");
-		witness_solver::WitnessSolver::deserialize_from(
-		std::fs::File::open(file_name).unwrap(),
-		)
-		.unwrap()
-	} else {
-		println!("The solver does not exist.");
-		let compile_result =
-			compile_generic(&PairingCircuit::default(), CompileOptions::default()).unwrap();
-		compile_result
-			.witness_solver
-			.serialize_into(std::fs::File::create(file_name).unwrap())
-			.unwrap();
-		compile_result.witness_solver
-	};
+    let w_s = if std::fs::metadata(file_name).is_ok() {
+        println!("The solver exists!");
+        witness_solver::WitnessSolver::deserialize_from(std::fs::File::open(file_name).unwrap())
+            .unwrap()
+    } else {
+        println!("The solver does not exist.");
+        let compile_result =
+            compile_generic(&PairingCircuit::default(), CompileOptions::default()).unwrap();
+        compile_result
+            .witness_solver
+            .serialize_into(std::fs::File::create(file_name).unwrap())
+            .unwrap();
+        compile_result.witness_solver
+    };
     // let w_s: witness_solver::WitnessSolver<M31Config>;
     // if std::fs::metadata("pairing.witness").is_ok() {
     //     println!("The solver exists!");

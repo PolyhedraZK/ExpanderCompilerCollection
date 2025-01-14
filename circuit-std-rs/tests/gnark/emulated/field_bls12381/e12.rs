@@ -1,11 +1,14 @@
-use circuit_std_rs::{gnark::{
-    element::new_internal_element,
-    emulated::field_bls12381::{
-        e12::{Ext12, GE12},
-        e2::GE2,
-        e6::GE6,
+use circuit_std_rs::{
+    gnark::{
+        element::new_internal_element,
+        emulated::field_bls12381::{
+            e12::{Ext12, GE12},
+            e2::GE2,
+            e6::GE6,
+        },
     },
-}, utils::register_hint};
+    utils::register_hint,
+};
 use expander_compiler::{
     compile::CompileOptions,
     declare_circuit,
