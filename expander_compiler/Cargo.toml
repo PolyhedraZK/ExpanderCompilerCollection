@@ -16,10 +16,12 @@ mpi_config.workspace = true
 gkr_field_config.workspace = true
 expander_config.workspace = true
 expander_circuit.workspace = true
+expander_transcript.workspace = true
 gkr.workspace = true
 arith.workspace = true
 gf2.workspace = true
 mersenne31.workspace = true
+crosslayer_prototype.workspace = true
 
 [[bin]]
 name = "trivial_circuit"
