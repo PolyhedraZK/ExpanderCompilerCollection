@@ -40,23 +40,14 @@ impl Ext6 {
         let b2 = self.ext2.zero();
         GE6 { b0, b1, b2 }
     }
-    pub fn is_zero<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        z: &GE6,
-    ) -> Variable {
+    pub fn is_zero<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, z: &GE6) -> Variable {
         let b0 = self.ext2.is_zero(native, &z.b0.my_clone());
         let b1 = self.ext2.is_zero(native, &z.b1.my_clone());
         let b2 = self.ext2.is_zero(native, &z.b2.my_clone());
         let tmp = native.and(b0, b1);
         native.and(tmp, b2)
     }
-    pub fn add<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        x: &GE6,
-        y: &GE6,
-    ) -> GE6 {
+    pub fn add<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE6, y: &GE6) -> GE6 {
         let z0 = self.ext2.add(native, &x.b0.my_clone(), &y.b0.my_clone());
         let z1 = self.ext2.add(native, &x.b1.my_clone(), &y.b1.my_clone());
         let z2 = self.ext2.add(native, &x.b2.my_clone(), &y.b2.my_clone());
@@ -76,12 +67,7 @@ impl Ext6 {
             b2: z2,
         }
     }
-    pub fn sub<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        x: &GE6,
-        y: &GE6,
-    ) -> GE6 {
+    pub fn sub<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE6, y: &GE6) -> GE6 {
         let z0 = self.ext2.sub(native, &x.b0.my_clone(), &y.b0.my_clone());
         let z1 = self.ext2.sub(native, &x.b1.my_clone(), &y.b1.my_clone());
         let z2 = self.ext2.sub(native, &x.b2.my_clone(), &y.b2.my_clone());
@@ -127,12 +113,7 @@ impl Ext6 {
             b2: z2,
         }
     }
-    pub fn mul_by_e2<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        x: &GE6,
-        y: &GE2,
-    ) -> GE6 {
+    pub fn mul_by_e2<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE6, y: &GE2) -> GE6 {
         let z0 = self.ext2.mul(native, &x.b0.my_clone(), y);
         let z1 = self.ext2.mul(native, &x.b1.my_clone(), y);
         let z2 = self.ext2.mul(native, &x.b2.my_clone(), y);
@@ -172,12 +153,7 @@ impl Ext6 {
             b2: c2,
         }
     }
-    pub fn mul_by_0<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        z: &GE6,
-        c0: &GE2,
-    ) -> GE6 {
+    pub fn mul_by_0<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, z: &GE6, c0: &GE2) -> GE6 {
         let a = self.ext2.mul(native, &z.b0.my_clone(), c0);
         let tmp = self.ext2.add(native, &z.b0.my_clone(), &z.b2.my_clone());
         let mut t2 = self.ext2.mul(native, c0, &tmp);
@@ -219,11 +195,7 @@ impl Ext6 {
             b2: t2,
         }
     }
-    pub fn mul_by_non_residue<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        x: &GE6,
-    ) -> GE6 {
+    pub fn mul_by_non_residue<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE6) -> GE6 {
         let z0 = self.ext2.mul_by_non_residue(native, &x.b2.my_clone());
         GE6 {
             b0: z0,
@@ -231,12 +203,7 @@ impl Ext6 {
             b2: x.b1.my_clone(),
         }
     }
-    pub fn assert_isequal<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        x: &GE6,
-        y: &GE6,
-    ) {
+    pub fn assert_isequal<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE6, y: &GE6) {
         self.ext2.assert_isequal(native, &x.b0, &y.b0);
         self.ext2.assert_isequal(native, &x.b1, &y.b1);
         self.ext2.assert_isequal(native, &x.b2, &y.b2);
@@ -257,11 +224,7 @@ impl Ext6 {
         let b2 = self
             .ext2
             .select(native, selector, &z1.b2.my_clone(), &z0.b2.my_clone());
-        GE6 {
-            b0,
-            b1,
-            b2
-        }
+        GE6 { b0, b1, b2 }
     }
     pub fn mul_karatsuba_over_karatsuba<C: Config, B: RootAPI<C>>(
         &mut self,
@@ -298,20 +261,10 @@ impl Ext6 {
             b2: c2,
         }
     }
-    pub fn mul<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        x: &GE6,
-        y: &GE6,
-    ) -> GE6 {
+    pub fn mul<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE6, y: &GE6) -> GE6 {
         self.mul_karatsuba_over_karatsuba(native, x, y)
     }
-    pub fn div<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        x: &GE6,
-        y: &GE6,
-    ) -> GE6 {
+    pub fn div<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE6, y: &GE6) -> GE6 {
         let inputs = vec![
             x.b0.a0.my_clone(),
             x.b0.a1.my_clone(),

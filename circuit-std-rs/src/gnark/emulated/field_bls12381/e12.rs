@@ -92,31 +92,17 @@ impl Ext12 {
             },
         }
     }
-    pub fn is_zero<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        z: &GE12,
-    ) -> Variable {
+    pub fn is_zero<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, z: &GE12) -> Variable {
         let c0 = self.ext6.is_zero(native, &z.c0);
         let c1 = self.ext6.is_zero(native, &z.c1);
         native.and(c0, c1)
     }
-    pub fn add<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        x: &GE12,
-        y: &GE12,
-    ) -> GE12 {
+    pub fn add<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE12, y: &GE12) -> GE12 {
         let z0 = self.ext6.add(native, &x.c0, &y.c0);
         let z1 = self.ext6.add(native, &x.c1, &y.c1);
         GE12 { c0: z0, c1: z1 }
     }
-    pub fn sub<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        x: &GE12,
-        y: &GE12,
-    ) -> GE12 {
+    pub fn sub<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE12, y: &GE12) -> GE12 {
         let z0 = self.ext6.sub(native, &x.c0, &y.c0);
         let z1 = self.ext6.sub(native, &x.c1, &y.c1);
         GE12 { c0: z0, c1: z1 }
@@ -128,12 +114,7 @@ impl Ext12 {
             c1: z1,
         }
     }
-    pub fn mul<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        x: &GE12,
-        y: &GE12,
-    ) -> GE12 {
+    pub fn mul<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE12, y: &GE12) -> GE12 {
         let a = self.ext6.add(native, &x.c0, &x.c1);
         let b = self.ext6.add(native, &y.c0, &y.c1);
         let a = self.ext6.mul(native, &a, &b);
@@ -219,21 +200,11 @@ impl Ext12 {
             },
         }
     }
-    pub fn assert_isequal<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        x: &GE12,
-        y: &GE12,
-    ) {
+    pub fn assert_isequal<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE12, y: &GE12) {
         self.ext6.assert_isequal(native, &x.c0, &y.c0);
         self.ext6.assert_isequal(native, &x.c1, &y.c1);
     }
-    pub fn div<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        x: &GE12,
-        y: &GE12,
-    ) -> GE12 {
+    pub fn div<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE12, y: &GE12) -> GE12 {
         let inputs = vec![
             x.c0.b0.a0.clone(),
             x.c0.b0.a1.clone(),
@@ -607,11 +578,7 @@ impl Ext12 {
             },
         }
     }
-    pub fn frobenius_square<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        x: &GE12,
-    ) -> GE12 {
+    pub fn frobenius_square<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE12) -> GE12 {
         let z00 = x.c0.b0.clone();
         let z01 = self.ext6.ext2.mul_by_non_residue2_power2(native, &x.c0.b1);
         let z02 = self.ext6.ext2.mul_by_non_residue2_power4(native, &x.c0.b2);

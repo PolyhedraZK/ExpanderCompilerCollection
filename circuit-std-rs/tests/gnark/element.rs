@@ -1,6 +1,9 @@
 #[cfg(test)]
 mod tests {
-    use circuit_std_rs::gnark::{element::{from_interface, value_of}, emparam::Bls12381Fp};
+    use circuit_std_rs::gnark::{
+        element::{from_interface, value_of},
+        emparam::Bls12381Fp,
+    };
     use expander_compiler::frontend::*;
     use num_bigint::BigInt;
     #[test]

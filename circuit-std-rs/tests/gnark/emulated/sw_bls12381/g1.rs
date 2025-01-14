@@ -1,5 +1,16 @@
-use circuit_std_rs::gnark::{element::Element, emulated::sw_bls12381::g1::{G1Affine, G1}, hints::register_hint};
-use expander_compiler::{compile::CompileOptions, declare_circuit, frontend::{compile_generic, extra::debug_eval, GenericDefine, HintRegistry, M31Config, RootAPI, Variable, M31}};
+use circuit_std_rs::gnark::{
+    element::Element,
+    emulated::sw_bls12381::g1::{G1Affine, G1},
+    hints::register_hint,
+};
+use expander_compiler::{
+    compile::CompileOptions,
+    declare_circuit,
+    frontend::{
+        compile_generic, extra::debug_eval, GenericDefine, HintRegistry, M31Config, RootAPI,
+        Variable, M31,
+    },
+};
 
 declare_circuit!(G1AddCircuit {
     p: [[Variable; 48]; 2],

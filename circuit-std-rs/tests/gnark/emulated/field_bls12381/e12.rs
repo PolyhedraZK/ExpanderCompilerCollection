@@ -1,5 +1,20 @@
-use circuit_std_rs::gnark::{element::new_internal_element, emulated::field_bls12381::{e12::{Ext12, GE12}, e2::GE2, e6::GE6}, hints::register_hint};
-use expander_compiler::{compile::CompileOptions, declare_circuit, frontend::{extra::debug_eval,compile_generic, GenericDefine, HintRegistry, M31Config, RootAPI, Variable, M31}};
+use circuit_std_rs::gnark::{
+    element::new_internal_element,
+    emulated::field_bls12381::{
+        e12::{Ext12, GE12},
+        e2::GE2,
+        e6::GE6,
+    },
+    hints::register_hint,
+};
+use expander_compiler::{
+    compile::CompileOptions,
+    declare_circuit,
+    frontend::{
+        compile_generic, extra::debug_eval, GenericDefine, HintRegistry, M31Config, RootAPI,
+        Variable, M31,
+    },
+};
 
 declare_circuit!(E12AddCircuit {
     x: [[[[Variable; 48]; 2]; 3]; 2],

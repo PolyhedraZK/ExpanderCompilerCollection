@@ -20,11 +20,7 @@ pub struct MulCheck<T: FieldParams> {
     p: Element<T>,
 }
 impl<T: FieldParams> MulCheck<T> {
-    pub fn eval_round1<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        at: Vec<Variable>,
-    ) {
+    pub fn eval_round1<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, at: Vec<Variable>) {
         self.c = eval_with_challenge(native, self.c.my_clone(), at.clone());
         self.r = eval_with_challenge(native, self.r.my_clone(), at.clone());
         self.k = eval_with_challenge(native, self.k.my_clone(), at.clone());
@@ -32,20 +28,11 @@ impl<T: FieldParams> MulCheck<T> {
             self.p = eval_with_challenge(native, self.p.my_clone(), at.clone());
         }
     }
-    pub fn eval_round2<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        at: Vec<Variable>,
-    ) {
+    pub fn eval_round2<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, at: Vec<Variable>) {
         self.a = eval_with_challenge(native, self.a.my_clone(), at.clone());
         self.b = eval_with_challenge(native, self.b.my_clone(), at.clone());
     }
-    pub fn check<C: Config, B: RootAPI<C>>(
-        &self,
-        native: &mut B,
-        pval: Variable,
-        ccoef: Variable,
-    ) {
+    pub fn check<C: Config, B: RootAPI<C>>(&self, native: &mut B, pval: Variable, ccoef: Variable) {
         let mut new_peval = pval;
         if !self.p.is_empty() {
             new_peval = self.p.evaluation
@@ -149,7 +136,7 @@ impl<T: FieldParams> GField<T> {
         let mut normalize = |limbs: Vec<Variable>| -> Vec<Variable> {
             if limbs.len() < nb_limbs {
                 let mut tail = vec![native.constant(0); nb_limbs - limbs.len()];
-                for cur_tail in &mut tail  {
+                for cur_tail in &mut tail {
                     *cur_tail = native.constant(0);
                 }
                 return limbs.iter().chain(tail.iter()).cloned().collect();
@@ -174,7 +161,9 @@ impl<T: FieldParams> GField<T> {
         }
         for i in 0..a.limbs.len() {
             let value_id = get_variable_id(a.limbs[i]);
-            if let std::collections::hash_map::Entry::Vacant(e) = self.constrained_limbs.entry(value_id) {
+            if let std::collections::hash_map::Entry::Vacant(e) =
+                self.constrained_limbs.entry(value_id)
+            {
                 e.insert(());
             } else {
                 did_constrain = true;
@@ -454,11 +443,7 @@ impl<T: FieldParams> GField<T> {
         }
         new_internal_element::<T>(limbs, next_overflow)
     }
-    pub fn neg<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        a: &Element<T>,
-    ) -> Element<T> {
+    pub fn neg<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, a: &Element<T>) -> Element<T> {
         let zero = self.zero_const.my_clone();
         self.sub(native, &zero, a)
     }

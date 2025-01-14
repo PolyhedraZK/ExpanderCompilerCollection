@@ -1,6 +1,14 @@
-use circuit_std_rs::gnark::{element::new_internal_element, emulated::field_bls12381::e2::{Ext2, GE2}, hints::register_hint};
-use expander_compiler::{compile::CompileOptions, declare_circuit, frontend::{extra::debug_eval, GenericDefine, HintRegistry, M31Config, RootAPI, Variable, M31}};
+use circuit_std_rs::gnark::{
+    element::new_internal_element,
+    emulated::field_bls12381::e2::{Ext2, GE2},
+    hints::register_hint,
+};
 use expander_compiler::frontend::compile_generic;
+use expander_compiler::{
+    compile::CompileOptions,
+    declare_circuit,
+    frontend::{extra::debug_eval, GenericDefine, HintRegistry, M31Config, RootAPI, Variable, M31},
+};
 declare_circuit!(E2AddCircuit {
     x: [[Variable; 48]; 2],
     y: [[Variable; 48]; 2],
@@ -19,7 +27,7 @@ impl GenericDefine<M31Config> for E2AddCircuit<Variable> {
             a1: new_internal_element(self.y[1].to_vec(), 0),
         };
         let z = ext2.add(builder, &x_e2, &y_e2);
-        let expect_z = GE2{
+        let expect_z = GE2 {
             a0: new_internal_element(self.z[0].to_vec(), 0),
             a1: new_internal_element(self.z[1].to_vec(), 0),
         };

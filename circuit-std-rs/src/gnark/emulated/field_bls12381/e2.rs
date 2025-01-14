@@ -1,9 +1,9 @@
 use crate::gnark::element::*;
 use crate::gnark::emparam::*;
 use crate::gnark::field::GField;
+use expander_compiler::frontend::{Config, RootAPI, Variable};
 use num_bigint::BigInt;
 use std::collections::HashMap;
-use expander_compiler::frontend::{Config, RootAPI, Variable};
 
 pub type CurveF = GField<Bls12381Fp>;
 #[derive(Default, Clone)]
@@ -143,31 +143,17 @@ impl Ext2 {
         let z1 = self.curve_f.zero_const.my_clone();
         GE2 { a0: z0, a1: z1 }
     }
-    pub fn is_zero<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        z: &GE2,
-    ) -> Variable {
+    pub fn is_zero<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, z: &GE2) -> Variable {
         let a0 = self.curve_f.is_zero(native, &z.a0);
         let a1 = self.curve_f.is_zero(native, &z.a1);
         native.and(a0, a1)
     }
-    pub fn add<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        x: &GE2,
-        y: &GE2,
-    ) -> GE2 {
+    pub fn add<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE2, y: &GE2) -> GE2 {
         let z0 = self.curve_f.add(native, &x.a0, &y.a0);
         let z1 = self.curve_f.add(native, &x.a1, &y.a1);
         GE2 { a0: z0, a1: z1 }
     }
-    pub fn sub<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        x: &GE2,
-        y: &GE2,
-    ) -> GE2 {
+    pub fn sub<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE2, y: &GE2) -> GE2 {
         let z0 = self.curve_f.sub(native, &x.a0, &y.a0);
         let z1 = self.curve_f.sub(native, &x.a1, &y.a1);
         GE2 { a0: z0, a1: z1 }
@@ -183,12 +169,7 @@ impl Ext2 {
         let z1 = self.curve_f.neg(native, &x.a1);
         GE2 { a0: z0, a1: z1 }
     }
-    pub fn mul<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        x: &GE2,
-        y: &GE2,
-    ) -> GE2 {
+    pub fn mul<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE2, y: &GE2) -> GE2 {
         let v0 = self.curve_f.mul(native, &x.a0, &y.a0);
         let v1 = self.curve_f.mul(native, &x.a1, &y.a1);
         let b0 = self.curve_f.sub(native, &v0, &v1);
@@ -219,11 +200,7 @@ impl Ext2 {
         let z1 = self.curve_f.mul_const(native, &x.a1, y.clone());
         GE2 { a0: z0, a1: z1 }
     }
-    pub fn mul_by_non_residue<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        x: &GE2,
-    ) -> GE2 {
+    pub fn mul_by_non_residue<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE2) -> GE2 {
         let a = self.curve_f.sub(native, &x.a0, &x.a1);
         let b = self.curve_f.add(native, &x.a0, &x.a1);
         GE2 { a0: a, a1: b }
@@ -236,13 +213,13 @@ impl Ext2 {
         let b = self.curve_f.mul_const(native, &b, BigInt::from(2));
         GE2 { a0: a, a1: b }
     }
-    pub fn div<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        x: &GE2,
-        y: &GE2,
-    ) -> GE2 {
-        let inputs = vec![x.a0.my_clone(), x.a1.my_clone(), y.a0.my_clone(), y.a1.my_clone()];
+    pub fn div<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE2, y: &GE2) -> GE2 {
+        let inputs = vec![
+            x.a0.my_clone(),
+            x.a1.my_clone(),
+            y.a0.my_clone(),
+            y.a1.my_clone(),
+        ];
         let output = self.curve_f.new_hint(native, "myhint.dive2hint", 2, inputs);
         let div = GE2 {
             a0: output[0].my_clone(),
@@ -279,12 +256,7 @@ impl Ext2 {
         self.assert_isequal(native, &one, &_one);
         inv
     }
-    pub fn assert_isequal<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        x: &GE2,
-        y: &GE2,
-    ) {
+    pub fn assert_isequal<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE2, y: &GE2) {
         self.curve_f.assert_isequal(native, &x.a0, &y.a0);
         self.curve_f.assert_isequal(native, &x.a1, &y.a1);
     }
@@ -295,12 +267,8 @@ impl Ext2 {
         z1: &GE2,
         z0: &GE2,
     ) -> GE2 {
-        let a0 = self
-            .curve_f
-            .select(native, selector, &z1.a0, &z0.a0);
-        let a1 = self
-            .curve_f
-            .select(native, selector, &z1.a1, &z0.a1);
+        let a0 = self.curve_f.select(native, selector, &z1.a0, &z0.a0);
+        let a1 = self.curve_f.select(native, selector, &z1.a1, &z0.a1);
         GE2 { a0, a1 }
     }
     pub fn conjugate<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE2) -> GE2 {

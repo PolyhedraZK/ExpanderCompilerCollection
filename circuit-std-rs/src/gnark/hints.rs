@@ -199,7 +199,7 @@ pub fn inv_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
 
     let p = recompose(plimbs.clone(), nb_bits as u32);
     let x = recompose(xlimbs.clone(), nb_bits as u32);
-    let res= x.clone().modinv(&p).unwrap();
+    let res = x.clone().modinv(&p).unwrap();
     let mut res_limbs = vec![BigInt::default(); nb_limbs];
     if let Err(err) = decompose(&res, nb_bits as u32, &mut res_limbs) {
         panic!("decompose value: {}", err);
@@ -819,9 +819,7 @@ pub fn copy_e2_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
         inputs,
         outputs,
         //copyE2Hint
-        |inputs| {
-            inputs
-        },
+        |inputs| inputs,
     ) {
         panic!("copyE2Hint: {}", err);
     }
@@ -834,9 +832,7 @@ pub fn copy_e12_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
         inputs,
         outputs,
         //copyE12Hint
-        |inputs| {
-            inputs
-        },
+        |inputs| inputs,
     ) {
         panic!("copyE12Hint: {}", err);
     }
@@ -872,9 +868,9 @@ pub fn final_exp_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> 
             let mut root_27th_inverse = Fq12::default();
             let order3rd;
             let mut order3rd_power = BigInt::default();
-            let mut exponent:BigInt;
+            let mut exponent: BigInt;
             let mut exponent_inv;
-            let poly_factor= 
+            let poly_factor =
                 BigInt::from_str("5044125407647214251").expect("Invalid string for BigInt");
             let final_exp_factor= BigInt::from_str("2366356426548243601069753987687709088104621721678962410379583120840019275952471579477684846670499039076873213559162845121989217658133790336552276567078487633052653005423051750848782286407340332979263075575489766963251914185767058009683318020965829271737924625612375201545022326908440428522712877494557944965298566001441468676802477524234094954960009227631543471415676620753242466901942121887152806837594306028649150255258504417829961387165043999299071444887652375514277477719817175923289019181393803729926249507024121957184340179467502106891835144220611408665090353102353194448552304429530104218473070114105759487413726485729058069746063140422361472585604626055492939586602274983146215294625774144156395553405525711143696689756441298365274341189385646499074862712688473936093315628166094221735056483459332831845007196600723053356837526749543765815988577005929923802636375670820616189737737304893769679803809426304143627363860243558537831172903494450556755190448279875942974830469855835666815454271389438587399739607656399812689280234103023464545891697941661992848552456326290792224091557256350095392859243101357349751064730561345062266850238821755009430903520645523345000326783803935359711318798844368754833295302563158150573540616830138810935344206231367357992991289265295323280").expect("Invalid string for BigInt");
             exponent = &final_exp_factor * 27;
@@ -936,7 +932,8 @@ pub fn final_exp_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> 
 
             let lambda= BigInt::from_str("4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129030796414117214202539").expect("Invalid string for BigInt");
             exponent = lambda.modinv(&final_exp_factor).unwrap();
-            let residue_witness =miller_loop.pow(exponent.to_biguint().unwrap().to_u64_digits().iter());
+            let residue_witness =
+                miller_loop.pow(exponent.to_biguint().unwrap().to_u64_digits().iter());
 
             let res_c0_b0_a0_bigint = residue_witness
                 .c0

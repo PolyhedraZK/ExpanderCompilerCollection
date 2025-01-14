@@ -1,5 +1,15 @@
-use circuit_std_rs::gnark::{element::Element, emulated::{field_bls12381::e2::GE2, sw_bls12381::{g1::*, g2::*, pairing::Pairing}}, hints::register_hint};
-use expander_compiler::{declare_circuit, frontend::{extra::debug_eval, GenericDefine, HintRegistry, M31Config, RootAPI, Variable, M31}};
+use circuit_std_rs::gnark::{
+    element::Element,
+    emulated::{
+        field_bls12381::e2::GE2,
+        sw_bls12381::{g1::*, g2::*, pairing::Pairing},
+    },
+    hints::register_hint,
+};
+use expander_compiler::{
+    declare_circuit,
+    frontend::{extra::debug_eval, GenericDefine, HintRegistry, M31Config, RootAPI, Variable, M31},
+};
 
 declare_circuit!(PairingCheckGKRCircuit {
     in1_g1: [[Variable; 48]; 2],

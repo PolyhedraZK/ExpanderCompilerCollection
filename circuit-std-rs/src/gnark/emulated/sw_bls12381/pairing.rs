@@ -1,14 +1,14 @@
-use crate::gnark::emparam::Bls12381Fp;
-use crate::gnark::emulated::field_bls12381::e12::*;
-use crate::gnark::emulated::field_bls12381::e2::*;
-use crate::gnark::emulated::field_bls12381::e6::GE6;
-use num_bigint::BigInt;
-use expander_compiler::frontend::{Config, RootAPI,Error};
 use super::g1::G1Affine;
 use super::g2::G2AffP;
 use super::g2::G2Affine;
 use super::g2::LineEvaluation;
 use super::g2::LineEvaluations;
+use crate::gnark::emparam::Bls12381Fp;
+use crate::gnark::emulated::field_bls12381::e12::*;
+use crate::gnark::emulated::field_bls12381::e2::*;
+use crate::gnark::emulated::field_bls12381::e6::GE6;
+use expander_compiler::frontend::{Config, Error, RootAPI};
+use num_bigint::BigInt;
 
 const LOOP_COUNTER: [i8; 64] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -75,7 +75,7 @@ impl Pairing {
         }
         let mut y_inv = vec![];
         let mut x_neg_over_y = vec![];
-        for cur_p in p.iter().take(n){
+        for cur_p in p.iter().take(n) {
             let y_inv_k = self.curve_f.inverse(native, &cur_p.y);
             let x_neg_over_y_k = self.curve_f.mul(native, &cur_p.x, &y_inv_k);
             let x_neg_over_y_k = self.curve_f.neg(native, &x_neg_over_y_k);
