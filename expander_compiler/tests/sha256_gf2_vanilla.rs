@@ -3,9 +3,13 @@ use arith::Field;
 use expander_compiler::frontend::*;
 
 mod sha256_utils;
+use sha256_utils::*;
+
+mod sha256_debug_utils;
+use sha256_debug_utils::{compress, H256_256 as SHA256_INIT_STATE};
+
 use rand::RngCore;
 use sha2::{Digest, Sha256};
-use sha256_utils::*;
 
 const N_HASHES: usize = 1;
 
@@ -66,6 +70,7 @@ fn compute_sha256<C: Config, Builder: RootAPI<C>>(
         w[i] = input[(i * 32)..((i + 1) * 32) as usize].to_vec();
     }
     for i in 16..64 {
+        // delta_0 (W(i - 15))
         let tmp = xor(
             api,
             rotate_right(&w[i - 15], 7),
@@ -73,6 +78,8 @@ fn compute_sha256<C: Config, Builder: RootAPI<C>>(
         );
         let shft = shift_right(api, w[i - 15].clone(), 3);
         let s0 = xor(api, tmp, shft);
+
+        // delta_1 (W(i - 2))
         let tmp = xor(
             api,
             rotate_right(&w[i - 2], 17),
@@ -82,29 +89,32 @@ fn compute_sha256<C: Config, Builder: RootAPI<C>>(
         let s1 = xor(api, tmp, shft);
         let s0 = add_vanilla(api, w[i - 16].clone(), s0);
         let s1 = add_vanilla(api, w[i - 7].clone(), s1);
-        let s1 = add_const(api, s1, k32[i]);
+        // let s1 = add_const(api, s1, k32[i]);
         w[i] = add_vanilla(api, s0, s1);
     }
 
     for i in 0..64 {
-        let s1 = sigma1(api, h[4].clone());
-        let c = ch(api, h[4].clone(), h[5].clone(), h[6].clone());
-        w[i] = add_vanilla(api, w[i].clone(), h[7].clone());
-        let c = add_const(api, c, k32[i].clone());
+        // T_1 = h + sigma1(e) + ch(e, f, g) + k_i + w_i
+        let s1 = sigma1(api, h[4].clone()); // sigma1(e)
+        let c = ch(api, h[4].clone(), h[5].clone(), h[6].clone()); // ch(e, f, g)
+        w[i] = add_vanilla(api, w[i].clone(), h[7].clone()); // h + w_i
+        let c = add_const(api, c, k32[i].clone()); // k_i
         let s1 = add_vanilla(api, s1, w[i].clone());
         let s1 = add_vanilla(api, s1, c);
+
+        // T_2 = sigma0(a) + maj(a, b, c)
         let s0 = sigma0(api, h[0].clone());
         let m = maj(api, h[0].clone(), h[1].clone(), h[2].clone());
         let s0 = add_vanilla(api, s0, m);
 
-        h[7] = h[6].clone();
-        h[6] = h[5].clone();
-        h[5] = h[4].clone();
-        h[4] = add_vanilla(api, h[3].clone(), s1.clone());
-        h[3] = h[2].clone();
-        h[2] = h[1].clone();
-        h[1] = h[0].clone();
-        h[0] = add_vanilla(api, s1, s0);
+        h[7] = h[6].clone(); // h = g
+        h[6] = h[5].clone(); // g = f
+        h[5] = h[4].clone(); // f = e
+        h[4] = add_vanilla(api, h[3].clone(), s1.clone()); // e = d + T_1
+        h[3] = h[2].clone(); // d = c
+        h[2] = h[1].clone(); // c = b
+        h[1] = h[0].clone(); // b = a
+        h[0] = add_vanilla(api, s1, s0); // a = T_1 + T_2
     }
 
     let mut result = add_const(api, h[0].clone(), h32[0].clone());
@@ -133,9 +143,14 @@ fn gen_assignment(
         .map(|input| {
             let mut assignment = SHA256Circuit::<GF2>::default();
             for (k, data) in input.chunks_exact(64).enumerate() {
-                let mut hash = Sha256::new();
-                hash.update(&data);
-                let output = hash.finalize();
+                // let mut hash = Sha256::new();
+                // hash.update(&data);
+                // let output = hash.finalize();
+
+                let mut state = SHA256_INIT_STATE.clone();
+                compress(&mut state, &[data.try_into().unwrap()]);
+                let output = state;
+
                 for i in 0..64 {
                     for j in 0..8 {
                         assignment.input[k % n_hashes_per_assignments][i * 8 + j] =
@@ -172,8 +187,7 @@ fn test_sha256_gf2() {
     let expected_res = vec![true; n_assignments];
 
     // TODO: Fix the circuit error
-    let _ = (res, expected_res);
-    // assert_eq!(res, expected_res);
+    assert_eq!(res, expected_res);
 
     // Test with wrong input
     for i in 0..n_assignments {

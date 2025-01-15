@@ -4,6 +4,7 @@
 use expander_compiler::frontend::*;
 
 pub fn int2bit<C: Config, Builder: RootAPI<C>>(api: &mut Builder, value: u32) -> Vec<Variable> {
+    // little-endian
     return (0..32)
         .map(|x| api.constant(((value >> x) & 1) as u32))
         .collect();
