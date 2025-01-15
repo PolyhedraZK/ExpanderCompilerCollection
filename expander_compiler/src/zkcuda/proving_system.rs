@@ -12,7 +12,7 @@ pub trait Proof: Clone {}
 pub trait ProvingSystem<C: Config> {
     type Proof: Proof;
     type Commitment: Commitment<C>;
-    fn commit(vals: &[C::CircuitField]) -> Self::Commitment;
+    fn commit(vals: &[C::DefaultSimdField]) -> Self::Commitment;
     fn prove(
         kernel: &Kernel<C>,
         commitments: &[&Self::Commitment],
@@ -32,14 +32,14 @@ pub trait ProvingSystem<C: Config> {
 
 #[derive(Clone)]
 pub struct DummyCommitment<C: Config> {
-    vals: Vec<C::CircuitField>,
+    vals: Vec<C::DefaultSimdField>,
 }
 
 impl<C: Config> Commitment<C> for DummyCommitment<C> {}
 
 #[derive(Clone)]
 pub struct DummyProof {
-    cond: Vec<bool>,
+    cond: Vec<Vec<bool>>,
 }
 
 impl Proof for DummyProof {}
@@ -51,7 +51,7 @@ pub struct DummyProvingSystem<C: Config> {
 impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
     type Proof = DummyProof;
     type Commitment = DummyCommitment<C>;
-    fn commit(vals: &[C::CircuitField]) -> Self::Commitment {
+    fn commit(vals: &[C::DefaultSimdField]) -> Self::Commitment {
         assert!(vals.len() & (vals.len() - 1) == 0);
         DummyCommitment {
             vals: vals.to_vec(),
@@ -69,7 +69,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
             let lc_input = dummy_prepare_inputs(kernel, commitments, is_broadcast, i);
             let (_, cond) = kernel
                 .layered_circuit
-                .eval_with_public_inputs(lc_input, &[]);
+                .eval_with_public_inputs_simd(lc_input, &[]);
             res.push(cond);
         }
         DummyProof { cond: res }
@@ -86,7 +86,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
             let lc_input = dummy_prepare_inputs(kernel, commitments, is_broadcast, i);
             let (_, cond) = kernel
                 .layered_circuit
-                .eval_with_public_inputs(lc_input, &[]);
+                .eval_with_public_inputs_simd(lc_input, &[]);
             if cond != proof.cond[i] {
                 return false;
             }
@@ -124,8 +124,8 @@ fn dummy_prepare_inputs<C: Config>(
     commitments: &[&DummyCommitment<C>],
     is_broadcast: &[bool],
     parallel_index: usize,
-) -> Vec<C::CircuitField> {
-    let mut lc_input = vec![C::CircuitField::zero(); kernel.layered_circuit.input_size()];
+) -> Vec<C::DefaultSimdField> {
+    let mut lc_input = vec![C::DefaultSimdField::zero(); kernel.layered_circuit.input_size()];
     for ((input, commitment), ib) in kernel
         .layered_circuit_input
         .iter()
