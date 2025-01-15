@@ -4,7 +4,7 @@ use tiny_keccak::Hasher;
 
 use crate::{field::Field, utils::error::Error};
 
-use super::BuiltinHintIds;
+use super::{stub_impl, BuiltinHintIds};
 
 pub type HintFn<F> = dyn FnMut(&[F], &mut [F]) -> Result<(), Error>;
 
@@ -59,6 +59,7 @@ impl EmptyHintCaller {
         Self
     }
 }
+pub struct StubHintCaller;
 
 pub trait HintCaller<F: Field>: 'static {
     fn call(&mut self, id: usize, args: &[F], num_outputs: usize) -> Result<Vec<F>, Error>;
@@ -73,5 +74,11 @@ impl<F: Field + 'static> HintCaller<F> for HintRegistry<F> {
 impl<F: Field> HintCaller<F> for EmptyHintCaller {
     fn call(&mut self, id: usize, _: &[F], _: usize) -> Result<Vec<F>, Error> {
         Err(Error::UserError(format!("hint with id {} not found", id)))
+    }
+}
+
+impl<F: Field> HintCaller<F> for StubHintCaller {
+    fn call(&mut self, id: usize, args: &[F], num_outputs: usize) -> Result<Vec<F>, Error> {
+        Ok(stub_impl(id, &args.to_vec(), num_outputs))
     }
 }

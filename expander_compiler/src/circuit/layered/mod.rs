@@ -56,6 +56,22 @@ impl<C: Config> Coef<C> {
         }
     }
 
+    pub fn get_value_with_public_inputs_simd<SF: arith::SimdField<Scalar = C::CircuitField>>(
+        &self,
+        public_inputs: &[SF],
+    ) -> SF {
+        match self {
+            Coef::Constant(c) => SF::one().scale(c),
+            Coef::Random => SF::random_unsafe(&mut rand::thread_rng()),
+            Coef::PublicInput(id) => {
+                if *id >= public_inputs.len() {
+                    panic!("public input id {} out of range", id);
+                }
+                public_inputs[*id]
+            }
+        }
+    }
+
     pub fn validate(&self, num_public_inputs: usize) -> Result<(), Error> {
         match self {
             Coef::Constant(_) => Ok(()),
@@ -762,6 +778,106 @@ impl<C: Config, I: InputType> Circuit<C, I> {
                     .map(|(l, (off, len))| &cur[l][off..off + len])
                     .collect::<Vec<_>>();
                 self.apply_segment_with_public_inputs(
+                    subc,
+                    &inputs,
+                    &mut nxt[a.output_offset..a.output_offset + subc.num_outputs],
+                    public_inputs,
+                );
+            }
+        }
+    }
+
+    pub fn eval_with_public_inputs_simd<SF: arith::SimdField<Scalar = C::CircuitField>>(
+        &self,
+        inputs: Vec<SF>,
+        public_inputs: &[SF],
+    ) -> (Vec<SF>, Vec<bool>) {
+        if inputs.len() != self.input_size() {
+            panic!("input length mismatch");
+        }
+        let mut cur = vec![inputs];
+        for id in self.layer_ids.iter() {
+            let mut next = vec![SF::zero(); self.segments[*id].num_outputs];
+            let mut inputs: Vec<&[SF]> = Vec::new();
+            for i in 0..self.segments[*id].num_inputs.len() {
+                inputs.push(&cur[cur.len() - i - 1]);
+            }
+            self.apply_segment_with_public_inputs_simd(
+                &self.segments[*id],
+                &inputs,
+                &mut next,
+                public_inputs,
+            );
+            cur.push(next);
+        }
+        let cur = cur.last().unwrap();
+        let mut constraints_satisfied = vec![true; SF::PACK_SIZE];
+        for out in cur.iter().take(self.expected_num_output_zeroes) {
+            let tmp = out.unpack();
+            for i in 0..SF::PACK_SIZE {
+                if !tmp[i].is_zero() {
+                    constraints_satisfied[i] = false;
+                }
+            }
+        }
+        (
+            cur[self.expected_num_output_zeroes..self.num_actual_outputs].to_vec(),
+            constraints_satisfied,
+        )
+    }
+
+    fn apply_segment_with_public_inputs_simd<SF: arith::SimdField<Scalar = C::CircuitField>>(
+        &self,
+        seg: &Segment<C, I>,
+        cur: &[&[SF]],
+        nxt: &mut [SF],
+        public_inputs: &[SF],
+    ) {
+        for m in seg.gate_muls.iter() {
+            nxt[m.output] += cur[m.inputs[0].layer()][m.inputs[0].offset()]
+                * cur[m.inputs[1].layer()][m.inputs[1].offset()]
+                * m.coef.get_value_with_public_inputs_simd(public_inputs);
+        }
+        for a in seg.gate_adds.iter() {
+            nxt[a.output] += cur[a.inputs[0].layer()][a.inputs[0].offset()]
+                * a.coef.get_value_with_public_inputs_simd(public_inputs);
+        }
+        for cs in seg.gate_consts.iter() {
+            nxt[cs.output] += cs.coef.get_value_with_public_inputs_simd(public_inputs);
+        }
+        for cu in seg.gate_customs.iter() {
+            let mut inputs = vec![Vec::with_capacity(cu.inputs.len()); SF::PACK_SIZE];
+            for input in cu.inputs.iter() {
+                let tmp = cur[input.layer()][input.offset()].unpack();
+                for i in 0..SF::PACK_SIZE {
+                    inputs[i].push(tmp[i]);
+                }
+            }
+            let mut outputs = Vec::with_capacity(SF::PACK_SIZE);
+            for x in inputs.iter() {
+                outputs.push(hints::stub_impl(cu.gate_type, x, 1));
+            }
+            for i in 0..outputs[0].len() {
+                let mut tmp = Vec::with_capacity(SF::PACK_SIZE);
+                for x in outputs.iter() {
+                    tmp.push(x[i]);
+                }
+                let output = SF::pack(&tmp);
+                nxt[cu.output + i] +=
+                    output * cu.coef.get_value_with_public_inputs_simd(public_inputs);
+            }
+        }
+        for (sub_id, allocs) in seg.child_segs.iter() {
+            let subc = &self.segments[*sub_id];
+            for a in allocs.iter() {
+                let inputs = a
+                    .input_offset
+                    .iter()
+                    .zip(subc.num_inputs.iter())
+                    .enumerate()
+                    .map(|(l, (off, len))| &cur[l][off..off + len])
+                    .collect::<Vec<_>>();
+                self.apply_segment_with_public_inputs_simd(
                     subc,
                     &inputs,
                     &mut nxt[a.output_offset..a.output_offset + subc.num_outputs],
