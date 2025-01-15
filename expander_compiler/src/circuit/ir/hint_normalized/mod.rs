@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::field::FieldArith;
+use crate::hints::registry::HintCaller;
 use crate::utils::error::Error;
 use crate::{
     circuit::{
@@ -198,6 +199,38 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 EvalResult::Values(outputs)
             }
         }
+    }
+}
+
+impl<C: Config> Instruction<C> {
+    fn eval_safe(
+        &self,
+        values: &[C::CircuitField],
+        public_inputs: &[C::CircuitField],
+        hint_caller: &mut impl HintCaller<C::CircuitField>,
+    ) -> EvalResult<C> {
+        if let Instruction::ConstantLike(coef) = self {
+            return match coef {
+                Coef::Constant(c) => EvalResult::Value(*c),
+                Coef::PublicInput(i) => EvalResult::Value(public_inputs[*i]),
+                Coef::Random => EvalResult::Error(Error::UserError(
+                    "random coef occured in witness solver".to_string(),
+                )),
+            };
+        }
+        if let Instruction::Hint {
+            hint_id,
+            inputs,
+            num_outputs,
+        } = self
+        {
+            let inputs: Vec<C::CircuitField> = inputs.iter().map(|i| values[*i]).collect();
+            return match hints::safe_impl(hint_caller, *hint_id, &inputs, *num_outputs) {
+                Ok(outputs) => EvalResult::Values(outputs),
+                Err(e) => EvalResult::Error(e),
+            };
+        }
+        self.eval_unsafe(values)
     }
 }
 
@@ -443,41 +476,27 @@ impl<C: Config> RootCircuit<C> {
         self.circuits.insert(0, c0);
     }
 
-    pub fn eval_with_public_inputs(
+    pub fn eval_safe(
         &self,
         inputs: Vec<C::CircuitField>,
         public_inputs: &[C::CircuitField],
+        hint_caller: &mut impl HintCaller<C::CircuitField>,
     ) -> Result<Vec<C::CircuitField>, Error> {
         assert_eq!(inputs.len(), self.input_size());
-        self.eval_sub_with_public_inputs(&self.circuits[&0], inputs, public_inputs)
+        self.eval_sub_safe(&self.circuits[&0], inputs, public_inputs, hint_caller)
     }
 
-    fn eval_sub_with_public_inputs(
+    fn eval_sub_safe(
         &self,
         circuit: &Circuit<C>,
         inputs: Vec<C::CircuitField>,
         public_inputs: &[C::CircuitField],
+        hint_caller: &mut impl HintCaller<C::CircuitField>,
     ) -> Result<Vec<C::CircuitField>, Error> {
         let mut values = vec![C::CircuitField::zero(); 1];
         values.extend(inputs);
         for insn in circuit.instructions.iter() {
-            if let Instruction::ConstantLike(coef) = insn {
-                match coef {
-                    Coef::Constant(c) => {
-                        values.push(*c);
-                    }
-                    Coef::PublicInput(i) => {
-                        values.push(public_inputs[*i]);
-                    }
-                    Coef::Random => {
-                        return Err(Error::UserError(
-                            "random coef occured in witness solver".to_string(),
-                        ));
-                    }
-                }
-                continue;
-            }
-            match insn.eval_unsafe(&values) {
+            match insn.eval_safe(&values, public_inputs, hint_caller) {
                 EvalResult::Value(v) => {
                     values.push(v);
                 }
@@ -485,10 +504,11 @@ impl<C: Config> RootCircuit<C> {
                     values.append(&mut vs);
                 }
                 EvalResult::SubCircuitCall(sub_circuit_id, inputs) => {
-                    let res = self.eval_sub_with_public_inputs(
+                    let res = self.eval_sub_safe(
                         &self.circuits[&sub_circuit_id],
                         inputs.iter().map(|&i| values[i]).collect(),
                         public_inputs,
+                        hint_caller,
                     )?;
                     values.extend(res);
                 }

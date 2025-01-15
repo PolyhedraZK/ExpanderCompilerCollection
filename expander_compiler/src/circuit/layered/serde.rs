@@ -198,7 +198,7 @@ const MAGIC: usize = 3914834606642317635;
 impl<C: Config, I: InputType> Serde for Circuit<C, I> {
     fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
         MAGIC.serialize_into(&mut writer)?;
-        C::CircuitField::modulus().serialize_into(&mut writer)?;
+        C::CircuitField::MODULUS.serialize_into(&mut writer)?;
         self.num_public_inputs.serialize_into(&mut writer)?;
         self.num_actual_outputs.serialize_into(&mut writer)?;
         self.expected_num_output_zeroes
@@ -216,7 +216,7 @@ impl<C: Config, I: InputType> Serde for Circuit<C, I> {
             ));
         }
         let modulus = ethnum::U256::deserialize_from(&mut reader)?;
-        if modulus != C::CircuitField::modulus() {
+        if modulus != C::CircuitField::MODULUS {
             return Err(IoError::new(
                 std::io::ErrorKind::InvalidData,
                 "invalid modulus",

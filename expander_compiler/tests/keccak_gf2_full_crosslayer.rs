@@ -1,6 +1,5 @@
-use expander_compiler::{circuit::layered::InputType, frontend::*};
-use extra::*;
-use internal::Serde;
+use expander_compiler::frontend::*;
+use expander_transcript::{BytesHashTranscript, SHA256hasher, Transcript};
 use rand::{thread_rng, Rng};
 use tiny_keccak::Hasher;
 
@@ -190,7 +189,7 @@ fn copy_out_unaligned(s: Vec<Vec<Variable>>, rate: usize, output_len: usize) -> 
 
 declare_circuit!(Keccak256Circuit {
     p: [[Variable; 64 * 8]; N_HASHES],
-    out: [[PublicVariable; 256]; N_HASHES],
+    out: [[Variable; 256]; N_HASHES],
 });
 
 fn compute_keccak<C: Config, B: RootAPI<C>>(api: &mut B, p: &Vec<Variable>) -> Vec<Variable> {
@@ -219,9 +218,8 @@ impl GenericDefine<GF2Config> for Keccak256Circuit<Variable> {
     fn define<Builder: RootAPI<GF2Config>>(&self, api: &mut Builder) {
         for i in 0..N_HASHES {
             // You can use api.memorized_simple_call for sub-circuits
-            // Or use the function directly
-            let out = api.memorized_simple_call(compute_keccak, &self.p[i].to_vec());
-            //let out = compute_keccak(api, &self.p[i].to_vec());
+            // let out = api.memorized_simple_call(compute_keccak, &self.p[i].to_vec());
+            let out = compute_keccak(api, &self.p[i].to_vec());
             for j in 0..256 {
                 api.assert_is_equal(out[j].clone(), self.out[i][j].clone());
             }
@@ -229,94 +227,8 @@ impl GenericDefine<GF2Config> for Keccak256Circuit<Variable> {
     }
 }
 
-fn keccak_gf2_test<I: InputType>(
-    witness_solver: WitnessSolver<GF2Config>,
-    layered_circuit: expander_compiler::circuit::layered::Circuit<GF2Config, I>,
-) {
-    let mut assignment = Keccak256Circuit::<GF2>::default();
-    for k in 0..N_HASHES {
-        let mut data = vec![0u8; 64];
-        for i in 0..64 {
-            data[i] = thread_rng().gen();
-        }
-        let mut hash = tiny_keccak::Keccak::v256();
-        hash.update(&data);
-        let mut output = [0u8; 32];
-        hash.finalize(&mut output);
-        for i in 0..64 {
-            for j in 0..8 {
-                assignment.p[k][i * 8 + j] = ((data[i] >> j) as u32 & 1).into();
-            }
-        }
-        for i in 0..32 {
-            for j in 0..8 {
-                assignment.out[k][i * 8 + j] = ((output[i] >> j) as u32 & 1).into();
-            }
-        }
-    }
-    let witness = witness_solver.solve_witness(&assignment).unwrap();
-    let res = layered_circuit.run(&witness);
-    assert_eq!(res, vec![true]);
-    println!("test 1 passed");
-
-    for k in 0..N_HASHES {
-        assignment.p[k][0] = assignment.p[k][0] - GF2::from(1);
-    }
-    let witness = witness_solver.solve_witness(&assignment).unwrap();
-    let res = layered_circuit.run(&witness);
-    assert_eq!(res, vec![false]);
-    println!("test 2 passed");
-
-    let mut assignments = Vec::new();
-    for _ in 0..16 {
-        for k in 0..N_HASHES {
-            assignment.p[k][0] = assignment.p[k][0] - GF2::from(1);
-        }
-        assignments.push(assignment.clone());
-    }
-    let witness = witness_solver.solve_witnesses(&assignments).unwrap();
-    let res = layered_circuit.run(&witness);
-    let mut expected_res = vec![false; 16];
-    for i in 0..8 {
-        expected_res[i * 2] = true;
-    }
-    assert_eq!(res, expected_res);
-    println!("test 3 passed");
-
-    let assignments_correct: Vec<Keccak256Circuit<GF2>> =
-        (0..8).map(|i| assignments[i * 2].clone()).collect();
-    let witness = witness_solver
-        .solve_witnesses(&assignments_correct)
-        .unwrap();
-
-    let file = std::fs::File::create("circuit_gf2.txt").unwrap();
-    let writer = std::io::BufWriter::new(file);
-    layered_circuit.serialize_into(writer).unwrap();
-
-    let file = std::fs::File::create("witness_gf2.txt").unwrap();
-    let writer = std::io::BufWriter::new(file);
-    witness.serialize_into(writer).unwrap();
-
-    let file = std::fs::File::create("witness_gf2_solver.txt").unwrap();
-    let writer = std::io::BufWriter::new(file);
-    witness_solver.serialize_into(writer).unwrap();
-
-    println!("dumped to files");
-}
-
 #[test]
-fn keccak_gf2_main() {
-    let compile_result =
-        compile_generic(&Keccak256Circuit::default(), CompileOptions::default()).unwrap();
-    let CompileResult {
-        witness_solver,
-        layered_circuit,
-    } = compile_result;
-    keccak_gf2_test(witness_solver, layered_circuit);
-}
-
-#[test]
-fn keccak_gf2_main_cross_layer() {
+fn keccak_gf2_full_crosslayer() {
     let compile_result =
         compile_generic_cross_layer(&Keccak256Circuit::default(), CompileOptions::default())
             .unwrap();
@@ -324,11 +236,7 @@ fn keccak_gf2_main_cross_layer() {
         witness_solver,
         layered_circuit,
     } = compile_result;
-    keccak_gf2_test(witness_solver, layered_circuit);
-}
 
-#[test]
-fn keccak_gf2_debug() {
     let mut assignment = Keccak256Circuit::<GF2>::default();
     for k in 0..N_HASHES {
         let mut data = vec![0u8; 64];
@@ -351,41 +259,48 @@ fn keccak_gf2_debug() {
         }
     }
 
-    debug_eval(
-        &Keccak256Circuit::default(),
-        &assignment,
-        EmptyHintCaller::new(),
-    );
-}
-
-#[test]
-#[should_panic]
-fn keccak_gf2_debug_error() {
-    let mut assignment = Keccak256Circuit::<GF2>::default();
-    for k in 0..N_HASHES {
-        let mut data = vec![0u8; 64];
-        for i in 0..64 {
-            data[i] = thread_rng().gen();
-        }
-        let mut hash = tiny_keccak::Keccak::v256();
-        hash.update(&data);
-        let mut output = [0u8; 32];
-        hash.finalize(&mut output);
-        for i in 0..64 {
-            for j in 0..8 {
-                assignment.p[k][i * 8 + j] = ((data[i] >> j) as u32 & 1).into();
-            }
-        }
-        for i in 0..32 {
-            for j in 0..8 {
-                assignment.out[k][i * 8 + j] = (((output[i] >> j) as u32 & 1) ^ 1).into();
-            }
-        }
+    let mut assignments = Vec::new();
+    for _ in 0..8 {
+        assignments.push(assignment.clone());
     }
+    let witness = witness_solver.solve_witnesses(&assignments).unwrap();
+    let res = layered_circuit.run(&witness);
+    let expected_res = vec![true; 8];
+    assert_eq!(res, expected_res);
+    println!("basic test passed");
 
-    debug_eval(
-        &Keccak256Circuit::default(),
-        &assignment,
-        EmptyHintCaller::new(),
+    let expander_circuit = layered_circuit
+        .export_to_expander::<gkr_field_config::GF2ExtConfig>()
+        .flatten();
+
+    let (simd_input, simd_public_input) = witness.to_simd::<gf2::GF2x8>();
+    println!("{} {}", simd_input.len(), simd_public_input.len());
+    assert_eq!(simd_public_input.len(), 0); // public input is not supported in current virgo++
+
+    let mut transcript = BytesHashTranscript::<
+        <gkr_field_config::GF2ExtConfig as gkr_field_config::GKRFieldConfig>::ChallengeField,
+        SHA256hasher,
+    >::new();
+
+    let connections = crosslayer_prototype::CrossLayerConnections::parse_circuit(&expander_circuit);
+
+    let start_time = std::time::Instant::now();
+    let evals = expander_circuit.evaluate(&simd_input);
+    let mut sp =
+        crosslayer_prototype::CrossLayerProverScratchPad::<gkr_field_config::GF2ExtConfig>::new(
+            expander_circuit.layers.len(),
+            expander_circuit.max_num_input_var(),
+            expander_circuit.max_num_output_var(),
+            1,
+        );
+    let (_output_claim, _input_challenge, _input_claim) = crosslayer_prototype::prove_gkr(
+        &expander_circuit,
+        &evals,
+        &connections,
+        &mut transcript,
+        &mut sp,
     );
+    let stop_time = std::time::Instant::now();
+    let duration = stop_time.duration_since(start_time);
+    println!("Time elapsed {} ms", duration.as_millis());
 }
