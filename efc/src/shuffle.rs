@@ -541,23 +541,6 @@ pub fn generate_shuffle_witnesses(dir: &str) {
                 .unwrap();
             compile_result.witness_solver
         };
-        // let w_s;
-        // if std::fs::metadata("shuffle.witness").is_ok() {
-        //     println!("The solver exists!");
-        //     w_s = witness_solver::WitnessSolver::deserialize_from(
-        //         std::fs::File::open("shuffle.witness").unwrap(),
-        //     )
-        //     .unwrap();
-        // } else {
-        //     println!("The solver does not exist.");
-        //     let compile_result =
-        //         compile_generic(&ShuffleCircuit::default(), CompileOptions::default()).unwrap();
-        //     compile_result
-        //         .witness_solver
-        //         .serialize_into(std::fs::File::create("shuffle.witness").unwrap())
-        //         .unwrap();
-        //     w_s = compile_result.witness_solver;
-        // }
         let witness_solver = Arc::new(w_s);
 
         println!("generating witnesses...");
