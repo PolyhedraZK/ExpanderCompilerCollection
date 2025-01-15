@@ -1,8 +1,10 @@
-// the spounge function of sha256, used to debug only, credit: https://crates.io/crates/sha2
+// the sponge function of sha256, used to debug only, credit: https://crates.io/crates/sha2
 
 #![allow(clippy::many_single_char_names)]
 pub const BLOCK_LEN: usize = 16;
 use core::convert::TryInto;
+
+// NOTE-ZF: This seems to be reversed in terms of left and right
 
 #[inline(always)]
 fn shl(v: [u32; 4], o: u32) -> [u32; 4] {

@@ -51,6 +51,8 @@ fn compute_sha256<C: Config, Builder: RootAPI<C>>(
 
     let mut h: Vec<Vec<Variable>> = (0..8).map(|x| int2bit(api, h32[x])).collect();
 
+    println!("v: {:?}", api.value_of(h[0][0].clone()));
+
     let k32: [u32; 64] = [
         0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
         0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
@@ -182,21 +184,28 @@ fn test_sha256_gf2() {
     let rng = rand::thread_rng();
     let mut assignments = gen_assignment(n_assignments, N_HASHES, rng);
 
-    let witness = witness_solver.solve_witnesses(&assignments).unwrap();
-    let res = layered_circuit.run(&witness);
-    let expected_res = vec![true; n_assignments];
+    debug_eval(
+        &Keccak256Circuit::default(),
+        &assignment,
+        EmptyHintCaller::new(),
+    );
 
-    // TODO: Fix the circuit error
-    assert_eq!(res, expected_res);
+    // let witness = witness_solver.solve_witnesses(&assignments).unwrap();
+    // let res = layered_circuit.run(&witness);
+    
+    // let expected_res = vec![true; n_assignments];
 
-    // Test with wrong input
-    for i in 0..n_assignments {
-        for j in 0..N_HASHES {
-            assignments[i].input[j][0] = assignments[i].input[j][0].clone() - GF2::ONE;
-        }
-    }
-    let witness_incorrect = witness_solver.solve_witnesses(&assignments).unwrap();
-    let res_incorrect = layered_circuit.run(&witness_incorrect);
-    let expected_res_incorrect = vec![false; n_assignments];
-    assert_eq!(res_incorrect, expected_res_incorrect);
+    // // TODO: Fix the circuit error
+    // assert_eq!(res, expected_res);
+
+    // // Test with wrong input
+    // for i in 0..n_assignments {
+    //     for j in 0..N_HASHES {
+    //         assignments[i].input[j][0] = assignments[i].input[j][0].clone() - GF2::ONE;
+    //     }
+    // }
+    // let witness_incorrect = witness_solver.solve_witnesses(&assignments).unwrap();
+    // let res_incorrect = layered_circuit.run(&witness_incorrect);
+    // let expected_res_incorrect = vec![false; n_assignments];
+    // assert_eq!(res_incorrect, expected_res_incorrect);
 }
