@@ -202,6 +202,9 @@ pub trait InputUsize:
         self.len() == 0
     }
     fn from_vec(v: Vec<usize>) -> Self;
+    fn to_vec(&self) -> Vec<usize> {
+        self.iter().collect()
+    }
 }
 
 impl InputUsize for CrossLayerInputUsize {
@@ -283,6 +286,33 @@ impl<C: Config, const INPUT_NUM: usize> Gate<C, NormalInputType, INPUT_NUM> {
             coef: c,
             coef_type: r,
             gate_type: 2 - INPUT_NUM,
+        }
+    }
+}
+
+impl<C: Config, const INPUT_NUM: usize> Gate<C, CrossLayerInputType, INPUT_NUM> {
+    pub fn export_to_crosslayer_simple<
+        DestConfig: gkr_field_config::GKRFieldConfig<CircuitField = C::CircuitField>,
+    >(
+        &self,
+    ) -> crosslayer_prototype::SimpleGate<DestConfig, INPUT_NUM> {
+        let (c, r) = self.coef.export_to_expander();
+        let mut i_ids: [usize; INPUT_NUM] = [0; INPUT_NUM];
+        for (x, y) in self.inputs.iter().zip(i_ids.iter_mut()) {
+            assert_eq!(x.layer(), 0);
+            *y = x.offset();
+        }
+        crosslayer_prototype::SimpleGate {
+            i_ids,
+            o_id: self.output,
+            coef: c,
+            coef_type: match r {
+                expander_circuit::CoefType::Constant => crosslayer_prototype::CoefType::Constant,
+                expander_circuit::CoefType::Random => crosslayer_prototype::CoefType::Random,
+                expander_circuit::CoefType::PublicInput(x) => {
+                    crosslayer_prototype::CoefType::PublicInput(x)
+                }
+            },
         }
     }
 }
