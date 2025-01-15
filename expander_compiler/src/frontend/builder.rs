@@ -17,7 +17,7 @@ use crate::{
     utils::function_id::get_function_id,
 };
 
-use super::api::{BasicAPI, DebugAPI, RootAPI, UnconstrainedAPI};
+use super::api::{BasicAPI, RootAPI, UnconstrainedAPI};
 
 pub struct Builder<C: Config> {
     instructions: Vec<SourceInstruction<C>>,
@@ -600,12 +600,6 @@ impl<C: Config> RootAPI<C> for RootBuilder<C> {
     }
 }
 
-impl<C: Config> DebugAPI<C> for RootBuilder<C> {
-    fn value_of(&self, _x: impl ToVariableOrValue<C::CircuitField>) -> C::CircuitField {
-        panic!("ValueOf is not supported in non-debug mode");
-    }
-}
-
 impl<C: Config> RootBuilder<C> {
     pub fn new(
         num_inputs: usize,
@@ -643,7 +637,7 @@ impl<C: Config> RootBuilder<C> {
         }
     }
 
-    fn last_builder(&mut self) -> &mut Builder<C> {
+    pub fn last_builder(&mut self) -> &mut Builder<C> {
         &mut self.current_builders.last_mut().unwrap().1
     }
 
