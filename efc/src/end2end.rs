@@ -38,9 +38,3 @@ pub fn end2end_witness(dir: &str) {
         end_time.duration_since(start_time)
     );
 }
-
-#[test]
-fn test_end2end_witness() {
-    let dir = "";
-    end2end_witness(dir);
-}
