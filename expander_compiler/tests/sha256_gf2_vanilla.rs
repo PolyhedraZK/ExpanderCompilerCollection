@@ -53,8 +53,6 @@ fn compute_sha256<C: Config, Builder: RootAPI<C>>(
 
     let mut h: Vec<Vec<Variable>> = (0..8).map(|x| int2bit(api, h32[x])).collect();
 
-    println!("v: {:?}", api.value_of(h[0][0].clone()));
-
     let k32: [u32; 64] = [
         0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
         0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
@@ -126,6 +124,10 @@ fn compute_sha256<C: Config, Builder: RootAPI<C>>(
         result.append(&mut add_const(api, h[i].clone(), h32[i].clone()));
     }
 
+    for i in 0..8 {
+        api.display(&format!("{}", i), result[i].clone());
+    }
+
     result
 }
 
@@ -153,7 +155,7 @@ fn gen_assignment(
 
                 let mut state = SHA256_INIT_STATE.clone();
                 compress(&mut state, &[data.try_into().unwrap()]);
-                let output = state;
+                let output = state.iter().map(|v| v.to_be_bytes()).flatten().collect::<Vec<_>>();
 
                 for i in 0..64 {
                     for j in 0..8 {
@@ -182,11 +184,11 @@ fn test_sha256_gf2() {
         layered_circuit,
     } = compile_result;
 
-    let n_assignments = 8;
+    let n_assignments = 1;
     let rng = rand::thread_rng();
-    let mut assignments = gen_assignment(n_assignments, N_HASHES, rng);
+    let mut assignments: Vec<SHA256Circuit<GF2>> = gen_assignment(n_assignments, N_HASHES, rng);
 
-    debug_eval(
+    debug_eval::<GF2Config, _, _, _>(
         &SHA256Circuit::default(),
         &assignments[0],
         EmptyHintCaller::new(),

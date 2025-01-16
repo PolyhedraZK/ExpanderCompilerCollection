@@ -11,6 +11,7 @@ pub fn int2bit<C: Config, Builder: RootAPI<C>>(api: &mut Builder, value: u32) ->
 }
 
 pub fn rotate_right(bits: &Vec<Variable>, k: usize) -> Vec<Variable> {
+    assert!(bits.len() & (bits.len() - 1) == 0);
     let n = bits.len();
     let s = k & (n - 1);
     let mut new_bits = bits[s as usize..].to_vec();
@@ -23,6 +24,7 @@ pub fn shift_right<C: Config, Builder: RootAPI<C>>(
     bits: Vec<Variable>,
     k: usize,
 ) -> Vec<Variable> {
+    assert!(bits.len() & (bits.len() - 1) == 0);
     let n = bits.len();
     let s = k & (n - 1);
     let mut new_bits = bits[s as usize..].to_vec();

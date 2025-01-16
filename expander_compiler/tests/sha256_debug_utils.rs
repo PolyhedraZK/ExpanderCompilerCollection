@@ -210,6 +210,8 @@ fn sha256_digest_block_u32(state: &mut [u32; 8], block: &[u32; 16]) {
     let mut w3 = [block[15], block[14], block[13], block[12]];
     let mut w4;
 
+    // [w3, w2, w1, w0] would be the total big-endian interpretation of the block
+
     rounds4!(abef, cdgh, w0, 0);
     rounds4!(abef, cdgh, w1, 1);
     rounds4!(abef, cdgh, w2, 2);
@@ -230,6 +232,10 @@ fn sha256_digest_block_u32(state: &mut [u32; 8], block: &[u32; 16]) {
     let [a, b, e, f] = abef;
     let [c, d, g, h] = cdgh;
 
+    for i in 0..8 {
+        println!("a {}: {}", i, a >> i & 1);
+    }
+
     state[0] = state[0].wrapping_add(a);
     state[1] = state[1].wrapping_add(b);
     state[2] = state[2].wrapping_add(c);
@@ -238,6 +244,7 @@ fn sha256_digest_block_u32(state: &mut [u32; 8], block: &[u32; 16]) {
     state[5] = state[5].wrapping_add(f);
     state[6] = state[6].wrapping_add(g);
     state[7] = state[7].wrapping_add(h);
+
 }
 
 
@@ -248,10 +255,12 @@ pub const H256_256: [u32; 8] = [
 
 pub fn compress(state: &mut [u32; 8], blocks: &[[u8; 64]]) {
     let mut block_u32 = [0u32; BLOCK_LEN];
+
     // since LLVM can't properly use aliasing yet it will make
     // unnecessary state stores without this copy
     let mut state_cpy = *state;
     for block in blocks {
+        // block is interpreted as u32 in big endian for every 4 bytes
         for (o, chunk) in block_u32.iter_mut().zip(block.chunks_exact(4)) {
             *o = u32::from_be_bytes(chunk.try_into().unwrap());
         }
