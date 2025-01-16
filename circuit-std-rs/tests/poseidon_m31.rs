@@ -1,4 +1,4 @@
-use circuit_std_rs::poseidon_m31::PoseidonM31Params;
+use circuit_std_rs::poseidon_m31::*;
 use expander_compiler::frontend::*;
 
 declare_circuit!(PoseidonSpongeLen8Circuit {
@@ -8,7 +8,13 @@ declare_circuit!(PoseidonSpongeLen8Circuit {
 
 impl Define<M31Config> for PoseidonSpongeLen8Circuit<Variable> {
     fn define(&self, builder: &mut API<M31Config>) {
-        let params = PoseidonM31Params::new(builder, 8, 16, 8, 14);
+        let params = PoseidonM31Params::new(
+            builder,
+            POSEIDON_M31X16_RATE,
+            16,
+            POSEIDON_M31X16_FULL_ROUNDS,
+            POSEIDON_M31X16_PARTIAL_ROUNDS,
+        );
         let res = params.hash_to_state(builder, &self.inputs);
         (0..params.width).for_each(|i| builder.assert_is_equal(res[i], self.outputs[i]));
     }
@@ -54,7 +60,13 @@ declare_circuit!(PoseidonSpongeLen16Circuit {
 
 impl Define<M31Config> for PoseidonSpongeLen16Circuit<Variable> {
     fn define(&self, builder: &mut API<M31Config>) {
-        let params = PoseidonM31Params::new(builder, 8, 16, 8, 14);
+        let params = PoseidonM31Params::new(
+            builder,
+            POSEIDON_M31X16_RATE,
+            16,
+            POSEIDON_M31X16_FULL_ROUNDS,
+            POSEIDON_M31X16_PARTIAL_ROUNDS,
+        );
         let res = params.hash_to_state(builder, &self.inputs);
         (0..params.width).for_each(|i| builder.assert_is_equal(res[i], self.outputs[i]));
     }

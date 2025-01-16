@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"os"
 
+	poseidonM31 "github.com/PolyhedraZK/ExpanderCompilerCollection/circuit-std-go/poseidon-m31"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo"
 	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/field/m31"
-	"github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/poseidon"
 	ecc_test "github.com/PolyhedraZK/ExpanderCompilerCollection/ecgo/test"
-	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/frontend"
 )
 
@@ -21,16 +20,14 @@ const NumRepeat = 120
 
 type MockPoseidonM31Circuit struct {
 	State  [NumRepeat][16]frontend.Variable
-	Digest [NumRepeat]frontend.Variable `gnark:",public"`
-	Params *poseidon.PoseidonParams
+	Digest [NumRepeat]frontend.Variable
 }
 
 func (c *MockPoseidonM31Circuit) Define(api frontend.API) (err error) {
 	// Define the circuit
-	engine := m31.Field{}
 	for i := 0; i < NumRepeat; i++ {
-		digest := poseidon.PoseidonCircuit(api, engine, c.Params, c.State[i][:], true)
-		api.AssertIsEqual(digest, c.Digest[i])
+		digest := poseidonM31.PoseidonM31x16Permutate(api, c.State[i][:])
+		api.AssertIsEqual(digest[0], c.Digest[i])
 	}
 
 	return
@@ -38,33 +35,32 @@ func (c *MockPoseidonM31Circuit) Define(api frontend.API) (err error) {
 
 func M31CircuitBuild() {
 
-	param := poseidon.NewPoseidonParams()
-
-	var states [NumRepeat][16]constraint.Element
 	var stateVars [NumRepeat][16]frontend.Variable
 	var outputVars [NumRepeat]frontend.Variable
 
 	for i := 0; i < NumRepeat; i++ {
-		for j := 0; j < 16; j++ {
-			states[i][j] = constraint.Element{uint64(i)}
-			stateVars[i][j] = frontend.Variable(uint64(i))
+
+		for j := 0; j < 8; j++ {
+			stateVars[i][j] = frontend.Variable(0)
 		}
-		output := poseidon.PoseidonM31(param, states[i][:])
-		outputVars[i] = frontend.Variable(output[0])
+
+		for j := 8; j < 16; j++ {
+			stateVars[i][j] = frontend.Variable(114514)
+		}
+
+		outputVars[i] = frontend.Variable(1021105124)
 
 	}
 
 	assignment := &MockPoseidonM31Circuit{
 		State:  stateVars,
 		Digest: outputVars,
-		Params: param,
 	}
 
 	// Ecc test
 	circuit, err := ecgo.Compile(m31.ScalarField, &MockPoseidonM31Circuit{
 		State:  stateVars,
 		Digest: outputVars,
-		Params: param,
 	}, frontend.WithCompressThreshold(32))
 	if err != nil {
 		panic(err)
