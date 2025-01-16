@@ -11,6 +11,8 @@ use sha256_debug_utils::{compress, H256_256 as SHA256_INIT_STATE};
 use rand::RngCore;
 use sha2::{Digest, Sha256};
 
+use crate::extra::debug_eval;
+
 const N_HASHES: usize = 1;
 
 declare_circuit!(SHA256Circuit {
@@ -185,8 +187,8 @@ fn test_sha256_gf2() {
     let mut assignments = gen_assignment(n_assignments, N_HASHES, rng);
 
     debug_eval(
-        &Keccak256Circuit::default(),
-        &assignment,
+        &SHA256Circuit::default(),
+        &assignments[0],
         EmptyHintCaller::new(),
     );
 
