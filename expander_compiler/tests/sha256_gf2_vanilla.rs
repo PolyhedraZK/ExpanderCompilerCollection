@@ -11,6 +11,7 @@ use sha256_debug_utils::{compress, H256_256 as SHA256_INIT_STATE};
 use rand::RngCore;
 
 // these imports will be used for the real hash, currently only the compression function is used
+#[allow(unused_imports)]
 use crate::extra::debug_eval;
 #[allow(unused_imports)]
 use sha2::{Digest, Sha256};
