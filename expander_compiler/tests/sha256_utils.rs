@@ -4,16 +4,16 @@
 use expander_compiler::frontend::*;
 
 pub fn int2bit<C: Config, Builder: RootAPI<C>>(api: &mut Builder, value: u32) -> Vec<Variable> {
-    // little-endian
+    // big-endian
     return (0..32)
-        .map(|x| api.constant(((value >> x) & 1) as u32))
+        .map(|x| api.constant(((value >> (31 - x)) & 1) as u32))
         .collect();
 }
 
 pub fn rotate_right(bits: &Vec<Variable>, k: usize) -> Vec<Variable> {
     assert!(bits.len() & (bits.len() - 1) == 0);
     let n = bits.len();
-    let s = k & (n - 1);
+    let s = n - k;
     let mut new_bits = bits[s as usize..].to_vec();
     new_bits.append(&mut bits[0..s as usize].to_vec());
     new_bits
@@ -26,9 +26,9 @@ pub fn shift_right<C: Config, Builder: RootAPI<C>>(
 ) -> Vec<Variable> {
     assert!(bits.len() & (bits.len() - 1) == 0);
     let n = bits.len();
-    let s = k & (n - 1);
-    let mut new_bits = bits[s as usize..].to_vec();
-    new_bits.append(&mut vec![api.constant(0); s]);
+    let s = n - k;
+    let mut new_bits = vec![api.constant(0); k];
+    new_bits.append(&mut bits[0..s].to_vec());
     new_bits
 }
 
@@ -95,8 +95,8 @@ pub fn add_const<C: Config, Builder: RootAPI<C>>(
     let n = a.len();
     let mut c = a.clone();
     let mut ci = api.constant(0);
-    for i in 0..n {
-        if b >> i & 1 == 1 {
+    for i in (0..n).rev() {
+        if (b >> (31 - i)) & 1 == 1 {
             let p = api.add(a[i].clone(), 1);
             c[i] = api.add(p.clone(), ci.clone());
 
@@ -223,7 +223,7 @@ pub fn add_vanilla<C: Config, Builder: RootAPI<C>>(
     let mut c = vec![api.constant(0); 32];
 
     let mut carry = api.constant(0);
-    for i in 0..32 {
+    for i in (0..32).rev() {
         (c[i], carry) = bit_add_with_carry(api, a[i], b[i], carry);
     }
     c

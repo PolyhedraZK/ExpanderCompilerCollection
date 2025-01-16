@@ -198,6 +198,26 @@ macro_rules! schedule_rounds4 {
     }};
 }
 
+fn print_state(abef: &[u32; 4], cdgh: &[u32; 4]) {
+    for i in 0..2 {
+        print!("{} ", (abef[i] >> 1) & 1);
+    }
+
+    for i in 0..2 {
+        print!("{} ", (cdgh[i] >> 1) & 1);
+    }
+
+    for i in 2..4 {
+        print!("{} ", (abef[i] >> 1) & 1);
+    }
+
+    for i in 2..4 {
+        print!("{} ", (cdgh[i] >> 1) & 1);
+    }
+
+    println!();
+}
+
 /// Process a block with the SHA-256 algorithm.
 fn sha256_digest_block_u32(state: &mut [u32; 8], block: &[u32; 16]) {
     let mut abef = [state[0], state[1], state[4], state[5]];
@@ -231,10 +251,6 @@ fn sha256_digest_block_u32(state: &mut [u32; 8], block: &[u32; 16]) {
 
     let [a, b, e, f] = abef;
     let [c, d, g, h] = cdgh;
-
-    for i in 0..8 {
-        println!("a {}: {}", i, a >> i & 1);
-    }
 
     state[0] = state[0].wrapping_add(a);
     state[1] = state[1].wrapping_add(b);

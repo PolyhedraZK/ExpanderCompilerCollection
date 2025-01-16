@@ -42,6 +42,12 @@ impl<C: Config> GenericDefine<C> for SHA256Circuit<Variable> {
     }
 }
 
+fn display_state<C: Config, Builder: RootAPI<C>>(api: &mut Builder, state: &Vec<Vec<Variable>>) {
+    for i in 0..8 {
+        api.display(&format!("{}", i), state[i][30].clone());
+    }
+}
+
 fn compute_sha256<C: Config, Builder: RootAPI<C>>(
     api: &mut Builder,
     input: &Vec<Variable>,
@@ -54,16 +60,14 @@ fn compute_sha256<C: Config, Builder: RootAPI<C>>(
     let mut h: Vec<Vec<Variable>> = (0..8).map(|x| int2bit(api, h32[x])).collect();
 
     let k32: [u32; 64] = [
-        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
-        0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
-        0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f,
-        0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
-        0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc,
-        0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
-        0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116,
-        0x1e376c48, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa11, 0x5b9cca4f, 0x682e6ff3,
-        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7,
-        0xc67178f2,
+        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+        0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+        0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+        0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+        0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+        0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+        0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
     ];
     //    let k: Vec<Vec<Variable>> = (0..64).map(|x| int2bit(api, k32[x])).collect();
 
@@ -119,13 +123,10 @@ fn compute_sha256<C: Config, Builder: RootAPI<C>>(
         h[0] = add_vanilla(api, s1, s0); // a = T_1 + T_2
     }
 
+    display_state(api, &h);
     let mut result = add_const(api, h[0].clone(), h32[0].clone());
     for i in 1..8 {
         result.append(&mut add_const(api, h[i].clone(), h32[i].clone()));
-    }
-
-    for i in 0..8 {
-        api.display(&format!("{}", i), result[i].clone());
     }
 
     result
@@ -160,13 +161,13 @@ fn gen_assignment(
                 for i in 0..64 {
                     for j in 0..8 {
                         assignment.input[k % n_hashes_per_assignments][i * 8 + j] =
-                            ((data[i] >> j) as u32 & 1).into();
+                            ((data[i] >> (7 - j)) as u32 & 1).into();
                     }
                 }
                 for i in 0..32 {
                     for j in 0..8 {
                         assignment.output[k % n_hashes_per_assignments][i * 8 + j] =
-                            ((output[i] >> j) as u32 & 1).into();
+                            ((output[i] >> (7 - j)) as u32 & 1).into();
                     }
                 }
             }
@@ -175,7 +176,7 @@ fn gen_assignment(
         .collect()
 }
 
-#[test]
+#[test] 
 fn test_sha256_gf2() {
     let compile_result: CompileResultCrossLayer<GF2Config> =
         compile_generic_cross_layer(&SHA256Circuit::default(), CompileOptions::default()).unwrap();
@@ -184,32 +185,32 @@ fn test_sha256_gf2() {
         layered_circuit,
     } = compile_result;
 
-    let n_assignments = 1;
+    let n_assignments = 8;
     let rng = rand::thread_rng();
     let mut assignments: Vec<SHA256Circuit<GF2>> = gen_assignment(n_assignments, N_HASHES, rng);
 
-    debug_eval::<GF2Config, _, _, _>(
-        &SHA256Circuit::default(),
-        &assignments[0],
-        EmptyHintCaller::new(),
-    );
+    // debug_eval::<GF2Config, _, _, _>(
+    //     &SHA256Circuit::default(),
+    //     &assignments[0],
+    //     EmptyHintCaller::new(),
+    // );
 
-    // let witness = witness_solver.solve_witnesses(&assignments).unwrap();
-    // let res = layered_circuit.run(&witness);
+    let witness = witness_solver.solve_witnesses(&assignments).unwrap();
+    let res = layered_circuit.run(&witness);
     
-    // let expected_res = vec![true; n_assignments];
+    let expected_res = vec![true; n_assignments];
 
-    // // TODO: Fix the circuit error
-    // assert_eq!(res, expected_res);
+    // TODO: Fix the circuit error
+    assert_eq!(res, expected_res);
 
-    // // Test with wrong input
-    // for i in 0..n_assignments {
-    //     for j in 0..N_HASHES {
-    //         assignments[i].input[j][0] = assignments[i].input[j][0].clone() - GF2::ONE;
-    //     }
-    // }
-    // let witness_incorrect = witness_solver.solve_witnesses(&assignments).unwrap();
-    // let res_incorrect = layered_circuit.run(&witness_incorrect);
-    // let expected_res_incorrect = vec![false; n_assignments];
-    // assert_eq!(res_incorrect, expected_res_incorrect);
+    // Test with wrong input
+    for i in 0..n_assignments {
+        for j in 0..N_HASHES {
+            assignments[i].input[j][0] = assignments[i].input[j][0].clone() - GF2::ONE;
+        }
+    }
+    let witness_incorrect = witness_solver.solve_witnesses(&assignments).unwrap();
+    let res_incorrect = layered_circuit.run(&witness_incorrect);
+    let expected_res_incorrect = vec![false; n_assignments];
+    assert_eq!(res_incorrect, expected_res_incorrect);
 }
