@@ -177,7 +177,6 @@ pub const K32X4: [[u32; 4]; 16] = [
     [K32[63], K32[62], K32[61], K32[60]],
 ];
 
-
 macro_rules! rounds4 {
     ($abef:ident, $cdgh:ident, $rest:expr, $i:expr) => {{
         let t1 = add($rest, K32X4[$i]);
@@ -198,6 +197,7 @@ macro_rules! schedule_rounds4 {
     }};
 }
 
+#[allow(dead_code)]
 fn print_state(abef: &[u32; 4], cdgh: &[u32; 4]) {
     for i in 0..2 {
         print!("{} ", (abef[i] >> 1) & 1);
@@ -260,13 +260,10 @@ fn sha256_digest_block_u32(state: &mut [u32; 8], block: &[u32; 16]) {
     state[5] = state[5].wrapping_add(f);
     state[6] = state[6].wrapping_add(g);
     state[7] = state[7].wrapping_add(h);
-
 }
 
-
 pub const H256_256: [u32; 8] = [
-    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
 ];
 
 pub fn compress(state: &mut [u32; 8], blocks: &[[u8; 64]]) {

@@ -74,7 +74,6 @@ fn test_add_vanilla() {
     assert_eq!(res, expected_res);
 }
 
-
 declare_circuit!(ConstAdder {
     a: [Variable; 32],
     c: [Variable; 32],
@@ -97,7 +96,6 @@ impl<C: Config> GenericDefine<C> for ConstAdder<Variable> {
         }
     }
 }
-
 
 #[test]
 fn test_add_const() {

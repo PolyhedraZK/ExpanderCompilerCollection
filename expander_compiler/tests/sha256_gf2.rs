@@ -2,11 +2,17 @@ use arith::Field;
 // credit: https://github.com/PolyhedraZK/proof-arena/blob/main/problems/sha256_hash/expander-sha256/src/main.rs
 use expander_compiler::frontend::*;
 
+mod sha256_debug_utils;
+use sha256_debug_utils::{compress, H256_256 as SHA256_INIT_STATE};
+
 mod sha256_utils;
+use sha256_utils::*;
+
 use extra::Serde;
 use rand::RngCore;
+
+#[allow(unused_imports)]
 use sha2::{Digest, Sha256};
-use sha256_utils::*;
 
 const N_HASHES: usize = 1;
 
@@ -134,19 +140,32 @@ fn gen_assignment(
         .map(|input| {
             let mut assignment = SHA256Circuit::<GF2>::default();
             for (k, data) in input.chunks_exact(64).enumerate() {
-                let mut hash = Sha256::new();
-                hash.update(&data);
-                let output = hash.finalize();
+                // let mut hash = Sha256::new();
+                // hash.update(&data);
+                // let output = hash.finalize();
+
+                // let mut hash = Sha256::new();
+                // hash.update(&data);
+                // let output = hash.finalize();
+
+                let mut state = SHA256_INIT_STATE.clone();
+                compress(&mut state, &[data.try_into().unwrap()]);
+                let output = state
+                    .iter()
+                    .map(|v| v.to_be_bytes())
+                    .flatten()
+                    .collect::<Vec<_>>();
+
                 for i in 0..64 {
                     for j in 0..8 {
                         assignment.input[k % n_hashes_per_assignments][i * 8 + j] =
-                            ((data[i] >> j) as u32 & 1).into();
+                            ((data[i] >> (7 - j)) as u32 & 1).into();
                     }
                 }
                 for i in 0..32 {
                     for j in 0..8 {
                         assignment.output[k % n_hashes_per_assignments][i * 8 + j] =
-                            ((output[i] >> j) as u32 & 1).into();
+                            ((output[i] >> (7 - j)) as u32 & 1).into();
                     }
                 }
             }

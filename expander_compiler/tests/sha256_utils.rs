@@ -115,6 +115,12 @@ fn add_brentkung<C: Config, Builder: RootAPI<C>>(
     a: &Vec<Variable>,
     b: &Vec<Variable>,
 ) -> Vec<Variable> {
+    // temporary solution to change endianness, big -> little
+    let mut a = a.clone();
+    let mut b = b.clone();
+    a.reverse();
+    b.reverse();
+
     let mut c = vec![api.constant(0); 32];
     let mut ci = api.constant(0);
 
@@ -129,6 +135,8 @@ fn add_brentkung<C: Config, Builder: RootAPI<C>>(
         c[start..end].copy_from_slice(&sum);
     }
 
+    // temporary solution to change endianness, little -> big
+    c.reverse();
     c
 }
 
