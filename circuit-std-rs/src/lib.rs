@@ -6,3 +6,5 @@ pub use logup::{LogUpCircuit, LogUpParams};
 
 pub mod big_int;
 pub mod sha2_m31;
+
+pub mod poseidon_m31;
