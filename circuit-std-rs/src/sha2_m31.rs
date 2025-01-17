@@ -116,6 +116,9 @@ impl MyDigest {
         self.len += CHUNK as u64;
         let tmp_h = self.h;
         self.h = self.block(api, tmp_h, p);
+		for i in 0..8 {
+			println!("h[{}]: {:?} {:?}", i, api.value_of(self.h[i][0]),  api.value_of(self.h[i][1]));
+		}
     }
     fn return_sum<C: Config, B: RootAPI<C>>(&mut self, api: &mut B) -> [Variable; SHA256LEN] {
         let mut digest = [api.constant(0); SHA256LEN];
@@ -286,7 +289,38 @@ pub fn sha256_37bytes<C: Config, B: RootAPI<C>>(
     d.return_sum(builder).to_vec()
 }
 
-pub fn check_sha256<C: Config, B: RootAPI<C>>(
+pub fn sha256_var_bytes<C: Config, B: RootAPI<C>>(
+    builder: &mut B,
+    orign_data: &[Variable],
+) -> Vec<Variable> {
+    let mut data = orign_data.to_vec();
+    let n = data.len();
+	let n_bytes = (n*8).to_be_bytes().to_vec();
+	let mut pad;
+    if n % 64 > 55 { //need to add one more chunk (64bytes)
+		pad = vec![builder.constant(0); 128 - n % 64];
+		pad[0] = builder.constant(128); //0x80
+	} else {
+		pad = vec![builder.constant(0); 64 - n % 64];
+		pad[0] = builder.constant(128); //0x80
+	}
+	let pad_len = pad.len();
+	for i in 0..n_bytes.len() {
+		pad[pad_len-n_bytes.len()+i] = builder.constant(n_bytes[i] as u32);
+	}
+	data.append(&mut pad); //append padding
+
+	let mut d = MyDigest::new(builder);
+	d.reset(builder);
+
+	let n = data.len();
+	for i in 0..n/64 {
+		d.chunk_write(builder, &data[i*64..(i+1)*64]);
+	}
+	d.return_sum(builder).to_vec()
+}
+
+pub fn check_sha256_37bytes<C: Config, B: RootAPI<C>>(
     builder: &mut B,
     origin_data: &[Variable],
 ) -> Vec<Variable> {
