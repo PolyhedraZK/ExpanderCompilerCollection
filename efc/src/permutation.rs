@@ -202,27 +202,7 @@ pub fn generate_permutation_hashes_witness(dir: &str) {
                 .unwrap();
             compile_result.witness_solver
         };
-
-        // if std::fs::metadata(&file_name).is_ok() {
-        //     println!("The solver exists!");
-        //     w_s = witness_solver::WitnessSolver::deserialize_from(
-        //         std::fs::File::open(&file_name).unwrap(),
-        //     )
-        //     .unwrap();
-        // } else {
-        //     println!("The solver does not exist.");
-        //     let compile_result = compile_generic(
-        //         &PermutationIndicesValidatorHashesCircuit::default(),
-        //         CompileOptions::default(),
-        //     )
-        //     .unwrap();
-        //     compile_result
-        //         .witness_solver
-        //         .serialize_into(std::fs::File::create(&file_name).unwrap())
-        //         .unwrap();
-        //     w_s = compile_result.witness_solver;
-        // }
-
+        
         let witness_solver = Arc::new(w_s);
 
         println!("Start generating permutationhash witnesses...");

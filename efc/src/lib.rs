@@ -8,3 +8,4 @@ pub mod permutation;
 pub mod shuffle;
 pub mod utils;
 pub mod validator;
+pub mod attestation;
