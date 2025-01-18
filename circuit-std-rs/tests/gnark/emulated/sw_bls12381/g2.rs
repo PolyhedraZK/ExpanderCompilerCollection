@@ -1,18 +1,10 @@
 use circuit_std_rs::{
-    gnark::{
-        element::Element,
-        emulated::{field_bls12381::e2::GE2, sw_bls12381::g2::*},
-        utils::{hash_to_fp_variable, print_e2},
-    },
+    gnark::emulated::{field_bls12381::e2::GE2, sw_bls12381::g2::*},
     utils::register_hint,
 };
 use expander_compiler::{
-    compile::CompileOptions,
     declare_circuit,
-    frontend::{
-        compile_generic, extra::debug_eval, GenericDefine, HintRegistry, M31Config, RootAPI,
-        Variable, M31,
-    },
+    frontend::{extra::debug_eval, GenericDefine, HintRegistry, M31Config, RootAPI, Variable, M31},
 };
 
 declare_circuit!(MapToG2Circuit {
@@ -112,8 +104,6 @@ impl GenericDefine<M31Config> for HashToG2Circuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g2 = G2::new(builder);
         let (hm0, hm1) = g2.hash_to_fp(builder, self.msg.to_vec());
-        let test0 = g2.ext2.copy(builder, &hm0);
-        let test1 = g2.ext2.copy(builder, &hm1);
         let res = g2.map_to_g2(builder, &hm0, &hm1);
         let target_out = G2AffP {
             x: GE2::from_vars(self.out[0][0].to_vec(), self.out[0][1].to_vec()),
