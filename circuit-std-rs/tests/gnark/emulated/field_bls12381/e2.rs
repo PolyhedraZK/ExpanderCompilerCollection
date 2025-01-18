@@ -91,11 +91,7 @@ fn test_e2_add() {
         assignment.z[1][i] = M31::from(z1_bytes[i] as u32);
     }
 
-    debug_eval(
-        &E2AddCircuit::default(),
-        &assignment,
-        hint_registry,
-    );
+    debug_eval(&E2AddCircuit::default(), &assignment, hint_registry);
 }
 
 declare_circuit!(E2SubCircuit {

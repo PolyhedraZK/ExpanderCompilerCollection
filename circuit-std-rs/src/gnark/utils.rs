@@ -9,9 +9,9 @@ use crate::gnark::emulated::field_bls12381::e2::GE2;
 use crate::gnark::limbs::decompose;
 use crate::gnark::limbs::recompose;
 use crate::sha2_m31::sha256_var_bytes;
-use expander_compiler::frontend::*;
-use ark_ff::Zero;
 use ark_bls12_381::Fq2;
+use ark_ff::Zero;
+use expander_compiler::frontend::*;
 
 pub fn nb_multiplication_res_limbs(len_left: usize, len_right: usize) -> usize {
     let res = len_left + len_right - 1;
@@ -50,12 +50,14 @@ pub fn sub_padding(
 }
 
 pub fn get_sign(x: &Fq2) -> bool {
-    let x_a0 = x.c0.to_string()
-    .parse::<BigInt>()
-    .expect("Invalid decimal string");
-    let x_a1 = x.c1.to_string()
-    .parse::<BigInt>()
-    .expect("Invalid decimal string");
+    let x_a0 =
+        x.c0.to_string()
+            .parse::<BigInt>()
+            .expect("Invalid decimal string");
+    let x_a1 =
+        x.c1.to_string()
+            .parse::<BigInt>()
+            .expect("Invalid decimal string");
     let z = x_a0.is_zero();
     let sgn0 = !(x_a0 % 2u32).is_zero();
     let sgn1 = !(x_a1 % 2u32).is_zero();
@@ -63,14 +65,10 @@ pub fn get_sign(x: &Fq2) -> bool {
 }
 pub fn has_sqrt(x: &Fq2) -> (Fq2, bool) {
     match x.sqrt() {
-        Some(sqrt_x) => {
-            (sqrt_x, true)
-        }
-        None => {
-            (x.clone(), false)
-        }
+        Some(sqrt_x) => (sqrt_x, true),
+        None => (*x, false),
     }
-} 
+}
 pub fn xor_variable<C: Config, B: RootAPI<C>>(
     api: &mut B,
     nbits: usize,
@@ -100,8 +98,8 @@ pub fn expand_msg_xmd_variable<C: Config, B: RootAPI<C>>(
     }
     let size_domain = dst.len() as u8;
     let mut block_v = vec![Variable::default(); 64];
-    for i in 0..block_v.len() {
-        block_v[i] = api.constant(0);
+    for v in &mut block_v {
+        *v = api.constant(0);
     }
     let mut input = Vec::new();
     input.extend_from_slice(&block_v);
@@ -154,7 +152,6 @@ pub fn hash_to_fp_variable<C: Config, B: RootAPI<C>>(
     }
     elems
 }
-
 
 pub fn print_e2<C: Config, B: RootAPI<C>>(native: &mut B, v: &GE2) {
     for i in 0..48 {

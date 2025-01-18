@@ -1,9 +1,13 @@
 #[cfg(test)]
 mod tests {
-    use circuit_std_rs::{gnark::{
-        element::{from_interface, new_internal_element, value_of},
-        emparam::Bls12381Fp, field::GField,
-    }, utils::register_hint};
+    use circuit_std_rs::{
+        gnark::{
+            element::{from_interface, new_internal_element, value_of},
+            emparam::Bls12381Fp,
+            field::GField,
+        },
+        utils::register_hint,
+    };
     use expander_compiler::frontend::*;
     use extra::debug_eval;
     use num_bigint::BigInt;
@@ -92,10 +96,6 @@ mod tests {
         }
         let mut hint_registry = HintRegistry::<M31>::new();
         register_hint(&mut hint_registry);
-        debug_eval(
-        &VALUECircuit::default(),
-        &assignment,
-        hint_registry,
-    );
+        debug_eval(&VALUECircuit::default(), &assignment, hint_registry);
     }
 }

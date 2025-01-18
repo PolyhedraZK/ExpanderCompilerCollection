@@ -126,8 +126,7 @@ impl<T: FieldParams> GField<T> {
         native: &mut B,
         x: &Element<T>,
     ) -> Variable {
-        let bit = to_binary(native, x.limbs[0], 30)[0];
-        bit
+        to_binary(native, x.limbs[0], 30)[0]
     }
     pub fn select<C: Config, B: RootAPI<C>>(
         &mut self,
@@ -518,13 +517,6 @@ impl<T: FieldParams> GField<T> {
         self.assert_isequal(native, &res, &new_a);
         e
     }
-    /*
-    mulOf, err := f.mulPreCond(a, &Element[T]{Limbs: make([]frontend.Variable, f.fParams.NbLimbs()), overflow: 0}) // order is important, we want that reduce left side
-    if err != nil {
-        return mulOf, err
-    }
-    return f.subPreCond(&Element[T]{overflow: 0}, &Element[T]{overflow: mulOf})
-     */
     pub fn inverse<C: Config, B: RootAPI<C>>(
         &mut self,
         native: &mut B,
