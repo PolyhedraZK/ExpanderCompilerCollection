@@ -86,7 +86,7 @@ impl G1 {
         //get YSquared
         let ysquared = self.curve_f.mul(native, &px, &px);
         let ysquared = self.curve_f.mul(native, &ysquared, &px);
-        let b_curve_coeff = value_of::<C, B, Bls12381Fp>( native, Box::new(4));
+        let b_curve_coeff = value_of::<C, B, Bls12381Fp>(native, Box::new(4));
         let ysquared = self.curve_f.add(native, &ysquared, &b_curve_coeff);
 
         let inputs = vec![ysquared.clone()];
@@ -105,17 +105,27 @@ impl G1 {
         let y_squared = self.curve_f.mul(native, &y, &y);
         self.curve_f.assert_isequal(native, &y_squared, &ysquared);
 
-
         //if y is lexicographically largest
         let half_fp = BigInt::from_str("4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787").unwrap() / 2;
-        let half_fp_var = value_of::<C, B, Bls12381Fp>( native, Box::new(half_fp));
-        let is_large = big_less_than(native, Bls12381Fp::bits_per_limb() as usize, Bls12381Fp::nb_limbs() as usize, &half_fp_var.limbs, &y.limbs);
+        let half_fp_var = value_of::<C, B, Bls12381Fp>(native, Box::new(half_fp));
+        let is_large = big_less_than(
+            native,
+            Bls12381Fp::bits_per_limb() as usize,
+            Bls12381Fp::nb_limbs() as usize,
+            &half_fp_var.limbs,
+            &y.limbs,
+        );
 
         //if Y > -Y --> check if mData == mCompressedSmallest
         //if Y <= -Y --> check if mData == mCompressedLargest
         let m_compressed_largest = native.constant(M_COMPRESSED_LARGEST as u32);
         let m_compressed_smallest = native.constant(M_COMPRESSED_SMALLEST as u32);
-        let check_m_data = simple_select(native, is_large, m_compressed_smallest, m_compressed_largest);
+        let check_m_data = simple_select(
+            native,
+            is_large,
+            m_compressed_smallest,
+            m_compressed_largest,
+        );
 
         let check_res = native.sub(m_data, check_m_data);
         let neg_flag = native.is_zero(check_res);
@@ -129,10 +139,9 @@ impl G1 {
     }
 }
 
-
 declare_circuit!(G1UncompressCircuit {
     x: [Variable; 48],
-    y: [[Variable; 48];2],
+    y: [[Variable; 48]; 2],
 });
 
 impl GenericDefine<M31Config> for G1UncompressCircuit<Variable> {
@@ -140,26 +149,27 @@ impl GenericDefine<M31Config> for G1UncompressCircuit<Variable> {
         let mut g1 = G1::new(builder);
         let public_key = g1.uncompressed(builder, &self.x);
         let expected_g1 = G1Affine::from_vars(self.y[0].to_vec(), self.y[1].to_vec());
-        g1.curve_f.assert_isequal(builder, &public_key.x, &expected_g1.x);
-        g1.curve_f.assert_isequal(builder, &public_key.y, &expected_g1.y);
+        g1.curve_f
+            .assert_isequal(builder, &public_key.x, &expected_g1.x);
+        g1.curve_f
+            .assert_isequal(builder, &public_key.y, &expected_g1.y);
         g1.curve_f.check_mul(builder);
         g1.curve_f.table.final_check(builder);
         g1.curve_f.table.final_check(builder);
         g1.curve_f.table.final_check(builder);
-        
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::G1UncompressCircuit;
+    use crate::utils::register_hint;
     use expander_compiler::frontend::*;
+    use extra::debug_eval;
     use num_bigint::BigInt;
     use num_traits::Num;
-    use crate::utils::register_hint;
-    use extra::debug_eval;
     #[test]
-    fn test_uncompress_g1(){
+    fn test_uncompress_g1() {
         let mut hint_registry = HintRegistry::<M31>::new();
         register_hint(&mut hint_registry);
         let mut assignment = G1UncompressCircuit::<M31> {
@@ -167,7 +177,7 @@ mod tests {
             y: [[M31::default(); 48]; 2],
         };
         let x_bigint = BigInt::from_str_radix("a637bd4aefa20593ff82bdf832db2a98ca60c87796bca1d04a5a0206d52b4ede0e906d903360e04b69f8daec631f79fe", 16).unwrap();
-        
+
         let x_bytes = x_bigint.to_bytes_be();
 
         let y_a0_bigint = BigInt::from_str_radix("956996561804650125715590823042978408716123343953697897618645235063950952926609558156980737775438019700668816652798", 10).unwrap();
@@ -176,7 +186,7 @@ mod tests {
         let y_a0_bytes = y_a0_bigint.to_bytes_le();
         let y_a1_bytes = y_a1_bigint.to_bytes_le();
 
-        for i in 0..48{
+        for i in 0..48 {
             assignment.x[i] = M31::from(x_bytes.1[i] as u32);
             assignment.y[0][i] = M31::from(y_a0_bytes.1[i] as u32);
             assignment.y[1][i] = M31::from(y_a1_bytes.1[i] as u32);

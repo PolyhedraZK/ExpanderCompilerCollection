@@ -1,14 +1,14 @@
-use std::str::FromStr;
+use crate::big_int::*;
 use crate::gnark::element::*;
 use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::emulated::field_bls12381::e2::Ext2;
 use crate::gnark::emulated::field_bls12381::e2::GE2;
 use crate::gnark::utils::hash_to_fp_variable;
-use expander_compiler::declare_circuit;
-use expander_compiler::frontend::{Config, RootAPI, Variable, GenericDefine, M31Config};
-use num_bigint::BigInt;
-use crate::big_int::*;
 use crate::utils::simple_select;
+use expander_compiler::declare_circuit;
+use expander_compiler::frontend::{Config, GenericDefine, M31Config, RootAPI, Variable};
+use num_bigint::BigInt;
+use std::str::FromStr;
 
 const M_COMPRESSED_SMALLEST: u8 = 0b100 << 5;
 const M_COMPRESSED_LARGEST: u8 = 0b101 << 5;
@@ -62,7 +62,6 @@ pub struct G2Affine {
     pub p: G2AffP,
     pub lines: LineEvaluations,
 }
-
 
 pub struct G2 {
     pub ext2: Ext2,
@@ -523,12 +522,16 @@ impl G2 {
         //get YSquared
         let ysquared = self.ext2.square(native, &px);
         let ysquared = self.ext2.mul(native, &ysquared, &px);
-        let b_curve_coeff = value_of::<C, B, Bls12381Fp>( native, Box::new(4));
-        let b_twist_curve_coeff = GE2::from_vars(b_curve_coeff.clone().limbs, b_curve_coeff.clone().limbs);
+        let b_curve_coeff = value_of::<C, B, Bls12381Fp>(native, Box::new(4));
+        let b_twist_curve_coeff =
+            GE2::from_vars(b_curve_coeff.clone().limbs, b_curve_coeff.clone().limbs);
         let ysquared = self.ext2.add(native, &ysquared, &b_twist_curve_coeff);
 
         let inputs = vec![ysquared.a0.clone(), ysquared.a1.clone()];
-        let outputs = self.ext2.curve_f.new_hint(native, "myhint.gete2sqrthint", 3, inputs);
+        let outputs = self
+            .ext2
+            .curve_f
+            .new_hint(native, "myhint.gete2sqrthint", 3, inputs);
 
         //is_square should be one
         let is_square = outputs[0].clone();
@@ -541,20 +544,36 @@ impl G2 {
         let y_squared = self.ext2.square(native, &y);
         self.ext2.assert_isequal(native, &y_squared, &ysquared);
 
-
         //if y is lexicographically largest
         let half_fp = BigInt::from_str("4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787").unwrap() / 2;
-        let half_fp_var = value_of::<C, B, Bls12381Fp>( native, Box::new(half_fp));
-        let is_large_a1 = big_less_than(native, Bls12381Fp::bits_per_limb() as usize, Bls12381Fp::nb_limbs() as usize, &half_fp_var.limbs, &y.a1.limbs);
+        let half_fp_var = value_of::<C, B, Bls12381Fp>(native, Box::new(half_fp));
+        let is_large_a1 = big_less_than(
+            native,
+            Bls12381Fp::bits_per_limb() as usize,
+            Bls12381Fp::nb_limbs() as usize,
+            &half_fp_var.limbs,
+            &y.a1.limbs,
+        );
         let is_zero_a1 = self.ext2.curve_f.is_zero(native, &y.a1);
-        let is_large_a0 = big_less_than(native, Bls12381Fp::bits_per_limb() as usize, Bls12381Fp::nb_limbs() as usize, &half_fp_var.limbs, &y.a0.limbs);
+        let is_large_a0 = big_less_than(
+            native,
+            Bls12381Fp::bits_per_limb() as usize,
+            Bls12381Fp::nb_limbs() as usize,
+            &half_fp_var.limbs,
+            &y.a0.limbs,
+        );
         let is_large = simple_select(native, is_zero_a1, is_large_a0, is_large_a1);
 
         //if Y > -Y --> check if mData == mCompressedSmallest
         //if Y <= -Y --> check if mData == mCompressedLargest
         let m_compressed_largest = native.constant(M_COMPRESSED_LARGEST as u32);
         let m_compressed_smallest = native.constant(M_COMPRESSED_SMALLEST as u32);
-        let check_m_data = simple_select(native, is_large, m_compressed_smallest, m_compressed_largest);
+        let check_m_data = simple_select(
+            native,
+            is_large,
+            m_compressed_smallest,
+            m_compressed_largest,
+        );
 
         let check_res = native.sub(m_data, check_m_data);
         let neg_flag = native.is_zero(check_res);
@@ -564,52 +583,52 @@ impl G2 {
         let y = self.ext2.select(native, neg_flag, &neg_y, &y);
 
         //TBD: subgroup check, do we need to do that? Since we are pretty sure that the sig bytes are correct, its unmashalling must be on the right curve?
-        G2AffP{
-                x: px, 
-                y
-            }
+        G2AffP { x: px, y }
     }
 }
 
-
 declare_circuit!(G2UncompressCircuit {
     x: [Variable; 96],
-    y: [[[Variable; 48];2];2],
+    y: [[[Variable; 48]; 2]; 2],
 });
 
 impl GenericDefine<M31Config> for G2UncompressCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g2 = G2::new(builder);
         let g2_res = g2.uncompressed(builder, &self.x);
-        let expected_g2 = G2AffP::from_vars(self.y[0][0].to_vec(), self.y[0][1].to_vec(), self.y[1][0].to_vec(), self.y[1][1].to_vec());
+        let expected_g2 = G2AffP::from_vars(
+            self.y[0][0].to_vec(),
+            self.y[0][1].to_vec(),
+            self.y[1][0].to_vec(),
+            self.y[1][1].to_vec(),
+        );
         g2.ext2.assert_isequal(builder, &g2_res.x, &expected_g2.x);
         g2.ext2.assert_isequal(builder, &g2_res.y, &expected_g2.y);
         g2.ext2.curve_f.check_mul(builder);
         g2.ext2.curve_f.table.final_check(builder);
         g2.ext2.curve_f.table.final_check(builder);
         g2.ext2.curve_f.table.final_check(builder);
-        
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::G2UncompressCircuit;
+    use crate::utils::register_hint;
     use expander_compiler::frontend::*;
+    use extra::debug_eval;
     use num_bigint::BigInt;
     use num_traits::Num;
-    use crate::utils::register_hint;
-    use extra::debug_eval;
     #[test]
-    fn test_uncompress_g2(){
+    fn test_uncompress_g2() {
         let mut hint_registry = HintRegistry::<M31>::new();
         register_hint(&mut hint_registry);
         let mut assignment = G2UncompressCircuit::<M31> {
             x: [M31::default(); 96],
-            y: [[[M31::default(); 48];2];2],
+            y: [[[M31::default(); 48]; 2]; 2],
         };
         let x_bigint = BigInt::from_str_radix("aa79bf02bb1633716de959b5ed8ccf7548e6733d7ca11791f1f5d386afb6cebc7cf0339a791bd9187e5346185ace329402b641d106d783e7fe20e5c1cf5b3416590ad45004a0b396f66178511ce724c3df76c2fae61fb682a3ec2dde1ae5a359", 16).unwrap();
-        
+
         let x_bytes = x_bigint.to_bytes_be();
 
         let y_b0_a0_bigint = BigInt::from_str_radix("417406042303837766676050444382954581819710384023930335899613364000243943316124744931107291428889984115562657456985", 10).unwrap();
@@ -622,9 +641,9 @@ mod tests {
         let y_b0_bytes = y_b1_a0_bigint.to_bytes_le();
         let y_b1_bytes = y_b1_a1_bigint.to_bytes_le();
 
-        for i in 0..48{
+        for i in 0..48 {
             assignment.x[i] = M31::from(x_bytes.1[i] as u32);
-            assignment.x[i+48] = M31::from(x_bytes.1[i+48] as u32);
+            assignment.x[i + 48] = M31::from(x_bytes.1[i + 48] as u32);
             assignment.y[0][0][i] = M31::from(y_a0_bytes.1[i] as u32);
             assignment.y[0][1][i] = M31::from(y_a1_bytes.1[i] as u32);
             assignment.y[1][0][i] = M31::from(y_b0_bytes.1[i] as u32);

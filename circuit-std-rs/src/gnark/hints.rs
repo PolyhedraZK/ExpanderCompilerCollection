@@ -815,10 +815,10 @@ pub fn get_element_sqrt_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), 
                 .collect::<Vec<_>>();
             let a = Fq::from(biguint_inputs[0].clone());
             let (sqrt, is_square) = fq_has_sqrt(&a);
-            let sqrt_bigint =
-                sqrt.to_string()
-                    .parse::<BigInt>()
-                    .expect("Invalid decimal string");
+            let sqrt_bigint = sqrt
+                .to_string()
+                .parse::<BigInt>()
+                .expect("Invalid decimal string");
             vec![BigInt::from(is_square), sqrt_bigint]
         },
     ) {
@@ -842,14 +842,16 @@ pub fn get_e2_sqrt_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error
             let a1 = Fq::from(biguint_inputs[1].clone());
             let a = Fq2::new(a0, a1);
             let (sqrt, is_square) = fq2_has_sqrt(&a);
-            let sqrt0_bigint =
-                sqrt.c0.to_string()
-                    .parse::<BigInt>()
-                    .expect("Invalid decimal string");
-            let sqrt1_bigint =
-                sqrt.c1.to_string()
-                    .parse::<BigInt>()
-                    .expect("Invalid decimal string");
+            let sqrt0_bigint = sqrt
+                .c0
+                .to_string()
+                .parse::<BigInt>()
+                .expect("Invalid decimal string");
+            let sqrt1_bigint = sqrt
+                .c1
+                .to_string()
+                .parse::<BigInt>()
+                .expect("Invalid decimal string");
             vec![BigInt::from(is_square), sqrt0_bigint, sqrt1_bigint]
         },
     ) {
