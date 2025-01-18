@@ -1,7 +1,7 @@
 use crate::utils::{ensure_directory_exists, read_from_json_file};
 use ark_std::primitive::u8;
 use circuit_std_rs::big_int::big_array_add;
-use circuit_std_rs::sha2_m31::check_sha256;
+use circuit_std_rs::sha2_m31::check_sha256_37bytes;
 use circuit_std_rs::utils::register_hint;
 use expander_compiler::circuit::ir::hint_normalized::witness_solver;
 use expander_compiler::frontend::extra::*;
@@ -59,7 +59,7 @@ impl GenericDefine<M31Config> for HASHTABLECircuit<Variable> {
             cur_input.extend_from_slice(index);
             let mut data = cur_input;
             data.append(&mut self.output[i].to_vec());
-            check_sha256(builder, &data);
+            check_sha256_37bytes(builder, &data);
         }
     }
 }
@@ -82,23 +82,6 @@ pub fn generate_hash_witnesses(dir: &str) {
             .unwrap();
         compile_result.witness_solver
     };
-    // let w_s: witness_solver::WitnessSolver<M31Config>;
-    // if std::fs::metadata("hashtable.witness").is_ok() {
-    //     println!("The solver exists!");
-    //     w_s = witness_solver::WitnessSolver::deserialize_from(
-    //         std::fs::File::open("hashtable.witness").unwrap(),
-    //     )
-    //     .unwrap();
-    // } else {
-    //     println!("The solver does not exist.");
-    //     let compile_result =
-    //         compile_generic(&HASHTABLECircuit::default(), CompileOptions::default()).unwrap();
-    //     compile_result
-    //         .witness_solver
-    //         .serialize_into(std::fs::File::create("hashtable.witness").unwrap())
-    //         .unwrap();
-    //     w_s = compile_result.witness_solver;
-    // }
     let witness_solver = Arc::new(w_s);
 
     println!("generating witnesses...");
