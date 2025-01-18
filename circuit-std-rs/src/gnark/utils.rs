@@ -1,3 +1,4 @@
+use ark_bls12_381::Fq;
 use ark_ff::Field;
 use num_bigint::BigInt;
 
@@ -63,7 +64,13 @@ pub fn get_sign(x: &Fq2) -> bool {
     let sgn1 = !(x_a1 % 2u32).is_zero();
     sgn0 | (z & sgn1)
 }
-pub fn has_sqrt(x: &Fq2) -> (Fq2, bool) {
+pub fn fq_has_sqrt(x: &Fq) -> (Fq, bool) {
+    match x.sqrt() {
+        Some(sqrt_x) => (sqrt_x, true),
+        None => (*x, false),
+    }
+}
+pub fn fq2_has_sqrt(x: &Fq2) -> (Fq2, bool) {
     match x.sqrt() {
         Some(sqrt_x) => (sqrt_x, true),
         None => (*x, false),

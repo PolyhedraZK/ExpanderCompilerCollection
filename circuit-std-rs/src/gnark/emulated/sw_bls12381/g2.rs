@@ -1,12 +1,18 @@
 use std::str::FromStr;
-
 use crate::gnark::element::*;
 use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::emulated::field_bls12381::e2::Ext2;
 use crate::gnark::emulated::field_bls12381::e2::GE2;
 use crate::gnark::utils::hash_to_fp_variable;
-use expander_compiler::frontend::{Config, RootAPI, Variable};
+use expander_compiler::declare_circuit;
+use expander_compiler::frontend::{Config, RootAPI, Variable, GenericDefine, M31Config};
 use num_bigint::BigInt;
+use crate::big_int::*;
+use crate::utils::simple_select;
+
+const M_COMPRESSED_SMALLEST: u8 = 0b100 << 5;
+const M_COMPRESSED_LARGEST: u8 = 0b101 << 5;
+
 #[derive(Default, Clone)]
 pub struct G2AffP {
     pub x: GE2,
@@ -29,6 +35,34 @@ impl G2AffP {
         }
     }
 }
+
+#[derive(Default)]
+pub struct LineEvaluation {
+    pub r0: GE2,
+    pub r1: GE2,
+}
+
+type LineEvaluationArray = [[Option<Box<LineEvaluation>>; 63]; 2];
+
+pub struct LineEvaluations(pub LineEvaluationArray);
+
+impl Default for LineEvaluations {
+    fn default() -> Self {
+        LineEvaluations([[None; 63]; 2].map(|row: [Option<Bls12381Fp>; 63]| row.map(|_| None)))
+    }
+}
+impl LineEvaluations {
+    pub fn is_empty(&self) -> bool {
+        self.0
+            .iter()
+            .all(|row| row.iter().all(|cell| cell.is_none()))
+    }
+}
+pub struct G2Affine {
+    pub p: G2AffP,
+    pub lines: LineEvaluations,
+}
+
 
 pub struct G2 {
     pub ext2: Ext2,
@@ -255,7 +289,7 @@ impl G2 {
         let output = self
             .ext2
             .curve_f
-            .new_hint(native, "myhint.getsqrtx0x1new", 3, inputs);
+            .new_hint(native, "myhint.getsqrtx0x1newhint", 3, inputs);
         let is_square = self.ext2.curve_f.is_zero(native, &output[0]); // is_square = 0 if g_x0 has not square root, 1 otherwise
         let y = GE2 {
             a0: output[1].my_clone(),
@@ -469,30 +503,134 @@ impl G2 {
         };
         (x0_e2, x1_e2)
     }
-}
-#[derive(Default)]
-pub struct LineEvaluation {
-    pub r0: GE2,
-    pub r1: GE2,
-}
 
-type LineEvaluationArray = [[Option<Box<LineEvaluation>>; 63]; 2];
+    pub fn uncompressed<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        bytes: &[Variable],
+    ) -> G2AffP {
+        let mut buf_x = bytes.to_vec();
+        let buf0 = to_binary(native, buf_x[0], 8);
+        let pad = vec![native.constant(0); 5];
+        let m_data = from_binary(native, [pad, buf0[5..].to_vec()].concat()); //buf0 & mMask
+        let buf0_and_non_mask = from_binary(native, buf0[..5].to_vec()); //buf0 & ^mMask
+        buf_x[0] = buf0_and_non_mask;
 
-pub struct LineEvaluations(pub LineEvaluationArray);
+        //get p.x
+        let rev_buf = buf_x.iter().rev().cloned().collect::<Vec<_>>();
+        let px = GE2::from_vars(rev_buf[0..48].to_vec(), rev_buf[48..].to_vec());
 
-impl Default for LineEvaluations {
-    fn default() -> Self {
-        LineEvaluations([[None; 63]; 2].map(|row: [Option<Bls12381Fp>; 63]| row.map(|_| None)))
+        //get YSquared
+        let ysquared = self.ext2.square(native, &px);
+        let ysquared = self.ext2.mul(native, &ysquared, &px);
+        let b_curve_coeff = value_of::<C, B, Bls12381Fp>( native, Box::new(4));
+        let b_twist_curve_coeff = GE2::from_vars(b_curve_coeff.clone().limbs, b_curve_coeff.clone().limbs);
+        let ysquared = self.ext2.add(native, &ysquared, &b_twist_curve_coeff);
+
+        let inputs = vec![ysquared.a0.clone(), ysquared.a1.clone()];
+        let outputs = self.ext2.curve_f.new_hint(native, "myhint.gete2sqrthint", 3, inputs);
+
+        //is_square should be one
+        let is_square = outputs[0].clone();
+        let one = self.ext2.curve_f.one_const.clone();
+        self.ext2.curve_f.assert_isequal(native, &is_square, &one);
+
+        //get Y
+        let y = GE2::from_vars(outputs[1].clone().limbs, outputs[2].clone().limbs);
+        //y^2 = ysquared
+        let y_squared = self.ext2.square(native, &y);
+        self.ext2.assert_isequal(native, &y_squared, &ysquared);
+
+
+        //if y is lexicographically largest
+        let half_fp = BigInt::from_str("4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787").unwrap() / 2;
+        let half_fp_var = value_of::<C, B, Bls12381Fp>( native, Box::new(half_fp));
+        let is_large_a1 = big_less_than(native, Bls12381Fp::bits_per_limb() as usize, Bls12381Fp::nb_limbs() as usize, &half_fp_var.limbs, &y.a1.limbs);
+        let is_zero_a1 = self.ext2.curve_f.is_zero(native, &y.a1);
+        let is_large_a0 = big_less_than(native, Bls12381Fp::bits_per_limb() as usize, Bls12381Fp::nb_limbs() as usize, &half_fp_var.limbs, &y.a0.limbs);
+        let is_large = simple_select(native, is_zero_a1, is_large_a0, is_large_a1);
+
+        //if Y > -Y --> check if mData == mCompressedSmallest
+        //if Y <= -Y --> check if mData == mCompressedLargest
+        let m_compressed_largest = native.constant(M_COMPRESSED_LARGEST as u32);
+        let m_compressed_smallest = native.constant(M_COMPRESSED_SMALLEST as u32);
+        let check_m_data = simple_select(native, is_large, m_compressed_smallest, m_compressed_largest);
+
+        let check_res = native.sub(m_data, check_m_data);
+        let neg_flag = native.is_zero(check_res);
+
+        let neg_y = self.ext2.neg(native, &y);
+
+        let y = self.ext2.select(native, neg_flag, &neg_y, &y);
+
+        //TBD: subgroup check, do we need to do that? Since we are pretty sure that the sig bytes are correct, its unmashalling must be on the right curve?
+        G2AffP{
+                x: px, 
+                y
+            }
     }
 }
-impl LineEvaluations {
-    pub fn is_empty(&self) -> bool {
-        self.0
-            .iter()
-            .all(|row| row.iter().all(|cell| cell.is_none()))
+
+
+declare_circuit!(G2UncompressCircuit {
+    x: [Variable; 96],
+    y: [[[Variable; 48];2];2],
+});
+
+impl GenericDefine<M31Config> for G2UncompressCircuit<Variable> {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
+        let mut g2 = G2::new(builder);
+        let g2_res = g2.uncompressed(builder, &self.x);
+        let expected_g2 = G2AffP::from_vars(self.y[0][0].to_vec(), self.y[0][1].to_vec(), self.y[1][0].to_vec(), self.y[1][1].to_vec());
+        g2.ext2.assert_isequal(builder, &g2_res.x, &expected_g2.x);
+        g2.ext2.assert_isequal(builder, &g2_res.y, &expected_g2.y);
+        g2.ext2.curve_f.check_mul(builder);
+        g2.ext2.curve_f.table.final_check(builder);
+        g2.ext2.curve_f.table.final_check(builder);
+        g2.ext2.curve_f.table.final_check(builder);
+        
     }
 }
-pub struct G2Affine {
-    pub p: G2AffP,
-    pub lines: LineEvaluations,
+
+#[cfg(test)]
+mod tests {
+    use super::G2UncompressCircuit;
+    use expander_compiler::frontend::*;
+    use num_bigint::BigInt;
+    use num_traits::Num;
+    use crate::utils::register_hint;
+    use extra::debug_eval;
+    #[test]
+    fn test_uncompress_g2(){
+        let mut hint_registry = HintRegistry::<M31>::new();
+        register_hint(&mut hint_registry);
+        let mut assignment = G2UncompressCircuit::<M31> {
+            x: [M31::default(); 96],
+            y: [[[M31::default(); 48];2];2],
+        };
+        let x_bigint = BigInt::from_str_radix("aa79bf02bb1633716de959b5ed8ccf7548e6733d7ca11791f1f5d386afb6cebc7cf0339a791bd9187e5346185ace329402b641d106d783e7fe20e5c1cf5b3416590ad45004a0b396f66178511ce724c3df76c2fae61fb682a3ec2dde1ae5a359", 16).unwrap();
+        
+        let x_bytes = x_bigint.to_bytes_be();
+
+        let y_b0_a0_bigint = BigInt::from_str_radix("417406042303837766676050444382954581819710384023930335899613364000243943316124744931107291428889984115562657456985", 10).unwrap();
+        let y_b0_a1_bigint = BigInt::from_str_radix("1612337918776384379710682981548399375489832112491603419994252758241488024847803823620674751718035900645102653944468", 10).unwrap();
+        let y_b1_a0_bigint = BigInt::from_str_radix("2138372746384454686692156684769748785619173944336480358459807585988147682623523096063056865298570471165754367761702", 10).unwrap();
+        let y_b1_a1_bigint = BigInt::from_str_radix("2515621099638397509480666850964364949449167540660259026336903510150090825582288208580180650995842554224706524936338", 10).unwrap();
+
+        let y_a0_bytes = y_b0_a0_bigint.to_bytes_le();
+        let y_a1_bytes = y_b0_a1_bigint.to_bytes_le();
+        let y_b0_bytes = y_b1_a0_bigint.to_bytes_le();
+        let y_b1_bytes = y_b1_a1_bigint.to_bytes_le();
+
+        for i in 0..48{
+            assignment.x[i] = M31::from(x_bytes.1[i] as u32);
+            assignment.x[i+48] = M31::from(x_bytes.1[i+48] as u32);
+            assignment.y[0][0][i] = M31::from(y_a0_bytes.1[i] as u32);
+            assignment.y[0][1][i] = M31::from(y_a1_bytes.1[i] as u32);
+            assignment.y[1][0][i] = M31::from(y_b0_bytes.1[i] as u32);
+            assignment.y[1][1][i] = M31::from(y_b1_bytes.1[i] as u32);
+        }
+
+        debug_eval(&G2UncompressCircuit::default(), &assignment, hint_registry);
+    }
 }

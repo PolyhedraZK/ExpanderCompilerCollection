@@ -801,6 +801,62 @@ pub fn copy_e2_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     }
     Ok(())
 }
+pub fn get_element_sqrt_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+    if let Err(err) = unwrap_hint(
+        true,
+        true,
+        inputs,
+        outputs,
+        //getElementSqrtHint
+        |inputs| {
+            let biguint_inputs = inputs
+                .iter()
+                .map(|x| x.to_biguint().unwrap())
+                .collect::<Vec<_>>();
+            let a = Fq::from(biguint_inputs[0].clone());
+            let (sqrt, is_square) = fq_has_sqrt(&a);
+            let sqrt_bigint =
+                sqrt.to_string()
+                    .parse::<BigInt>()
+                    .expect("Invalid decimal string");
+            vec![BigInt::from(is_square), sqrt_bigint]
+        },
+    ) {
+        panic!("getElementSqrtHint: {}", err);
+    }
+    Ok(())
+}
+pub fn get_e2_sqrt_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+    if let Err(err) = unwrap_hint(
+        true,
+        true,
+        inputs,
+        outputs,
+        //getElementSqrtHint
+        |inputs| {
+            let biguint_inputs = inputs
+                .iter()
+                .map(|x| x.to_biguint().unwrap())
+                .collect::<Vec<_>>();
+            let a0 = Fq::from(biguint_inputs[0].clone());
+            let a1 = Fq::from(biguint_inputs[1].clone());
+            let a = Fq2::new(a0, a1);
+            let (sqrt, is_square) = fq2_has_sqrt(&a);
+            let sqrt0_bigint =
+                sqrt.c0.to_string()
+                    .parse::<BigInt>()
+                    .expect("Invalid decimal string");
+            let sqrt1_bigint =
+                sqrt.c1.to_string()
+                    .parse::<BigInt>()
+                    .expect("Invalid decimal string");
+            vec![BigInt::from(is_square), sqrt0_bigint, sqrt1_bigint]
+        },
+    ) {
+        panic!("getElementSqrtHint: {}", err);
+    }
+    Ok(())
+}
 pub fn get_sqrt_x0x1_new_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     if let Err(err) = unwrap_hint(
         true,
@@ -825,8 +881,8 @@ pub fn get_sqrt_x0x1_new_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(),
             let g_x1 = Fq2::new(Fq::from(g_x1_a0), Fq::from(g_x1_a1));
             let t = Fq2::new(Fq::from(t_a0), Fq::from(t_a1));
             let sgn_t = get_sign(&t);
-            let (g_x0_sqrt, is_square0) = has_sqrt(&g_x0);
-            let (g_x1_sqrt, is_square1) = has_sqrt(&g_x1);
+            let (g_x0_sqrt, is_square0) = fq2_has_sqrt(&g_x0);
+            let (g_x1_sqrt, is_square1) = fq2_has_sqrt(&g_x1);
             let mut y;
             if is_square0 {
                 y = g_x0_sqrt;
