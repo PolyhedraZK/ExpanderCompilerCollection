@@ -222,7 +222,7 @@ pub fn generate_pairing_witnesses(dir: &str) {
 
 //     declare_circuit!(VerifySigCircuit {
 //         pubkey: [[Variable; 48]; 2],
-//         slot: [Variable; 8], 
+//         slot: [Variable; 8],
 //         committee_index: [Variable; 8],
 //         beacon_block_root: [[Variable; 8]; 32],
 //         source_epoch: [Variable; 8],
@@ -273,7 +273,7 @@ pub fn generate_pairing_witnesses(dir: &str) {
 
 //     #[test]
 //     fn test_pairing_circuit() {
-        
+
 //         /*
 //         att 0
 //         att.Data.Slot 9280000

@@ -202,7 +202,7 @@ pub fn generate_permutation_hashes_witness(dir: &str) {
                 .unwrap();
             compile_result.witness_solver
         };
-        
+
         let witness_solver = Arc::new(w_s);
 
         println!("Start generating permutationhash witnesses...");
