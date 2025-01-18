@@ -1,3 +1,4 @@
+use ark_ff::Field;
 use num_bigint::BigInt;
 
 use crate::gnark::element::*;
@@ -6,6 +7,8 @@ use crate::gnark::emulated::field_bls12381::e2::GE2;
 use crate::gnark::limbs::decompose;
 use crate::gnark::limbs::recompose;
 use expander_compiler::frontend::*;
+use ark_ff::Zero;
+use ark_bls12_381::Fq2;
 
 pub fn nb_multiplication_res_limbs(len_left: usize, len_right: usize) -> usize {
     let res = len_left + len_right - 1;
@@ -43,6 +46,28 @@ pub fn sub_padding(
     new_pad
 }
 
+pub fn get_sign(x: &Fq2) -> bool {
+    let x_a0 = x.c0.to_string()
+    .parse::<BigInt>()
+    .expect("Invalid decimal string");
+    let x_a1 = x.c1.to_string()
+    .parse::<BigInt>()
+    .expect("Invalid decimal string");
+    let z = x_a0.is_zero();
+    let sgn0 = !(x_a0 % 2u32).is_zero();
+    let sgn1 = !(x_a1 % 2u32).is_zero();
+    sgn0 | (z & sgn1)
+}
+pub fn has_sqrt(x: &Fq2) -> (Fq2, bool) {
+    match x.sqrt() {
+        Some(sqrt_x) => {
+            (sqrt_x, true)
+        }
+        None => {
+            (x.clone(), false)
+        }
+    }
+} 
 pub fn print_e2<C: Config, B: RootAPI<C>>(native: &mut B, v: &GE2) {
     for i in 0..48 {
         println!(

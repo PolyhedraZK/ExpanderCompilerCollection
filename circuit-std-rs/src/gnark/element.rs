@@ -75,6 +75,10 @@ pub fn new_const_element<C: Config, B: RootAPI<C>, T: FieldParams>(
     let fp = T::modulus();
     // convert to big.Int
     let mut b_value = from_interface(v);
+    //if neg, add modulus
+    if b_value < BigInt::from(0) {
+        b_value += &fp;
+    }
     // mod reduce
     if fp.cmp(&b_value) != Ordering::Equal {
         b_value %= fp;
@@ -105,7 +109,6 @@ pub fn copy<T: FieldParams>(e: &Element<T>) -> Element<T> {
 }
 pub fn from_interface(input: Box<dyn Any>) -> BigInt {
     let r;
-
     if let Some(v) = input.downcast_ref::<BigInt>() {
         r = v.clone();
     } else if let Some(v) = input.downcast_ref::<u8>() {
@@ -137,6 +140,5 @@ pub fn from_interface(input: Box<dyn Any>) -> BigInt {
     } else {
         panic!("value to BigInt not supported");
     }
-
     r
 }

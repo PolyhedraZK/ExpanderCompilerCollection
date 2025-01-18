@@ -1,3 +1,4 @@
+use crate::big_int::to_binary;
 use crate::gnark::element::*;
 use crate::gnark::emparam::FieldParams;
 use crate::gnark::utils::*;
@@ -119,6 +120,14 @@ impl<T: FieldParams> GField<T> {
             res0 = native.is_zero(limb_sum);
         }
         res0
+    }
+    pub fn get_element_sign<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        x: &Element<T>,
+    ) -> Variable {
+        let bit = to_binary(native, x.limbs[0], 30)[0];
+        bit
     }
     pub fn select<C: Config, B: RootAPI<C>>(
         &mut self,

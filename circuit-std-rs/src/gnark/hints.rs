@@ -801,6 +801,63 @@ pub fn copy_e2_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     }
     Ok(())
 }
+pub fn get_sqrt_x0x1_new_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+    if let Err(err) = unwrap_hint(
+        true,
+        true,
+        inputs,
+        outputs,
+        //divE12Hint
+        |inputs| {
+            let biguint_inputs = inputs
+                .iter()
+                .map(|x| x.to_biguint().unwrap())
+                .collect::<Vec<_>>();
+    
+            let g_x0_a0 = Fq::from(biguint_inputs[0].clone());
+            let g_x0_a1 = Fq::from(biguint_inputs[1].clone());
+            let g_x1_a0 = Fq::from(biguint_inputs[2].clone());
+            let g_x1_a1 = Fq::from(biguint_inputs[3].clone());
+            let t_a0 = Fq::from(biguint_inputs[4].clone());
+            let t_a1 = Fq::from(biguint_inputs[5].clone());
+
+            let g_x0 = Fq2::new(
+                Fq::from(g_x0_a0.clone()),
+                Fq::from(g_x0_a1.clone()),
+            );
+            let g_x1 = Fq2::new(
+                Fq::from(g_x1_a0.clone()),
+                Fq::from(g_x1_a1.clone()),
+            );
+            let t = Fq2::new(
+                Fq::from(t_a0.clone()),
+                Fq::from(t_a1.clone()),
+            );
+            let sgn_t = get_sign(&t);
+            let (g_x0_sqrt, is_square0) = has_sqrt(&g_x0);
+            let (g_x1_sqrt, is_square1) = has_sqrt(&g_x1);
+            let mut y;
+            if is_square0 {
+                y = g_x0_sqrt;
+            } else if is_square1 {
+                y = g_x1_sqrt;
+            } else {
+                panic!("At least one should be square");
+            }
+            let sgn_y = get_sign(&y);
+            if sgn_y != sgn_t {
+                y.c0 = -y.c0;
+                y.c1 = -y.c1;
+            }
+            let y0_c0_bigint = y.c0.to_string().parse::<BigInt>().expect("Invalid decimal string");
+            let y0_c1_bigint = y.c1.to_string().parse::<BigInt>().expect("Invalid decimal string");
+            vec![BigInt::from(is_square0), y0_c0_bigint, y0_c1_bigint]
+            },
+        ) {
+            panic!("divE2Hint: {}", err);
+        }
+        Ok(())
+}
 pub fn copy_e12_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     if let Err(err) = unwrap_hint(
         true,

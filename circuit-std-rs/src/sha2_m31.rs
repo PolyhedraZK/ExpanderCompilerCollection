@@ -116,9 +116,6 @@ impl MyDigest {
         self.len += CHUNK as u64;
         let tmp_h = self.h;
         self.h = self.block(api, tmp_h, p);
-		for i in 0..8 {
-			println!("h[{}]: {:?} {:?}", i, api.value_of(self.h[i][0]),  api.value_of(self.h[i][1]));
-		}
     }
     fn return_sum<C: Config, B: RootAPI<C>>(&mut self, api: &mut B) -> [Variable; SHA256LEN] {
         let mut digest = [api.constant(0); SHA256LEN];
