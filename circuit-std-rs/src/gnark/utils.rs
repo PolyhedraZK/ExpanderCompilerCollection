@@ -1,11 +1,14 @@
 use ark_ff::Field;
 use num_bigint::BigInt;
 
+use crate::big_int::from_binary;
+use crate::big_int::to_binary;
 use crate::gnark::element::*;
 use crate::gnark::emparam::FieldParams;
 use crate::gnark::emulated::field_bls12381::e2::GE2;
 use crate::gnark::limbs::decompose;
 use crate::gnark::limbs::recompose;
+use crate::sha2_m31::sha256_var_bytes;
 use expander_compiler::frontend::*;
 use ark_ff::Zero;
 use ark_bls12_381::Fq2;
@@ -68,6 +71,91 @@ pub fn has_sqrt(x: &Fq2) -> (Fq2, bool) {
         }
     }
 } 
+pub fn xor_variable<C: Config, B: RootAPI<C>>(
+    api: &mut B,
+    nbits: usize,
+    a: Variable,
+    b: Variable,
+) -> Variable {
+    let bits_a = to_binary(api, a, nbits);
+    let bits_b = to_binary(api, b, nbits);
+    let mut bits_res = vec![Variable::default(); nbits];
+    for i in 0..nbits {
+        bits_res[i] = api.xor(bits_a[i], bits_b[i]);
+    }
+    from_binary(api, bits_res)
+}
+pub fn expand_msg_xmd_variable<C: Config, B: RootAPI<C>>(
+    api: &mut B,
+    msg: Vec<Variable>,
+    dst: Vec<Variable>,
+    len_in_bytes: usize,
+) -> Vec<Variable> {
+    let ell = (len_in_bytes + 31) / 32;
+    if ell > 255 {
+        panic!("invalid lenInBytes");
+    }
+    if dst.len() > 255 {
+        panic!("invalid domain size (>255 bytes)");
+    }
+    let size_domain = dst.len() as u8;
+    let mut block_v = vec![Variable::default(); 64];
+    for i in 0..block_v.len() {
+        block_v[i] = api.constant(0);
+    }
+    let mut input = Vec::new();
+    input.extend_from_slice(&block_v);
+    input.extend_from_slice(&msg);
+    input.push(api.constant((len_in_bytes >> 8) as u32));
+    input.push(api.constant(len_in_bytes as u32));
+    input.push(api.constant(0));
+    input.extend_from_slice(&dst);
+    input.push(api.constant(size_domain as u32));
+    let b0 = sha256_var_bytes(api, &input);
+    input.clear();
+    input.extend_from_slice(&b0);
+    input.push(api.constant(1));
+    input.extend_from_slice(&dst);
+    input.push(api.constant(size_domain as u32));
+    let mut b1 = sha256_var_bytes(api, &input);
+    let mut res = b1.clone();
+    for i in 2..=ell {
+        let mut strxor = vec![Variable::default(); 32];
+        for j in 0..32 {
+            strxor[j] = xor_variable(api, 8, b0[j], b1[j]);
+        }
+        input.clear();
+        input.extend_from_slice(&strxor);
+        input.push(api.constant(i as u32));
+        input.extend_from_slice(&dst);
+        input.push(api.constant(size_domain as u32));
+        b1 = sha256_var_bytes(api, &input);
+        res.extend_from_slice(&b1);
+    }
+    res
+}
+
+pub fn hash_to_fp_variable<C: Config, B: RootAPI<C>>(
+    api: &mut B,
+    msg: Vec<Variable>,
+    dst: Vec<Variable>,
+    count: usize,
+) -> Vec<Vec<Variable>> {
+    const FP_BITS: usize = 381;
+    let bytes = 1 + (FP_BITS - 1) / 8;
+    let l = 16 + bytes;
+    let len_in_bytes = count * l;
+    let pseudo_random_bytes = expand_msg_xmd_variable(api, msg, dst, len_in_bytes);
+    let mut elems = vec![vec![Variable::default(); l]; count];
+    for i in 0..count {
+        for j in 0..l {
+            elems[i][j] = pseudo_random_bytes[i * l + j];
+        }
+    }
+    elems
+}
+
+
 pub fn print_e2<C: Config, B: RootAPI<C>>(native: &mut B, v: &GE2) {
     for i in 0..48 {
         println!(

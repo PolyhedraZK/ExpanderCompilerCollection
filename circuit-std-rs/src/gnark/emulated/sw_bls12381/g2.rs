@@ -5,7 +5,8 @@ use crate::gnark::field::*;
 use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::emulated::field_bls12381::e2::Ext2;
 use crate::gnark::emulated::field_bls12381::e2::GE2;
-use crate::gnark::utils::print_e2;
+use crate::gnark::utils::hash_to_fp_variable;
+use crate::gnark::utils::*;
 use expander_compiler::declare_circuit;
 use expander_compiler::frontend::{Config, Variable, RootAPI};
 use num_bigint::BigInt;
@@ -191,10 +192,10 @@ impl G2 {
 
         self.g2_add(native, &res, &t_double_mul)
     }
-    pub fn map_to_g2<C: Config, B: RootAPI<C>>(
+    pub fn map_to_curve2<C: Config, B: RootAPI<C>>(
         &mut self,
         native: &mut B,
-        in0: GE2,
+        in0: &GE2,
     ) -> G2AffP {
         let a = GE2::from_vars(value_of::<C, B, Bls12381Fp>(native, Box::new(0)).limbs, value_of::<C, B, Bls12381Fp>(native, Box::new(240)).limbs);
         let b = GE2::from_vars(value_of::<C, B, Bls12381Fp>(native, Box::new(1012)).limbs, value_of::<C, B, Bls12381Fp>(native, Box::new(1012)).limbs);
@@ -388,7 +389,75 @@ impl G2 {
         p.y = self.ext2.mul(native, &p.y, &den[1]);
         p
     }
+    pub fn map_to_g2<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        in0: &GE2,
+        in1: &GE2,
+    ) -> G2AffP {
+        let out0 = self.map_to_curve2(native, in0);
+        let out1 = self.map_to_curve2(native, in1);
+        let out = self.g2_add(native, &out0, &out1);
+        let new_out = self.g2_isogeny(native, &out);
+        self.clear_cofactor(native, &new_out)
+    }
+    pub fn hash_to_fp<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        msg: Vec<Variable>,
+    ) -> (GE2, GE2) {
+        let signature_dst: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_";
+        let mut dst = vec![];
+        for c in signature_dst {
+            dst.push(native.constant(*c as u32));
+        }
+        let hm = hash_to_fp_variable(native, msg, dst, 2*2);
+        let mut x0 = GE2::from_vars(vec![], vec![]);
+        let mut x1 = GE2::from_vars(vec![], vec![]);
+        for i in 0..48 {
+            x0.a0.limbs.push(hm[0][47-i]);
+            x0.a1.limbs.push(hm[1][47-i]);
+            x1.a0.limbs.push(hm[2][47-i]);
+            x1.a1.limbs.push(hm[3][47-i]);
+        }
+        let shift = value_of::<C, B, Bls12381Fp>(native, Box::new("340282366920938463463374607431768211456".to_string()));
+        let mut x0_a0_element = new_internal_element::<Bls12381Fp>(x0.a0.limbs, 0);
+        let mut x0_a1_element = new_internal_element::<Bls12381Fp>(x0.a1.limbs, 0);
+        let mut x1_a0_element = new_internal_element::<Bls12381Fp>(x1.a0.limbs, 0);
+        let mut x1_a1_element = new_internal_element::<Bls12381Fp>(x1.a1.limbs, 0);
+        let x0_a0 = self.ext2.curve_f.mul(native, &x0_a0_element, &shift);
+        let x0_a1 = self.ext2.curve_f.mul(native, &x0_a1_element, &shift);
+        let x1_a0 = self.ext2.curve_f.mul(native, &x1_a0_element, &shift);
+        let x1_a1 = self.ext2.curve_f.mul(native, &x1_a1_element, &shift);
+        for i in 0..48 {
+            if i < 16 {
+                x0_a0_element.limbs[i] = hm[0][63-i];
+                x0_a1_element.limbs[i] = hm[1][63-i];
+                x1_a0_element.limbs[i] = hm[2][63-i];
+                x1_a1_element.limbs[i] = hm[3][63-i];
+            } else {
+                x0_a0_element.limbs[i] = native.constant(0);
+                x0_a1_element.limbs[i] = native.constant(0);
+                x1_a0_element.limbs[i] = native.constant(0);
+                x1_a1_element.limbs[i] = native.constant(0);
+            }
+        }
 
+        let x0_a0: Element<Bls12381Fp> = self.ext2.curve_f.add(native, &x0_a0_element, &x0_a0);
+        let x0_a1 = self.ext2.curve_f.add(native, &x0_a1_element, &x0_a1);
+        let x1_a0 = self.ext2.curve_f.add(native, &x1_a0_element, &x1_a0);
+        let x1_a1 = self.ext2.curve_f.add(native, &x1_a1_element, &x1_a1);
+
+        let x0_e2 = GE2{
+            a0: x0_a0,
+            a1: x0_a1,
+        };
+        let x1_e2 = GE2{
+            a0: x1_a0,
+            a1: x1_a1,
+        };
+        (x0_e2, x1_e2)
+    }
 }
 #[derive(Default)]
 pub struct LineEvaluation {
