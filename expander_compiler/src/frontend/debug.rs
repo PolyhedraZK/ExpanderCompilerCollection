@@ -24,6 +24,11 @@ pub struct DebugBuilder<C: Config, H: HintCaller<C::CircuitField>> {
 }
 
 impl<C: Config, H: HintCaller<C::CircuitField>> BasicAPI<C> for DebugBuilder<C, H> {
+    fn display(&self, str: &str, x: impl ToVariableOrValue<<C as Config>::CircuitField>) {
+        let x = self.convert_to_value(x);
+        println!("{}: {:?}", str, x);
+    }
+
     fn add(
         &mut self,
         x: impl ToVariableOrValue<C::CircuitField>,
@@ -394,12 +399,6 @@ impl<C: Config, H: HintCaller<C::CircuitField>> UnconstrainedAPI<C> for DebugBui
             y,
             op: UnconstrainedBinOpType::BitXor,
         })
-    }
-}
-
-impl<C: Config, H: HintCaller<C::CircuitField>> DebugAPI<C> for DebugBuilder<C, H> {
-    fn value_of(&self, x: impl ToVariableOrValue<C::CircuitField>) -> C::CircuitField {
-        self.convert_to_value(x)
     }
 }
 

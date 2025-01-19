@@ -19,6 +19,8 @@ pub trait BasicAPI<C: Config> {
     binary_op!(xor);
     binary_op!(or);
     binary_op!(and);
+
+    fn display(&self, _label: &str, _x: impl ToVariableOrValue<C::CircuitField>) {}
     fn div(
         &mut self,
         x: impl ToVariableOrValue<C::CircuitField>,
@@ -88,15 +90,7 @@ pub trait UnconstrainedAPI<C: Config> {
     binary_op!(unconstrained_bit_xor);
 }
 
-// DebugAPI is used for debugging purposes
-// Only DebugBuilder will implement functions in this trait, other builders will panic
-pub trait DebugAPI<C: Config> {
-    fn value_of(&self, x: impl ToVariableOrValue<C::CircuitField>) -> C::CircuitField;
-}
-
-pub trait RootAPI<C: Config>:
-    Sized + BasicAPI<C> + UnconstrainedAPI<C> + DebugAPI<C> + 'static
-{
+pub trait RootAPI<C: Config>: Sized + BasicAPI<C> + UnconstrainedAPI<C> + 'static {
     fn memorized_simple_call<F: Fn(&mut Self, &Vec<Variable>) -> Vec<Variable> + 'static>(
         &mut self,
         f: F,
