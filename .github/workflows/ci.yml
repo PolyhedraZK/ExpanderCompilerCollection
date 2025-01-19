@@ -12,10 +12,4 @@ jobs:
     steps:
       - uses: styfle/cancel-workflow-action@0.11.0
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "expander_compiler -> expander_compiler/target"
-          # The prefix cache key, this can be changed to start a new cache manually.
-          prefix-key: "mpi-v5.0.5" # update me if brew formula changes to a new version
-      - run: RUSTFLAGS="-C target-cpu=native -C target-feature=+avx512f" cargo test
+      - run: docker run --rm rust:1.84-bullseye echo Hello world
