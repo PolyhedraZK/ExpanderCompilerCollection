@@ -83,13 +83,9 @@ jobs:
     steps:
       - uses: styfle/cancel-workflow-action@0.11.0
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: "expander_compiler -> expander_compiler/target"
-          # The prefix cache key, this can be changed to start a new cache manually.
-          prefix-key: "mpi-v5.0.5" # update me if brew formula changes to a new version
-      - run: RUSTFLAGS="-C target-cpu=native -C target-feature=+avx512f" cargo test
+          path: ecc2 # due to misoperation, the original path is occupied by other files
+      - run: sudo docker run --rm -v .:/tmp/ecc2:ro rust:1.82-bullseye /tmp/ecc2/ecc2/.github/workflows/docker-test.sh test-rust-avx512
 
   test-go:
     runs-on: ${{ matrix.os }}
