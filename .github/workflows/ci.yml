@@ -13,6 +13,5 @@ jobs:
       - uses: styfle/cancel-workflow-action@0.11.0
       - uses: actions/checkout@v4
         with:
-          path: ecc2
-      - run: pwd
-      #- run: sudo docker run --rm -v .:/tmp/ecc rust:1.84-bullseye /tmp/ecc/.github/workflows/docker-scripts/test-rust-avx512.sh
+          path: ecc2 # due to misoperation, the original path is occupied by other files
+      - run: sudo docker run --rm -v ecc2:/tmp/ecc2:ro rust:1.84-bullseye /tmp/ecc/.github/workflows/docker-scripts/test-rust-avx512.sh
