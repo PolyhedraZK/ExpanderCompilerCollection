@@ -2,15 +2,17 @@ use arith::Field;
 // credit: https://github.com/PolyhedraZK/proof-arena/blob/main/problems/sha256_hash/expander-sha256/src/main.rs
 use expander_compiler::frontend::*;
 
-mod sha256_debug_utils;
-use sha256_debug_utils::{compress, H256_256 as SHA256_INIT_STATE};
-
 mod sha256_utils;
 use sha256_utils::*;
 
-use extra::Serde;
+mod sha256_debug_utils;
+use sha256_debug_utils::{compress, H256_256 as SHA256_INIT_STATE};
+
 use rand::RngCore;
 
+// these imports will be used for the real hash, currently only the compression function is used
+#[allow(unused_imports)]
+use crate::extra::debug_eval;
 #[allow(unused_imports)]
 use sha2::{Digest, Sha256};
 
@@ -43,6 +45,12 @@ impl<C: Config> GenericDefine<C> for SHA256Circuit<Variable> {
     }
 }
 
+fn display_state<C: Config, Builder: RootAPI<C>>(api: &mut Builder, state: &Vec<Vec<Variable>>) {
+    for i in 0..8 {
+        api.display(&format!("{}", i), state[i][30].clone());
+    }
+}
+
 fn compute_sha256<C: Config, Builder: RootAPI<C>>(
     api: &mut Builder,
     input: &Vec<Variable>,
@@ -62,7 +70,7 @@ fn compute_sha256<C: Config, Builder: RootAPI<C>>(
         0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc,
         0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
         0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116,
-        0x1e376c48, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa11, 0x5b9cca4f, 0x682e6ff3,
+        0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
         0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7,
         0xc67178f2,
     ];
@@ -73,6 +81,7 @@ fn compute_sha256<C: Config, Builder: RootAPI<C>>(
         w[i] = input[(i * 32)..((i + 1) * 32) as usize].to_vec();
     }
     for i in 16..64 {
+        // delta_0 (W(i - 15))
         let tmp = xor(
             api,
             rotate_right(&w[i - 15], 7),
@@ -80,6 +89,8 @@ fn compute_sha256<C: Config, Builder: RootAPI<C>>(
         );
         let shft = shift_right(api, w[i - 15].clone(), 3);
         let s0 = xor(api, tmp, shft);
+
+        // delta_1 (W(i - 2))
         let tmp = xor(
             api,
             rotate_right(&w[i - 2], 17),
@@ -87,33 +98,37 @@ fn compute_sha256<C: Config, Builder: RootAPI<C>>(
         );
         let shft = shift_right(api, w[i - 2].clone(), 10);
         let s1 = xor(api, tmp, shft);
-        let s0 = add(api, w[i - 16].clone(), s0);
-        let s1 = add(api, w[i - 7].clone(), s1);
-        let s1 = add_const(api, s1, k32[i]);
-        w[i] = add(api, s0, s1);
+        let s0 = add_vanilla(api, w[i - 16].clone(), s0);
+        let s1 = add_vanilla(api, w[i - 7].clone(), s1);
+        // let s1 = add_const(api, s1, k32[i]);
+        w[i] = add_vanilla(api, s0, s1);
     }
 
     for i in 0..64 {
-        let s1 = sigma1(api, h[4].clone());
-        let c = ch(api, h[4].clone(), h[5].clone(), h[6].clone());
-        w[i] = add(api, w[i].clone(), h[7].clone());
-        let c = add_const(api, c, k32[i].clone());
-        let s1 = add(api, s1, w[i].clone());
-        let s1 = add(api, s1, c);
+        // T_1 = h + sigma1(e) + ch(e, f, g) + k_i + w_i
+        let s1 = sigma1(api, h[4].clone()); // sigma1(e)
+        let c = ch(api, h[4].clone(), h[5].clone(), h[6].clone()); // ch(e, f, g)
+        w[i] = add_vanilla(api, w[i].clone(), h[7].clone()); // h + w_i
+        let c = add_const(api, c, k32[i].clone()); // k_i
+        let s1 = add_vanilla(api, s1, w[i].clone());
+        let s1 = add_vanilla(api, s1, c);
+
+        // T_2 = sigma0(a) + maj(a, b, c)
         let s0 = sigma0(api, h[0].clone());
         let m = maj(api, h[0].clone(), h[1].clone(), h[2].clone());
-        let s0 = add(api, s0, m);
+        let s0 = add_vanilla(api, s0, m);
 
-        h[7] = h[6].clone();
-        h[6] = h[5].clone();
-        h[5] = h[4].clone();
-        h[4] = add(api, h[3].clone(), s1.clone());
-        h[3] = h[2].clone();
-        h[2] = h[1].clone();
-        h[1] = h[0].clone();
-        h[0] = add(api, s1, s0);
+        h[7] = h[6].clone(); // h = g
+        h[6] = h[5].clone(); // g = f
+        h[5] = h[4].clone(); // f = e
+        h[4] = add_vanilla(api, h[3].clone(), s1.clone()); // e = d + T_1
+        h[3] = h[2].clone(); // d = c
+        h[2] = h[1].clone(); // c = b
+        h[1] = h[0].clone(); // b = a
+        h[0] = add_vanilla(api, s1, s0); // a = T_1 + T_2
     }
 
+    display_state(api, &h);
     let mut result = add_const(api, h[0].clone(), h32[0].clone());
     for i in 1..8 {
         result.append(&mut add_const(api, h[i].clone(), h32[i].clone()));
@@ -140,10 +155,6 @@ fn gen_assignment(
         .map(|input| {
             let mut assignment = SHA256Circuit::<GF2>::default();
             for (k, data) in input.chunks_exact(64).enumerate() {
-                // let mut hash = Sha256::new();
-                // hash.update(&data);
-                // let output = hash.finalize();
-
                 // let mut hash = Sha256::new();
                 // hash.update(&data);
                 // let output = hash.finalize();
@@ -183,26 +194,23 @@ fn test_sha256_gf2() {
         layered_circuit,
     } = compile_result;
 
-    layered_circuit.validate().unwrap();
     let n_assignments = 8;
     let rng = rand::thread_rng();
-    let mut assignments = gen_assignment(n_assignments, N_HASHES, rng);
+    let mut assignments: Vec<SHA256Circuit<GF2>> = gen_assignment(n_assignments, N_HASHES, rng);
+
+    // debug_eval::<GF2Config, _, _, _>(
+    //     &SHA256Circuit::default(),
+    //     &assignments[0],
+    //     EmptyHintCaller::new(),
+    // );
 
     let witness = witness_solver.solve_witnesses(&assignments).unwrap();
     let res = layered_circuit.run(&witness);
+
     let expected_res = vec![true; n_assignments];
 
-    let file = std::fs::File::create("sha256_circuit_gf2.txt").unwrap();
-    let writer = std::io::BufWriter::new(file);
-    layered_circuit.serialize_into(writer).unwrap();
-
-    let file = std::fs::File::create("sha256_witness_gf2.txt").unwrap();
-    let writer = std::io::BufWriter::new(file);
-    witness.serialize_into(writer).unwrap();
-
     // TODO: Fix the circuit error
-    let _ = (res, expected_res);
-    // assert_eq!(res, expected_res);
+    assert_eq!(res, expected_res);
 
     // Test with wrong input
     for i in 0..n_assignments {
