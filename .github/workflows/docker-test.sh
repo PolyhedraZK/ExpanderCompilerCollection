@@ -1,6 +1,7 @@
 #!/bin/sh
 cp /tmp/ecc2/ecc2 /tmp/ecc-test -r
 cd /tmp/ecc-test
+apt-get update
 apt-get install -y libopenmpi-dev
 
 case $1 in
