@@ -11,7 +11,7 @@ use crate::{
 };
 
 use super::{
-    api::{BasicAPI, DebugAPI, RootAPI, UnconstrainedAPI},
+    api::{BasicAPI, RootAPI, UnconstrainedAPI},
     builder::{
         ensure_variables_valid, get_variable_id, new_variable, ToVariableOrValue, VariableOrValue,
     },
