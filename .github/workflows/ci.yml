@@ -12,4 +12,7 @@ jobs:
     steps:
       - uses: styfle/cancel-workflow-action@0.11.0
       - uses: actions/checkout@v4
-      - run: sudo docker run --rm -v .:/tmp/ecc rust:1.84-bullseye /tmp/ecc/.github/workflows/docker-scripts/test-rust-avx512.sh
+        with:
+          path: ecc2
+      - run: pwd
+      #- run: sudo docker run --rm -v .:/tmp/ecc rust:1.84-bullseye /tmp/ecc/.github/workflows/docker-scripts/test-rust-avx512.sh
