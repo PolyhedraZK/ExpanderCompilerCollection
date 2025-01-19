@@ -48,14 +48,14 @@ pub fn print_e2<C: Config, B: RootAPI<C>>(native: &mut B, v: &GE2) {
         println!(
             "{}: {:?} {:?}",
             i,
-            native.value_of(v.a0.limbs[i]),
-            native.value_of(v.a1.limbs[i])
+            native.display("",v.a0.limbs[i]),
+            native.display("",v.a1.limbs[i])
         );
     }
 }
 pub fn print_element<C: Config, B: RootAPI<C>, T: FieldParams>(native: &mut B, v: &Element<T>) {
     for i in 0..v.limbs.len() {
-        print!("{:?} ", native.value_of(v.limbs[i]));
+        print!("{:?} ", native.display("",v.limbs[i]));
     }
     println!(" ");
 }
