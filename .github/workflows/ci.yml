@@ -14,4 +14,4 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: ecc2 # due to misoperation, the original path is occupied by other files
-      - run: sudo docker run --rm -v ecc2:/tmp/ecc2:ro rust:1.84-bullseye ls -l /tmp/ecc2/.github/workflows/docker-scripts/
+      - run: sudo docker run --rm -v ecc2:/tmp/ecc2:ro rust:1.84-bullseye ls -al /tmp/ecc2/
