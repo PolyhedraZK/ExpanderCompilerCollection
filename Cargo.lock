@@ -527,6 +527,7 @@ dependencies = [
  "num-traits",
  "rand",
  "sha2",
+ "tiny-keccak",
 ]
 
 [[package]]
