@@ -50,7 +50,14 @@ pub fn sub_padding(
     new_pad
 }
 
-pub fn get_sign(x: &Fq2) -> bool {
+pub fn get_fq_sign(x: &Fq) -> bool {
+    let x_bigint = x
+        .to_string()
+        .parse::<BigInt>()
+        .expect("Invalid decimal string");
+    !(x_bigint % 2u32).is_zero()
+}
+pub fn get_fq2_sign(x: &Fq2) -> bool {
     let x_a0 =
         x.c0.to_string()
             .parse::<BigInt>()
@@ -92,8 +99,8 @@ pub fn xor_variable<C: Config, B: RootAPI<C>>(
 }
 pub fn expand_msg_xmd_variable<C: Config, B: RootAPI<C>>(
     api: &mut B,
-    msg: Vec<Variable>,
-    dst: Vec<Variable>,
+    msg: &[Variable],
+    dst: &[Variable],
     len_in_bytes: usize,
 ) -> Vec<Variable> {
     let ell = (len_in_bytes + 31) / 32;
@@ -110,17 +117,17 @@ pub fn expand_msg_xmd_variable<C: Config, B: RootAPI<C>>(
     }
     let mut input = Vec::new();
     input.extend_from_slice(&block_v);
-    input.extend_from_slice(&msg);
+    input.extend_from_slice(msg);
     input.push(api.constant((len_in_bytes >> 8) as u32));
     input.push(api.constant(len_in_bytes as u32));
     input.push(api.constant(0));
-    input.extend_from_slice(&dst);
+    input.extend_from_slice(dst);
     input.push(api.constant(size_domain as u32));
     let b0 = sha256_var_bytes(api, &input);
     input.clear();
     input.extend_from_slice(&b0);
     input.push(api.constant(1));
-    input.extend_from_slice(&dst);
+    input.extend_from_slice(dst);
     input.push(api.constant(size_domain as u32));
     let mut b1 = sha256_var_bytes(api, &input);
     let mut res = b1.clone();
@@ -132,7 +139,7 @@ pub fn expand_msg_xmd_variable<C: Config, B: RootAPI<C>>(
         input.clear();
         input.extend_from_slice(&strxor);
         input.push(api.constant(i as u32));
-        input.extend_from_slice(&dst);
+        input.extend_from_slice(dst);
         input.push(api.constant(size_domain as u32));
         b1 = sha256_var_bytes(api, &input);
         res.extend_from_slice(&b1);
@@ -142,8 +149,8 @@ pub fn expand_msg_xmd_variable<C: Config, B: RootAPI<C>>(
 
 pub fn hash_to_fp_variable<C: Config, B: RootAPI<C>>(
     api: &mut B,
-    msg: Vec<Variable>,
-    dst: Vec<Variable>,
+    msg: &[Variable],
+    dst: &[Variable],
     count: usize,
 ) -> Vec<Vec<Variable>> {
     const FP_BITS: usize = 381;

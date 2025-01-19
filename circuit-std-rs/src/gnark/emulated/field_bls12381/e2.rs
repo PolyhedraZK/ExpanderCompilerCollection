@@ -270,8 +270,8 @@ impl Ext2 {
         inv
     }
     pub fn assert_isequal<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE2, y: &GE2) {
-        self.curve_f.assert_isequal(native, &x.a0, &y.a0);
-        self.curve_f.assert_isequal(native, &x.a1, &y.a1);
+        self.curve_f.assert_is_equal(native, &x.a0, &y.a0);
+        self.curve_f.assert_is_equal(native, &x.a1, &y.a1);
     }
     pub fn select<C: Config, B: RootAPI<C>>(
         &mut self,

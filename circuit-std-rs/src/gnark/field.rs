@@ -374,7 +374,7 @@ impl<T: FieldParams> GField<T> {
         };
         self.mul_checks.push(mc);
     }
-    pub fn assert_isequal<C: Config, B: RootAPI<C>>(
+    pub fn assert_is_equal<C: Config, B: RootAPI<C>>(
         &mut self,
         native: &mut B,
         a: &Element<T>,
@@ -514,7 +514,7 @@ impl<T: FieldParams> GField<T> {
         let div = self.compute_division_hint(native, a.limbs.clone(), b.limbs.clone());
         let e = self.pack_limbs(native, div, true);
         let res = self.mul(native, &e, &new_b);
-        self.assert_isequal(native, &res, &new_a);
+        self.assert_is_equal(native, &res, &new_a);
         e
     }
     pub fn inverse<C: Config, B: RootAPI<C>>(
@@ -541,7 +541,7 @@ impl<T: FieldParams> GField<T> {
         let e = self.pack_limbs(native, inv, true);
         let res = self.mul(native, &e, &new_b);
         let one = self.one_const.my_clone();
-        self.assert_isequal(native, &res, &one);
+        self.assert_is_equal(native, &res, &one);
         e
     }
     pub fn compute_inverse_hint<C: Config, B: RootAPI<C>>(
@@ -636,6 +636,54 @@ impl<T: FieldParams> GField<T> {
         for i in 0..self.mul_checks.len() {
             self.mul_checks[i].clean_evaluations();
         }
+    }
+    pub fn hash_to_fp<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        msg: &[Variable],
+        len: usize,
+    ) -> Vec<Element<T>> {
+        let signature_dst: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_";
+        let mut dst = vec![];
+        for c in signature_dst {
+            dst.push(native.constant(*c as u32));
+        }
+        let hm = hash_to_fp_variable(native, msg, &dst, len);
+        let mut xs_limbs = vec![];
+        let n = T::bits_per_limb();
+        if n != 8 {
+            panic!("only support 8 bits per limb for now");
+        }
+        let k = T::nb_limbs() as usize;
+        if k > 64 {
+            panic!("only support <= 64 limbs for now");
+        }
+        for element in &hm {
+            let mut x = vec![];
+            for j in 0..k {
+                x.push(element[k - 1 - j]);
+            }
+            xs_limbs.push(x);
+        }
+        let shift = value_of(
+            native,
+            Box::new("340282366920938463463374607431768211456".to_string()),
+        );
+        let mut x_elements = vec![];
+        for i in 0..xs_limbs.len() {
+            let mut x_element = new_internal_element(xs_limbs[i].clone(), 0);
+            x_element = self.mul(native, &x_element, &shift);
+            let mut x_rem = vec![native.constant(0); k];
+            for (j, rem) in x_rem.iter_mut().enumerate().take(k) {
+                if j < (64 - k) {
+                    *rem = hm[i][63 - j];
+                }
+            }
+            x_element = self.add(native, &x_element, &new_internal_element(x_rem, 0));
+            x_element = self.reduce(native, &x_element, true);
+            x_elements.push(x_element);
+        }
+        x_elements
     }
 }
 pub fn eval_with_challenge<C: Config, B: RootAPI<C>, T: FieldParams>(

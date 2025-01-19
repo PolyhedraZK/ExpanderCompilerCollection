@@ -68,6 +68,7 @@ pub fn value_of<C: Config, B: RootAPI<C>, T: FieldParams>(
     let r: Element<T> = new_const_element::<C, B, T>(api, constant);
     r
 }
+
 pub fn new_const_element<C: Config, B: RootAPI<C>, T: FieldParams>(
     api: &mut B,
     v: Box<dyn Any>,

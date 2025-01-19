@@ -66,7 +66,7 @@ mod tests {
             let expect_r1 = new_internal_element::<Bls12381Fp>(self.target[0].to_vec(), 0);
             let r1_zero = fp.add(builder, &r1.clone(), &expect_r1);
             let zero = fp.zero_const.clone();
-            fp.assert_isequal(builder, &r1_zero, &zero);
+            fp.assert_is_equal(builder, &r1_zero, &zero);
             for i in 1..rs.len() {
                 for j in 0..rs[i].limbs.len() {
                     builder.assert_is_equal(rs[i].limbs[j], self.target[i][j]);

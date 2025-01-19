@@ -859,7 +859,49 @@ pub fn get_e2_sqrt_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error
     }
     Ok(())
 }
-pub fn get_sqrt_x0x1_new_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+pub fn get_sqrt_x0x1_fq_new_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+    if let Err(err) = unwrap_hint(
+        true,
+        true,
+        inputs,
+        outputs,
+        //divE12Hint
+        |inputs| {
+            let biguint_inputs = inputs
+                .iter()
+                .map(|x| x.to_biguint().unwrap())
+                .collect::<Vec<_>>();
+
+            let g_x0 = Fq::from(biguint_inputs[0].clone());
+            let g_x1 = Fq::from(biguint_inputs[1].clone());
+            let t = Fq::from(biguint_inputs[2].clone());
+            let sgn_t = get_fq_sign(&t);
+            let (g_x0_sqrt, is_square0) = fq_has_sqrt(&g_x0);
+            let (g_x1_sqrt, is_square1) = fq_has_sqrt(&g_x1);
+            let mut y;
+            if is_square0 {
+                y = g_x0_sqrt;
+            } else if is_square1 {
+                y = g_x1_sqrt;
+            } else {
+                panic!("At least one should be square");
+            }
+            let sgn_y = get_fq_sign(&y);
+            if sgn_y != sgn_t {
+                y = -y;
+            }
+            let y_bigint = y
+                .to_string()
+                .parse::<BigInt>()
+                .expect("Invalid decimal string");
+            vec![BigInt::from(is_square0), y_bigint]
+        },
+    ) {
+        panic!("divE2Hint: {}", err);
+    }
+    Ok(())
+}
+pub fn get_sqrt_x0x1_fq2_new_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     if let Err(err) = unwrap_hint(
         true,
         true,
@@ -882,7 +924,7 @@ pub fn get_sqrt_x0x1_new_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(),
             let g_x0 = Fq2::new(Fq::from(g_x0_a0), Fq::from(g_x0_a1));
             let g_x1 = Fq2::new(Fq::from(g_x1_a0), Fq::from(g_x1_a1));
             let t = Fq2::new(Fq::from(t_a0), Fq::from(t_a1));
-            let sgn_t = get_sign(&t);
+            let sgn_t = get_fq2_sign(&t);
             let (g_x0_sqrt, is_square0) = fq2_has_sqrt(&g_x0);
             let (g_x1_sqrt, is_square1) = fq2_has_sqrt(&g_x1);
             let mut y;
@@ -893,7 +935,7 @@ pub fn get_sqrt_x0x1_new_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(),
             } else {
                 panic!("At least one should be square");
             }
-            let sgn_y = get_sign(&y);
+            let sgn_y = get_fq2_sign(&y);
             if sgn_y != sgn_t {
                 y.c0 = -y.c0;
                 y.c1 = -y.c1;

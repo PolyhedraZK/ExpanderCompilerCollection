@@ -7,7 +7,6 @@ mod gnark {
         }
         mod sw_bls12381 {
             mod g1;
-            mod g2;
             mod pairing;
         }
     }

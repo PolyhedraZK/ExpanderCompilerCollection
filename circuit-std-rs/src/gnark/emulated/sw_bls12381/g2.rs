@@ -3,7 +3,6 @@ use crate::gnark::element::*;
 use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::emulated::field_bls12381::e2::Ext2;
 use crate::gnark::emulated::field_bls12381::e2::GE2;
-use crate::gnark::utils::hash_to_fp_variable;
 use crate::utils::simple_select;
 use expander_compiler::declare_circuit;
 use expander_compiler::frontend::{Config, GenericDefine, M31Config, RootAPI, Variable};
@@ -288,7 +287,7 @@ impl G2 {
         let output = self
             .ext2
             .curve_f
-            .new_hint(native, "myhint.getsqrtx0x1newhint", 3, inputs);
+            .new_hint(native, "myhint.getsqrtx0x1fq2newhint", 3, inputs);
         let is_square = self.ext2.curve_f.is_zero(native, &output[0]); // is_square = 0 if g_x0 has not square root, 1 otherwise
         let y = GE2 {
             a0: output[1].my_clone(),
@@ -430,6 +429,17 @@ impl G2 {
         p.y = self.ext2.mul(native, &p.y, &den1);
         p
     }
+    pub fn hash_to_fp<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        data: &[Variable],
+    ) -> (GE2, GE2) {
+        let u = self.ext2.curve_f.hash_to_fp(native, data, 2 * 2);
+        (
+            GE2::from_vars(u[0].clone().limbs, u[1].clone().limbs),
+            GE2::from_vars(u[2].clone().limbs, u[3].clone().limbs),
+        )
+    }
     pub fn map_to_g2<C: Config, B: RootAPI<C>>(
         &mut self,
         native: &mut B,
@@ -441,66 +451,6 @@ impl G2 {
         let out = self.g2_add(native, &out0, &out1);
         let new_out = self.g2_isogeny(native, &out);
         self.clear_cofactor(native, &new_out)
-    }
-    pub fn hash_to_fp<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        msg: Vec<Variable>,
-    ) -> (GE2, GE2) {
-        let signature_dst: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_";
-        let mut dst = vec![];
-        for c in signature_dst {
-            dst.push(native.constant(*c as u32));
-        }
-        let hm = hash_to_fp_variable(native, msg, dst, 2 * 2);
-        let mut x0 = GE2::from_vars(vec![], vec![]);
-        let mut x1 = GE2::from_vars(vec![], vec![]);
-        for i in 0..48 {
-            x0.a0.limbs.push(hm[0][47 - i]);
-            x0.a1.limbs.push(hm[1][47 - i]);
-            x1.a0.limbs.push(hm[2][47 - i]);
-            x1.a1.limbs.push(hm[3][47 - i]);
-        }
-        let shift = value_of::<C, B, Bls12381Fp>(
-            native,
-            Box::new("340282366920938463463374607431768211456".to_string()),
-        );
-        let mut x0_a0_element = new_internal_element::<Bls12381Fp>(x0.a0.limbs, 0);
-        let mut x0_a1_element = new_internal_element::<Bls12381Fp>(x0.a1.limbs, 0);
-        let mut x1_a0_element = new_internal_element::<Bls12381Fp>(x1.a0.limbs, 0);
-        let mut x1_a1_element = new_internal_element::<Bls12381Fp>(x1.a1.limbs, 0);
-        let x0_a0 = self.ext2.curve_f.mul(native, &x0_a0_element, &shift);
-        let x0_a1 = self.ext2.curve_f.mul(native, &x0_a1_element, &shift);
-        let x1_a0 = self.ext2.curve_f.mul(native, &x1_a0_element, &shift);
-        let x1_a1 = self.ext2.curve_f.mul(native, &x1_a1_element, &shift);
-        for i in 0..48 {
-            if i < 16 {
-                x0_a0_element.limbs[i] = hm[0][63 - i];
-                x0_a1_element.limbs[i] = hm[1][63 - i];
-                x1_a0_element.limbs[i] = hm[2][63 - i];
-                x1_a1_element.limbs[i] = hm[3][63 - i];
-            } else {
-                x0_a0_element.limbs[i] = native.constant(0);
-                x0_a1_element.limbs[i] = native.constant(0);
-                x1_a0_element.limbs[i] = native.constant(0);
-                x1_a1_element.limbs[i] = native.constant(0);
-            }
-        }
-
-        let x0_a0: Element<Bls12381Fp> = self.ext2.curve_f.add(native, &x0_a0_element, &x0_a0);
-        let x0_a1 = self.ext2.curve_f.add(native, &x0_a1_element, &x0_a1);
-        let x1_a0 = self.ext2.curve_f.add(native, &x1_a0_element, &x1_a0);
-        let x1_a1 = self.ext2.curve_f.add(native, &x1_a1_element, &x1_a1);
-
-        let x0_e2 = GE2 {
-            a0: x0_a0,
-            a1: x0_a1,
-        };
-        let x1_e2 = GE2 {
-            a0: x1_a0,
-            a1: x1_a1,
-        };
-        (x0_e2, x1_e2)
     }
 
     pub fn uncompressed<C: Config, B: RootAPI<C>>(
@@ -536,7 +486,7 @@ impl G2 {
         //is_square should be one
         let is_square = outputs[0].clone();
         let one = self.ext2.curve_f.one_const.clone();
-        self.ext2.curve_f.assert_isequal(native, &is_square, &one);
+        self.ext2.curve_f.assert_is_equal(native, &is_square, &one);
 
         //get Y
         let y = GE2::from_vars(outputs[1].clone().limbs, outputs[2].clone().limbs);
@@ -611,16 +561,176 @@ impl GenericDefine<M31Config> for G2UncompressCircuit<Variable> {
     }
 }
 
+declare_circuit!(MapToG2Circuit {
+    in0: [[Variable; 48]; 2],
+    in1: [[Variable; 48]; 2],
+    out: [[[Variable; 48]; 2]; 2],
+});
+
+impl GenericDefine<M31Config> for MapToG2Circuit<Variable> {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
+        let mut g2 = G2::new(builder);
+        let in0 = GE2::from_vars(self.in0[0].to_vec(), self.in0[1].to_vec());
+        let in1 = GE2::from_vars(self.in1[0].to_vec(), self.in1[1].to_vec());
+        let res = g2.map_to_g2(builder, &in0, &in1);
+        let target_out = G2AffP {
+            x: GE2::from_vars(self.out[0][0].to_vec(), self.out[0][1].to_vec()),
+            y: GE2::from_vars(self.out[1][0].to_vec(), self.out[1][1].to_vec()),
+        };
+        g2.assert_is_equal(builder, &res, &target_out);
+        g2.ext2.curve_f.check_mul(builder);
+        g2.ext2.curve_f.table.final_check(builder);
+        g2.ext2.curve_f.table.final_check(builder);
+        g2.ext2.curve_f.table.final_check(builder);
+    }
+}
+
+declare_circuit!(HashToG2Circuit {
+    msg: [Variable; 32],
+    out: [[[Variable; 48]; 2]; 2],
+});
+
+impl GenericDefine<M31Config> for HashToG2Circuit<Variable> {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
+        let mut g2 = G2::new(builder);
+        let (hm0, hm1) = g2.hash_to_fp(builder, &self.msg);
+        let res = g2.map_to_g2(builder, &hm0, &hm1);
+        let target_out = G2AffP {
+            x: GE2::from_vars(self.out[0][0].to_vec(), self.out[0][1].to_vec()),
+            y: GE2::from_vars(self.out[1][0].to_vec(), self.out[1][1].to_vec()),
+        };
+        g2.assert_is_equal(builder, &res, &target_out);
+        g2.ext2.curve_f.check_mul(builder);
+        g2.ext2.curve_f.table.final_check(builder);
+        g2.ext2.curve_f.table.final_check(builder);
+        g2.ext2.curve_f.table.final_check(builder);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::G2UncompressCircuit;
+    use crate::gnark::emulated::sw_bls12381::g2::*;
     use crate::utils::register_hint;
     use expander_compiler::frontend::*;
+    use expander_compiler::frontend::{HintRegistry, M31};
     use extra::debug_eval;
     use num_bigint::BigInt;
     use num_traits::Num;
+
+    #[test]
+    fn test_map_to_g2() {
+        let mut hint_registry = HintRegistry::<M31>::new();
+        register_hint(&mut hint_registry);
+        let mut assignment = MapToG2Circuit::<M31> {
+            in0: [[M31::from(0); 48]; 2],
+            in1: [[M31::from(0); 48]; 2],
+            out: [[[M31::from(0); 48]; 2]; 2],
+        };
+        let p1_x_bytes = [
+            75, 240, 55, 239, 72, 231, 76, 188, 20, 26, 234, 236, 23, 166, 182, 159, 239, 165, 10,
+            98, 220, 117, 40, 167, 160, 143, 63, 57, 113, 82, 97, 238, 36, 48, 226, 19, 210, 13,
+            216, 163, 51, 199, 31, 228, 211, 18, 125, 25,
+        ];
+        let p1_y_bytes = [
+            161, 161, 201, 159, 90, 241, 214, 89, 177, 71, 235, 130, 168, 37, 237, 255, 26, 105,
+            22, 122, 136, 28, 83, 245, 117, 135, 212, 63, 208, 241, 109, 4, 109, 188, 74, 50, 63,
+            41, 78, 174, 164, 121, 104, 77, 56, 23, 100, 5,
+        ];
+        let p2_x_bytes = [
+            161, 152, 122, 79, 206, 47, 160, 114, 196, 82, 17, 183, 227, 115, 71, 7, 9, 141, 33,
+            224, 127, 254, 158, 109, 69, 225, 184, 146, 239, 137, 146, 138, 224, 79, 56, 100, 184,
+            236, 99, 77, 28, 117, 111, 179, 106, 181, 35, 21,
+        ];
+        let p2_y_bytes = [
+            199, 231, 196, 205, 165, 5, 112, 203, 238, 82, 8, 79, 245, 151, 226, 80, 154, 146, 230,
+            51, 79, 60, 20, 190, 9, 171, 34, 41, 131, 165, 60, 0, 10, 197, 177, 140, 108, 41, 99,
+            113, 151, 51, 253, 219, 105, 227, 25, 24,
+        ];
+        let out0_x_bytes = [
+            215, 186, 167, 113, 176, 255, 84, 123, 163, 0, 104, 202, 139, 197, 29, 119, 253, 35,
+            206, 68, 130, 75, 218, 109, 179, 63, 65, 197, 67, 206, 64, 89, 30, 201, 95, 238, 5, 66,
+            143, 94, 37, 238, 150, 113, 159, 165, 110, 3,
+        ];
+        let out0_y_bytes = [
+            88, 110, 24, 185, 208, 195, 142, 173, 176, 12, 228, 155, 64, 223, 147, 25, 37, 234,
+            200, 3, 123, 119, 193, 221, 234, 253, 199, 190, 120, 135, 32, 215, 32, 118, 55, 230,
+            74, 204, 56, 12, 24, 221, 240, 188, 188, 76, 233, 20,
+        ];
+        let out1_x_bytes = [
+            202, 105, 74, 230, 255, 158, 238, 160, 121, 234, 219, 154, 239, 176, 232, 81, 56, 53,
+            154, 76, 221, 53, 156, 165, 215, 18, 148, 34, 124, 242, 154, 218, 243, 171, 88, 53, 13,
+            182, 39, 84, 254, 161, 96, 192, 154, 242, 71, 15,
+        ];
+        let out1_y_bytes = [
+            66, 124, 60, 101, 29, 246, 150, 109, 233, 119, 212, 23, 132, 79, 170, 0, 178, 98, 151,
+            189, 214, 70, 171, 93, 2, 98, 194, 243, 38, 160, 178, 224, 91, 20, 11, 209, 190, 76,
+            182, 253, 89, 144, 170, 191, 128, 66, 207, 1,
+        ];
+
+        for i in 0..48 {
+            assignment.in0[0][i] = M31::from(p1_x_bytes[i]);
+            assignment.in0[1][i] = M31::from(p1_y_bytes[i]);
+            assignment.in1[0][i] = M31::from(p2_x_bytes[i]);
+            assignment.in1[1][i] = M31::from(p2_y_bytes[i]);
+            assignment.out[0][0][i] = M31::from(out0_x_bytes[i]);
+            assignment.out[0][1][i] = M31::from(out0_y_bytes[i]);
+            assignment.out[1][0][i] = M31::from(out1_x_bytes[i]);
+            assignment.out[1][1][i] = M31::from(out1_y_bytes[i]);
+        }
+
+        debug_eval(&MapToG2Circuit::default(), &assignment, hint_registry);
+    }
+
+    #[test]
+    fn test_hash_to_g2() {
+        // compile_generic(&HashToG2Circuit::default(), CompileOptions::default()).unwrap();
+        let mut hint_registry = HintRegistry::<M31>::new();
+        register_hint(&mut hint_registry);
+        let mut assignment = HashToG2Circuit::<M31> {
+            msg: [M31::from(0); 32],
+            out: [[[M31::from(0); 48]; 2]; 2],
+        };
+        let msg_bytes = [
+            140, 148, 79, 140, 170, 85, 208, 7, 114, 138, 47, 198, 231, 255, 48, 104, 221, 225, 3,
+            237, 99, 251, 57, 156, 89, 194, 79, 31, 130, 109, 228, 200,
+        ];
+        let out0_x_bytes = [
+            215, 186, 167, 113, 176, 255, 84, 123, 163, 0, 104, 202, 139, 197, 29, 119, 253, 35,
+            206, 68, 130, 75, 218, 109, 179, 63, 65, 197, 67, 206, 64, 89, 30, 201, 95, 238, 5, 66,
+            143, 94, 37, 238, 150, 113, 159, 165, 110, 3,
+        ];
+        let out0_y_bytes = [
+            88, 110, 24, 185, 208, 195, 142, 173, 176, 12, 228, 155, 64, 223, 147, 25, 37, 234,
+            200, 3, 123, 119, 193, 221, 234, 253, 199, 190, 120, 135, 32, 215, 32, 118, 55, 230,
+            74, 204, 56, 12, 24, 221, 240, 188, 188, 76, 233, 20,
+        ];
+        let out1_x_bytes = [
+            202, 105, 74, 230, 255, 158, 238, 160, 121, 234, 219, 154, 239, 176, 232, 81, 56, 53,
+            154, 76, 221, 53, 156, 165, 215, 18, 148, 34, 124, 242, 154, 218, 243, 171, 88, 53, 13,
+            182, 39, 84, 254, 161, 96, 192, 154, 242, 71, 15,
+        ];
+        let out1_y_bytes = [
+            66, 124, 60, 101, 29, 246, 150, 109, 233, 119, 212, 23, 132, 79, 170, 0, 178, 98, 151,
+            189, 214, 70, 171, 93, 2, 98, 194, 243, 38, 160, 178, 224, 91, 20, 11, 209, 190, 76,
+            182, 253, 89, 144, 170, 191, 128, 66, 207, 1,
+        ];
+        for i in 0..32 {
+            assignment.msg[i] = M31::from(msg_bytes[i]);
+        }
+        for i in 0..48 {
+            assignment.out[0][0][i] = M31::from(out0_x_bytes[i]);
+            assignment.out[0][1][i] = M31::from(out0_y_bytes[i]);
+            assignment.out[1][0][i] = M31::from(out1_x_bytes[i]);
+            assignment.out[1][1][i] = M31::from(out1_y_bytes[i]);
+        }
+
+        debug_eval(&HashToG2Circuit::default(), &assignment, hint_registry);
+    }
+
     #[test]
     fn test_uncompress_g2() {
+        // compile_generic(&G2UncompressCircuit::default(), CompileOptions::default()).unwrap();
         let mut hint_registry = HintRegistry::<M31>::new();
         register_hint(&mut hint_registry);
         let mut assignment = G2UncompressCircuit::<M31> {
