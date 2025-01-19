@@ -14,4 +14,4 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: ecc2 # due to misoperation, the original path is occupied by other files
-      - run: sudo docker run --rm -v .:/tmp/ecc2:ro rust:1.84-bullseye /tmp/ecc/ecc2/.github/workflows/docker-scripts/test-rust-avx512.sh
+      - run: sudo docker run --rm -v .:/tmp/ecc2:ro rust:1.84-bullseye /tmp/ecc2/ecc2/.github/workflows/docker-scripts/test-rust-avx512.sh
