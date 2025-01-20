@@ -1,16 +1,16 @@
-use crate::utils::{ensure_directory_exists, read_from_json_file};
 use circuit_std_rs::big_int::*;
 use circuit_std_rs::logup::LogUpSingleKeyTable;
 use circuit_std_rs::poseidon_m31::*;
 use circuit_std_rs::utils::{register_hint, simple_lookup2, simple_select};
+use efc::permutation::*;
 use expander_compiler::circuit::ir::hint_normalized::witness_solver;
 use expander_compiler::frontend::extra::*;
 use expander_compiler::frontend::*;
-use serde::Deserialize;
 use std::sync::Arc;
 use std::thread;
 
-pub const TABLE_SIZE: usize = 1024;
+use efc::utils::{ensure_directory_exists, read_from_json_file};
+
 declare_circuit!(PermutationHashCircuit {
     index: [Variable; TABLE_SIZE],
     value: [Variable; TABLE_SIZE],
@@ -62,8 +62,6 @@ fn test_permutation_hash() {
     );
 }
 
-pub const QUERY_SIZE: usize = 1024 * 1024;
-pub const VALIDATOR_COUNT: usize = QUERY_SIZE * 2;
 declare_circuit!(PermutationIndicesValidatorHashesCircuit {
     query_indices: [Variable; QUERY_SIZE],
     query_validator_hashes: [[Variable; POSEIDON_M31X16_RATE]; QUERY_SIZE],
@@ -72,21 +70,6 @@ declare_circuit!(PermutationIndicesValidatorHashesCircuit {
     table_validator_hashes: [[Variable; POSEIDON_M31X16_RATE]; VALIDATOR_COUNT],
     real_keys: [Variable; VALIDATOR_COUNT],
 });
-#[derive(Debug, Clone, Deserialize)]
-pub struct PermutationHashEntry {
-    #[serde(rename = "QueryIndices")]
-    pub query_indices: Vec<u32>,
-    #[serde(rename = "QueryValidatorHashes")]
-    pub query_validator_hashes: Vec<Vec<u32>>,
-    #[serde(rename = "ActiveValidatorBitsHash")]
-    pub active_validator_bits_hash: Vec<u32>,
-    #[serde(rename = "ActiveValidatorBits")]
-    pub active_validator_bits: Vec<u32>,
-    #[serde(rename = "TableValidatorHashes")]
-    pub table_validator_hashes: Vec<Vec<u32>>,
-    #[serde(rename = "RealKeys")]
-    pub real_keys: Vec<u32>,
-}
 
 impl GenericDefine<M31Config> for PermutationIndicesValidatorHashesCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
@@ -111,21 +94,19 @@ impl GenericDefine<M31Config> for PermutationIndicesValidatorHashesCircuit<Varia
             POSEIDON_M31X16_PARTIAL_ROUNDS,
         );
         let active_validator_hash = params.hash_to_state(builder, &active_validator_16_bits);
-        for (i, active_validator_hashbit) in active_validator_hash
-            .iter()
-            .enumerate()
-            .take(POSEIDON_HASH_LENGTH)
-        {
-            builder.assert_is_equal(active_validator_hashbit, self.active_validator_bits_hash[i]);
+        for i in 0..POSEIDON_M31X16_RATE {
+            builder.assert_is_equal(active_validator_hash[i], self.active_validator_bits_hash[i]);
         }
         //move inactive validators to the end
         let mut sorted_table_key = [Variable::default(); VALIDATOR_COUNT];
-        sorted_table_key[..VALIDATOR_COUNT].copy_from_slice(&self.real_keys[..VALIDATOR_COUNT]); //if active, use curKey, else use curInactiveKey
-                                                                                                 //for the first one, if active, use 0, else use -ValidatorCount
+        for i in 0..VALIDATOR_COUNT {
+            sorted_table_key[i] = self.real_keys[i]; //if active, use curKey, else use curInactiveKey
+        }
+        //for the first one, if active, use 0, else use -ValidatorCount
         let shift = simple_select(
             builder,
             self.active_validator_bits[0],
-            zero_var,
+            zero_var.clone(),
             neg_one_count,
         );
         let shift_key = builder.add(sorted_table_key[0], shift);
@@ -179,17 +160,74 @@ impl GenericDefine<M31Config> for PermutationIndicesValidatorHashesCircuit<Varia
     }
 }
 
+#[test]
+fn test_permutation_indices_validator_hashes() {
+    stacker::grow(32 * 1024 * 1024 * 1024, || {
+        let mut hint_registry = HintRegistry::<M31>::new();
+        register_hint(&mut hint_registry);
+        println!("Start generating witnesses...");
+        let start_time = std::time::Instant::now();
+        let dir = "./data";
+        let file_path = format!("{}/permutationhash_assignment1.json", dir);
+
+        let permutation_hash_data: Vec<PermutationHashEntry> =
+            read_from_json_file(&file_path).unwrap();
+        let permutation_hash_data = &permutation_hash_data[0];
+        let end_time = std::time::Instant::now();
+        println!(
+            "loaded permutationhash data time: {:?}",
+            end_time.duration_since(start_time)
+        );
+
+        let mut hint_registry = HintRegistry::<M31>::new();
+        register_hint(&mut hint_registry);
+        let mut assignment = PermutationIndicesValidatorHashesCircuit::<M31> {
+            query_indices: [M31::from(0); QUERY_SIZE],
+            query_validator_hashes: [[M31::from(0); POSEIDON_M31X16_RATE]; QUERY_SIZE],
+            active_validator_bits_hash: [M31::from(0); POSEIDON_M31X16_RATE],
+            active_validator_bits: [M31::from(0); VALIDATOR_COUNT],
+            table_validator_hashes: [[M31::from(0); POSEIDON_M31X16_RATE]; VALIDATOR_COUNT],
+            real_keys: [M31::from(0); VALIDATOR_COUNT],
+        };
+        for i in 0..VALIDATOR_COUNT {
+            for j in 0..POSEIDON_M31X16_RATE {
+                assignment.table_validator_hashes[i][j] =
+                    M31::from(permutation_hash_data.table_validator_hashes[i][j]);
+            }
+            assignment.real_keys[i] = M31::from(permutation_hash_data.real_keys[i]);
+            assignment.active_validator_bits[i] =
+                M31::from(permutation_hash_data.active_validator_bits[i]);
+        }
+        for i in 0..QUERY_SIZE {
+            assignment.query_indices[i] = M31::from(permutation_hash_data.query_indices[i]);
+            for j in 0..POSEIDON_M31X16_RATE {
+                assignment.query_validator_hashes[i][j] =
+                    M31::from(permutation_hash_data.query_validator_hashes[i][j]);
+            }
+        }
+        for i in 0..POSEIDON_M31X16_RATE {
+            assignment.active_validator_bits_hash[i] =
+                M31::from(permutation_hash_data.active_validator_bits_hash[i]);
+        }
+        debug_eval(
+            &PermutationIndicesValidatorHashesCircuit::default(),
+            &assignment,
+            hint_registry,
+        );
+    });
+}
 pub fn generate_permutation_hashes_witness(dir: &str) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
         println!("preparing solver...");
         ensure_directory_exists("./witnesses/permutationhashes");
+        let w_s;
         let file_name = format!("permutationhashes_{}.witness", VALIDATOR_COUNT);
-        let w_s = if std::fs::metadata(&file_name).is_ok() {
+        if std::fs::metadata(&file_name).is_ok() {
             println!("The solver exists!");
-            witness_solver::WitnessSolver::deserialize_from(
+            w_s = witness_solver::WitnessSolver::deserialize_from(
                 std::fs::File::open(&file_name).unwrap(),
             )
-            .unwrap()
+            .unwrap();
         } else {
             println!("The solver does not exist.");
             let compile_result = compile_generic(
@@ -201,28 +239,8 @@ pub fn generate_permutation_hashes_witness(dir: &str) {
                 .witness_solver
                 .serialize_into(std::fs::File::create(&file_name).unwrap())
                 .unwrap();
-            compile_result.witness_solver
-        };
-
-        // if std::fs::metadata(&file_name).is_ok() {
-        //     println!("The solver exists!");
-        //     w_s = witness_solver::WitnessSolver::deserialize_from(
-        //         std::fs::File::open(&file_name).unwrap(),
-        //     )
-        //     .unwrap();
-        // } else {
-        //     println!("The solver does not exist.");
-        //     let compile_result = compile_generic(
-        //         &PermutationIndicesValidatorHashesCircuit::default(),
-        //         CompileOptions::default(),
-        //     )
-        //     .unwrap();
-        //     compile_result
-        //         .witness_solver
-        //         .serialize_into(std::fs::File::create(&file_name).unwrap())
-        //         .unwrap();
-        //     w_s = compile_result.witness_solver;
-        // }
+            w_s = compile_result.witness_solver;
+        }
 
         let witness_solver = Arc::new(w_s);
 
@@ -243,14 +261,14 @@ pub fn generate_permutation_hashes_witness(dir: &str) {
         register_hint(&mut hint_registry);
         let mut assignment = PermutationIndicesValidatorHashesCircuit::<M31> {
             query_indices: [M31::from(0); QUERY_SIZE],
-            query_validator_hashes: [[M31::from(0); POSEIDON_HASH_LENGTH]; QUERY_SIZE],
-            active_validator_bits_hash: [M31::from(0); POSEIDON_HASH_LENGTH],
+            query_validator_hashes: [[M31::from(0); POSEIDON_M31X16_RATE]; QUERY_SIZE],
+            active_validator_bits_hash: [M31::from(0); POSEIDON_M31X16_RATE],
             active_validator_bits: [M31::from(0); VALIDATOR_COUNT],
-            table_validator_hashes: [[M31::from(0); POSEIDON_HASH_LENGTH]; VALIDATOR_COUNT],
+            table_validator_hashes: [[M31::from(0); POSEIDON_M31X16_RATE]; VALIDATOR_COUNT],
             real_keys: [M31::from(0); VALIDATOR_COUNT],
         };
         for i in 0..VALIDATOR_COUNT {
-            for j in 0..POSEIDON_HASH_LENGTH {
+            for j in 0..POSEIDON_M31X16_RATE {
                 assignment.table_validator_hashes[i][j] =
                     M31::from(permutation_hash_data.table_validator_hashes[i][j]);
             }
@@ -260,17 +278,17 @@ pub fn generate_permutation_hashes_witness(dir: &str) {
         }
         for i in 0..QUERY_SIZE {
             assignment.query_indices[i] = M31::from(permutation_hash_data.query_indices[i]);
-            for j in 0..POSEIDON_HASH_LENGTH {
+            for j in 0..POSEIDON_M31X16_RATE {
                 assignment.query_validator_hashes[i][j] =
                     M31::from(permutation_hash_data.query_validator_hashes[i][j]);
             }
         }
-        for i in 0..POSEIDON_HASH_LENGTH {
+        for i in 0..POSEIDON_M31X16_RATE {
             assignment.active_validator_bits_hash[i] =
                 M31::from(permutation_hash_data.active_validator_bits_hash[i]);
         }
         let mut assignments = vec![];
-        for _i in 0..16 {
+        for _ in 0..16 {
             assignments.push(assignment.clone());
         }
         let assignment_chunks: Vec<Vec<PermutationIndicesValidatorHashesCircuit<M31>>> =
@@ -294,8 +312,9 @@ pub fn generate_permutation_hashes_witness(dir: &str) {
                 })
             })
             .collect::<Vec<_>>();
+        let mut results = Vec::new();
         for handle in handles {
-            handle.join().unwrap();
+            results.push(handle.join().unwrap());
         }
         let end_time = std::time::Instant::now();
         println!(
@@ -303,4 +322,9 @@ pub fn generate_permutation_hashes_witness(dir: &str) {
             end_time.duration_since(start_time)
         );
     });
+}
+#[test]
+fn test_generate_permutation_hashes_witness() {
+    let dir = "./data";
+    generate_permutation_hashes_witness(dir);
 }
