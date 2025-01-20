@@ -7,6 +7,5 @@ pub use logup::{LogUpCircuit, LogUpParams};
 pub mod big_int;
 pub mod gnark;
 pub mod poseidon_m31;
-pub mod poseidon_m31_var;
 pub mod sha2_m31;
 pub mod utils;

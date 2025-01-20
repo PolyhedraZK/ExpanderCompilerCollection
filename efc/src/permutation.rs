@@ -2,7 +2,6 @@ use crate::utils::{ensure_directory_exists, read_from_json_file};
 use circuit_std_rs::big_int::*;
 use circuit_std_rs::logup::LogUpSingleKeyTable;
 use circuit_std_rs::poseidon_m31::*;
-use circuit_std_rs::poseidon_m31_var::poseidon_variable_unsafe;
 use circuit_std_rs::utils::{register_hint, simple_lookup2, simple_select};
 use expander_compiler::circuit::ir::hint_normalized::witness_solver;
 use expander_compiler::frontend::extra::*;
@@ -67,10 +66,10 @@ pub const QUERY_SIZE: usize = 1024 * 1024;
 pub const VALIDATOR_COUNT: usize = QUERY_SIZE * 2;
 declare_circuit!(PermutationIndicesValidatorHashesCircuit {
     query_indices: [Variable; QUERY_SIZE],
-    query_validator_hashes: [[Variable; POSEIDON_HASH_LENGTH]; QUERY_SIZE],
-    active_validator_bits_hash: [Variable; POSEIDON_HASH_LENGTH],
+    query_validator_hashes: [[Variable; POSEIDON_M31X16_RATE]; QUERY_SIZE],
+    active_validator_bits_hash: [Variable; POSEIDON_M31X16_RATE],
     active_validator_bits: [Variable; VALIDATOR_COUNT],
-    table_validator_hashes: [[Variable; POSEIDON_HASH_LENGTH]; VALIDATOR_COUNT],
+    table_validator_hashes: [[Variable; POSEIDON_M31X16_RATE]; VALIDATOR_COUNT],
     real_keys: [Variable; VALIDATOR_COUNT],
 });
 #[derive(Debug, Clone, Deserialize)]
@@ -104,16 +103,18 @@ impl GenericDefine<M31Config> for PermutationIndicesValidatorHashesCircuit<Varia
                 self.active_validator_bits[i * 16..(i + 1) * 16].to_vec(),
             ));
         }
-        let active_validator_hash = poseidon_variable_unsafe(
+        let params = PoseidonM31Params::new(
             builder,
-            &PoseidonParams::new(),
-            active_validator_16_bits,
-            false,
+            POSEIDON_M31X16_RATE,
+            16,
+            POSEIDON_M31X16_FULL_ROUNDS,
+            POSEIDON_M31X16_PARTIAL_ROUNDS,
         );
+        let active_validator_hash = params.hash_to_state(builder, &active_validator_16_bits);
         for (i, active_validator_hashbit) in active_validator_hash
             .iter()
             .enumerate()
-            .take(POSEIDON_HASH_LENGTH)
+            .take(POSEIDON_M31X16_RATE)
         {
             builder.assert_is_equal(active_validator_hashbit, self.active_validator_bits_hash[i]);
         }
@@ -203,26 +204,6 @@ pub fn generate_permutation_hashes_witness(dir: &str) {
             compile_result.witness_solver
         };
 
-        // if std::fs::metadata(&file_name).is_ok() {
-        //     println!("The solver exists!");
-        //     w_s = witness_solver::WitnessSolver::deserialize_from(
-        //         std::fs::File::open(&file_name).unwrap(),
-        //     )
-        //     .unwrap();
-        // } else {
-        //     println!("The solver does not exist.");
-        //     let compile_result = compile_generic(
-        //         &PermutationIndicesValidatorHashesCircuit::default(),
-        //         CompileOptions::default(),
-        //     )
-        //     .unwrap();
-        //     compile_result
-        //         .witness_solver
-        //         .serialize_into(std::fs::File::create(&file_name).unwrap())
-        //         .unwrap();
-        //     w_s = compile_result.witness_solver;
-        // }
-
         let witness_solver = Arc::new(w_s);
 
         println!("Start generating permutationhash witnesses...");
@@ -242,14 +223,14 @@ pub fn generate_permutation_hashes_witness(dir: &str) {
         register_hint(&mut hint_registry);
         let mut assignment = PermutationIndicesValidatorHashesCircuit::<M31> {
             query_indices: [M31::from(0); QUERY_SIZE],
-            query_validator_hashes: [[M31::from(0); POSEIDON_HASH_LENGTH]; QUERY_SIZE],
-            active_validator_bits_hash: [M31::from(0); POSEIDON_HASH_LENGTH],
+            query_validator_hashes: [[M31::from(0); POSEIDON_M31X16_RATE]; QUERY_SIZE],
+            active_validator_bits_hash: [M31::from(0); POSEIDON_M31X16_RATE],
             active_validator_bits: [M31::from(0); VALIDATOR_COUNT],
-            table_validator_hashes: [[M31::from(0); POSEIDON_HASH_LENGTH]; VALIDATOR_COUNT],
+            table_validator_hashes: [[M31::from(0); POSEIDON_M31X16_RATE]; VALIDATOR_COUNT],
             real_keys: [M31::from(0); VALIDATOR_COUNT],
         };
         for i in 0..VALIDATOR_COUNT {
-            for j in 0..POSEIDON_HASH_LENGTH {
+            for j in 0..POSEIDON_M31X16_RATE {
                 assignment.table_validator_hashes[i][j] =
                     M31::from(permutation_hash_data.table_validator_hashes[i][j]);
             }
@@ -259,12 +240,12 @@ pub fn generate_permutation_hashes_witness(dir: &str) {
         }
         for i in 0..QUERY_SIZE {
             assignment.query_indices[i] = M31::from(permutation_hash_data.query_indices[i]);
-            for j in 0..POSEIDON_HASH_LENGTH {
+            for j in 0..POSEIDON_M31X16_RATE {
                 assignment.query_validator_hashes[i][j] =
                     M31::from(permutation_hash_data.query_validator_hashes[i][j]);
             }
         }
-        for i in 0..POSEIDON_HASH_LENGTH {
+        for i in 0..POSEIDON_M31X16_RATE {
             assignment.active_validator_bits_hash[i] =
                 M31::from(permutation_hash_data.active_validator_bits_hash[i]);
         }

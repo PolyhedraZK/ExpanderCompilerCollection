@@ -1,240 +1,188 @@
 use expander_compiler::frontend::*;
+use tiny_keccak::{Hasher, Keccak};
 
-const P: u64 = 2147483647;
-pub const POSEIDON_HASH_LENGTH: usize = 8;
-#[derive(Default)]
-pub struct PoseidonParams {
-    pub num_full_rounds: usize,
-    pub num_half_full_rounds: usize,
-    pub num_part_rounds: usize,
-    pub num_half_partial_rounds: usize,
-    pub num_states: usize,
-    pub mds_matrix: Vec<Vec<u32>>,
-    pub external_round_constant: Vec<Vec<u32>>,
-    pub internal_round_constant: Vec<u32>,
-}
-impl PoseidonParams {
-    pub fn new() -> PoseidonParams {
-        let mut _rng = rand::thread_rng();
-        let num_full_rounds = 8;
-        let num_part_rounds = 14;
-        let num_states = 16;
-        let external_round_constant = vec![
-            vec![
-                1602144611, 283469975, 447079688, 896869500, 188198846, 1645802691, 1343797066,
-                1651182352,
-            ],
-            vec![
-                1645164257, 628681638, 1012020211, 936051935, 1553415631, 520713656, 704421656,
-                2002329306,
-            ],
-            vec![
-                912104457, 927309554, 1896963422, 2021987360, 512526164, 1461005868, 1230890889,
-                975482550,
-            ],
-            vec![
-                655249440, 180293723, 1833042356, 558181838, 1935993014, 906657358, 1577735965,
-                952246556,
-            ],
-            vec![
-                1686276583, 2135981572, 301879258, 2033580949, 1875784301, 1528511887, 651033144,
-                546509366,
-            ],
-            vec![
-                1044572822, 1099335126, 1096147649, 244154321, 878215424, 308591376, 1437140741,
-                187187417,
-            ],
-            vec![
-                244141211, 1241082190, 802875957, 758482785, 1882334571, 1260030334, 140962496,
-                1004550553,
-            ],
-            vec![
-                1946499876, 1224110803, 167959573, 1112131775, 1777017360, 794128708, 719742823,
-                964768064,
-            ],
-            vec![
-                260466031, 1280875791, 1311686993, 334003808, 1708822585, 1575283902, 1085939132,
-                853116326,
-            ],
-            vec![
-                1948693740, 1676460526, 592034112, 175515361, 1925748203, 423003568, 2064012607,
-                1607483085,
-            ],
-            vec![
-                1781173630, 1992696998, 1172364027, 1007563471, 1904034292, 888768061, 1369442223,
-                671255092,
-            ],
-            vec![
-                919393366, 1262786628, 1174193565, 2120008749, 1514449614, 841831014, 741479278,
-                124916655,
-            ],
-            vec![
-                1418908281, 1941555103, 1776135713, 340191556, 59007516, 2070331360, 1475967456,
-                597566110,
-            ],
-            vec![
-                1802709549, 1794127988, 126858077, 1413234214, 1033418513, 593787007, 1588170737,
-                658446415,
-            ],
-            vec![
-                657013279, 1078572839, 1394546710, 1029801709, 1397378755, 6060087, 474304723,
-                1469825109,
-            ],
-            vec![
-                780675426, 359271844, 1731998572, 801241649, 926841567, 2109531454, 275946491,
-                1847955509,
-            ],
-        ];
-        let internal_round_constant = vec![
-            477367687, 1846273021, 220762869, 2068417058, 618183629, 1079533163, 1835801580,
-            1649855374, 1027781798, 670016125, 1011893799, 664483678, 669708402, 787762663,
-        ];
-        let mut mds = vec![vec![0; 16]; num_states];
-        mds[0] = vec![1, 1, 51, 1, 11, 17, 2, 1, 101, 63, 15, 2, 67, 22, 13, 3];
-        for i in 1..16 {
-            mds[i] = vec![0; 16];
-            for j in 0..16 {
-                mds[i][j] = mds[0][(j + i) % 16];
-            }
-        }
-        PoseidonParams {
-            num_full_rounds,
-            num_half_full_rounds: num_full_rounds / 2,
-            num_part_rounds,
-            num_half_partial_rounds: num_part_rounds / 2,
-            num_states,
-            mds_matrix: mds,
-            external_round_constant,
-            internal_round_constant,
-        }
-    }
-}
-#[derive(Default)]
-pub struct PoseidonInternalState {
-    after_half_full_round: Vec<u64>,
-    after_half_partial_round: Vec<u64>,
-    after_partial_round: Vec<u64>,
-}
-pub fn padding_zeros_poseidon_input_element(input: Vec<u64>, num_states: usize) -> Vec<u64> {
-    let mut input = input;
-    while input.len() % num_states != 0 {
-        input.push(0);
-    }
-    input
-}
-pub fn poseidon_elements_unsafe(
-    param: &PoseidonParams,
-    input: Vec<u64>,
-    with_state: bool,
-) -> Vec<u64> {
-    let mut input = padding_zeros_poseidon_input_element(input, param.num_states);
+const POSEIDON_SEED_PREFIX: &str = "poseidon_seed";
 
-    while input.len() >= param.num_states {
-        input = padding_zeros_poseidon_input_element(input, param.num_states);
-        for i in 0..input.len() / param.num_states {
-            let mut state = vec![0; param.num_states];
-            state.copy_from_slice(&input[i * param.num_states..(i + 1) * param.num_states]);
-            let output = poseidon_m31_with_internal_states(param, state, with_state);
-            input[i * POSEIDON_HASH_LENGTH..(i + 1) * POSEIDON_HASH_LENGTH]
-                .copy_from_slice(&output[..POSEIDON_HASH_LENGTH]);
-        }
-        input = input[..input.len() / 2].to_vec();
-    }
-    input[..POSEIDON_HASH_LENGTH].to_vec()
-}
-pub fn poseidon_m31_with_internal_states(
-    param: &PoseidonParams,
-    input: Vec<u64>,
-    with_state: bool,
-) -> Vec<u64> {
-    if input.len() != param.num_states {
-        panic!("input length does not match the number of states in the Poseidon parameters");
-    }
-    let mut state = input;
-    let mut internal_state = PoseidonInternalState::default();
-    for i in 0..param.num_half_full_rounds {
-        for (j, cur_state) in state.iter_mut().enumerate().take(param.num_states) {
-            *cur_state = (*cur_state + param.external_round_constant[j][i] as u64) % P;
-        }
-        state = apply_mds_matrix(state, &param.mds_matrix);
-        for cur_state in state.iter_mut().take(param.num_states) {
-            *cur_state = s_box(*cur_state);
-        }
-    }
-    if with_state {
-        internal_state.after_half_full_round.copy_from_slice(&state);
-    }
-    for i in 0..param.num_half_partial_rounds {
-        state[0] = (state[0] + param.internal_round_constant[i] as u64) % P;
-        state = apply_mds_matrix(state, &param.mds_matrix);
-        state[0] = s_box(state[0]);
-    }
-    if with_state {
-        internal_state
-            .after_half_partial_round
-            .copy_from_slice(&state);
-    }
-    for i in 0..param.num_half_partial_rounds {
-        state[0] = (state[0]
-            + param.internal_round_constant[i + param.num_half_partial_rounds] as u64)
-            % P;
-        state = apply_mds_matrix(state, &param.mds_matrix);
-        state[0] = s_box(state[0]);
-    }
-    if with_state {
-        internal_state.after_partial_round.copy_from_slice(&state);
-    }
-    for i in 0..param.num_half_full_rounds {
-        for (j, cur_state) in state.iter_mut().enumerate().take(param.num_states) {
-            *cur_state = (*cur_state
-                + param.external_round_constant[j][i + param.num_half_full_rounds] as u64)
-                % P;
-        }
-        state = apply_mds_matrix(state, &param.mds_matrix);
-        for cur_state in state.iter_mut().take(param.num_states) {
-            *cur_state = s_box(*cur_state);
-        }
-    }
-    state
+const FIELD_NAME: &str = "Mersenne 31";
+
+fn get_constants(width: usize, round_num: usize) -> Vec<Vec<u32>> {
+    let seed = format!("{POSEIDON_SEED_PREFIX}_{}_{}", FIELD_NAME, width);
+
+    let mut keccak = Keccak::v256();
+    let mut buffer = [0u8; 32];
+    keccak.update(seed.as_bytes());
+    keccak.finalize(&mut buffer);
+
+    let mut res = vec![vec![0u32; width]; round_num];
+
+    (0..round_num).for_each(|i| {
+        (0..width).for_each(|j| {
+            let mut keccak = Keccak::v256();
+            keccak.update(&buffer);
+            keccak.finalize(&mut buffer);
+
+            let mut u32_le_bytes = [0u8; 4];
+            u32_le_bytes.copy_from_slice(&buffer[..4]);
+
+            res[i][j] = u32::from_le_bytes(u32_le_bytes);
+        });
+    });
+
+    res
 }
 
-pub fn apply_mds_matrix(state: Vec<u64>, mds: &[Vec<u32>]) -> Vec<u64> {
-    let mut tmp = vec![0; state.len()];
-    for i in 0..state.len() {
-        tmp[i] = state[0] * mds[i][0] as u64;
-        for (j, cur_state) in state.iter().enumerate().skip(1) {
-            tmp[i] += *cur_state * mds[i][j] as u64;
-            tmp[i] %= P;
+const MATRIX_CIRC_MDS_8_SML_ROW: [u32; 8] = [7, 1, 3, 8, 8, 3, 4, 9];
+
+const MATRIX_CIRC_MDS_12_SML_ROW: [u32; 12] = [1, 1, 2, 1, 8, 9, 10, 7, 5, 9, 4, 10];
+
+const MATRIX_CIRC_MDS_16_SML_ROW: [u32; 16] =
+    [1, 1, 51, 1, 11, 17, 2, 1, 101, 63, 15, 2, 67, 22, 13, 3];
+
+fn get_mds_matrix(width: usize) -> Vec<Vec<u32>> {
+    let mds_first_row: &[u32] = match width {
+        8 => &MATRIX_CIRC_MDS_8_SML_ROW,
+        12 => &MATRIX_CIRC_MDS_12_SML_ROW,
+        16 => &MATRIX_CIRC_MDS_16_SML_ROW,
+        _ => panic!("unsupported state width for MDS matrix"),
+    };
+
+    let mut res = vec![vec![0u32; width]; width];
+
+    (0..width).for_each(|i| (0..width).for_each(|j| res[i][j] = mds_first_row[(i + j) % width]));
+
+    res
+}
+
+fn power_5<C: Config, B: RootAPI<C>>(api: &mut B, base: Variable) -> Variable {
+    let pow2 = api.mul(base, base);
+    let pow4 = api.mul(pow2, pow2);
+    api.mul(pow4, base)
+}
+
+pub struct PoseidonM31Params {
+    pub mds_matrix: Vec<Vec<Variable>>,
+    pub round_constants: Vec<Vec<Variable>>,
+
+    pub rate: usize,
+    pub width: usize,
+    pub full_rounds: usize,
+    pub partial_rounds: usize,
+}
+
+impl PoseidonM31Params {
+    pub fn new<C: Config, B: RootAPI<C>>(
+        api: &mut B,
+        rate: usize,
+        width: usize,
+        full_rounds: usize,
+        partial_rounds: usize,
+    ) -> Self {
+        let round_constants = get_constants(width, partial_rounds + full_rounds);
+        let mds_matrix = get_mds_matrix(width);
+
+        let round_constants_variables = (0..partial_rounds + full_rounds)
+            .map(|i| {
+                (0..width)
+                    .map(|j| api.constant(round_constants[i][j]))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+
+        let mds_matrix_variables = (0..width)
+            .map(|i| {
+                (0..width)
+                    .map(|j| api.constant(mds_matrix[i][j]))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+
+        Self {
+            mds_matrix: mds_matrix_variables,
+            round_constants: round_constants_variables,
+            rate,
+            width,
+            full_rounds,
+            partial_rounds,
         }
     }
-    tmp
-}
-pub fn s_box(f: u64) -> u64 {
-    let mut x2 = f * f;
-    x2 %= P;
-    let mut x4 = x2 * x2;
-    x4 %= P;
-    (x4 * f) % P
+
+    fn add_round_constants<C: Config, B: RootAPI<C>>(
+        &self,
+        api: &mut B,
+        state: &mut [Variable],
+        constants: &[Variable],
+    ) {
+        (0..self.width).for_each(|i| state[i] = api.add(state[i], constants[i]))
+    }
+
+    fn apply_mds_matrix<C: Config, B: RootAPI<C>>(&self, api: &mut B, state: &mut [Variable]) {
+        let prev_state = state.to_vec();
+
+        (0..self.width).for_each(|i| {
+            let mut inner_product = api.constant(0);
+            (0..self.width).for_each(|j| {
+                let unit = api.mul(prev_state[j], self.mds_matrix[i][j]);
+                inner_product = api.add(inner_product, unit);
+            });
+            state[i] = inner_product;
+        })
+    }
+
+    fn partial_full_sbox<C: Config, B: RootAPI<C>>(&self, api: &mut B, state: &mut [Variable]) {
+        state[0] = power_5(api, state[0])
+    }
+
+    fn apply_full_sbox<C: Config, B: RootAPI<C>>(&self, api: &mut B, state: &mut [Variable]) {
+        state.iter_mut().for_each(|s| *s = power_5(api, *s))
+    }
+
+    pub fn permute<C: Config, B: RootAPI<C>>(&self, api: &mut B, state: &mut [Variable]) {
+        let half_full_rounds = self.full_rounds / 2;
+        let partial_ends = half_full_rounds + self.partial_rounds;
+
+        assert_eq!(self.width, state.len());
+
+        (0..half_full_rounds).for_each(|i| {
+            self.add_round_constants(api, state, &self.round_constants[i]);
+            self.apply_mds_matrix(api, state);
+            self.apply_full_sbox(api, state)
+        });
+        (half_full_rounds..partial_ends).for_each(|i| {
+            self.add_round_constants(api, state, &self.round_constants[i]);
+            self.apply_mds_matrix(api, state);
+            self.partial_full_sbox(api, state)
+        });
+        (partial_ends..half_full_rounds + partial_ends).for_each(|i| {
+            self.add_round_constants(api, state, &self.round_constants[i]);
+            self.apply_mds_matrix(api, state);
+            self.apply_full_sbox(api, state)
+        });
+    }
+
+    pub fn hash_to_state<C: Config, B: RootAPI<C>>(
+        &self,
+        api: &mut B,
+        inputs: &[Variable],
+    ) -> Vec<Variable> {
+        let mut elts = inputs.to_vec();
+        elts.resize(elts.len().next_multiple_of(self.rate), api.constant(0));
+
+        let mut res = vec![api.constant(0); self.width];
+
+        elts.chunks(self.rate).for_each(|chunk| {
+            let mut state_elts = vec![api.constant(0); self.width - self.rate];
+            state_elts.extend_from_slice(chunk);
+
+            (0..self.width).for_each(|i| res[i] = api.add(res[i], state_elts[i]));
+            self.permute(api, &mut res)
+        });
+
+        res
+    }
 }
 
-pub fn poseidon_elements_hint<C: Config, B: RootAPI<C>>(
-    native: &mut B,
-    _: &PoseidonParams,
-    inputs: Vec<Variable>,
-    _: bool,
-) -> Vec<Variable> {
-    native.new_hint("myhint.poseidonhint", &inputs, POSEIDON_HASH_LENGTH)
-}
+pub const POSEIDON_M31X16_FULL_ROUNDS: usize = 8;
 
-pub fn poseidon_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
-    let mut inputs_u64 = vec![0; inputs.len()];
-    for i in 0..inputs.len() {
-        inputs_u64[i] = inputs[i].to_u256().as_u64();
-    }
-    let param = PoseidonParams::new();
-    let output = poseidon_elements_unsafe(&param, inputs_u64, false);
-    for i in 0..output.len() {
-        outputs[i] = M31::from(output[i] as u32);
-    }
-    Ok(())
-}
+pub const POSEIDON_M31X16_PARTIAL_ROUNDS: usize = 14;
+
+pub const POSEIDON_M31X16_RATE: usize = 8;

@@ -1,6 +1,6 @@
 use expander_compiler::frontend::*;
 
-use crate::{big_int::to_binary_hint, gnark::hints::*, logup::*, poseidon_m31::poseidon_hint};
+use crate::{big_int::to_binary_hint, gnark::hints::*, logup::*};
 
 pub fn simple_select<C: Config, B: RootAPI<C>>(
     native: &mut B,
@@ -51,5 +51,4 @@ pub fn register_hint(hint_registry: &mut HintRegistry<M31>) {
     hint_registry.register("myhint.copye12hint", copy_e12_hint);
     hint_registry.register("myhint.finalexphint", final_exp_hint);
     hint_registry.register("myhint.rangeproofhint", rangeproof_hint);
-    hint_registry.register("myhint.poseidonhint", poseidon_hint);
 }

@@ -1,54 +1,108 @@
 use circuit_std_rs::poseidon_m31::*;
 use expander_compiler::frontend::*;
-use extra::*;
 
-declare_circuit!(PoseidonElementCircuit {
-    inputs: [Variable; 16],
-    outputs: [Variable; POSEIDON_HASH_LENGTH],
+declare_circuit!(PoseidonSpongeLen8Circuit {
+    inputs: [Variable; 8],
+    outputs: [Variable; 16]
 });
 
-impl GenericDefine<M31Config> for PoseidonElementCircuit<Variable> {
-    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
-        let outputs =
-            poseidon_elements_hint(builder, &PoseidonParams::new(), self.inputs.to_vec(), false);
-        for i in 0..POSEIDON_HASH_LENGTH {
-            // println!("i: {}, outputs[i]: {:?}, expect:{:?}", i, builder.value_of(outputs[i]),  builder.value_of(self.outputs[i]));
-            builder.assert_is_equal(self.outputs[i], outputs[i]);
-        }
+impl Define<M31Config> for PoseidonSpongeLen8Circuit<Variable> {
+    fn define(&self, builder: &mut API<M31Config>) {
+        let params = PoseidonM31Params::new(
+            builder,
+            POSEIDON_M31X16_RATE,
+            16,
+            POSEIDON_M31X16_FULL_ROUNDS,
+            POSEIDON_M31X16_PARTIAL_ROUNDS,
+        );
+        let res = params.hash_to_state(builder, &self.inputs);
+        (0..params.width).for_each(|i| builder.assert_is_equal(res[i], self.outputs[i]));
     }
 }
 
 #[test]
-fn test_poseidon_element() {
-    let mut input = vec![0; 31];
-    for i in 0..input.len() {
-        input[i] = i as u64;
+// NOTE(HS) Poseidon Mersenne-31 Width-16 Sponge tested over input length 8
+fn test_poseidon_m31x16_hash_to_state_input_len8() {
+    let compile_result = compile(&PoseidonSpongeLen8Circuit::default()).unwrap();
+
+    let assignment = PoseidonSpongeLen8Circuit::<M31> {
+        inputs: [M31::from(114514); 8],
+        outputs: [
+            M31 { v: 1021105124 },
+            M31 { v: 1342990709 },
+            M31 { v: 1593716396 },
+            M31 { v: 2100280498 },
+            M31 { v: 330652568 },
+            M31 { v: 1371365483 },
+            M31 { v: 586650367 },
+            M31 { v: 345482939 },
+            M31 { v: 849034538 },
+            M31 { v: 175601510 },
+            M31 { v: 1454280121 },
+            M31 { v: 1362077584 },
+            M31 { v: 528171622 },
+            M31 { v: 187534772 },
+            M31 { v: 436020341 },
+            M31 { v: 1441052621 },
+        ],
+    };
+    let witness = compile_result
+        .witness_solver
+        .solve_witness(&assignment)
+        .unwrap();
+    let output = compile_result.layered_circuit.run(&witness);
+    assert_eq!(output, vec![true]);
+}
+
+declare_circuit!(PoseidonSpongeLen16Circuit {
+    inputs: [Variable; 16],
+    outputs: [Variable; 16]
+});
+
+impl Define<M31Config> for PoseidonSpongeLen16Circuit<Variable> {
+    fn define(&self, builder: &mut API<M31Config>) {
+        let params = PoseidonM31Params::new(
+            builder,
+            POSEIDON_M31X16_RATE,
+            16,
+            POSEIDON_M31X16_FULL_ROUNDS,
+            POSEIDON_M31X16_PARTIAL_ROUNDS,
+        );
+        let res = params.hash_to_state(builder, &self.inputs);
+        (0..params.width).for_each(|i| builder.assert_is_equal(res[i], self.outputs[i]));
     }
-    let param = PoseidonParams::new();
-    let output = poseidon_elements_unsafe(&param, input, false);
-    println!("{:?}", output);
 }
 
 #[test]
-fn test_poseidon_element_circuit() {
-    let mut hint_registry = HintRegistry::<M31>::new();
-    hint_registry.register("myhint.poseidonhint", poseidon_hint);
-    let mut input = vec![];
-    for i in 0..16 {
-        input.push(i as u64);
-    }
-    let output = poseidon_elements_unsafe(&PoseidonParams::new(), input.clone(), false);
-    let mut assignment = PoseidonElementCircuit::default();
-    for i in 0..16 {
-        assignment.inputs[i] = M31::from(input[i].clone() as u32);
-    }
-    for i in 0..POSEIDON_HASH_LENGTH {
-        assignment.outputs[i] = M31::from(output[i] as u32);
-    }
+// NOTE(HS) Poseidon Mersenne-31 Width-16 Sponge tested over input length 16
+fn test_poseidon_m31x16_hash_to_state_input_len16() {
+    let compile_result = compile(&PoseidonSpongeLen16Circuit::default()).unwrap();
 
-    debug_eval(
-        &PoseidonElementCircuit::default(),
-        &assignment,
-        hint_registry,
-    );
+    let assignment = PoseidonSpongeLen16Circuit::<M31> {
+        inputs: [M31::from(114514); 16],
+        outputs: [
+            M31 { v: 1510043913 },
+            M31 { v: 1840611937 },
+            M31 { v: 45881205 },
+            M31 { v: 1134797377 },
+            M31 { v: 803058407 },
+            M31 { v: 1772167459 },
+            M31 { v: 846553905 },
+            M31 { v: 2143336151 },
+            M31 { v: 300871060 },
+            M31 { v: 545838827 },
+            M31 { v: 1603101164 },
+            M31 { v: 396293243 },
+            M31 { v: 502075988 },
+            M31 { v: 2067011878 },
+            M31 { v: 402134378 },
+            M31 { v: 535675968 },
+        ],
+    };
+    let witness = compile_result
+        .witness_solver
+        .solve_witness(&assignment)
+        .unwrap();
+    let output = compile_result.layered_circuit.run(&witness);
+    assert_eq!(output, vec![true]);
 }

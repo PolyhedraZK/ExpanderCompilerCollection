@@ -1,5 +1,4 @@
 use circuit_std_rs::poseidon_m31::*;
-use circuit_std_rs::poseidon_m31_var::poseidon_variable_unsafe;
 use expander_compiler::frontend::*;
 use serde::Deserialize;
 
@@ -94,7 +93,13 @@ impl ValidatorSSZ {
         for i in 0..8 {
             inputs.push(self.withdrawable_epoch[i]);
         }
-        // let hash = poseidon_elements_hint(builder, &PoseidonParams::new(), inputs, false);
-        poseidon_variable_unsafe(builder, &PoseidonParams::new(), inputs, false)
+        let params = PoseidonM31Params::new(
+            builder,
+            POSEIDON_M31X16_RATE,
+            16,
+            POSEIDON_M31X16_FULL_ROUNDS,
+            POSEIDON_M31X16_PARTIAL_ROUNDS,
+        );
+        params.hash_to_state(builder, &inputs)
     }
 }

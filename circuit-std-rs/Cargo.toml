@@ -20,4 +20,5 @@ big-int = "7.0.0"
 num-bigint = "0.4.6"
 num-traits = "0.2.19"
 ark-bls12-381 = "0.5.0"
+tiny-keccak = { version = "2.0.2", features = [ "sha3", "keccak" ] }
 ark-ff = "0.5.0"
