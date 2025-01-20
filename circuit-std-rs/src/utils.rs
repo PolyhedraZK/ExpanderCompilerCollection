@@ -51,4 +51,8 @@ pub fn register_hint(hint_registry: &mut HintRegistry<M31>) {
     hint_registry.register("myhint.copye12hint", copy_e12_hint);
     hint_registry.register("myhint.finalexphint", final_exp_hint);
     hint_registry.register("myhint.rangeproofhint", rangeproof_hint);
+    hint_registry.register("myhint.getsqrtx0x1fq2newhint", get_sqrt_x0x1_fq2_new_hint);
+    hint_registry.register("myhint.getsqrtx0x1fqnewhint", get_sqrt_x0x1_fq_new_hint);
+    hint_registry.register("myhint.getelementsqrthint", get_element_sqrt_hint);
+    hint_registry.register("myhint.gete2sqrthint", get_e2_sqrt_hint);
 }

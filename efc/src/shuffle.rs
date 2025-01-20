@@ -516,9 +516,9 @@ pub fn aggregate_attestation_public_key<C: Config, B: RootAPI<C>>(
         has_first_flag = simple_select(builder, validator_agg_bits[i], one_var, has_first_flag);
     }
     g1.curve_f
-        .assert_isequal(builder, &aggregated_pubkey.x, &agg_pubkey.x);
+        .assert_is_equal(builder, &aggregated_pubkey.x, &agg_pubkey.x);
     g1.curve_f
-        .assert_isequal(builder, &aggregated_pubkey.y, &agg_pubkey.y);
+        .assert_is_equal(builder, &aggregated_pubkey.y, &agg_pubkey.y);
 }
 
 pub fn generate_shuffle_witnesses(dir: &str) {

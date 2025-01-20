@@ -122,9 +122,6 @@ impl GenericDefine<M31Config> for PairingCircuit<Variable> {
         let mut g2 = G2::new(builder);
         let neg_sig_g2 = g2.neg(builder, &sig_g2);
 
-        // P := []*G1Affine{&one_g1, &pubkey_g1}
-        // Q := []*G2Affine{neg_sig_g2, &hm_g2}
-        // pairing.pairingcheck(P, Q)
         let p_array = vec![one_g1, pubkey_g1];
         let mut q_array = [
             G2Affine {
@@ -164,23 +161,6 @@ pub fn generate_pairing_witnesses(dir: &str) {
             .unwrap();
         compile_result.witness_solver
     };
-    // let w_s: witness_solver::WitnessSolver<M31Config>;
-    // if std::fs::metadata("pairing.witness").is_ok() {
-    //     println!("The solver exists!");
-    //     w_s = witness_solver::WitnessSolver::deserialize_from(
-    //         std::fs::File::open("pairing.witness").unwrap(),
-    //     )
-    //     .unwrap();
-    // } else {
-    //     println!("The solver does not exist.");
-    //     let compile_result =
-    //         compile_generic(&PairingCircuit::default(), CompileOptions::default()).unwrap();
-    //     compile_result
-    //         .witness_solver
-    //         .serialize_into(std::fs::File::create("pairing.witness").unwrap())
-    //         .unwrap();
-    //     w_s = compile_result.witness_solver;
-    // }
 
     println!("Start generating witnesses...");
     let start_time = std::time::Instant::now();
@@ -232,3 +212,74 @@ pub fn generate_pairing_witnesses(dir: &str) {
         end_time.duration_since(start_time)
     );
 }
+
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use crate::utils::ensure_directory_exists;
+//     use std::fs::File;
+//     use std::io::Write;
+
+//     declare_circuit!(VerifySigCircuit {
+//         pubkey: [[Variable; 48]; 2],
+//         slot: [Variable; 8],
+//         committee_index: [Variable; 8],
+//         beacon_block_root: [[Variable; 8]; 32],
+//         source_epoch: [Variable; 8],
+//         target_epoch: [Variable; 8],
+//         source_root: [Variable; 32],
+//         target_root: [Variable; 32],
+//         sig_byte: [Variable; 48]
+//     });
+
+//     impl GenericDefine<M31Config> for VerifySigCircuit<Variable> {
+//         fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
+//             let mut pairing = Pairing::new(builder);
+//             let one_g1 = G1Affine::one(builder);
+//             let pubkey_g1 = G1Affine::from_vars(self.pubkey[0].to_vec(), self.pubkey[1].to_vec());
+//             let sig_g2 = G2AffP::from_vars(
+//                 self.sig[0][0].to_vec(),
+//                 self.sig[0][1].to_vec(),
+//                 self.sig[1][0].to_vec(),
+//                 self.sig[1][1].to_vec(),
+//             );
+
+//             let mut g2 = G2::new(builder);
+//             let neg_sig_g2 = g2.neg(builder, &sig_g2);
+
+//             let (hm0, hm1) = g2.hash_to_fp(builder, self.msg.to_vec());
+//             let res = g2.map_to_g2(builder, &hm0, &hm1);
+
+//             let p_array = vec![one_g1, pubkey_g1];
+//             let mut q_array = [
+//                 G2Affine {
+//                     p: neg_sig_g2,
+//                     lines: LineEvaluations::default(),
+//                 },
+//                 G2Affine {
+//                     p: res,
+//                     lines: LineEvaluations::default(),
+//                 },
+//             ];
+//             pairing
+//                 .pairing_check(builder, &p_array, &mut q_array)
+//                 .unwrap();
+//             pairing.ext12.ext6.ext2.curve_f.check_mul(builder);
+//             pairing.ext12.ext6.ext2.curve_f.table.final_check(builder);
+//             pairing.ext12.ext6.ext2.curve_f.table.final_check(builder);
+//             pairing.ext12.ext6.ext2.curve_f.table.final_check(builder);
+//         }
+//     }
+
+//     #[test]
+//     fn test_pairing_circuit() {
+
+//         /*
+//         att 0
+//         att.Data.Slot 9280000
+//         att.Data.CommitteeIndex 0
+//         att.Data.BeaconBlockRoot [31 28 22 87 106 251 75 169 100 167 224 201 6 63 144 105 213 235 18 224 169 157 122 56 47 48 28 31 124 69 38 248]
+//         att.Data.Source 289999 [194 212 152 232 56 145 101 103 73 230 240 242 89 129 63 184 38 157 86 185 251 148 157 68 227 144 241 74 228 200 206 199]
+//         att.Data.Target 290000 [31 28 22 87 106 251 75 169 100 167 224 201 6 63 144 105 213 235 18 224 169 157 122 56 47 48 28 31 124 69 38 248]
+//         att.Signature [170 121 191 2 187 22 51 113 109 233 89 181 237 140 207 117 72 230 115 61 124 161 23 145 241 245 211 134 175 182 206 188 124 240 51 154 121 27 217 24 126 83 70 24 90 206 50 148 2 182 65 209 6 215 131 231 254 32 229 193 207 91 52 22 89 10 212 80 4 160 179 150 246 97 120 81 28 231 36 195 223 118 194 250 230 31 182 130 163 236 45 222 26 229 163 89]
+//          */
