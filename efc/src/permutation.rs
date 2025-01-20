@@ -114,7 +114,7 @@ impl GenericDefine<M31Config> for PermutationIndicesValidatorHashesCircuit<Varia
         for (i, active_validator_hashbit) in active_validator_hash
             .iter()
             .enumerate()
-            .take(POSEIDON_HASH_LENGTH)
+            .take(POSEIDON_M31X16_RATE)
         {
             builder.assert_is_equal(active_validator_hashbit, self.active_validator_bits_hash[i]);
         }
@@ -243,14 +243,14 @@ pub fn generate_permutation_hashes_witness(dir: &str) {
         register_hint(&mut hint_registry);
         let mut assignment = PermutationIndicesValidatorHashesCircuit::<M31> {
             query_indices: [M31::from(0); QUERY_SIZE],
-            query_validator_hashes: [[M31::from(0); POSEIDON_HASH_LENGTH]; QUERY_SIZE],
-            active_validator_bits_hash: [M31::from(0); POSEIDON_HASH_LENGTH],
+            query_validator_hashes: [[M31::from(0); POSEIDON_M31X16_RATE]; QUERY_SIZE],
+            active_validator_bits_hash: [M31::from(0); POSEIDON_M31X16_RATE],
             active_validator_bits: [M31::from(0); VALIDATOR_COUNT],
-            table_validator_hashes: [[M31::from(0); POSEIDON_HASH_LENGTH]; VALIDATOR_COUNT],
+            table_validator_hashes: [[M31::from(0); POSEIDON_M31X16_RATE]; VALIDATOR_COUNT],
             real_keys: [M31::from(0); VALIDATOR_COUNT],
         };
         for i in 0..VALIDATOR_COUNT {
-            for j in 0..POSEIDON_HASH_LENGTH {
+            for j in 0..POSEIDON_M31X16_RATE {
                 assignment.table_validator_hashes[i][j] =
                     M31::from(permutation_hash_data.table_validator_hashes[i][j]);
             }
@@ -260,12 +260,12 @@ pub fn generate_permutation_hashes_witness(dir: &str) {
         }
         for i in 0..QUERY_SIZE {
             assignment.query_indices[i] = M31::from(permutation_hash_data.query_indices[i]);
-            for j in 0..POSEIDON_HASH_LENGTH {
+            for j in 0..POSEIDON_M31X16_RATE {
                 assignment.query_validator_hashes[i][j] =
                     M31::from(permutation_hash_data.query_validator_hashes[i][j]);
             }
         }
-        for i in 0..POSEIDON_HASH_LENGTH {
+        for i in 0..POSEIDON_M31X16_RATE {
             assignment.active_validator_bits_hash[i] =
                 M31::from(permutation_hash_data.active_validator_bits_hash[i]);
         }
