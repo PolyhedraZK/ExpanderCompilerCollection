@@ -35,7 +35,7 @@ fn example<C: Config>() {
         .unwrap();
     let output = compile_result.layered_circuit.run(&witness);
     for x in output.iter() {
-        assert_eq!(*x, true);
+        assert!(*x);
     }
 
     let mut expander_circuit = compile_result

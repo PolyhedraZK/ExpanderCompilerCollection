@@ -18,7 +18,7 @@ declare_circuit!(SHA256CircuitCompressionOnly {
 
 impl GenericDefine<GF2Config> for SHA256CircuitCompressionOnly<Variable> {
     fn define<Builder: RootAPI<GF2Config>>(&self, api: &mut Builder) {
-        let hasher = SHA256GF2::new(api);
+        let hasher = SHA256GF2::new();
         let mut state = SHA256_INIT_STATE
             .iter()
             .map(|x| u32_to_bit(api, *x))
@@ -48,12 +48,11 @@ fn test_sha256_compression_gf2() {
     let n_tests = 5;
     for _ in 0..n_tests {
         let data = [rng.next_u32() as u8; 512 / 8];
-        let mut state = SHA256_INIT_STATE.clone();
+        let mut state = SHA256_INIT_STATE;
         compress(&mut state, &[data.try_into().unwrap()]);
         let output = state
             .iter()
-            .map(|v| v.to_be_bytes())
-            .flatten()
+            .flat_map(|v| v.to_be_bytes())
             .collect::<Vec<_>>();
 
         let mut assignment = SHA256CircuitCompressionOnly::default();
@@ -91,7 +90,7 @@ declare_circuit!(SHA256Circuit {
 
 impl GenericDefine<GF2Config> for SHA256Circuit<Variable> {
     fn define<Builder: RootAPI<GF2Config>>(&self, api: &mut Builder) {
-        let mut hasher = SHA256GF2::new(api);
+        let mut hasher = SHA256GF2::new();
         hasher.update(&self.input);
         let output = hasher.finalize(api);
         (0..OUTPUT_LEN).for_each(|i| api.assert_is_equal(output[i], self.output[i]));
@@ -112,7 +111,7 @@ fn test_sha256_gf2() {
     for _ in 0..n_tests {
         let data = [rng.next_u32() as u8; INPUT_LEN / 8];
         let mut hash = Sha256::new();
-        hash.update(&data);
+        hash.update(data);
         let output = hash.finalize();
         let mut assignment = SHA256Circuit::default();
         for i in 0..INPUT_LEN / 8 {

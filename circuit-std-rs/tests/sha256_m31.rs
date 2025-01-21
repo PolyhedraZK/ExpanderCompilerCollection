@@ -39,7 +39,7 @@ fn test_sha256_37bytes() {
     for i in 0..1 {
         let data = [i; 37];
         let mut hash = Sha256::new();
-        hash.update(&data);
+        hash.update(data);
         let output = hash.finalize();
         let mut assignment = SHA25637BYTESCircuit::default();
         for i in 0..37 {
@@ -63,7 +63,7 @@ fn debug_sha256_37bytes() {
     hint_registry.register("myhint.tobinary", to_binary_hint);
     let data = [255; 37];
     let mut hash = Sha256::new();
-    hash.update(&data);
+    hash.update(data);
     let output = hash.finalize();
     let mut assignment = SHA25637BYTESCircuit::default();
     for i in 0..37 {

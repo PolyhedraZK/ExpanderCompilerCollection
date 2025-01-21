@@ -2,9 +2,8 @@ use expander_compiler::frontend::*;
 
 use super::gf2_utils::*;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct SHA256GF2 {
-    cst_k: [Sha256Word; 64],
     data: Vec<Variable>,
 }
 
@@ -24,15 +23,8 @@ const SHA256_K: [u32; 64] = [
 ];
 
 impl SHA256GF2 {
-    pub fn new(api: &mut impl RootAPI<GF2Config>) -> Self {
-        let cst_k = SHA256_K
-            .iter()
-            .map(|&x| u32_to_bit(api, x))
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap();
-        SHA256GF2 {
-            cst_k,
+    pub fn new() -> Self {
+        Self {
             data: Vec::new(),
         }
     }
@@ -81,7 +73,7 @@ impl SHA256GF2 {
 
         let mut w = [[api.constant(0); 32]; 64];
         for i in 0..16 {
-            w[i] = input[(i * 32)..((i + 1) * 32) as usize].try_into().unwrap();
+            w[i] = input[(i * 32)..((i + 1) * 32)].try_into().unwrap();
         }
         for i in 16..64 {
             let lower_sigma1 = lower_case_sigma1(api, &w[i - 2]);
@@ -94,21 +86,22 @@ impl SHA256GF2 {
         }
 
         for i in 0..64 {
+            let w_plus_k = add_const(api, &w[i], SHA256_K[i]);
             let capital_sigma_1_e = capital_sigma1(api, &e);
             let ch_e_f_g = ch(api, &e, &f, &g);
-            let t_1 = sum_all(api, &[h, capital_sigma_1_e, ch_e_f_g, self.cst_k[i], w[i]]);
+            let t_1 = sum_all(api, &[h, capital_sigma_1_e, ch_e_f_g, w_plus_k]);
 
             let capital_sigma_0_a = capital_sigma0(api, &a);
             let maj_a_b_c = maj(api, &a, &b, &c);
             let t_2 = add(api, &capital_sigma_0_a, &maj_a_b_c);
 
-            h = g.clone();
-            g = f.clone();
-            f = e.clone();
+            h = g;
+            g = f;
+            f = e;
             e = add(api, &d, &t_1);
-            d = c.clone();
-            c = b.clone();
-            b = a.clone();
+            d = c;
+            c = b;
+            b = a;
             a = add(api, &t_1, &t_2);
         }
 
@@ -124,8 +117,8 @@ impl SHA256GF2 {
 
     #[allow(dead_code)]
     fn display_state(&self, api: &mut impl RootAPI<GF2Config>, state: &[Sha256Word; 8]) {
-        for i in 0..8 {
-            api.display(&format!("{}", i), state[i][30].clone());
+        for (i, s) in state.iter().enumerate() {
+            api.display(&format!("{}", i), s[30]);
         }
     }
 }

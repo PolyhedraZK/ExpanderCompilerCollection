@@ -9,8 +9,8 @@ where
     Cir: StdCircuit<Cfg>,
 {
     let mut rng = thread_rng();
-    let compile_result: CompileResult<Cfg> = compile(&Cir::new_circuit(&params)).unwrap();
-    let assignment = Cir::new_assignment(&params, &mut rng);
+    let compile_result: CompileResult<Cfg> = compile(&Cir::new_circuit(params)).unwrap();
+    let assignment = Cir::new_assignment(params, &mut rng);
     let witness = compile_result
         .witness_solver
         .solve_witness(&assignment)

@@ -5,7 +5,7 @@ pub type Sha256Word = [Variable; 32];
 // parse the u32 into 32 bits, big-endian
 pub fn u32_to_bit<C: Config, Builder: RootAPI<C>>(api: &mut Builder, value: u32) -> [Variable; 32] {
     (0..32)
-        .map(|i| api.constant(((value >> (31 - i)) & 1) as u32))
+        .map(|i| api.constant((value >> (31 - i)) & 1))
         .collect::<Vec<Variable>>()
         .try_into()
         .expect("Iterator should have exactly 32 elements")
@@ -23,8 +23,8 @@ pub fn rotate_right(bits: &Sha256Word, k: usize) -> Sha256Word {
     assert!(bits.len() & (bits.len() - 1) == 0);
     let n = bits.len();
     let s = n - k;
-    let mut new_bits = bits[s as usize..].to_vec();
-    new_bits.append(&mut bits[0..s as usize].to_vec());
+    let mut new_bits = bits[s..].to_vec();
+    new_bits.append(&mut bits[0..s].to_vec());
     new_bits.try_into().unwrap()
 }
 
@@ -127,7 +127,7 @@ pub fn add_const<C: Config, Builder: RootAPI<C>>(
     b: u32,
 ) -> Sha256Word {
     let n = a.len();
-    let mut c = a.clone();
+    let mut c = *a;
     let mut ci = api.constant(0);
     for i in (0..n).rev() {
         if (b >> (31 - i)) & 1 == 1 {
@@ -151,8 +151,8 @@ pub fn add_brentkung<C: Config, Builder: RootAPI<C>>(
     b: &Sha256Word,
 ) -> Sha256Word {
     // temporary solution to change endianness, big -> little
-    let mut a = a.clone();
-    let mut b = b.clone();
+    let mut a = *a;
+    let mut b = *b;
     a.reverse();
     b.reverse();
 
@@ -164,7 +164,7 @@ pub fn add_brentkung<C: Config, Builder: RootAPI<C>>(
         let end = start + 4;
 
         let (sum, ci_next) =
-            brent_kung_adder_4_bits(api, &a[start..end].to_vec(), &b[start..end].to_vec(), ci);
+            brent_kung_adder_4_bits(api, &a[start..end], &b[start..end], ci);
         ci = ci_next;
 
         c[start..end].copy_from_slice(&sum);
@@ -177,8 +177,8 @@ pub fn add_brentkung<C: Config, Builder: RootAPI<C>>(
 
 fn brent_kung_adder_4_bits<C: Config, Builder: RootAPI<C>>(
     api: &mut Builder,
-    a: &Vec<Variable>,
-    b: &Vec<Variable>,
+    a: &[Variable],
+    b: &[Variable],
     carry_in: Variable,
 ) -> ([Variable; 4], Variable) {
     let mut g = [api.constant(0); 4];
