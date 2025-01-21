@@ -40,6 +40,7 @@ pub fn register_hint(hint_registry: &mut HintRegistry<M31>) {
     hint_registry.register("myhint.copyvarshint", copy_vars_hint);
     hint_registry.register("myhint.divhint", div_hint);
     hint_registry.register("myhint.invhint", inv_hint);
+    hint_registry.register("myhint.copyelementhint", copy_element_hint);
     hint_registry.register("myhint.dive2hint", div_e2_hint);
     hint_registry.register("myhint.inversee2hint", inverse_e2_hint);
     hint_registry.register("myhint.copye2hint", copy_e2_hint);

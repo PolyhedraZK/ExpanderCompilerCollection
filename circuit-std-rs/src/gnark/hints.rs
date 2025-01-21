@@ -788,6 +788,19 @@ pub fn copy_vars_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> 
     outputs.copy_from_slice(&inputs[..outputs.len()]);
     Ok(())
 }
+pub fn copy_element_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+    if let Err(err) = unwrap_hint(
+        true,
+        true,
+        inputs,
+        outputs,
+        //copyE2Hint
+        |inputs| inputs,
+    ) {
+        panic!("copyElementHint: {}", err);
+    }
+    Ok(())
+}
 pub fn copy_e2_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     if let Err(err) = unwrap_hint(
         true,

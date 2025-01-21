@@ -177,6 +177,7 @@ impl G2 {
         res = self.g2_double(native, &res);
         res = self.g2_double(native, &res);
         res = self.g2_add(native, &res, &ops[1]);
+        // let mut copy_res = self.copy_g2_aff_p(native, &res);
         for w in b {
             let mut mask = 0xc0;
             for j in 0..4 {
@@ -684,7 +685,7 @@ mod tests {
 
     #[test]
     fn test_hash_to_g2() {
-        // compile_generic(&HashToG2Circuit::default(), CompileOptions::default()).unwrap();
+        compile_generic(&HashToG2Circuit::default(), CompileOptions::default()).unwrap();
         let mut hint_registry = HintRegistry::<M31>::new();
         register_hint(&mut hint_registry);
         let mut assignment = HashToG2Circuit::<M31> {

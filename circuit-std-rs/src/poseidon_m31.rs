@@ -179,6 +179,29 @@ impl PoseidonM31Params {
 
         res
     }
+    pub fn hash_to_state_flatten<C: Config, B: RootAPI<C>>(
+        &self,
+        api: &mut B,
+        inputs: &[Variable],
+    ) -> Vec<Variable> {
+        let mut elts = inputs.to_vec();
+        elts.resize(elts.len().next_multiple_of(self.rate), api.constant(0));
+
+        let mut res = vec![api.constant(0); self.width];
+        let mut copy_res =
+        api.new_hint("myhint.copyvarshint", &res, res.len());
+        elts.chunks(self.rate).for_each(|chunk| {
+            let mut state_elts = vec![api.constant(0); self.width - self.rate];
+            state_elts.extend_from_slice(chunk);
+
+            (0..self.width).for_each(|i| res[i] = api.add(copy_res[i], state_elts[i]));
+            self.permute(api, &mut res);
+            copy_res =
+            api.new_hint("myhint.copyvarshint", &res, res.len());
+        });
+
+        res
+    }
 }
 
 pub const POSEIDON_M31X16_FULL_ROUNDS: usize = 8;

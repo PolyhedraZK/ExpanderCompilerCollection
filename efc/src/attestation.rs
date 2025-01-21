@@ -164,39 +164,43 @@ const ZERO_HASHES: [&[u8]; 40] = [
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct CheckpointPlain {
-    #[serde(default)]
     pub epoch: u64,
-    #[serde(default)]
     pub root: String,
 }
 #[derive(Debug, Deserialize, Clone)]
-pub struct AttestationPlain {
+pub struct AttestationData {
     #[serde(default)]
     pub slot: u64,
     #[serde(default)]
     pub committee_index: u64,
-    #[serde(default)]
-    pub beacon_beacon_block_root: String,
+    pub beacon_block_root: String,
     pub source: CheckpointPlain,
     pub target: CheckpointPlain,
 }
+#[derive(Debug, Deserialize, Clone)]
+pub struct Attestation {
+    #[serde(default)]
+    pub aggregation_bits: String, 
+    pub data: AttestationData,
+    pub signature: String,
+}
 
 #[derive(Default, Clone, Copy)]
-pub struct AttestationSSZ {
+pub struct AttestationDataSSZ {
     pub slot: [Variable; 8],
     pub committee_index: [Variable; 8],
-    pub beacon_beacon_block_root: [Variable; 32],
+    pub beacon_block_root: [Variable; 32],
     pub source_epoch: [Variable; 8],
     pub target_epoch: [Variable; 8],
     pub source_root: [Variable; 32],
     pub target_root: [Variable; 32],
 }
-impl AttestationSSZ {
+impl AttestationDataSSZ {
     pub fn new() -> Self {
         Self {
             slot: [Variable::default(); 8],
             committee_index: [Variable::default(); 8],
-            beacon_beacon_block_root: [Variable::default(); 32],
+            beacon_block_root: [Variable::default(); 32],
             source_epoch: [Variable::default(); 8],
             target_epoch: [Variable::default(); 8],
             source_root: [Variable::default(); 32],
@@ -230,7 +234,7 @@ impl AttestationSSZ {
         let mut inputs = Vec::new();
         inputs.extend_from_slice(&append_to_32_bytes(builder, &self.slot));
         inputs.extend_from_slice(&append_to_32_bytes(builder, &self.committee_index));
-        inputs.extend_from_slice(&self.beacon_beacon_block_root);
+        inputs.extend_from_slice(&self.beacon_block_root);
         let source_checkpoint_root =
             self.check_point_hash_tree_variable(builder, &self.source_epoch, &self.source_root);
         inputs.extend_from_slice(&source_checkpoint_root);
@@ -322,10 +326,10 @@ declare_circuit!(AttHashCircuit {
 
 impl GenericDefine<M31Config> for AttHashCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
-        let att_ssz = AttestationSSZ {
+        let att_ssz = AttestationDataSSZ {
             slot: self.slot,
             committee_index: self.committee_index,
-            beacon_beacon_block_root: self.beacon_beacon_block_root,
+            beacon_block_root: self.beacon_beacon_block_root,
             source_epoch: self.source_epoch,
             target_epoch: self.target_epoch,
             source_root: self.source_root,
@@ -339,6 +343,8 @@ impl GenericDefine<M31Config> for AttHashCircuit<Variable> {
 }
 #[cfg(test)]
 mod tests {
+    use crate::{attestation::Attestation, utils::read_from_json_file};
+
     use super::AttHashCircuit;
     use circuit_std_rs::utils::register_hint;
     use expander_compiler::frontend::*;
@@ -413,5 +419,12 @@ mod tests {
         }
 
         debug_eval(&AttHashCircuit::default(), &assignment, hint_registry);
+    }
+
+    #[test]
+    fn read_attestation(){
+    let file_path = "./data/slotAttestationsFolded.json";
+    let attestations: Vec<Attestation> = read_from_json_file(file_path).unwrap();
+    println!("attestations[0]:{:?}", attestations[0]);
     }
 }

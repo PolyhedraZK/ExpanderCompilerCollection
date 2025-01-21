@@ -374,6 +374,14 @@ impl<T: FieldParams> GField<T> {
         };
         self.mul_checks.push(mc);
     }
+    pub fn copy<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &Element<T>) -> Element<T> {
+        let inputs = vec![x.my_clone()];
+        let output = self
+            .new_hint(native, "myhint.copyelementhint", 1, inputs);
+        let res = output[0].my_clone();
+        self.assert_is_equal(native, x, &res);
+        res
+    }
     pub fn assert_is_equal<C: Config, B: RootAPI<C>>(
         &mut self,
         native: &mut B,

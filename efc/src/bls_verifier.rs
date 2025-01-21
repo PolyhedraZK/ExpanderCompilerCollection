@@ -74,17 +74,16 @@ declare_circuit!(PairingCircuit {
     sig: [[[Variable; 48]; 2]; 2]
 });
 
+pub fn convert_limbs(limbs: Vec<u8>) -> [M31; 48] {
+    let converted: Vec<M31> = limbs.into_iter().map(|x| M31::from(x as u32)).collect();
+    converted.try_into().expect("Limbs should have 48 elements")
+}
+
+pub fn convert_point(point: Coordinate) -> [[M31; 48]; 2] {
+    [convert_limbs(point.a0.limbs), convert_limbs(point.a1.limbs)]
+}
 impl PairingCircuit<M31> {
     pub fn from_entry(entry: &PairingEntry) -> Self {
-        fn convert_limbs(limbs: Vec<u8>) -> [M31; 48] {
-            let converted: Vec<M31> = limbs.into_iter().map(|x| M31::from(x as u32)).collect();
-            converted.try_into().expect("Limbs should have 48 elements")
-        }
-
-        fn convert_point(point: Coordinate) -> [[M31; 48]; 2] {
-            [convert_limbs(point.a0.limbs), convert_limbs(point.a1.limbs)]
-        }
-
         PairingCircuit {
             pubkey: [
                 convert_limbs(entry.pub_key.x.limbs.clone()),
