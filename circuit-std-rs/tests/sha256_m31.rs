@@ -1,4 +1,4 @@
-use circuit_std_rs::{sha256::m31_utils::to_binary_hint, sha256::m31::sha256_37bytes};
+use circuit_std_rs::{sha256::m31::sha256_37bytes, sha256::m31_utils::to_binary_hint};
 use expander_compiler::frontend::*;
 use extra::*;
 use sha2::{Digest, Sha256};

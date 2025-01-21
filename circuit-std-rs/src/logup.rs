@@ -284,13 +284,13 @@ impl LogUpSingleKeyTable {
     pub fn query(&mut self, key: Variable, value: Vec<Variable>) {
         self.add_query(key, value);
     }
-    
+
     pub fn batch_query(&mut self, keys: Vec<Variable>, values: Vec<Vec<Variable>>) {
         for i in 0..keys.len() {
             self.add_query(keys[i], values[i].clone());
         }
     }
-    
+
     pub fn final_check<C: Config, B: RootAPI<C>>(&mut self, builder: &mut B) {
         if self.table.is_empty() || self.query_keys.is_empty() {
             panic!("empty table or empty query");

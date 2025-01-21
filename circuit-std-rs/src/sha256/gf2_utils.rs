@@ -70,7 +70,6 @@ pub fn maj<C: Config, Builder: RootAPI<C>>(
     xor(api, &tmp, &yz)
 }
 
-
 // sigma0 function: ROTR(x, 7) XOR ROTR(x, 18) XOR SHR(x, 3)
 pub fn lower_case_sigma0<C: Config, Builder: RootAPI<C>>(
     api: &mut Builder,
@@ -233,10 +232,7 @@ pub fn add<C: Config, Builder: RootAPI<C>>(
     add_brentkung(api, a, b)
 }
 
-pub fn sum_all<C: Config, Builder: RootAPI<C>>(
-    api: &mut Builder,
-    vs: &[Sha256Word],
-) -> Sha256Word {
+pub fn sum_all<C: Config, Builder: RootAPI<C>>(api: &mut Builder, vs: &[Sha256Word]) -> Sha256Word {
     let mut n_values_to_sum = vs.len();
     let mut vvs = vs.to_vec();
 
@@ -253,7 +249,7 @@ pub fn sum_all<C: Config, Builder: RootAPI<C>>(
 
         n_values_to_sum = (n_values_to_sum + 1) / 2;
     }
-    
+
     vvs[0]
 }
 

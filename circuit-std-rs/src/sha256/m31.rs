@@ -131,7 +131,7 @@ impl MyDigest {
         big_endian_m31_array_put_uint32(api, &mut digest[28..], self.h[7]);
         digest
     }
-    
+
     fn block<C: Config, B: RootAPI<C>>(
         &mut self,
         api: &mut B,
