@@ -75,7 +75,8 @@ impl SHA256GF2 {
         input: &[Variable; 512],
     ) {
         let [mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut h] = state;
-    
+        // self.display_state(api, state);
+
         let mut w = [[api.constant(0); 32]; 64];
         for i in 0..16 {
             w[i] = input[(i * 32)..((i + 1) * 32) as usize].try_into().unwrap();
@@ -126,6 +127,13 @@ impl SHA256GF2 {
         state[5] = add(api, &state[5], &f);
         state[6] = add(api, &state[6], &g);
         state[7] = add(api, &state[7], &h);
+    }
+
+    #[allow(dead_code)]
+    fn display_state(&self, api: &mut impl RootAPI<GF2Config>, state: &[Sha256Word; 8]) {
+        for i in 0..8 {
+            api.display(&format!("{}", i), state[i][30].clone());
+        }
     }
 }
 
