@@ -163,8 +163,7 @@ pub fn add_brentkung<C: Config, Builder: RootAPI<C>>(
         let start = i * 4;
         let end = start + 4;
 
-        let (sum, ci_next) =
-            brent_kung_adder_4_bits(api, &a[start..end], &b[start..end], ci);
+        let (sum, ci_next) = brent_kung_adder_4_bits(api, &a[start..end], &b[start..end], ci);
         ci = ci_next;
 
         c[start..end].copy_from_slice(&sum);

@@ -24,9 +24,7 @@ const SHA256_K: [u32; 64] = [
 
 impl SHA256GF2 {
     pub fn new() -> Self {
-        Self {
-            data: Vec::new(),
-        }
+        Self { data: Vec::new() }
     }
 
     // data can have arbitrary length, do not have to be aligned to 512 bits
