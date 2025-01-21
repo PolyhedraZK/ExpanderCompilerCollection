@@ -8,7 +8,7 @@ use sha2::{Digest, Sha256};
 mod sha256_debug_utils;
 use sha256_debug_utils::{compress, H256_256 as SHA256_INIT_STATE};
 
-const INPUT_LEN: usize = 1024; // input size in bits, must be a power of 8
+const INPUT_LEN: usize = 1024; // input size in bits, must be a multiple of 8
 const OUTPUT_LEN: usize = 256; // FIXED 256
 
 declare_circuit!(SHA256CircuitCompressionOnly {
@@ -42,7 +42,7 @@ fn test_sha256_compression_gf2() {
     // .unwrap();
 
     let compile_result =
-        compile_generic_cross_layer(&SHA256Circuit::default(), CompileOptions::default()).unwrap();
+        compile_generic_cross_layer(&SHA256CircuitCompressionOnly::default(), CompileOptions::default()).unwrap();
 
     let mut rng = rand::thread_rng();
     let n_tests = 5;
