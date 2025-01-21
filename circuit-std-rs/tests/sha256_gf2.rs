@@ -3,7 +3,7 @@ use expander_compiler::frontend::*;
 use rand::RngCore;
 use sha2::{Digest, Sha256};
 
-const INPUT_LEN: usize = 447; // input size in bits, must be a power of 8
+const INPUT_LEN: usize = 8; // input size in bits, must be a power of 8
 const OUTPUT_LEN: usize = 256; // FIXED 256
 
 declare_circuit!(SHA256Circuit {
@@ -50,21 +50,3 @@ fn test_sha256_37bytes() {
         assert_eq!(output, vec![true]);
     }
 }
-
-// #[test]
-// fn debug_sha256_37bytes() {
-//     let mut hint_registry = HintRegistry::<M31>::new();
-//     hint_registry.register("myhint.tobinary", to_binary_hint);
-//     let data = [255; 37];
-//     let mut hash = Sha256::new();
-//     hash.update(&data);
-//     let output = hash.finalize();
-//     let mut assignment = SHA256Circuit::default();
-//     for i in 0..37 {
-//         assignment.input[i] = M31::from(data[i] as u32);
-//     }
-//     for i in 0..32 {
-//         assignment.output[i] = M31::from(output[i] as u32);
-//     }
-//     debug_eval(&SHA256Circuit::default(), &assignment, hint_registry);
-// }
