@@ -97,11 +97,7 @@ impl G1 {
         self.curve_f.assert_is_equal(native, &a.x, &b.x);
         self.curve_f.assert_is_equal(native, &a.y, &b.y);
     }
-    pub fn copy_g1<C: Config, B: RootAPI<C>>(
-        &mut self,
-        native: &mut B,
-        q: &G1Affine,
-    ) -> G1Affine {
+    pub fn copy_g1<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, q: &G1Affine) -> G1Affine {
         let copy_q_acc_x = self.curve_f.copy(native, &q.x);
         let copy_q_acc_y = self.curve_f.copy(native, &q.y);
         G1Affine {

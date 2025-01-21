@@ -99,7 +99,7 @@ impl ValidatorSSZ {
             16,
             POSEIDON_M31X16_FULL_ROUNDS,
             POSEIDON_M31X16_PARTIAL_ROUNDS,
-        );;
+        );
         params.hash_to_state_flatten(builder, &inputs)
     }
 }

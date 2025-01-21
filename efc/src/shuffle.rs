@@ -278,7 +278,7 @@ impl GenericDefine<M31Config> for ShuffleCircuit<Variable> {
             *chunk = simple_select(builder, ignore_flag, zero_var, *chunk);
         }
         //flip the indices based on the hashbit
-        let mut cur_indices = indices_chunk.clone();
+        let cur_indices = indices_chunk.clone();
         let mut copy_cur_indices =
             builder.new_hint("myhint.copyvarshint", &cur_indices, cur_indices.len());
         for i in 0..SHUFFLE_ROUND {
@@ -629,10 +629,8 @@ pub fn generate_shuffle_witnesses(dir: &str) {
     });
 }
 
-
-
 #[test]
-fn run_shuffle(){
+fn run_shuffle() {
     let dir = "./data";
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
@@ -646,11 +644,11 @@ fn run_shuffle(){
     let mut assignment = ShuffleCircuit::<M31>::default();
     assignment.from_plains(
         shuffle_data[0].clone(),
-                &plain_validators,
-                &public_key_bls_list,
-            );
+        &plain_validators,
+        &public_key_bls_list,
+    );
 
-            stacker::grow(32 * 1024 * 1024 * 1024, || {
-    debug_eval(&ShuffleCircuit::default(), &assignment, hint_registry);
-            });
+    stacker::grow(32 * 1024 * 1024 * 1024, || {
+        debug_eval(&ShuffleCircuit::default(), &assignment, hint_registry);
+    });
 }

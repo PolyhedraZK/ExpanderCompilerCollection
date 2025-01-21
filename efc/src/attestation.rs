@@ -180,7 +180,7 @@ pub struct AttestationData {
 #[derive(Debug, Deserialize, Clone)]
 pub struct Attestation {
     #[serde(default)]
-    pub aggregation_bits: String, 
+    pub aggregation_bits: String,
     pub data: AttestationData,
     pub signature: String,
 }
@@ -422,9 +422,9 @@ mod tests {
     }
 
     #[test]
-    fn read_attestation(){
-    let file_path = "./data/slotAttestationsFolded.json";
-    let attestations: Vec<Attestation> = read_from_json_file(file_path).unwrap();
-    println!("attestations[0]:{:?}", attestations[0]);
+    fn read_attestation() {
+        let file_path = "./data/slotAttestationsFolded.json";
+        let attestations: Vec<Attestation> = read_from_json_file(file_path).unwrap();
+        println!("attestations[0]:{:?}", attestations[0]);
     }
 }

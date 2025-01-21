@@ -1,6 +1,6 @@
 use crate::attestation::{Attestation, AttestationDataSSZ};
 use crate::bls::check_pubkey_key_bls;
-use crate::bls_verifier::{convert_point, G1Json, PairingCircuit, PairingEntry};
+use crate::bls_verifier::{convert_point, G1Json, PairingEntry};
 use crate::utils::{ensure_directory_exists, read_from_json_file};
 use crate::validator::{read_validators, ValidatorPlain, ValidatorSSZ};
 use base64::engine::general_purpose::STANDARD;
@@ -133,13 +133,13 @@ declare_circuit!(ShuffleCircuit {
     source_root: [Variable; 32],
     target_root: [Variable; 32],
     //attestationhm = hashtog2(attestationdata.signingroot()), a g2 point
-    attestation_hm: [[[Variable; 48];2];2], //public hm
+    attestation_hm: [[[Variable; 48]; 2]; 2], //public hm
     //attestationsig
     attestation_sig_bytes: [Variable; 96],
-    attestation_sig_g2: [[[Variable; 48];2];2], //public sig, unmarsalled from attestation_sig_bytes
+    attestation_sig_g2: [[[Variable; 48]; 2]; 2], //public sig, unmarsalled from attestation_sig_bytes
     aggregation_bits: [Variable; VALIDATOR_CHUNK_SIZE],
     validator_hashes: [[Variable; POSEIDON_HASH_LENGTH]; VALIDATOR_CHUNK_SIZE],
-    aggregated_pubkey: [[Variable; 48]; 2],  //public public_key
+    aggregated_pubkey: [[Variable; 48]; 2], //public public_key
     attestation_balance: [Variable; 8],
     pubkeys_bls: [[[Variable; 48]; 2]; VALIDATOR_CHUNK_SIZE],
     // validators:      [ValidatorSSZ;VALIDATOR_CHUNK_SIZE],
@@ -275,8 +275,7 @@ impl ShuffleCircuit<M31> {
             let beacon_beacon_block_root = attestation.data.beacon_block_root.clone();
             let beacon_beacon_block_root = STANDARD.decode(beacon_beacon_block_root).unwrap();
             for (j, beacon_beacon_block_root_byte) in beacon_beacon_block_root.iter().enumerate() {
-                self.beacon_beacon_block_root[j] =
-                    M31::from(*beacon_beacon_block_root_byte as u32);
+                self.beacon_beacon_block_root[j] = M31::from(*beacon_beacon_block_root_byte as u32);
             }
             //assign source_epoch
             let source_epoch = attestation.data.source.epoch.to_le_bytes();
@@ -303,7 +302,7 @@ impl ShuffleCircuit<M31> {
             //assign attestation_hm
             self.attestation_hm[0] = convert_point(pairing_entry.hm.p.x.clone());
             self.attestation_hm[1] = convert_point(pairing_entry.hm.p.y.clone());
-            
+
             //assign attestation_sig_bytes
             let attestation_sig_bytes = attestation.signature.clone();
             let attestation_sig_bytes = STANDARD.decode(attestation_sig_bytes).unwrap();
@@ -458,16 +457,16 @@ impl GenericDefine<M31Config> for ShuffleCircuit<Variable> {
         };
         let mut g2 = G2::new(builder);
         // domain
-        let domain = vec![
+        let domain = [
             1, 0, 0, 0, 187, 164, 218, 150, 53, 76, 159, 37, 71, 108, 241, 188, 105, 191, 88, 58,
             127, 158, 10, 240, 73, 48, 91, 98, 222, 103, 102, 64,
         ];
         let mut domain_var = vec![];
-        for i in 0..32 {
-            domain_var.push(builder.constant(domain[i]));
+        for domain_byte in domain.iter() {
+            domain_var.push(builder.constant(*domain_byte as u32));
         }
         let att_hash = att_ssz.att_data_signing_root(builder, &domain_var); //msg
-        //map to hm
+                                                                            //map to hm
         let (hm0, hm1) = g2.hash_to_fp(builder, &att_hash);
         let hm_g2 = g2.map_to_g2(builder, &hm0, &hm1);
         let expected_hm_g2 = G2AffP::from_vars(
@@ -490,8 +489,6 @@ impl GenericDefine<M31Config> for ShuffleCircuit<Variable> {
         g2.ext2.curve_f.table.final_check(builder);
         g2.ext2.curve_f.table.final_check(builder);
         g2.ext2.curve_f.table.final_check(builder);
-
-        
 
         g1.curve_f.check_mul(builder);
         g1.curve_f.table.final_check(builder);
@@ -629,7 +626,8 @@ pub fn aggregate_attestation_public_key<C: Config, B: RootAPI<C>>(
         aggregated_pubkey.y =
             g1.curve_f
                 .select(builder, is_first, &pub_key[i].y, &aggregated_pubkey.y);
-        has_first_flag = simple_select(builder, validator_agg_bits[i], one_var, copy_has_first_flag);
+        has_first_flag =
+            simple_select(builder, validator_agg_bits[i], one_var, copy_has_first_flag);
         copy_aggregated_pubkey = g1.copy_g1(builder, &aggregated_pubkey);
         copy_has_first_flag = builder.new_hint("myhint.copyvarshint", &[has_first_flag], 1)[0];
     }
@@ -721,8 +719,8 @@ pub fn generate_shuffle_witnesses(dir: &str) {
         let mut handles = vec![];
         let plain_validators = Arc::new(plain_validators);
         let public_key_bls_list = Arc::new(public_key_bls_list);
-        let attestations  = Arc::new(attestations);
-        let assignments = Arc::new(Mutex::new(vec![None; shuffle_data.len()/2]));
+        let attestations = Arc::new(attestations);
+        let assignments = Arc::new(Mutex::new(vec![None; shuffle_data.len() / 2]));
         let pairing_data = Arc::new(pairing_data);
 
         for (i, shuffle_item) in shuffle_data.into_iter().enumerate().take(1024) {
@@ -797,15 +795,13 @@ pub fn generate_shuffle_witnesses(dir: &str) {
     });
 }
 
-
 #[test]
 fn test_generate_shuffle2_witnesses() {
     generate_shuffle_witnesses("./data");
 }
 
-
 #[test]
-fn run_shuffle2(){
+fn run_shuffle2() {
     let dir = "./data";
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
@@ -824,18 +820,19 @@ fn run_shuffle2(){
     let mut assignment = ShuffleCircuit::<M31>::default();
     assignment.from_plains(
         &shuffle_data[0],
-                &plain_validators,
-                &public_key_bls_list,
-                &attestations[0],
-                &pairing_data[0],
-            );
-            let file_name = "shuffle.witness";
-            stacker::grow(32 * 1024 * 1024 * 1024, || {
-                let compile_result = compile_generic(&ShuffleCircuit::default(), CompileOptions::default()).unwrap();
-                compile_result
-                .witness_solver
-                .serialize_into(std::fs::File::create(file_name).unwrap())
-                .unwrap();
-    debug_eval(&ShuffleCircuit::default(), &assignment, hint_registry);
-            });
+        &plain_validators,
+        &public_key_bls_list,
+        &attestations[0],
+        &pairing_data[0],
+    );
+    let file_name = "shuffle.witness";
+    stacker::grow(32 * 1024 * 1024 * 1024, || {
+        let compile_result =
+            compile_generic(&ShuffleCircuit::default(), CompileOptions::default()).unwrap();
+        compile_result
+            .witness_solver
+            .serialize_into(std::fs::File::create(file_name).unwrap())
+            .unwrap();
+        debug_eval(&ShuffleCircuit::default(), &assignment, hint_registry);
+    });
 }
