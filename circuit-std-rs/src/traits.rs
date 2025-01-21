@@ -8,7 +8,9 @@ pub trait StdCircuit<C: Config>: Clone + Define<C> + DumpLoadTwoVariables<Variab
     type Params: Clone + Debug;
     type Assignment: Clone + DumpLoadTwoVariables<C::CircuitField>;
 
+    // Create a new circuit with the given parameters
     fn new_circuit(params: &Self::Params) -> Self;
 
+    // Create a new random assignment for the circuit
     fn new_assignment(params: &Self::Params, rng: impl RngCore) -> Self::Assignment;
 }

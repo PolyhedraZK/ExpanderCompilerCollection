@@ -1,4 +1,4 @@
-use crate::big_int::{
+use super::m31_utils::{
     big_array_add, big_endian_m31_array_put_uint32, bit_array_to_m31, bytes_to_bits, cap_sigma0,
     cap_sigma1, ch, m31_to_bit_array, maj, sigma0, sigma1,
 };
@@ -47,6 +47,7 @@ struct MyDigest {
     len: u64,
     kbits: [[Variable; 32]; 64],
 }
+
 impl MyDigest {
     fn new<C: Config, B: RootAPI<C>>(api: &mut B) -> Self {
         let mut h = [[api.constant(0); 2]; 8];
@@ -130,6 +131,7 @@ impl MyDigest {
         big_endian_m31_array_put_uint32(api, &mut digest[28..], self.h[7]);
         digest
     }
+    
     fn block<C: Config, B: RootAPI<C>>(
         &mut self,
         api: &mut B,
