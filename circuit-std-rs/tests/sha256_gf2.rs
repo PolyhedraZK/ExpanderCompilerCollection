@@ -41,8 +41,11 @@ fn test_sha256_compression_gf2() {
     // )
     // .unwrap();
 
-    let compile_result =
-        compile_generic_cross_layer(&SHA256CircuitCompressionOnly::default(), CompileOptions::default()).unwrap();
+    let compile_result = compile_generic_cross_layer(
+        &SHA256CircuitCompressionOnly::default(),
+        CompileOptions::default(),
+    )
+    .unwrap();
 
     let mut rng = rand::thread_rng();
     let n_tests = 5;
