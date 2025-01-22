@@ -3,20 +3,22 @@ use crate::circuit::config::Config;
 use super::super::kernel::Kernel;
 use super::{check_inputs, prepare_inputs, Commitment, Proof, ProvingSystem};
 
+// dummy implementation of these traits
+
 #[derive(Clone)]
 pub struct DummyCommitment<C: Config> {
-    vals: Vec<C::CircuitField>,
+    vals: Vec<C::DefaultSimdField>,
 }
 
 impl<C: Config> Commitment<C> for DummyCommitment<C> {
-    fn vals_ref(&self) -> &[C::CircuitField] {
+    fn vals_ref(&self) -> &[C::DefaultSimdField] {
         &self.vals
     }
 }
 
 #[derive(Clone)]
 pub struct DummyProof {
-    cond: Vec<bool>,
+    cond: Vec<Vec<bool>>,
 }
 
 impl Proof for DummyProof {}
@@ -28,7 +30,7 @@ pub struct DummyProvingSystem<C: Config> {
 impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
     type Proof = DummyProof;
     type Commitment = DummyCommitment<C>;
-    fn commit(vals: &[C::CircuitField]) -> Self::Commitment {
+    fn commit(vals: &[C::DefaultSimdField]) -> Self::Commitment {
         assert!(vals.len() & (vals.len() - 1) == 0);
         DummyCommitment {
             vals: vals.to_vec(),
@@ -46,7 +48,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
             let lc_input = prepare_inputs(kernel, commitments, is_broadcast, i);
             let (_, cond) = kernel
                 .layered_circuit
-                .eval_with_public_inputs(lc_input, &[]);
+                .eval_with_public_inputs_simd(lc_input, &[]);
             res.push(cond);
         }
         DummyProof { cond: res }
@@ -63,7 +65,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
             let lc_input = prepare_inputs(kernel, commitments, is_broadcast, i);
             let (_, cond) = kernel
                 .layered_circuit
-                .eval_with_public_inputs(lc_input, &[]);
+                .eval_with_public_inputs_simd(lc_input, &[]);
             if cond != proof.cond[i] {
                 return false;
             }

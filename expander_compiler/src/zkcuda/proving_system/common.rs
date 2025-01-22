@@ -33,8 +33,8 @@ pub fn prepare_inputs<C: Config>(
     commitments: &[&impl Commitment<C>],
     is_broadcast: &[bool],
     parallel_index: usize,
-) -> Vec<C::CircuitField> {
-    let mut lc_input = vec![C::CircuitField::zero(); kernel.layered_circuit.input_size()];
+) -> Vec<C::DefaultSimdField> {
+    let mut lc_input = vec![C::DefaultSimdField::zero(); kernel.layered_circuit.input_size()];
     for ((input, commitment), ib) in kernel
         .layered_circuit_input
         .iter()
