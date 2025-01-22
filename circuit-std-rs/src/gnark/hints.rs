@@ -1,7 +1,7 @@
-use crate::big_int::to_binary_hint;
 use crate::gnark::limbs::*;
 use crate::gnark::utils::*;
 use crate::logup::{query_count_by_key_hint, query_count_hint, rangeproof_hint};
+use crate::sha256::m31_utils::to_binary_hint;
 use ark_bls12_381::Fq;
 use ark_bls12_381::Fq12;
 use ark_bls12_381::Fq2;
