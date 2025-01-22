@@ -894,6 +894,8 @@ dependencies = [
  "mersenne31",
  "mpi_config",
  "rand",
+ "rayon",
+ "sha2",
  "tiny-keccak",
  "transcript",
 ]

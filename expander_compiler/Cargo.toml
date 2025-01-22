@@ -23,6 +23,10 @@ gf2.workspace = true
 mersenne31.workspace = true
 crosslayer_prototype.workspace = true
 
+[dev-dependencies]
+rayon = "1.9"
+sha2 = "0.10.8"
+
 [[bin]]
 name = "trivial_circuit"
 path = "bin/trivial_circuit.rs"
