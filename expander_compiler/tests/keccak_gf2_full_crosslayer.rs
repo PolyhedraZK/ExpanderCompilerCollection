@@ -1,8 +1,9 @@
 use expander_compiler::frontend::*;
+use expander_transcript::{BytesHashTranscript, SHA256hasher, Transcript};
 use rand::{thread_rng, Rng};
 use tiny_keccak::Hasher;
 
-const N_HASHES: usize = 4;
+const N_HASHES: usize = 1;
 
 fn rc() -> Vec<u64> {
     vec![
@@ -33,8 +34,8 @@ fn rc() -> Vec<u64> {
     ]
 }
 
-fn xor_in<C: Config>(
-    api: &mut API<C>,
+fn xor_in<C: Config, B: RootAPI<C>>(
+    api: &mut B,
     mut s: Vec<Vec<Variable>>,
     buf: Vec<Vec<Variable>>,
 ) -> Vec<Vec<Variable>> {
@@ -48,7 +49,10 @@ fn xor_in<C: Config>(
     s
 }
 
-fn keccak_f<C: Config>(api: &mut API<C>, mut a: Vec<Vec<Variable>>) -> Vec<Vec<Variable>> {
+fn keccak_f<C: Config, B: RootAPI<C>>(
+    api: &mut B,
+    mut a: Vec<Vec<Variable>>,
+) -> Vec<Vec<Variable>> {
     let mut b = vec![vec![api.constant(0); 64]; 25];
     let mut c = vec![vec![api.constant(0); 64]; 5];
     let mut d = vec![vec![api.constant(0); 64]; 5];
@@ -132,7 +136,7 @@ fn keccak_f<C: Config>(api: &mut API<C>, mut a: Vec<Vec<Variable>>) -> Vec<Vec<V
     a
 }
 
-fn xor<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
+fn xor<C: Config, B: RootAPI<C>>(api: &mut B, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
     let nbits = a.len();
     let mut bits_res = vec![api.constant(0); nbits];
     for i in 0..nbits {
@@ -141,7 +145,7 @@ fn xor<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<V
     bits_res
 }
 
-fn and<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
+fn and<C: Config, B: RootAPI<C>>(api: &mut B, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
     let nbits = a.len();
     let mut bits_res = vec![api.constant(0); nbits];
     for i in 0..nbits {
@@ -150,7 +154,7 @@ fn and<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<V
     bits_res
 }
 
-fn not<C: Config>(api: &mut API<C>, a: Vec<Variable>) -> Vec<Variable> {
+fn not<C: Config, B: RootAPI<C>>(api: &mut B, a: Vec<Variable>) -> Vec<Variable> {
     let mut bits_res = vec![api.constant(0); a.len()];
     for i in 0..a.len() {
         bits_res[i] = api.sub(1, a[i].clone());
@@ -184,11 +188,11 @@ fn copy_out_unaligned(s: Vec<Vec<Variable>>, rate: usize, output_len: usize) -> 
 }
 
 declare_circuit!(Keccak256Circuit {
-    p: [[Variable]],
-    out: [[PublicVariable]],
+    p: [[Variable; 64 * 8]; N_HASHES],
+    out: [[Variable; 256]; N_HASHES],
 });
 
-fn compute_keccak<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variable> {
+fn compute_keccak<C: Config, B: RootAPI<C>>(api: &mut B, p: &Vec<Variable>) -> Vec<Variable> {
     let mut ss = vec![vec![api.constant(0); 64]; 25];
     let mut new_p = p.clone();
     let mut append_data = vec![0; 136 - 64];
@@ -210,10 +214,12 @@ fn compute_keccak<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variabl
     copy_out_unaligned(ss, 136, 32)
 }
 
-impl Define<GF2Config> for Keccak256Circuit<Variable> {
-    fn define(&self, api: &mut API<GF2Config>) {
+impl GenericDefine<GF2Config> for Keccak256Circuit<Variable> {
+    fn define<Builder: RootAPI<GF2Config>>(&self, api: &mut Builder) {
         for i in 0..N_HASHES {
-            let out = api.memorized_simple_call(compute_keccak, &self.p[i].to_vec());
+            // You can use api.memorized_simple_call for sub-circuits
+            // let out = api.memorized_simple_call(compute_keccak, &self.p[i].to_vec());
+            let out = compute_keccak(api, &self.p[i].to_vec());
             for j in 0..256 {
                 api.assert_is_equal(out[j].clone(), self.out[i][j].clone());
             }
@@ -222,20 +228,16 @@ impl Define<GF2Config> for Keccak256Circuit<Variable> {
 }
 
 #[test]
-fn keccak_gf2_vec() {
-    let mut circuit = Keccak256Circuit::<Variable>::default();
-    circuit.p = vec![vec![Variable::default(); 64 * 8]; N_HASHES];
-    circuit.out = vec![vec![Variable::default(); 32 * 8]; N_HASHES];
-
-    let compile_result = compile(&circuit).unwrap();
-    let CompileResult {
+fn keccak_gf2_full_crosslayer() {
+    let compile_result =
+        compile_generic_cross_layer(&Keccak256Circuit::default(), CompileOptions::default())
+            .unwrap();
+    let CompileResultCrossLayer {
         witness_solver,
         layered_circuit,
     } = compile_result;
 
     let mut assignment = Keccak256Circuit::<GF2>::default();
-    assignment.p = vec![vec![GF2::from(0); 64 * 8]; N_HASHES];
-    assignment.out = vec![vec![GF2::from(0); 32 * 8]; N_HASHES];
     for k in 0..N_HASHES {
         let mut data = vec![0u8; 64];
         for i in 0..64 {
@@ -256,32 +258,49 @@ fn keccak_gf2_vec() {
             }
         }
     }
-    let witness = witness_solver.solve_witness(&assignment).unwrap();
-    let res = layered_circuit.run(&witness);
-    assert_eq!(res, vec![true]);
-    println!("test 1 passed");
-
-    for k in 0..N_HASHES {
-        assignment.p[k][0] = assignment.p[k][0] - GF2::from(1);
-    }
-    let witness = witness_solver.solve_witness(&assignment).unwrap();
-    let res = layered_circuit.run(&witness);
-    assert_eq!(res, vec![false]);
-    println!("test 2 passed");
 
     let mut assignments = Vec::new();
-    for _ in 0..15 {
-        for k in 0..N_HASHES {
-            assignment.p[k][0] = assignment.p[k][0] - GF2::from(1);
-        }
+    for _ in 0..8 {
         assignments.push(assignment.clone());
     }
     let witness = witness_solver.solve_witnesses(&assignments).unwrap();
     let res = layered_circuit.run(&witness);
-    let mut expected_res = vec![false; 15];
-    for i in 0..8 {
-        expected_res[i * 2] = true;
-    }
+    let expected_res = vec![true; 8];
     assert_eq!(res, expected_res);
-    println!("test 3 passed");
+    println!("basic test passed");
+
+    let expander_circuit = layered_circuit
+        .export_to_expander::<gkr_field_config::GF2ExtConfig>()
+        .flatten();
+
+    let (simd_input, simd_public_input) = witness.to_simd::<gf2::GF2x8>();
+    println!("{} {}", simd_input.len(), simd_public_input.len());
+    assert_eq!(simd_public_input.len(), 0); // public input is not supported in current virgo++
+
+    let mut transcript = BytesHashTranscript::<
+        <gkr_field_config::GF2ExtConfig as gkr_field_config::GKRFieldConfig>::ChallengeField,
+        SHA256hasher,
+    >::new();
+
+    let connections = crosslayer_prototype::CrossLayerConnections::parse_circuit(&expander_circuit);
+
+    let start_time = std::time::Instant::now();
+    let evals = expander_circuit.evaluate(&simd_input);
+    let mut sp =
+        crosslayer_prototype::CrossLayerProverScratchPad::<gkr_field_config::GF2ExtConfig>::new(
+            expander_circuit.layers.len(),
+            expander_circuit.max_num_input_var(),
+            expander_circuit.max_num_output_var(),
+            1,
+        );
+    let (_output_claim, _input_challenge, _input_claim) = crosslayer_prototype::prove_gkr(
+        &expander_circuit,
+        &evals,
+        &connections,
+        &mut transcript,
+        &mut sp,
+    );
+    let stop_time = std::time::Instant::now();
+    let duration = stop_time.duration_since(start_time);
+    println!("Time elapsed {} ms", duration.as_millis());
 }

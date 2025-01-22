@@ -58,6 +58,7 @@ fn generate_unflatten_code(
     array_index: usize,
     output_name: &proc_macro2::TokenStream,
     ty: &Type,
+    is_input: bool,
 ) -> proc_macro2::TokenStream {
     fn collect_dimensions(ty: &Type) -> Vec<&syn::Expr> {
         let mut dims = Vec::new();
@@ -71,12 +72,19 @@ fn generate_unflatten_code(
 
     let dims = collect_dimensions(ty);
     if dims.is_empty() {
-        panic!("Expected array type");
+        if is_input {
+            return quote! {
+                let mut #output_name: Variable = inputs[#array_index][0];
+            };
+        }
+        return quote! {
+            let mut #output_name: Variable = Variable::default();
+        };
     }
 
     let mut steps = Vec::with_capacity(dims.len());
     let mut step = quote! { 1 };
-    for &dim in dims.iter().rev().skip(1) {
+    for &dim in dims.iter().skip(1).rev() {
         step = quote! { #dim * (#step) };
         steps.push(step.clone());
     }
@@ -99,8 +107,14 @@ fn generate_unflatten_code(
     }
 
     let array_access = generate_array_access(&loop_vars[..loop_vars.len() - 1]);
-    let mut inner_code = quote! {
-        #output_name #array_access.push(inputs[#array_index][#index_calc].clone());
+    let mut inner_code = if is_input {
+        quote! {
+            #output_name #array_access.push(inputs[#array_index][#index_calc].clone());
+        }
+    } else {
+        quote! {
+            #output_name #array_access.push(Variable::default());
+        }
     };
 
     for (i, (var, &dim)) in loop_vars.iter().zip(dims.iter()).enumerate().rev() {
@@ -145,12 +159,14 @@ fn generate_flatten_code(
 
     let dims = collect_dimensions(ty);
     if dims.is_empty() {
-        panic!("Expected array type");
+        return quote! {
+            inputs[#array_index][0] = #input_name;
+        };
     }
 
     let mut steps = Vec::with_capacity(dims.len());
     let mut step = quote! { 1 };
-    for &dim in dims.iter().rev().skip(1) {
+    for &dim in dims.iter().skip(1).rev() {
         step = quote! { #dim * (#step) };
         steps.push(step.clone());
     }
@@ -210,10 +226,14 @@ pub fn kernel(_attr: TokenStream, item: TokenStream) -> TokenStream {
         .first()
         .expect("Expected at least one argument (API)");
 
-    let user_fn_inputs: Vec<_> = input_fn.sig.inputs.iter().skip(1).map(|arg| {
-        if let FnArg::Typed(PatType { pat, ty, .. }) = arg {
-            if let Type::Reference(ref_type) = &**ty {
-                if let Type::Array(_) = *ref_type.elem {
+    let user_fn_inputs: Vec<_> = input_fn
+        .sig
+        .inputs
+        .iter()
+        .skip(1)
+        .map(|arg| {
+            if let FnArg::Typed(PatType { pat, ty, .. }) = arg {
+                if let Type::Reference(ref_type) = &**ty {
                     let vec_type = replace_array_with_vec(&ref_type.elem);
                     let arg_name = quote! { #pat };
 
@@ -237,14 +257,15 @@ pub fn kernel(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     unflatten_code.push(generate_unflatten_code(
                         current_index,
                         &arg_name,
-                        &ref_type.elem
+                        &ref_type.elem,
+                        is_input,
                     ));
 
                     if is_output {
                         flatten_code.push(generate_flatten_code(
                             current_index,
                             &arg_name,
-                            &ref_type.elem
+                            &ref_type.elem,
                         ));
                     }
 
@@ -257,15 +278,13 @@ pub fn kernel(_attr: TokenStream, item: TokenStream) -> TokenStream {
                         quote! { #pat: &#vec_type }
                     }
                 } else {
-                    panic!("Expected a reference to a multi-dimensional array for kernel parameters");
+                    panic!("Expected a reference type for kernel parameters");
                 }
             } else {
-                panic!("Expected a reference type for kernel parameters");
+                panic!("Unsupported argument type for kernel function");
             }
-        } else {
-            panic!("Unsupported argument type for kernel function");
-        }
-    }).collect();
+        })
+        .collect();
 
     let fn_args = arg_names
         .iter()

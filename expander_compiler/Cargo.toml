@@ -22,6 +22,7 @@ arith.workspace = true
 gf2.workspace = true
 mersenne31.workspace = true
 macros = {path = "./macros" }
+crosslayer_prototype.workspace = true
 poly_commit.workspace = true
 polynomials.workspace = true
 sumcheck.workspace = true
