@@ -12,8 +12,8 @@ use super::{
 };
 
 pub struct DeviceMemory<C: Config, P: ProvingSystem<C>> {
+    pub raw_values: Vec<C::DefaultSimdField>,
     pub values: Vec<C::DefaultSimdField>,
-    pub padded_values: Vec<C::DefaultSimdField>,
     pub commitment: P::Commitment,
 }
 
@@ -163,8 +163,8 @@ impl<C: Config, P: ProvingSystem<C>> Context<C, P> {
     ) -> DeviceMemoryHandle {
         let commitment = P::commit(&padded_values);
         self.device_memories.push(DeviceMemory {
-            values,
-            padded_values,
+            raw_values: values,
+            values: padded_values,
             commitment,
         });
         Some(DeviceMemoryHandleRaw {
@@ -424,8 +424,8 @@ impl<C: Config, P: ProvingSystem<C>> Context<C, P> {
             ov.resize(next_power_of_two(ov.len()), C::DefaultSimdField::zero());
             let commitment = P::commit(&ov);
             let device_memory = DeviceMemory {
-                values: ov_raw,
-                padded_values: ov,
+                raw_values: ov_raw,
+                values: ov,
                 commitment,
             };
             self.device_memories.push(device_memory);
@@ -445,8 +445,8 @@ impl<C: Config, P: ProvingSystem<C>> Context<C, P> {
             );
             let commitment = P::commit(&hint_output_vec);
             let device_memory = DeviceMemory {
-                values: hint_output_vec.clone(),
-                padded_values: hint_output_vec,
+                raw_values: hint_output_vec.clone(),
+                values: hint_output_vec,
                 commitment,
             };
             self.device_memories.push(device_memory);
