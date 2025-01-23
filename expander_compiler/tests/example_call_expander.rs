@@ -1,6 +1,6 @@
 use arith::Field;
 use expander_compiler::frontend::*;
-use rand::{Rng, SeedableRng};
+use rand::SeedableRng;
 
 declare_circuit!(Circuit {
     s: [Variable; 100],
