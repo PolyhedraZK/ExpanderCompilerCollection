@@ -5,11 +5,21 @@ pub use mersenne31::M31;
 use crate::utils::serde::Serde;
 use arith::{FieldForECC, FieldSerde, FieldSerdeError};
 
-pub trait Field: FieldArith + FieldForECC + FieldSerde {}
+pub trait Field: FieldArith + FieldForECC + FieldSerde + FieldRaw {}
 
 impl Field for BN254 {}
 impl Field for GF2 {}
 impl Field for M31 {}
+
+// This trait exist only for making Rust happy
+// If we use arith::Field, Rust says upstream may add more impls
+pub trait FieldRaw: FieldArith {}
+
+impl FieldRaw for BN254 {}
+impl FieldRaw for GF2 {}
+impl FieldRaw for M31 {}
+impl FieldRaw for mersenne31::M31x16 {}
+impl FieldRaw for gf2::GF2x8 {}
 
 impl<T: Field> Serde for T {
     fn serialize_into<W: std::io::Write>(&self, writer: W) -> Result<(), std::io::Error> {

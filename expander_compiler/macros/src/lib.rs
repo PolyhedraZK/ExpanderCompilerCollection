@@ -13,6 +13,17 @@ fn calculate_array_total_len(ty: &Type) -> proc_macro2::TokenStream {
     }
 }
 
+fn get_array_shape(ty: &Type) -> proc_macro2::TokenStream {
+    match ty {
+        Type::Array(array) => {
+            let len = &array.len;
+            let inner_shape = get_array_shape(&array.elem);
+            quote! { (#len as usize) , #inner_shape }
+        }
+        _ => quote! {},
+    }
+}
+
 fn replace_array_with_vec(ty: &Type) -> proc_macro2::TokenStream {
     match ty {
         Type::Array(array) => {
@@ -214,6 +225,7 @@ pub fn kernel(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let stmts = &input_fn.block.stmts;
 
     let mut specs = Vec::new();
+    let mut shapes = Vec::new();
     let mut arg_names = Vec::new();
     let mut arg_mutability = Vec::new();
     let mut unflatten_code = Vec::new();
@@ -243,6 +255,8 @@ pub fn kernel(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     }
                     let (is_input, is_output) = get_variable_spec(inner_ty);
                     let total_len = calculate_array_total_len(&ref_type.elem);
+                    let shape = get_array_shape(&ref_type.elem);
+                    shapes.push(quote! { Some(vec![#shape]) });
 
                     specs.push(quote! {
                         IOVecSpec {
@@ -303,7 +317,7 @@ pub fn kernel(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
 
         fn #compile_fn_name<C: Config>() -> Result<Kernel<C>, Error> {
-            compile_with_spec(
+            compile_with_spec_and_shapes(
                 |api: &mut API<C>, inputs: &mut Vec<Vec<Variable>>| {
                     #(#unflatten_code)*
 
@@ -311,7 +325,8 @@ pub fn kernel(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
                     #(#flatten_code)*
                 },
-                &[#(#specs),*]
+                &[#(#specs),*],
+                &[#(#shapes),*],
             )
         }
     };

@@ -15,9 +15,23 @@ pub use macros::kernel;
 pub struct Kernel<C: Config> {
     pub witness_solver: ir::hint_normalized::RootCircuit<C>,
     pub layered_circuit: LayeredCircuit<C, NormalInputType>,
+    pub io_shapes: Vec<Shape>,
     pub witness_solver_io: Vec<WitnessSolverIOVec>,
     pub witness_solver_hint_input: Option<WitnessSolverIOVec>,
     pub layered_circuit_input: Vec<LayeredCircuitInputVec>,
+}
+
+pub type Shape = Option<Vec<usize>>;
+
+pub fn shape_prepend(shape: &Shape, x: usize) -> Shape {
+    match shape {
+        Some(shape) => {
+            let mut shape = shape.clone();
+            shape.insert(0, x);
+            Some(shape)
+        }
+        None => None,
+    }
 }
 
 #[derive(Default, Debug, Clone, Hash, PartialEq, Eq)]
@@ -49,6 +63,18 @@ fn dup_inputs<C: Config>(api: &mut API<C>, inputs: &Vec<Variable>) -> Vec<Variab
 }
 
 pub fn compile_with_spec<C, F>(f: F, io_specs: &[IOVecSpec]) -> Result<Kernel<C>, Error>
+where
+    C: Config,
+    F: Fn(&mut API<C>, &mut Vec<Vec<Variable>>),
+{
+    compile_with_spec_and_shapes(f, io_specs, &vec![None; io_specs.len()])
+}
+
+pub fn compile_with_spec_and_shapes<C, F>(
+    f: F,
+    io_specs: &[IOVecSpec],
+    shapes: &[Option<Vec<usize>>],
+) -> Result<Kernel<C>, Error>
 where
     C: Config,
     F: Fn(&mut API<C>, &mut Vec<Vec<Variable>>),
@@ -238,6 +264,7 @@ where
     Ok(Kernel {
         witness_solver: r_hint_exported_opt,
         layered_circuit: lc,
+        io_shapes: shapes.to_vec(),
         witness_solver_io: io_off,
         witness_solver_hint_input: hint_io,
         layered_circuit_input: lc_in,
