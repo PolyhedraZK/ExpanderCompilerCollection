@@ -24,6 +24,10 @@ mersenne31.workspace = true
 macros = {path = "./macros" }
 crosslayer_prototype.workspace = true
 
+[dev-dependencies]
+rayon = "1.9"
+sha2 = "0.10.8"
+
 [[bin]]
 name = "trivial_circuit"
 path = "bin/trivial_circuit.rs"

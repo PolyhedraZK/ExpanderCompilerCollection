@@ -44,9 +44,9 @@ fn test_circuit_declaration() {
     c.dump_into(&mut vars, &mut public_vars);
     assert_eq!((vars.len(), public_vars.len()), c.num_vars());
     let mut c2 = Circuit1::<F>::default();
-    let mut vars_ref = &mut vars.as_slice();
-    let mut public_vars_ref = &mut public_vars.as_slice();
-    c2.load_from(&mut vars_ref, &mut public_vars_ref);
+    let vars_ref = &mut vars.as_slice();
+    let public_vars_ref = &mut public_vars.as_slice();
+    c2.load_from(vars_ref, public_vars_ref);
     assert_eq!(vars_ref.len(), 0);
     assert_eq!(public_vars_ref.len(), 0);
     assert_eq!(c.a, c2.a);

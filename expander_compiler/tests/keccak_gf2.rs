@@ -1,7 +1,7 @@
 use expander_compiler::{circuit::layered::InputType, frontend::*};
 use extra::*;
 use internal::Serde;
-use rand::{thread_rng, Rng};
+use rand::{Rng, SeedableRng};
 use tiny_keccak::Hasher;
 
 const N_HASHES: usize = 1;
@@ -232,12 +232,14 @@ impl GenericDefine<GF2Config> for Keccak256Circuit<Variable> {
 fn keccak_gf2_test<I: InputType>(
     witness_solver: WitnessSolver<GF2Config>,
     layered_circuit: expander_compiler::circuit::layered::Circuit<GF2Config, I>,
+    filename: &str,
 ) {
     let mut assignment = Keccak256Circuit::<GF2>::default();
+    let mut rng = rand::rngs::StdRng::seed_from_u64(1235);
     for k in 0..N_HASHES {
         let mut data = vec![0u8; 64];
         for i in 0..64 {
-            data[i] = thread_rng().gen();
+            data[i] = rng.gen();
         }
         let mut hash = tiny_keccak::Keccak::v256();
         hash.update(&data);
@@ -289,15 +291,15 @@ fn keccak_gf2_test<I: InputType>(
         .solve_witnesses(&assignments_correct)
         .unwrap();
 
-    let file = std::fs::File::create("circuit_gf2.txt").unwrap();
+    let file = std::fs::File::create(format!("circuit_{}.txt", filename)).unwrap();
     let writer = std::io::BufWriter::new(file);
     layered_circuit.serialize_into(writer).unwrap();
 
-    let file = std::fs::File::create("witness_gf2.txt").unwrap();
+    let file = std::fs::File::create(format!("witness_{}.txt", filename)).unwrap();
     let writer = std::io::BufWriter::new(file);
     witness.serialize_into(writer).unwrap();
 
-    let file = std::fs::File::create("witness_gf2_solver.txt").unwrap();
+    let file = std::fs::File::create(format!("witness_{}_solver.txt", filename)).unwrap();
     let writer = std::io::BufWriter::new(file);
     witness_solver.serialize_into(writer).unwrap();
 
@@ -312,7 +314,7 @@ fn keccak_gf2_main() {
         witness_solver,
         layered_circuit,
     } = compile_result;
-    keccak_gf2_test(witness_solver, layered_circuit);
+    keccak_gf2_test(witness_solver, layered_circuit, "gf2");
 }
 
 #[test]
@@ -324,16 +326,17 @@ fn keccak_gf2_main_cross_layer() {
         witness_solver,
         layered_circuit,
     } = compile_result;
-    keccak_gf2_test(witness_solver, layered_circuit);
+    keccak_gf2_test(witness_solver, layered_circuit, "gf2_cross_layer");
 }
 
 #[test]
 fn keccak_gf2_debug() {
     let mut assignment = Keccak256Circuit::<GF2>::default();
+    let mut rng = rand::rngs::StdRng::seed_from_u64(1235);
     for k in 0..N_HASHES {
         let mut data = vec![0u8; 64];
         for i in 0..64 {
-            data[i] = thread_rng().gen();
+            data[i] = rng.gen();
         }
         let mut hash = tiny_keccak::Keccak::v256();
         hash.update(&data);
@@ -362,10 +365,11 @@ fn keccak_gf2_debug() {
 #[should_panic]
 fn keccak_gf2_debug_error() {
     let mut assignment = Keccak256Circuit::<GF2>::default();
+    let mut rng = rand::rngs::StdRng::seed_from_u64(1235);
     for k in 0..N_HASHES {
         let mut data = vec![0u8; 64];
         for i in 0..64 {
-            data[i] = thread_rng().gen();
+            data[i] = rng.gen();
         }
         let mut hash = tiny_keccak::Keccak::v256();
         hash.update(&data);
