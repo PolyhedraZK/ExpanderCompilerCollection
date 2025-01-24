@@ -259,7 +259,7 @@ where
     }
     let re_c0 = r_hint_exported_opt.circuits.get_mut(&0).unwrap();
     re_c0.outputs.truncate(off1);
-    println!("{:?}", lc_in);
+    //println!("{:?}", lc_in);
 
     Ok(Kernel {
         witness_solver: r_hint_exported_opt,

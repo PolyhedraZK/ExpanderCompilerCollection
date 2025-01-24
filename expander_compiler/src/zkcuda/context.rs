@@ -127,18 +127,30 @@ fn broadcast_type(shape: &Shape, is_broadcast: bool) -> BroadcastType {
 }
 
 // returns (compatible, is_broadcast, parallel_count)
-fn check_shape_compat(kernel_shape: &Shape, io_shape: &Shape) -> (bool, bool, Option<usize>) {
+fn check_shape_compat(
+    kernel_shape: &Shape,
+    io_shape: &Shape,
+    broadcast_type: BroadcastType,
+) -> (bool, bool, Option<usize>) {
     if let Some(kernel_shape) = kernel_shape {
         if let Some(io_shape) = io_shape {
             if kernel_shape.len() == io_shape.len() {
                 if *kernel_shape == *io_shape {
-                    (true, true, None)
+                    match broadcast_type {
+                        BroadcastType::BroadcastOnly | BroadcastType::Both => (true, true, None),
+                        BroadcastType::NonBroadcastOnly => (false, false, None),
+                    }
                 } else {
                     (false, false, None)
                 }
             } else if kernel_shape.len() + 1 == io_shape.len() {
                 if io_shape.iter().skip(1).eq(kernel_shape.iter()) {
-                    (true, false, Some(io_shape[0]))
+                    match broadcast_type {
+                        BroadcastType::BroadcastOnly => (false, false, None),
+                        BroadcastType::NonBroadcastOnly | BroadcastType::Both => {
+                            (true, false, Some(io_shape[0]))
+                        }
+                    }
                 } else {
                     (false, false, None)
                 }
@@ -150,6 +162,54 @@ fn check_shape_compat(kernel_shape: &Shape, io_shape: &Shape) -> (bool, bool, Op
         }
     } else {
         panic!("Kernel shape is not defined, you should define kernel using macro, or use call_kernel_raw");
+    }
+}
+
+/*
+A reshape is acceptable if:
+support the shape is [a,b,c]
+let sequence of a*b*c,b*c,c be a1,a2,a3,... and other one be b1,b2,b3,...
+there must exist n such that a1=b1, a2=b2, a3=b3, ..., an=bn
+and for i>n, ai=2^k and bi=2^k for some k
+*/
+fn check_reshape_compat(shape: &[usize], new_shape: &[usize]) {
+    let total = shape.iter().product::<usize>();
+    let new_total = new_shape.iter().product::<usize>();
+    if total != new_total {
+        panic!("Total number of elements must be the same");
+    }
+    let mut i = 0;
+    while i < shape.len() && i < new_shape.len() && shape[i] == new_shape[i] {
+        i += 1;
+    }
+    for x in shape.iter().skip(i) {
+        if *x & (*x - 1) != 0 {
+            panic!("Incompatible shapes");
+        }
+    }
+    for x in new_shape.iter().skip(i) {
+        if *x & (*x - 1) != 0 {
+            panic!("Incompatible shapes");
+        }
+    }
+}
+
+pub trait Reshape {
+    fn reshape(&self, new_shape: &[usize]) -> Self;
+}
+
+impl Reshape for DeviceMemoryHandle {
+    fn reshape(&self, new_shape: &[usize]) -> Self {
+        let handle = ensure_handle(self.clone());
+        if handle.shape.is_none() {
+            panic!("Cannot reshape non-shaped memory");
+        }
+        check_reshape_compat(&handle.shape.unwrap(), new_shape);
+        Some(DeviceMemoryHandleRaw {
+            id: handle.id,
+            broadcast_type: handle.broadcast_type,
+            shape: Some(new_shape.to_vec()),
+        })
     }
 }
 
@@ -255,17 +315,18 @@ impl<C: Config, P: ProvingSystem<C>> Context<C, P> {
                 check_results.push((true, false, None));
                 continue;
             }
-            let io_shape = if let Some(handle) = io {
-                handle.shape.clone()
+            let (io_shape, broadcast_type) = if let Some(handle) = io {
+                (handle.shape.clone(), handle.broadcast_type)
             } else {
-                None
+                panic!("Missing input")
             };
-            let chk = check_shape_compat(kernel_shape, &io_shape);
+            let chk = check_shape_compat(kernel_shape, &io_shape, broadcast_type);
             if !chk.0 {
                 panic!("Incompatible shapes: {:?} {:?}", kernel_shape, io_shape);
             }
             check_results.push(chk);
         }
+        println!("{:?}", check_results);
         let mut parallel_count = None;
         for (_, _, pc) in check_results.iter() {
             if let Some(pc) = pc {

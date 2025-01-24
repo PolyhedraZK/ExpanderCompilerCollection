@@ -84,47 +84,6 @@ fn add_16_macro<C: Config>(api: &mut API<C>, a: &[InputVariable; 16], b: &mut [O
     b[0] = sum;
 }
 
-/*
-
-Design:
-
-let kernel shape be (a,b,c), parallel count=n, simd size=m
-
-acceptable shapes are:
-(a,b,c) - broadcast, non simd
-(a,b,c,m) - broadcast, simd
-(n,a,b,c) - non broadcast, non simd
-(n,a,b,c,m) - non broadcast, simd
-
-in case of possible confusion, throw error
-
----
-
-but shapes has another property
-the actual shape of the committed input is (n,pad2(a*b*c))
-
----
-
-so the final solution:
-
-simd arrays are explicitly defined
-
-a reshape is acceptable if:
-let sequence of a*b*c,b*c,c be a1,a2,a3,... and other one be b1,b2,b3,...
-there must exist n such that a1=b1, a2=b2, a3=b3, ..., an=bn
-and for i>n, ai=2^k and bi=2^k for some k
-
----
-
-only one type vec_with_shape, it's always simd (or DeviceMemoryHandleShaped)
-it has two bool fields: broadcast, simd
-
-and it's underlying data can be determined by the shape and broadcast
-
-if it's perfect 2^n (or, perfect 2^n but the first one), broadcast doesn't matter
-
-*/
-
 #[test]
 fn zkcuda_2() {
     let kernel_add_2: Kernel<M31Config> = compile_add_2_macro().unwrap();
@@ -133,16 +92,19 @@ fn zkcuda_2() {
     println!("{:?}", kernel_add_16.io_shapes);
 
     let mut ctx: Context<M31Config, DummyProvingSystem<M31Config>> = Context::default();
-    let mut a = vec![];
-    for i in 0..32 {
-        a.push(M31::from(i + 1 as u32));
+    let mut a: Vec<Vec<M31>> = vec![];
+    for i in 0..16 {
+        a.push(vec![]);
+        for j in 0..2 {
+            a[i].push(M31::from((i * 2 + j + 1) as u32));
+        }
     }
-    let a = ctx.copy_raw_to_device(&a);
+    let a = ctx.copy_to_device(&a, false);
     let mut io = vec![a, None];
-    ctx.call_kernel_raw(&kernel_add_2, &mut io, 16, &vec![false, false]);
-    let b = io[1].clone();
+    ctx.call_kernel(&kernel_add_2, &mut io);
+    let b = io[1].reshape(&[1, 16]);
     let mut io = vec![b, None];
-    ctx.call_kernel_raw(&kernel_add_16, &mut io, 1, &vec![false, false]);
+    ctx.call_kernel(&kernel_add_16, &mut io);
     let c = io[1].clone();
     let result = ctx.copy_raw_to_host(c);
     assert_eq!(result, vec![M31::from(32 * 33 / 2)]);
