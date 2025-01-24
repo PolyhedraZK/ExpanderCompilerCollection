@@ -336,7 +336,7 @@ impl<C: Config, P: ProvingSystem<C>> Context<C, P> {
             .zip(ios.iter())
             .zip(kernel.witness_solver_io.iter())
         {
-            if !ws_input.input_offset.is_some() {
+            if ws_input.input_offset.is_none() {
                 check_results.push((true, false, None));
                 continue;
             }

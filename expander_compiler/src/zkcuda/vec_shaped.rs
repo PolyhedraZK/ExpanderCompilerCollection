@@ -7,7 +7,7 @@ pub trait VecShaped<T: Clone + Default> {
 
 impl<T: FieldRaw> VecShaped<T> for T {
     fn flatten_shaped(&self, to: &mut Vec<T>) -> Vec<usize> {
-        to.push(self.clone());
+        to.push(*self);
         vec![]
     }
     fn unflatten_shaped<'a>(&mut self, s: &'a [T], shape: &[usize]) -> &'a [T] {
@@ -17,7 +17,7 @@ impl<T: FieldRaw> VecShaped<T> for T {
         if s.is_empty() {
             panic!("Shape mismatch in unflatten");
         }
-        *self = s[0].clone();
+        *self = s[0];
         &s[1..]
     }
 }
@@ -64,7 +64,7 @@ pub fn flatten_shaped<T: FieldRaw, V: VecShaped<T>>(v: &V) -> (Vec<T>, Vec<usize
 
 pub fn unflatten_shaped<T: FieldRaw, V: VecShaped<T> + Default>(mut s: &[T], shape: &[usize]) -> V {
     let mut v = V::default();
-    s = v.unflatten_shaped(&mut s, shape);
+    s = v.unflatten_shaped(s, shape);
     if !s.is_empty() {
         panic!("Shape mismatch in unflatten");
     }
