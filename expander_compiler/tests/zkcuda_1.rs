@@ -76,12 +76,12 @@ fn add_2_macro<C: Config>(api: &mut API<C>, a: &[InputVariable; 2], b: &mut Outp
 }
 
 #[kernel]
-fn add_16_macro<C: Config>(api: &mut API<C>, a: &[InputVariable; 16], b: &mut [OutputVariable; 1]) {
+fn add_16_macro<C: Config>(api: &mut API<C>, a: &[InputVariable; 16], b: &mut OutputVariable) {
     let mut sum = api.constant(0);
     for i in 0..16 {
         sum = api.add(sum, a[i]);
     }
-    b[0] = sum;
+    *b = sum;
 }
 
 #[test]
@@ -100,14 +100,14 @@ fn zkcuda_2() {
         }
     }
     let a = ctx.copy_to_device(&a, false);
-    let mut io = vec![a, None];
-    ctx.call_kernel(&kernel_add_2, &mut io);
-    let b = io[1].reshape(&[1, 16]);
-    let mut io = vec![b, None];
-    ctx.call_kernel(&kernel_add_16, &mut io);
-    let c = io[1].clone();
-    let result = ctx.copy_raw_to_host(c);
-    assert_eq!(result, vec![M31::from(32 * 33 / 2)]);
+    let mut b: DeviceMemoryHandle = None;
+    call_kernel!(ctx, kernel_add_2, a, mut b);
+    let b = b.reshape(&[1, 16]);
+    let mut c: DeviceMemoryHandle = None;
+    call_kernel!(ctx, kernel_add_16, b, mut c);
+    let c = c.reshape(&[]);
+    let result: M31 = ctx.copy_to_host(c);
+    assert_eq!(result, M31::from(32 * 33 / 2));
     let proof = ctx.to_proof();
     assert!(proof.verify());
 }

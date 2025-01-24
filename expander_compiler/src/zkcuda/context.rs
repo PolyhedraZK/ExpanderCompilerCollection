@@ -2,14 +2,17 @@ use arith::SimdField;
 
 use crate::field::FieldArith;
 use crate::utils::misc::next_power_of_two;
+use crate::zkcuda::vec_shaped::unflatten_shaped;
 use crate::{circuit::config::Config, utils::pool::Pool};
 
-use super::flatten_shaped::{flatten_shaped, FlattenShaped};
 use super::kernel::shape_prepend;
+use super::vec_shaped::{flatten_shaped, VecShaped};
 use super::{
     kernel::{Kernel, Shape},
     proving_system::ProvingSystem,
 };
+
+pub use macros::call_kernel;
 
 pub struct DeviceMemory<C: Config, P: ProvingSystem<C>> {
     pub raw_values: Vec<C::DefaultSimdField>,
@@ -24,7 +27,7 @@ pub struct DeviceMemoryHandleRaw {
     pub shape: Shape,
 }
 
-type DeviceMemoryHandle = Option<DeviceMemoryHandleRaw>;
+pub type DeviceMemoryHandle = Option<DeviceMemoryHandleRaw>;
 
 #[derive(Copy, Clone)]
 pub enum BroadcastType {
@@ -256,7 +259,7 @@ impl<C: Config, P: ProvingSystem<C>> Context<C, P> {
         )
     }
 
-    pub fn copy_to_device<T: FlattenShaped<C::CircuitField>>(
+    pub fn copy_to_device<T: VecShaped<C::CircuitField>>(
         &mut self,
         host_memory: &T,
         is_broadcast: bool,
@@ -273,7 +276,7 @@ impl<C: Config, P: ProvingSystem<C>> Context<C, P> {
         )
     }
 
-    pub fn copy_simd_to_device<T: FlattenShaped<C::DefaultSimdField>>(
+    pub fn copy_simd_to_device<T: VecShaped<C::DefaultSimdField>>(
         &mut self,
         host_memory: &T,
         is_broadcast: bool,
@@ -298,6 +301,28 @@ impl<C: Config, P: ProvingSystem<C>> Context<C, P> {
     ) -> Vec<C::DefaultSimdField> {
         let device_memory_handle = ensure_handle(device_memory_handle);
         self.device_memories[device_memory_handle.id].values.clone()
+    }
+
+    pub fn copy_to_host<T: VecShaped<C::CircuitField> + Default>(
+        &self,
+        device_memory_handle: DeviceMemoryHandle,
+    ) -> T {
+        let device_memory_handle = ensure_handle(device_memory_handle);
+        unflatten_shaped(
+            &unpack_vec::<C>(&self.device_memories[device_memory_handle.id].raw_values),
+            &device_memory_handle.shape.unwrap(),
+        )
+    }
+
+    pub fn copy_simd_to_host<T: VecShaped<C::DefaultSimdField> + Default>(
+        &self,
+        device_memory_handle: DeviceMemoryHandle,
+    ) -> T {
+        let device_memory_handle = ensure_handle(device_memory_handle);
+        unflatten_shaped(
+            &self.device_memories[device_memory_handle.id].raw_values,
+            &device_memory_handle.shape.unwrap(),
+        )
     }
 
     pub fn call_kernel(&mut self, kernel: &Kernel<C>, ios: &mut [DeviceMemoryHandle]) {
