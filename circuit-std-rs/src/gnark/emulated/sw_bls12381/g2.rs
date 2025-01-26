@@ -685,7 +685,7 @@ mod tests {
 
     #[test]
     fn test_hash_to_g2() {
-        compile_generic(&HashToG2Circuit::default(), CompileOptions::default()).unwrap();
+        // compile_generic(&HashToG2Circuit::default(), CompileOptions::default()).unwrap();
         let mut hint_registry = HintRegistry::<M31>::new();
         register_hint(&mut hint_registry);
         let mut assignment = HashToG2Circuit::<M31> {

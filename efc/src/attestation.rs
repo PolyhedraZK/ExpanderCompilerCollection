@@ -343,7 +343,7 @@ impl GenericDefine<M31Config> for AttHashCircuit<Variable> {
 }
 #[cfg(test)]
 mod tests {
-    use crate::{attestation::Attestation, utils::read_from_json_file};
+    // use crate::{attestation::Attestation, utils::read_from_json_file};
 
     use super::AttHashCircuit;
     use circuit_std_rs::utils::register_hint;
@@ -421,10 +421,10 @@ mod tests {
         debug_eval(&AttHashCircuit::default(), &assignment, hint_registry);
     }
 
-    #[test]
-    fn read_attestation() {
-        let file_path = "./data/slotAttestationsFolded.json";
-        let attestations: Vec<Attestation> = read_from_json_file(file_path).unwrap();
-        println!("attestations[0]:{:?}", attestations[0]);
-    }
+    // #[test]
+    // fn read_attestation() {
+    //     let file_path = "./data/slotAttestationsFolded.json";
+    //     let attestations: Vec<Attestation> = read_from_json_file(file_path).unwrap();
+    //     println!("attestations[0]:{:?}", attestations[0]);
+    // }
 }

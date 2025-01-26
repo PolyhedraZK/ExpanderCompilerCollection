@@ -7,6 +7,5 @@ pub mod end2end;
 pub mod hashtable;
 pub mod permutation;
 pub mod shuffle;
-pub mod shuffle2;
 pub mod utils;
 pub mod validator;
