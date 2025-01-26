@@ -1,4 +1,4 @@
-use crate::big_int::to_binary;
+use crate::sha256::m31_utils::to_binary;
 use crate::gnark::element::*;
 use crate::gnark::emparam::FieldParams;
 use crate::gnark::utils::*;
