@@ -5,7 +5,7 @@ use crate::utils::{ensure_directory_exists, read_from_json_file};
 use crate::validator::{read_validators, ValidatorPlain, ValidatorSSZ};
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
-use circuit_std_rs::big_int::big_array_add;
+use circuit_std_rs::sha256::m31_utils::big_array_add;
 use circuit_std_rs::gnark::emulated::sw_bls12381::g1::*;
 use circuit_std_rs::gnark::emulated::sw_bls12381::g2::{G2AffP, G2};
 use circuit_std_rs::utils::{register_hint, simple_select};

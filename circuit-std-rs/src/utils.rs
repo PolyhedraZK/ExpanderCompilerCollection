@@ -1,6 +1,6 @@
 use expander_compiler::frontend::*;
 
-use crate::{sha256::m31_utils::to_binary_hint, gnark::hints::*, logup::*};
+use crate::{gnark::hints::*, logup::*, sha256::m31_utils::to_binary_hint};
 
 pub fn simple_select<C: Config, B: RootAPI<C>>(
     native: &mut B,

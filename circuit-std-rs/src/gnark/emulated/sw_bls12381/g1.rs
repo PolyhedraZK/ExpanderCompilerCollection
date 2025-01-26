@@ -1,9 +1,9 @@
 use std::str::FromStr;
 
-use crate::sha256::m31_utils::*;
 use crate::gnark::element::*;
 use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::emulated::field_bls12381::e2::CurveF;
+use crate::sha256::m31_utils::*;
 use crate::utils::simple_select;
 use expander_compiler::{
     declare_circuit,

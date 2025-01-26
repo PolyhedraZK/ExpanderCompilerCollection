@@ -1,8 +1,8 @@
-use crate::sha256::m31_utils::to_binary;
 use crate::gnark::element::*;
 use crate::gnark::emparam::FieldParams;
 use crate::gnark::utils::*;
 use crate::logup::LogUpRangeProofTable;
+use crate::sha256::m31_utils::to_binary;
 use crate::utils::simple_select;
 use expander_compiler::frontend::*;
 use num_bigint::BigInt;

@@ -1,4 +1,4 @@
-use circuit_std_rs::big_int::{big_is_zero, big_less_than, bigint_to_m31_array, to_binary};
+use circuit_std_rs::sha256::m31_utils::{big_is_zero, big_less_than, bigint_to_m31_array, to_binary};
 use circuit_std_rs::gnark::emulated::sw_bls12381::g1::G1Affine;
 use circuit_std_rs::utils::{simple_lookup2, simple_select};
 use expander_compiler::frontend::*;
