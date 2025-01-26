@@ -8,7 +8,7 @@ declare_circuit!(Circuit {
 });
 
 fn to_binary<C: Config>(api: &mut API<C>, x: Variable, n_bits: usize) -> Vec<Variable> {
-    api.new_hint("myhint.tobinary", &vec![x], n_bits)
+    api.new_hint("myhint.tobinary", &[x], n_bits)
 }
 
 fn from_binary<C: Config>(api: &mut API<C>, bits: Vec<Variable>) -> Variable {

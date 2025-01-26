@@ -936,7 +936,7 @@ mod tests {
             }
             _ => panic!(),
         }
-        let inputs: Vec<CField> = (1..=100000).map(|i| CField::from(i)).collect();
+        let inputs: Vec<CField> = (1..=100000).map(CField::from).collect();
         let (out, ok) = root.eval_unsafe(inputs.clone());
         let (out2, ok2) = root_processed.eval_unsafe(inputs);
         assert_eq!(out, out2);
@@ -959,7 +959,7 @@ mod tests {
         assert_eq!(root.validate(), Ok(()));
         let root_processed = super::process(&root).unwrap();
         assert_eq!(root_processed.validate(), Ok(()));
-        let inputs: Vec<CField> = (1..=100000).map(|i| CField::from(i)).collect();
+        let inputs: Vec<CField> = (1..=100000).map(CField::from).collect();
         let (out, ok) = root.eval_unsafe(inputs.clone());
         let (out2, ok2) = root_processed.eval_unsafe(inputs);
         assert_eq!(out, out2);

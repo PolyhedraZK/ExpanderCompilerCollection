@@ -1,4 +1,4 @@
-use crate::big_int::*;
+use crate::sha256::m31_utils::*;
 use crate::gnark::element::*;
 use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::emulated::field_bls12381::e2::Ext2;

@@ -1,4 +1,4 @@
-use circuit_std_rs::sha2_m31::sha256_var_bytes;
+use circuit_std_rs::sha256::m31::sha256_var_bytes;
 use expander_compiler::frontend::*;
 use serde::Deserialize;
 
