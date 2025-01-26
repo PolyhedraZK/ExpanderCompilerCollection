@@ -1,7 +1,7 @@
 use crate::utils::{ensure_directory_exists, read_from_json_file};
-use circuit_std_rs::sha256::m31_utils::*;
 use circuit_std_rs::logup::LogUpSingleKeyTable;
 use circuit_std_rs::poseidon_m31::*;
+use circuit_std_rs::sha256::m31_utils::*;
 use circuit_std_rs::utils::{register_hint, simple_lookup2, simple_select};
 use expander_compiler::circuit::ir::hint_normalized::witness_solver;
 use expander_compiler::frontend::extra::*;
