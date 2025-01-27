@@ -19,11 +19,11 @@ use sumcheck::ProverScratchPad;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 
+#[allow(dead_code)] 
 #[derive(Clone)]
 pub struct ExpanderGKRCommitment<C: Config> {
     vals: Vec<C::DefaultSimdField>,
     commitment: RawCommitment<C::DefaultSimdField>,
-    #[allow(dead_code)] // We will use this after the mutability change in Expander 
     scratch: RawExpanderGKRScratchPad,
 }
 
@@ -135,6 +135,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
             let mut transcript = <C::DefaultGKRConfig as GKRConfig>::Transcript::new();
             transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
             let mut cursor = Cursor::new(&proof.data[i].bytes);
+            cursor.set_position(32);
             let (mut verified, rz0, rz1, r_simd, _r_mpi, claimed_v0, claimed_v1) = gkr_verify(
                 &MPIConfig::new(),
                 &expander_circuit,
@@ -143,6 +144,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
                 &mut transcript,
                 &mut cursor,
             );
+
             verified &= verify_input_claim(
                 &mut cursor,
                 &rz0,
@@ -196,8 +198,8 @@ fn max_n_vars<C: GKRFieldConfig>(circuit: &Circuit<C>) -> (usize, usize) {
     let mut max_num_input_var = 0;
     let mut max_num_output_var = 0;
     for layer in circuit.layers.iter() {
-        max_num_input_var = max_num_input_var.max(layer.input_vals.len());
-        max_num_output_var = max_num_output_var.max(layer.output_vals.len());
+        max_num_input_var = max_num_input_var.max(layer.input_var_num);
+        max_num_output_var = max_num_output_var.max(layer.output_var_num);
     }
     (max_num_input_var, max_num_output_var)
 }
@@ -223,7 +225,7 @@ fn prove_input_claim<C: Config>(
         let vals = if *ib {
             commitment.vals_ref()
         } else {
-            &commitment.vals[parallel_index * input.len..(parallel_index + 1) * input.len]
+            &commitment.vals_ref()[parallel_index * input.len..(parallel_index + 1) * input.len]
         };
 
         let (params, p_key, _v_key, _) = pcs_testing_setup_fixed_seed::<C>(vals);
@@ -233,7 +235,7 @@ fn prove_input_claim<C: Config>(
             <
                 C::DefaultGKRFieldConfig, 
                 <C::DefaultGKRConfig as GKRConfig>::Transcript
-            >::eval(vals, x, x_simd, &[]);
+            >::eval(vals, challenge_vars, x_simd, &[]);
         transcript.append_field_element(&v);
 
         let mut scratch_pad = <RawExpanderGKR::<C::DefaultGKRFieldConfig, <C::DefaultGKRConfig as GKRConfig>::Transcript> as PCSForExpanderGKR<_, _>>::ScratchPad::default();
@@ -313,7 +315,7 @@ fn verify_input_claim<C: Config>(
             &params,
             &MPIConfig::default(),
             &v_key,
-            &commitment.commitment,
+            &RawCommitment {evals: raw_commitment.to_vec()},
             &ExpanderGKRChallenge::<C::DefaultGKRFieldConfig> {
                 x: challenge_vars.to_vec(),
                 x_simd: x_simd.to_vec(),
