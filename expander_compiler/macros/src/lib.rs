@@ -1,6 +1,11 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, FnArg, ItemFn, PatType, Type};
+use syn::{
+    parse::{Parse, ParseStream},
+    parse_macro_input,
+    punctuated::Punctuated,
+    FnArg, Ident, ItemFn, PatType, Result, Token, Type,
+};
 
 fn calculate_array_total_len(ty: &Type) -> proc_macro2::TokenStream {
     match ty {
@@ -10,6 +15,17 @@ fn calculate_array_total_len(ty: &Type) -> proc_macro2::TokenStream {
             quote! { (#len as usize) * (#inner_len) }
         }
         _ => quote! { 1usize },
+    }
+}
+
+fn get_array_shape(ty: &Type) -> proc_macro2::TokenStream {
+    match ty {
+        Type::Array(array) => {
+            let len = &array.len;
+            let inner_shape = get_array_shape(&array.elem);
+            quote! { (#len as usize) , #inner_shape }
+        }
+        _ => quote! {},
     }
 }
 
@@ -214,6 +230,7 @@ pub fn kernel(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let stmts = &input_fn.block.stmts;
 
     let mut specs = Vec::new();
+    let mut shapes = Vec::new();
     let mut arg_names = Vec::new();
     let mut arg_mutability = Vec::new();
     let mut unflatten_code = Vec::new();
@@ -243,6 +260,8 @@ pub fn kernel(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     }
                     let (is_input, is_output) = get_variable_spec(inner_ty);
                     let total_len = calculate_array_total_len(&ref_type.elem);
+                    let shape = get_array_shape(&ref_type.elem);
+                    shapes.push(quote! { Some(vec![#shape]) });
 
                     specs.push(quote! {
                         IOVecSpec {
@@ -303,7 +322,7 @@ pub fn kernel(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
 
         fn #compile_fn_name<C: Config>() -> Result<Kernel<C>, Error> {
-            compile_with_spec(
+            compile_with_spec_and_shapes(
                 |api: &mut API<C>, inputs: &mut Vec<Vec<Variable>>| {
                     #(#unflatten_code)*
 
@@ -311,7 +330,8 @@ pub fn kernel(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
                     #(#flatten_code)*
                 },
-                &[#(#specs),*]
+                &[#(#specs),*],
+                &[#(#shapes),*],
             )
         }
     };
@@ -319,4 +339,77 @@ pub fn kernel(_attr: TokenStream, item: TokenStream) -> TokenStream {
     // eprintln!("Expanded tokens: {:#?}", expanded);
     // eprintln!("Expanded code: {}", expanded);
     TokenStream::from(expanded)
+}
+
+struct KernelArg {
+    is_mut: bool,
+    name: Ident,
+}
+
+struct KernelCall {
+    ctx: Ident,
+    kernel_name: Ident,
+    args: Punctuated<KernelArg, Token![,]>,
+}
+
+impl Parse for KernelArg {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let is_mut = input.peek(Token![mut]);
+        if is_mut {
+            input.parse::<Token![mut]>()?;
+        }
+        let name = input.parse()?;
+        Ok(KernelArg { is_mut, name })
+    }
+}
+
+impl Parse for KernelCall {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let ctx = input.parse()?;
+        input.parse::<Token![,]>()?;
+        let kernel_name = input.parse()?;
+        input.parse::<Token![,]>()?;
+
+        let args = Punctuated::parse_terminated(input)?;
+
+        Ok(KernelCall {
+            ctx,
+            kernel_name,
+            args,
+        })
+    }
+}
+
+#[proc_macro]
+pub fn call_kernel(input: TokenStream) -> TokenStream {
+    let KernelCall {
+        ctx,
+        kernel_name,
+        args,
+    } = parse_macro_input!(input as KernelCall);
+
+    // 收集所有参数名
+    let arg_names: Vec<_> = args.iter().map(|arg| &arg.name).collect();
+
+    // 分别收集可变参数的名称和索引
+    let mut_vars: Vec<_> = args
+        .iter()
+        .enumerate()
+        .filter(|(_, arg)| arg.is_mut)
+        .collect();
+
+    let mut_assignments = mut_vars.iter().map(|(i, arg)| {
+        let var_name = &arg.name;
+        let idx = *i;
+        quote! { #var_name = io[#idx].clone(); }
+    });
+
+    // 生成代码
+    let expanded = quote! {
+        let mut io = [#(#arg_names),*];
+        #ctx.call_kernel(&#kernel_name, &mut io);
+        #(#mut_assignments)*
+    };
+
+    expanded.into()
 }

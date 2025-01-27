@@ -1,5 +1,6 @@
 use arith::Field;
 use expander_compiler::frontend::*;
+use rand::SeedableRng;
 
 declare_circuit!(Circuit {
     s: [Variable; 100],
@@ -21,8 +22,9 @@ fn example<C: Config>() {
     println!("n_witnesses: {}", n_witnesses);
     let compile_result: CompileResult<C> = compile(&Circuit::default()).unwrap();
     let mut s = [C::CircuitField::zero(); 100];
+    let mut rng = rand::rngs::StdRng::seed_from_u64(1235);
     for i in 0..s.len() {
-        s[i] = C::CircuitField::random_unsafe(&mut rand::thread_rng());
+        s[i] = C::CircuitField::random_unsafe(&mut rng);
     }
     let assignment = Circuit::<C::CircuitField> {
         s,
@@ -35,7 +37,7 @@ fn example<C: Config>() {
         .unwrap();
     let output = compile_result.layered_circuit.run(&witness);
     for x in output.iter() {
-        assert_eq!(*x, true);
+        assert!(*x);
     }
 
     let mut expander_circuit = compile_result

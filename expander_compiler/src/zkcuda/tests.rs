@@ -87,14 +87,14 @@ fn zkcuda_1() {
     for i in 0..32 {
         a.push(M31::from(i + 1 as u32));
     }
-    let a = ctx.copy_to_device(&a);
-    let mut io = vec![Some(a), None];
-    ctx.call_kernel(&kernel_add_2, &mut io, 16, &vec![false, false]);
-    let b = io[1].unwrap();
-    let mut io = vec![Some(b), None];
-    ctx.call_kernel(&kernel_add_16, &mut io, 1, &vec![false, false]);
-    let c = io[1].unwrap();
-    let result = ctx.copy_to_host(c);
+    let a = ctx.copy_raw_to_device(&a);
+    let mut io = vec![a, None];
+    ctx.call_kernel_raw(&kernel_add_2, &mut io, 16, &vec![false, false]);
+    let b = io[1].clone();
+    let mut io = vec![b, None];
+    ctx.call_kernel_raw(&kernel_add_16, &mut io, 1, &vec![false, false]);
+    let c = io[1].clone();
+    let result = ctx.copy_raw_to_host(c);
     assert_eq!(result, vec![M31::from(32 * 33 / 2)]);
     let proof = ctx.to_proof();
     assert!(proof.verify());
@@ -108,15 +108,15 @@ fn zkcuda_1() {
     for i in 0..8 {
         b.push(M31::from(i + 1 as u32));
     }
-    let a = ctx.copy_to_device(&a);
-    let b = ctx.copy_to_device(&b);
-    let mut io = vec![Some(a), Some(b), None];
-    ctx.call_kernel(&kernel_div_2x8, &mut io, 2, &vec![false, true, false]);
-    let c = io[2].unwrap();
-    let mut io = vec![Some(c), None];
-    ctx.call_kernel(&kernel_add_16, &mut io, 1, &vec![false, false]);
-    let c = io[1].unwrap();
-    let result = ctx.copy_to_host(c);
+    let a = ctx.copy_raw_to_device(&a);
+    let b = ctx.copy_raw_to_device(&b);
+    let mut io = vec![a, b, None];
+    ctx.call_kernel_raw(&kernel_div_2x8, &mut io, 2, &vec![false, true, false]);
+    let c = io[2].clone();
+    let mut io = vec![c, None];
+    ctx.call_kernel_raw(&kernel_add_16, &mut io, 1, &vec![false, false]);
+    let c = io[1].clone();
+    let result = ctx.copy_raw_to_host(c);
     assert_eq!(result, vec![M31::from(16 * 17 / 2)]);
     let proof = ctx.to_proof();
     assert!(proof.verify());
@@ -200,18 +200,18 @@ fn zkcuda_2() {
     for _ in 0..3 {
         b.push(M31::from(0));
     }
-    let a = ctx.copy_to_device(&a);
-    let b = ctx.copy_to_device(&b);
-    let mut io = vec![Some(a), Some(b), None];
-    ctx.call_kernel(&kernel_div_2x5, &mut io, 5, &vec![false, true, false]);
-    let c = io[2].unwrap();
-    let mut io = vec![Some(c), None];
-    ctx.call_kernel(&kernel_add_5, &mut io, 5, &vec![false, false]);
-    let c = io[1].unwrap();
-    let mut io = vec![Some(c), None];
-    ctx.call_kernel(&kernel_add_5, &mut io, 1, &vec![false, false]);
-    let c = io[1].unwrap();
-    let result = ctx.copy_to_host(c);
+    let a = ctx.copy_raw_to_device(&a);
+    let b = ctx.copy_raw_to_device(&b);
+    let mut io = vec![a, b, None];
+    ctx.call_kernel_raw(&kernel_div_2x5, &mut io, 5, &vec![false, true, false]);
+    let c = io[2].clone();
+    let mut io = vec![c, None];
+    ctx.call_kernel_raw(&kernel_add_5, &mut io, 5, &vec![false, false]);
+    let c = io[1].clone();
+    let mut io = vec![c, None];
+    ctx.call_kernel_raw(&kernel_add_5, &mut io, 1, &vec![false, false]);
+    let c = io[1].clone();
+    let result = ctx.copy_raw_to_host(c);
     assert_eq!(result, vec![M31::from(25 * 26 / 2)]);
     let proof = ctx.to_proof();
     assert!(proof.verify());
