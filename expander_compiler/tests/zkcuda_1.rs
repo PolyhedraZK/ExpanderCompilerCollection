@@ -110,14 +110,14 @@ fn zkcuda_1_expander() {
     for i in 0..32 {
         a.push(M31::from(i + 1 as u32));
     }
-    let a = ctx.copy_to_device(&a);
-    let mut io = vec![Some(a), None];
-    ctx.call_kernel(&kernel_add_2, &mut io, 16, &vec![false, false]);
-    let b = io[1].unwrap();
-    let mut io = vec![Some(b), None];
-    ctx.call_kernel(&kernel_add_16, &mut io, 1, &vec![false, false]);
-    let c = io[1].unwrap();
-    let result = ctx.copy_to_host(c);
+    let a = ctx.copy_raw_to_device(&a);
+    let mut io = vec![a, None];
+    ctx.call_kernel_raw(&kernel_add_2, &mut io, 16, &vec![false, false]);
+    let b = io[1].clone();
+    let mut io = vec![b, None];
+    ctx.call_kernel_raw(&kernel_add_16, &mut io, 1, &vec![false, false]);
+    let c = io[1].clone();
+    let result = ctx.copy_raw_to_host(c);
     assert_eq!(result, vec![M31::from(32 * 33 / 2)]);
     let proof = ctx.to_proof();
     assert!(proof.verify());
