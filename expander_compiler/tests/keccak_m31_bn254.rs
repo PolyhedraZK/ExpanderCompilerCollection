@@ -2,7 +2,7 @@ use ethnum::U256;
 use expander_compiler::field::{FieldArith, FieldModulus};
 use expander_compiler::frontend::*;
 use internal::Serde;
-use rand::{thread_rng, Rng};
+use rand::{Rng, SeedableRng};
 use tiny_keccak::Hasher;
 
 const N_HASHES: usize = 2;
@@ -292,10 +292,11 @@ fn keccak_big_field<C: Config, const N_WITNESSES: usize>(field_name: &str) {
     } = compile_result;
 
     let mut assignment = Keccak256Circuit::<C::CircuitField>::default();
+    let mut rng = rand::rngs::StdRng::seed_from_u64(1235);
     for k in 0..N_HASHES {
         let mut data = vec![0u8; 64];
         for i in 0..64 {
-            data[i] = thread_rng().gen();
+            data[i] = rng.gen();
         }
         let mut hash = tiny_keccak::Keccak::v256();
         hash.update(&data);
@@ -315,7 +316,7 @@ fn keccak_big_field<C: Config, const N_WITNESSES: usize>(field_name: &str) {
         let out_compressed = compress_bits(out_bits);
         assert_eq!(out_compressed.len(), CHECK_PARTITIONS);
         for (i, x) in out_compressed.iter().enumerate() {
-            assert!(U256::from(*x as u64) < C::CircuitField::modulus());
+            assert!(U256::from(*x as u64) < C::CircuitField::MODULUS);
             assignment.out[k][i] = C::CircuitField::from(*x as u32);
         }
     }

@@ -1,6 +1,11 @@
 use crate::{
     builder,
-    circuit::{config::Config, input_mapping::InputMapping, ir, layered},
+    circuit::{
+        config::Config,
+        input_mapping::InputMapping,
+        ir,
+        layered::{self, InputType},
+    },
     layering,
     utils::error::Error,
 };
@@ -9,6 +14,18 @@ use crate::{
 mod random_circuit_tests;
 #[cfg(test)]
 mod tests;
+
+#[derive(Default)]
+pub struct CompileOptions {
+    pub mul_fanout_limit: Option<usize>,
+}
+
+impl CompileOptions {
+    pub fn with_mul_fanout_limit(mut self, mul_fanout_limit: usize) -> Self {
+        self.mul_fanout_limit = Some(mul_fanout_limit);
+        self
+    }
+}
 
 fn optimize_until_fixed_point<T, F>(x: &T, im: &mut InputMapping, f: F) -> T
 where
@@ -47,9 +64,16 @@ fn print_stat(stat_name: &str, stat: usize, is_last: bool) {
     }
 }
 
-pub fn compile<C: Config>(
+pub fn compile<C: Config, I: InputType>(
     r_source: &ir::source::RootCircuit<C>,
-) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C>), Error> {
+) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C, I>), Error> {
+    compile_with_options(r_source, CompileOptions::default())
+}
+
+pub fn compile_with_options<C: Config, I: InputType>(
+    r_source: &ir::source::RootCircuit<C>,
+    options: CompileOptions,
+) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C, I>), Error> {
     r_source.validate()?;
 
     let mut src_im = InputMapping::new_identity(r_source.input_size());
@@ -114,6 +138,15 @@ pub fn compile<C: Config>(
         .validate()
         .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
 
+    let r_dest_relaxed_opt = if let Some(limit) = options.mul_fanout_limit {
+        r_dest_relaxed_opt.solve_mul_fanout_limit(limit)
+    } else {
+        r_dest_relaxed_opt
+    };
+    r_dest_relaxed_opt
+        .validate()
+        .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
+
     let r_dest_relaxed_p2 = if C::ENABLE_RANDOM_COMBINATION {
         r_dest_relaxed_opt
     } else {
@@ -127,18 +160,21 @@ pub fn compile<C: Config>(
         .validate()
         .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
 
-    let r_dest_relaxed_p3 = layering::ir_split::split_to_single_layer(&r_dest_relaxed_p2);
-    r_dest_relaxed_p3
-        .validate()
-        .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
+    let r_dest_relaxed_p3 = if I::CROSS_LAYER_RELAY {
+        r_dest_relaxed_p2
+    } else {
+        let r = layering::ir_split::split_to_single_layer(&r_dest_relaxed_p2);
+        r.validate()
+            .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
 
-    let r_dest_relaxed_p3_opt = optimize_until_fixed_point(&r_dest_relaxed_p3, &mut hl_im, |r| {
-        let (mut r, im) = r.remove_unreachable();
-        r.reassign_duplicate_sub_circuit_outputs();
-        (r, im)
-    });
+        optimize_until_fixed_point(&r, &mut hl_im, |r| {
+            let (mut r, im) = r.remove_unreachable();
+            r.reassign_duplicate_sub_circuit_outputs();
+            (r, im)
+        })
+    };
 
-    let r_dest = r_dest_relaxed_p3_opt.solve_duplicates();
+    let r_dest = r_dest_relaxed_p3.solve_duplicates();
 
     let r_dest_opt = optimize_until_fixed_point(&r_dest, &mut hl_im, |r| {
         let (mut r, im) = r.remove_unreachable();

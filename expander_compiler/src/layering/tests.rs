@@ -1,17 +1,23 @@
 use crate::circuit::{
     config::{Config, M31Config as C},
     input_mapping::InputMapping,
-    ir::{common::rand_gen::*, dest::RootCircuit as IrRootCircuit},
-    layered,
+    ir::{
+        common::rand_gen::*,
+        dest::{Circuit as IrCircuit, Instruction as IrInstruction, RootCircuit as IrRootCircuit},
+        expr::{Expression, Term},
+    },
+    layered::{self, CrossLayerInputType, InputType, NormalInputType},
 };
+
+use crate::field::M31 as CField;
 
 use crate::field::FieldArith;
 
 use super::compile;
 
-pub fn test_input<C: Config>(
+pub fn test_input<C: Config, I: InputType>(
     rc: &IrRootCircuit<C>,
-    lc: &layered::Circuit<C>,
+    lc: &layered::Circuit<C, I>,
     input_mapping: &InputMapping,
     input: &Vec<C::CircuitField>,
 ) {
@@ -22,10 +28,10 @@ pub fn test_input<C: Config>(
     assert_eq!(rc_output, lc_output);
 }
 
-pub fn compile_and_random_test<C: Config>(
+pub fn compile_and_random_test<C: Config, I: InputType>(
     rc: &IrRootCircuit<C>,
     n_tests: usize,
-) -> (layered::Circuit<C>, InputMapping) {
+) -> (layered::Circuit<C, I>, InputMapping) {
     assert!(rc.validate().is_ok());
     let (lc, input_mapping) = compile(rc);
     assert_eq!(lc.validate(), Ok(()));
@@ -56,7 +62,8 @@ fn random_circuits_1() {
         config.seed = i;
         let root = IrRootCircuit::<C>::random(&config);
         assert_eq!(root.validate(), Ok(()));
-        compile_and_random_test(&root, 5);
+        compile_and_random_test::<_, NormalInputType>(&root, 5);
+        compile_and_random_test::<_, CrossLayerInputType>(&root, 5);
     }
 }
 
@@ -76,7 +83,8 @@ fn random_circuits_2() {
         config.seed = i + 10000;
         let root = IrRootCircuit::<C>::random(&config);
         assert_eq!(root.validate(), Ok(()));
-        compile_and_random_test(&root, 5);
+        compile_and_random_test::<_, NormalInputType>(&root, 5);
+        compile_and_random_test::<_, CrossLayerInputType>(&root, 5);
     }
 }
 
@@ -96,7 +104,8 @@ fn random_circuits_3() {
         config.seed = i + 20000;
         let root = IrRootCircuit::<C>::random(&config);
         assert_eq!(root.validate(), Ok(()));
-        compile_and_random_test(&root, 5);
+        compile_and_random_test::<_, NormalInputType>(&root, 5);
+        compile_and_random_test::<_, CrossLayerInputType>(&root, 5);
     }
 }
 
@@ -119,6 +128,40 @@ fn random_circuits_4() {
         config.seed = i + 30000;
         let root = IrRootCircuit::<C>::random(&config);
         assert_eq!(root.validate(), Ok(()));
-        compile_and_random_test(&root, 5);
+        compile_and_random_test::<_, NormalInputType>(&root, 5);
+        compile_and_random_test::<_, CrossLayerInputType>(&root, 5);
+    }
+}
+
+#[test]
+fn cross_layer_circuit() {
+    let mut root = IrRootCircuit::<C>::default();
+    const N: usize = 1000;
+    root.circuits.insert(
+        0,
+        IrCircuit::<C> {
+            instructions: vec![],
+            constraints: vec![N * 2 - 1],
+            outputs: vec![],
+            num_inputs: N,
+        },
+    );
+    for i in 0..N - 1 {
+        root.circuits
+            .get_mut(&0)
+            .unwrap()
+            .instructions
+            .push(IrInstruction::InternalVariable {
+                expr: Expression::from_terms(vec![
+                    Term::new_linear(CField::one(), N + i),
+                    Term::new_linear(CField::one(), N - i - 1),
+                ]),
+            });
+    }
+    assert_eq!(root.validate(), Ok(()));
+    let (lc, _) = compile_and_random_test::<_, CrossLayerInputType>(&root, 5);
+    assert!((lc.layer_ids.len() as isize - N as isize).abs() <= 10);
+    for i in lc.layer_ids.iter() {
+        assert!(lc.segments[*i].gate_adds.len() <= 10);
     }
 }

@@ -9,23 +9,14 @@ use crate::utils::{misc::next_power_of_two, union_find::UnionFind};
 
 use super::*;
 
-impl<C: Config, const INPUT_NUM: usize> PartialOrd for Gate<C, INPUT_NUM> {
+impl<C: Config, I: InputType, const INPUT_NUM: usize> PartialOrd for Gate<C, I, INPUT_NUM> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<C: Config, const INPUT_NUM: usize> Ord for Gate<C, INPUT_NUM> {
+impl<C: Config, I: InputType, const INPUT_NUM: usize> Ord for Gate<C, I, INPUT_NUM> {
     fn cmp(&self, other: &Self) -> Ordering {
-        match self.output.cmp(&other.output) {
-            Ordering::Less => {
-                return Ordering::Less;
-            }
-            Ordering::Greater => {
-                return Ordering::Greater;
-            }
-            Ordering::Equal => {}
-        };
         for i in 0..INPUT_NUM {
             match self.inputs[i].cmp(&other.inputs[i]) {
                 Ordering::Less => {
@@ -37,19 +28,7 @@ impl<C: Config, const INPUT_NUM: usize> Ord for Gate<C, INPUT_NUM> {
                 Ordering::Equal => {}
             };
         }
-        self.coef.cmp(&other.coef)
-    }
-}
-
-impl<C: Config> PartialOrd for GateCustom<C> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<C: Config> Ord for GateCustom<C> {
-    fn cmp(&self, other: &Self) -> Ordering {
-        match self.gate_type.cmp(&other.gate_type) {
+        match self.output.cmp(&other.output) {
             Ordering::Less => {
                 return Ordering::Less;
             }
@@ -58,7 +37,19 @@ impl<C: Config> Ord for GateCustom<C> {
             }
             Ordering::Equal => {}
         };
-        match self.output.cmp(&other.output) {
+        self.coef.cmp(&other.coef)
+    }
+}
+
+impl<C: Config, I: InputType> PartialOrd for GateCustom<C, I> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<C: Config, I: InputType> Ord for GateCustom<C, I> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.gate_type.cmp(&other.gate_type) {
             Ordering::Less => {
                 return Ordering::Less;
             }
@@ -87,18 +78,27 @@ impl<C: Config> Ord for GateCustom<C> {
                 Ordering::Equal => {}
             };
         }
+        match self.output.cmp(&other.output) {
+            Ordering::Less => {
+                return Ordering::Less;
+            }
+            Ordering::Greater => {
+                return Ordering::Greater;
+            }
+            Ordering::Equal => {}
+        };
         self.coef.cmp(&other.coef)
     }
 }
 
-trait GateOpt<C: Config>: PartialEq + Ord + Clone {
+trait GateOpt<C: Config, I: InputType>: PartialEq + Ord + Clone {
     fn coef_add(&mut self, coef: Coef<C>);
     fn can_merge_with(&self, other: &Self) -> bool;
     fn get_coef(&self) -> Coef<C>;
-    fn add_offset(&self, in_offset: usize, out_offset: usize) -> Self;
+    fn add_offset(&self, in_offset: &I::InputUsize, out_offset: usize) -> Self;
 }
 
-impl<C: Config, const INPUT_NUM: usize> GateOpt<C> for Gate<C, INPUT_NUM> {
+impl<C: Config, I: InputType, const INPUT_NUM: usize> GateOpt<C, I> for Gate<C, I, INPUT_NUM> {
     fn coef_add(&mut self, coef: Coef<C>) {
         self.coef = self.coef.add_constant(coef.get_constant().unwrap());
     }
@@ -111,10 +111,10 @@ impl<C: Config, const INPUT_NUM: usize> GateOpt<C> for Gate<C, INPUT_NUM> {
     fn get_coef(&self) -> Coef<C> {
         self.coef.clone()
     }
-    fn add_offset(&self, in_offset: usize, out_offset: usize) -> Self {
+    fn add_offset(&self, in_offset: &I::InputUsize, out_offset: usize) -> Self {
         let mut inputs = self.inputs;
         for input in inputs.iter_mut() {
-            *input += in_offset;
+            input.set_offset(input.offset() + in_offset.get(input.layer()));
         }
         let output = self.output + out_offset;
         let coef = self.coef.clone();
@@ -126,7 +126,7 @@ impl<C: Config, const INPUT_NUM: usize> GateOpt<C> for Gate<C, INPUT_NUM> {
     }
 }
 
-impl<C: Config> GateOpt<C> for GateCustom<C> {
+impl<C: Config, I: InputType> GateOpt<C, I> for GateCustom<C, I> {
     fn coef_add(&mut self, coef: Coef<C>) {
         self.coef = self.coef.add_constant(coef.get_constant().unwrap());
     }
@@ -140,10 +140,10 @@ impl<C: Config> GateOpt<C> for GateCustom<C> {
     fn get_coef(&self) -> Coef<C> {
         self.coef.clone()
     }
-    fn add_offset(&self, in_offset: usize, out_offset: usize) -> Self {
+    fn add_offset(&self, in_offset: &I::InputUsize, out_offset: usize) -> Self {
         let mut inputs = self.inputs.clone();
         for input in inputs.iter_mut() {
-            *input += in_offset;
+            input.set_offset(input.offset() + in_offset.get(input.layer()));
         }
         let output = self.output + out_offset;
         let coef = self.coef.clone();
@@ -156,7 +156,7 @@ impl<C: Config> GateOpt<C> for GateCustom<C> {
     }
 }
 
-fn dedup_gates<C: Config, G: GateOpt<C>>(gates: &mut Vec<G>, trim_zero: bool) {
+fn dedup_gates<C: Config, I: InputType, G: GateOpt<C, I>>(gates: &mut Vec<G>, trim_zero: bool) {
     gates.sort();
     let mut lst = 0;
     for i in 1..gates.len() {
@@ -188,14 +188,14 @@ fn dedup_gates<C: Config, G: GateOpt<C>>(gates: &mut Vec<G>, trim_zero: bool) {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-enum UniGate<C: Config> {
-    Mul(GateMul<C>),
-    Add(GateAdd<C>),
-    Const(GateConst<C>),
-    Custom(GateCustom<C>),
+enum UniGate<C: Config, I: InputType> {
+    Mul(GateMul<C, I>),
+    Add(GateAdd<C, I>),
+    Const(GateConst<C, I>),
+    Custom(GateCustom<C, I>),
 }
 
-impl<C: Config> Segment<C> {
+impl<C: Config, I: InputType> Segment<C, I> {
     fn dedup_gates(&mut self) {
         let mut occured_outputs = vec![false; self.num_outputs];
         for gate in self.gate_muls.iter_mut() {
@@ -239,7 +239,7 @@ impl<C: Config> Segment<C> {
         self.gate_consts.sort();
     }
 
-    fn sample_gates(&self, num_gates: usize, mut rng: impl RngCore) -> HashSet<UniGate<C>> {
+    fn sample_gates(&self, num_gates: usize, mut rng: impl RngCore) -> HashSet<UniGate<C, I>> {
         let tot_gates = self.num_all_gates();
         let mut ids: HashSet<usize> = HashSet::new();
         while ids.len() < num_gates && ids.len() < tot_gates {
@@ -251,25 +251,25 @@ impl<C: Config> Segment<C> {
         let tot_mul = self.gate_muls.len();
         let tot_add = self.gate_adds.len();
         let tot_const = self.gate_consts.len();
-        for id in ids.iter() {
-            if *id < tot_mul {
-                gates.insert(UniGate::Mul(self.gate_muls[*id].clone()));
-            } else if *id < tot_mul + tot_add {
-                gates.insert(UniGate::Add(self.gate_adds[*id - tot_mul].clone()));
-            } else if *id < tot_mul + tot_add + tot_const {
+        for &id in ids.iter() {
+            if id < tot_mul {
+                gates.insert(UniGate::Mul(self.gate_muls[id].clone()));
+            } else if id < tot_mul + tot_add {
+                gates.insert(UniGate::Add(self.gate_adds[id - tot_mul].clone()));
+            } else if id < tot_mul + tot_add + tot_const {
                 gates.insert(UniGate::Const(
-                    self.gate_consts[*id - tot_mul - tot_add].clone(),
+                    self.gate_consts[id - tot_mul - tot_add].clone(),
                 ));
             } else {
                 gates.insert(UniGate::Custom(
-                    self.gate_customs[*id - tot_mul - tot_add - tot_const].clone(),
+                    self.gate_customs[id - tot_mul - tot_add - tot_const].clone(),
                 ));
             }
         }
         gates
     }
 
-    fn all_gates(&self) -> HashSet<UniGate<C>> {
+    fn all_gates(&self) -> HashSet<UniGate<C, I>> {
         let mut gates = HashSet::new();
         for gate in self.gate_muls.iter() {
             gates.insert(UniGate::Mul(gate.clone()));
@@ -293,7 +293,7 @@ impl<C: Config> Segment<C> {
             + self.gate_customs.len()
     }
 
-    fn remove_gates(&mut self, gates: &HashSet<UniGate<C>>) {
+    fn remove_gates(&mut self, gates: &HashSet<UniGate<C, I>>) {
         let mut new_gates = Vec::new();
         for gate in self.gate_muls.iter() {
             if !gates.contains(&UniGate::Mul(gate.clone())) {
@@ -324,7 +324,7 @@ impl<C: Config> Segment<C> {
         self.gate_customs = new_gates;
     }
 
-    fn from_uni_gates(gates: &HashSet<UniGate<C>>) -> Self {
+    fn from_uni_gates(gates: &HashSet<UniGate<C, I>>) -> Self {
         let mut gate_muls = Vec::new();
         let mut gate_adds = Vec::new();
         let mut gate_consts = Vec::new();
@@ -341,17 +341,23 @@ impl<C: Config> Segment<C> {
         gate_adds.sort();
         gate_consts.sort();
         gate_customs.sort();
-        let mut max_input = 0;
+        let mut max_input = Vec::new();
         let mut max_output = 0;
         for gate in gate_muls.iter() {
             for input in gate.inputs.iter() {
-                max_input = max_input.max(*input);
+                while max_input.len() <= input.layer() {
+                    max_input.push(0);
+                }
+                max_input[input.layer()] = max_input[input.layer()].max(input.offset());
             }
             max_output = max_output.max(gate.output);
         }
         for gate in gate_adds.iter() {
             for input in gate.inputs.iter() {
-                max_input = max_input.max(*input);
+                while max_input.len() <= input.layer() {
+                    max_input.push(0);
+                }
+                max_input[input.layer()] = max_input[input.layer()].max(input.offset());
             }
             max_output = max_output.max(gate.output);
         }
@@ -360,12 +366,19 @@ impl<C: Config> Segment<C> {
         }
         for gate in gate_customs.iter() {
             for input in gate.inputs.iter() {
-                max_input = max_input.max(*input);
+                while max_input.len() <= input.layer() {
+                    max_input.push(0);
+                }
+                max_input[input.layer()] = max_input[input.layer()].max(input.offset());
             }
             max_output = max_output.max(gate.output);
         }
+        if max_input.is_empty() {
+            max_input.push(0);
+        }
+        let num_inputs_vec = max_input.iter().map(|x| next_power_of_two(x + 1)).collect();
         Segment {
-            num_inputs: next_power_of_two(max_input + 1),
+            num_inputs: I::InputUsize::from_vec(num_inputs_vec),
             num_outputs: next_power_of_two(max_output + 1),
             gate_muls,
             gate_adds,
@@ -376,17 +389,17 @@ impl<C: Config> Segment<C> {
     }
 }
 
-impl<C: Config> Circuit<C> {
+impl<C: Config, I: InputType> Circuit<C, I> {
     pub fn dedup_gates(&mut self) {
         for segment in self.segments.iter_mut() {
             segment.dedup_gates();
         }
     }
 
-    fn expand_gates<T: GateOpt<C>, F: Fn(usize) -> bool, G: Fn(&Segment<C>) -> &Vec<T>>(
+    fn expand_gates<T: GateOpt<C, I>, F: Fn(usize) -> bool, G: Fn(&Segment<C, I>) -> &Vec<T>>(
         &self,
         segment_id: usize,
-        prev_segments: &[Segment<C>],
+        prev_segments: &[Segment<C, I>],
         should_expand: F,
         get_gates: G,
     ) -> Vec<T> {
@@ -397,7 +410,7 @@ impl<C: Config> Circuit<C> {
                 let sub_segment = &prev_segments[*sub_segment_id];
                 let sub_gates = get_gates(sub_segment).clone();
                 for allocation in allocations.iter() {
-                    let in_offset = allocation.input_offset;
+                    let in_offset = &allocation.input_offset;
                     let out_offset = allocation.output_offset;
                     for gate in sub_gates.iter() {
                         gates.push(gate.add_offset(in_offset, out_offset));
@@ -411,9 +424,9 @@ impl<C: Config> Circuit<C> {
     fn expand_segment<F: Fn(usize) -> bool>(
         &self,
         segment_id: usize,
-        prev_segments: &[Segment<C>],
+        prev_segments: &[Segment<C, I>],
         should_expand: F,
-    ) -> Segment<C> {
+    ) -> Segment<C, I> {
         let segment = &self.segments[segment_id];
         let gate_muls =
             self.expand_gates(segment_id, prev_segments, &should_expand, |s| &s.gate_muls);
@@ -443,8 +456,14 @@ impl<C: Config> Circuit<C> {
                     }
                     for sub_allocation in sub_allocations.iter() {
                         for allocation in allocations.iter() {
+                            let input_offset_vec = sub_allocation
+                                .input_offset
+                                .iter()
+                                .zip(allocation.input_offset.iter())
+                                .map(|(x, y)| x + y)
+                                .collect();
                             let new_allocation = Allocation {
-                                input_offset: sub_allocation.input_offset + allocation.input_offset,
+                                input_offset: I::InputUsize::from_vec(input_offset_vec),
                                 output_offset: sub_allocation.output_offset
                                     + allocation.output_offset,
                             };
@@ -462,7 +481,7 @@ impl<C: Config> Circuit<C> {
         }
         let child_segs = child_segs_map.into_iter().collect();
         Segment {
-            num_inputs: segment.num_inputs,
+            num_inputs: segment.num_inputs.clone(),
             num_outputs: segment.num_outputs,
             gate_muls,
             gate_adds,
@@ -537,7 +556,7 @@ impl<C: Config> Circuit<C> {
                     new_child_segs.push((new_id[sub_segment.0], sub_segment.1.clone()));
                 }
                 let mut seg = Segment {
-                    num_inputs: segment.num_inputs,
+                    num_inputs: segment.num_inputs.clone(),
                     num_outputs: segment.num_outputs,
                     gate_muls: segment.gate_muls.clone(),
                     gate_adds: segment.gate_adds.clone(),
@@ -565,12 +584,12 @@ impl<C: Config> Circuit<C> {
         const COMMON_THRESHOLD_PERCENT: usize = 5;
         const COMMON_THRESHOLD_VALUE: usize = 10;
         let mut rng = rand::rngs::StdRng::seed_from_u64(123); //for deterministic
-        let sampled_gates: Vec<HashSet<UniGate<C>>> = self
+        let sampled_gates: Vec<HashSet<UniGate<C, I>>> = self
             .segments
             .iter()
             .map(|segment| segment.sample_gates(SAMPLE_PER_SEGMENT, &mut rng))
             .collect();
-        let all_gates: Vec<HashSet<UniGate<C>>> = self
+        let all_gates: Vec<HashSet<UniGate<C, I>>> = self
             .segments
             .iter()
             .map(|segment| segment.all_gates())
@@ -617,7 +636,7 @@ impl<C: Config> Circuit<C> {
             if cnt < COMMON_THRESHOLD_VALUE {
                 continue;
             }
-            let merged_gates: HashSet<UniGate<C>> = group_gates[x]
+            let merged_gates: HashSet<UniGate<C, I>> = group_gates[x]
                 .intersection(&group_gates[y])
                 .cloned()
                 .collect();
@@ -629,7 +648,7 @@ impl<C: Config> Circuit<C> {
             size[uf.find(i)] += 1;
         }
         let mut rm_id: Vec<Option<usize>> = vec![None; self.segments.len()];
-        let mut new_segments: Vec<Segment<C>> = Vec::new();
+        let mut new_segments: Vec<Segment<C, I>> = Vec::new();
         let mut new_id = vec![!0; self.segments.len()];
         for i in 0..self.segments.len() {
             if i == uf.find(i) && size[i] > 1 && group_gates[i].len() >= COMMON_THRESHOLD_VALUE {
@@ -644,7 +663,7 @@ impl<C: Config> Circuit<C> {
                 new_child_segs.push((new_id[sub_segment.0], sub_segment.1.clone()));
             }
             let mut seg = Segment {
-                num_inputs: segment.num_inputs,
+                num_inputs: segment.num_inputs.clone(),
                 num_outputs: segment.num_outputs,
                 gate_muls: segment.gate_muls.clone(),
                 gate_adds: segment.gate_adds.clone(),
@@ -655,10 +674,11 @@ impl<C: Config> Circuit<C> {
             let parent_id = uf.find(segment_id);
             if let Some(common_id) = rm_id[parent_id] {
                 seg.remove_gates(&group_gates[parent_id]);
+                let common_seg = &new_segments[common_id];
                 seg.child_segs.push((
                     common_id,
                     vec![Allocation {
-                        input_offset: 0,
+                        input_offset: I::InputUsize::from_vec(vec![0; common_seg.num_inputs.len()]),
                         output_offset: 0,
                     }],
                 ));
@@ -691,10 +711,14 @@ mod tests {
         utils::error::Error,
     };
 
+    use super::{CrossLayerInputType, InputType, NormalInputType};
+
     type CField = <C as Config>::CircuitField;
 
-    fn get_random_layered_circuit(rcc: &RandomCircuitConfig) -> Option<layered::Circuit<C>> {
-        let root = ir::dest::RootCircuitRelaxed::<C>::random(&rcc);
+    fn get_random_layered_circuit<I: InputType>(
+        rcc: &RandomCircuitConfig,
+    ) -> Option<layered::Circuit<C, I>> {
+        let root = ir::dest::RootCircuitRelaxed::<C>::random(rcc);
         let mut root = root.export_constraints();
         root.reassign_duplicate_sub_circuit_outputs();
         let root = root.remove_unreachable().0;
@@ -716,8 +740,7 @@ mod tests {
         Some(lc)
     }
 
-    #[test]
-    fn dedup_gates_random() {
+    fn dedup_gates_random_<I: InputType>() {
         let mut config = RandomCircuitConfig {
             seed: 0,
             num_circuits: RandomRange { min: 1, max: 10 },
@@ -730,7 +753,7 @@ mod tests {
         };
         for i in 0..3000 {
             config.seed = i + 400000;
-            let lc = match get_random_layered_circuit(&config) {
+            let lc = match get_random_layered_circuit::<I>(&config) {
                 Some(lc) => lc,
                 None => {
                     continue;
@@ -753,7 +776,12 @@ mod tests {
     }
 
     #[test]
-    fn expand_small_segments_random() {
+    fn dedup_gates_random() {
+        dedup_gates_random_::<NormalInputType>();
+        dedup_gates_random_::<CrossLayerInputType>();
+    }
+
+    fn expand_small_segments_random_<I: InputType>() {
         let mut config = RandomCircuitConfig {
             seed: 0,
             num_circuits: RandomRange { min: 1, max: 100 },
@@ -766,7 +794,7 @@ mod tests {
         };
         for i in 0..3000 {
             config.seed = i + 500000;
-            let lc = match get_random_layered_circuit(&config) {
+            let lc = match get_random_layered_circuit::<I>(&config) {
                 Some(lc) => lc,
                 None => {
                     continue;
@@ -788,7 +816,12 @@ mod tests {
     }
 
     #[test]
-    fn find_common_parts_random() {
+    fn expand_small_segments_random() {
+        expand_small_segments_random_::<NormalInputType>();
+        expand_small_segments_random_::<CrossLayerInputType>();
+    }
+
+    fn find_common_parts_random_<I: InputType>() {
         let mut config = RandomCircuitConfig {
             seed: 0,
             num_circuits: RandomRange { min: 1, max: 100 },
@@ -801,7 +834,7 @@ mod tests {
         };
         for i in 0..3000 {
             config.seed = i + 600000;
-            let lc = match get_random_layered_circuit(&config) {
+            let lc = match get_random_layered_circuit::<I>(&config) {
                 Some(lc) => lc,
                 None => {
                     continue;
@@ -820,5 +853,11 @@ mod tests {
                 assert_eq!(lc_output, lc_opt_output);
             }
         }
+    }
+
+    #[test]
+    fn find_common_parts_random() {
+        find_common_parts_random_::<NormalInputType>();
+        find_common_parts_random_::<CrossLayerInputType>();
     }
 }

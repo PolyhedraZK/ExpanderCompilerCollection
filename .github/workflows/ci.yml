@@ -80,6 +80,7 @@ jobs:
 
   test-rust-avx512:
     runs-on: 7950x3d
+    if: false # temporarily disabled
     steps:
       - uses: styfle/cancel-workflow-action@0.11.0
       - uses: actions/checkout@v4

@@ -1,0 +1,67 @@
+use crate::gnark::emparam::Bls12381Fp;
+use crate::gnark::emulated::field_bls12381::e2::Ext2;
+use crate::gnark::emulated::field_bls12381::e2::GE2;
+use expander_compiler::frontend::*;
+#[derive(Default, Clone)]
+pub struct G2AffP {
+    pub x: GE2,
+    pub y: GE2,
+}
+
+impl G2AffP {
+    pub fn new(x: GE2, y: GE2) -> Self {
+        Self { x, y }
+    }
+    pub fn from_vars(
+        x0: Vec<Variable>,
+        y0: Vec<Variable>,
+        x1: Vec<Variable>,
+        y1: Vec<Variable>,
+    ) -> Self {
+        Self {
+            x: GE2::from_vars(x0, y0),
+            y: GE2::from_vars(x1, y1),
+        }
+    }
+}
+
+pub struct G2 {
+    pub curve_f: Ext2,
+}
+
+impl G2 {
+    pub fn new<C: Config, B: RootAPI<C>>(native: &mut B) -> Self {
+        let curve_f = Ext2::new(native);
+        Self { curve_f }
+    }
+    pub fn neg<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, p: &G2AffP) -> G2AffP {
+        let yr = self.curve_f.neg(native, &p.y);
+        G2AffP::new(p.x.my_clone(), yr)
+    }
+}
+#[derive(Default)]
+pub struct LineEvaluation {
+    pub r0: GE2,
+    pub r1: GE2,
+}
+
+type LineEvaluationArray = [[Option<Box<LineEvaluation>>; 63]; 2];
+
+pub struct LineEvaluations(pub LineEvaluationArray);
+
+impl Default for LineEvaluations {
+    fn default() -> Self {
+        LineEvaluations([[None; 63]; 2].map(|row: [Option<Bls12381Fp>; 63]| row.map(|_| None)))
+    }
+}
+impl LineEvaluations {
+    pub fn is_empty(&self) -> bool {
+        self.0
+            .iter()
+            .all(|row| row.iter().all(|cell| cell.is_none()))
+    }
+}
+pub struct G2Affine {
+    pub p: G2AffP,
+    pub lines: LineEvaluations,
+}

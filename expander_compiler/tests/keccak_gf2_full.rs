@@ -1,5 +1,5 @@
 use expander_compiler::frontend::*;
-use rand::{thread_rng, Rng};
+use rand::{Rng, SeedableRng};
 use tiny_keccak::Hasher;
 
 const N_HASHES: usize = 1;
@@ -232,10 +232,11 @@ fn keccak_gf2_full() {
     } = compile_result;
 
     let mut assignment = Keccak256Circuit::<GF2>::default();
+    let mut rng = rand::rngs::StdRng::seed_from_u64(1235);
     for k in 0..N_HASHES {
         let mut data = vec![0u8; 64];
         for i in 0..64 {
-            data[i] = thread_rng().gen();
+            data[i] = rng.gen();
         }
         let mut hash = tiny_keccak::Keccak::v256();
         hash.update(&data);
@@ -281,31 +282,30 @@ fn keccak_gf2_full() {
     assert_eq!(res, expected_res);
     println!("test 3 passed");
 
+    // alternatively, you can specify the particular config like gkr_field_config::GF2ExtConfig
     let mut expander_circuit = layered_circuit
-        .export_to_expander::<expander_config::GF2ExtConfigSha2>()
+        .export_to_expander::<<GF2Config as Config>::DefaultGKRFieldConfig>()
         .flatten();
-    let config = expander_config::Config::<expander_config::GF2ExtConfigSha2>::new(
+    let config = expander_config::Config::<<GF2Config as Config>::DefaultGKRConfig>::new(
         expander_config::GKRScheme::Vanilla,
-        expander_config::MPIConfig::new(),
+        mpi_config::MPIConfig::new(),
     );
 
-    let (simd_input, simd_public_input) = witness.to_simd::<gf2::GF2x8>();
+    let (simd_input, simd_public_input) =
+        witness.to_simd::<<GF2Config as Config>::DefaultSimdField>();
     println!("{} {}", simd_input.len(), simd_public_input.len());
     expander_circuit.layers[0].input_vals = simd_input;
     expander_circuit.public_input = simd_public_input.clone();
 
     // prove
     expander_circuit.evaluate();
-    let mut prover = gkr::Prover::new(&config);
-    prover.prepare_mem(&expander_circuit);
-    let (claimed_v, proof) = prover.prove(&mut expander_circuit);
+    let (claimed_v, proof) = gkr::executor::prove(&mut expander_circuit, &config);
 
     // verify
-    let verifier = gkr::Verifier::new(&config);
-    assert!(verifier.verify(
+    assert!(gkr::executor::verify(
         &mut expander_circuit,
-        &simd_public_input,
-        &claimed_v,
-        &proof
+        &config,
+        &proof,
+        &claimed_v
     ));
 }
