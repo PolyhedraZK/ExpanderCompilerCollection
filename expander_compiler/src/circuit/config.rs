@@ -1,11 +1,11 @@
 use std::{fmt::Debug, hash::Hash};
 
-use crate::field::Field;
+use crate::field::{Field, FieldRaw};
 
 pub trait Config: Default + Clone + Ord + Debug + Hash + Copy + 'static {
     type CircuitField: Field;
 
-    type DefaultSimdField: arith::SimdField<Scalar = Self::CircuitField>;
+    type DefaultSimdField: FieldRaw + arith::SimdField<Scalar = Self::CircuitField>;
     type DefaultGKRFieldConfig: gkr_field_config::GKRFieldConfig<
         CircuitField = Self::CircuitField,
         SimdCircuitField = Self::DefaultSimdField,

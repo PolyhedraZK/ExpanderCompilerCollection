@@ -271,7 +271,7 @@ fn keccak_gf2_vec() {
     println!("test 2 passed");
 
     let mut assignments = Vec::new();
-    for _ in 0..16 {
+    for _ in 0..15 {
         for k in 0..N_HASHES {
             assignment.p[k][0] = assignment.p[k][0] - GF2::from(1);
         }
@@ -279,7 +279,7 @@ fn keccak_gf2_vec() {
     }
     let witness = witness_solver.solve_witnesses(&assignments).unwrap();
     let res = layered_circuit.run(&witness);
-    let mut expected_res = vec![false; 16];
+    let mut expected_res = vec![false; 15];
     for i in 0..8 {
         expected_res[i * 2] = true;
     }

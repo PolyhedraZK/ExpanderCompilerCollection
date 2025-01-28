@@ -702,7 +702,7 @@ impl<C: Config, I: InputType> Circuit<C, I> {
 mod tests {
     use crate::circuit::layered;
     use crate::field::FieldArith;
-    use crate::layering::compile;
+    use crate::layering::{compile, CompileOptions};
     use crate::{
         circuit::{
             config::{Config, GF2Config as C},
@@ -735,7 +735,12 @@ mod tests {
                 }
             },
         }
-        let (lc, _) = compile(&root);
+        let (lc, _) = compile(
+            &root,
+            CompileOptions {
+                allow_input_reorder: true,
+            },
+        );
         assert_eq!(lc.validate(), Ok(()));
         Some(lc)
     }

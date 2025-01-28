@@ -260,7 +260,12 @@ mod tests {
             config.seed = i + 10000;
             let root = RootCircuit::<C>::random(&config);
             assert_eq!(root.validate(), Ok(()));
-            let (circuit, _) = crate::layering::compile(&root);
+            let (circuit, _) = crate::layering::compile(
+                &root,
+                crate::layering::CompileOptions {
+                    allow_input_reorder: true,
+                },
+            );
             assert_eq!(circuit.validate(), Ok(()));
             let mut buf = Vec::new();
             circuit.serialize_into(&mut buf).unwrap();
