@@ -895,9 +895,12 @@ dependencies = [
  "macros",
  "mersenne31",
  "mpi_config",
+ "poly_commit",
+ "polynomials",
  "rand",
  "rayon",
  "sha2",
+ "sumcheck",
  "tiny-keccak",
  "transcript",
 ]
