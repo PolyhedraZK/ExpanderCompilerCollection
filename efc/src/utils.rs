@@ -41,6 +41,12 @@ pub fn run_circuit<C: Config>(compile_result: &CompileResult<C>, witness: Witnes
     ));
 }
 
+pub fn convert_limbs(limbs: Vec<u8>) -> [M31; 48] {
+    let converted: Vec<M31> = limbs.into_iter().map(|x| M31::from(x as u32)).collect();
+    converted.try_into().expect("Limbs should have 48 elements")
+}
+
+
 pub fn read_from_json_file<T: DeserializeOwned + std::fmt::Debug>(
     file_path: &str,
 ) -> Result<T, Box<dyn std::error::Error>> {

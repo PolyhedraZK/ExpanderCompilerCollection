@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::thread;
 
 pub const SHA256LEN: usize = 32;
-pub const HASHTABLESIZE: usize = 32;
+pub const HASHTABLESIZE: usize = 64;
 #[derive(Clone, Copy, Debug)]
 pub struct HashTableParams {
     pub table_size: usize,
@@ -67,11 +67,12 @@ impl GenericDefine<M31Config> for HASHTABLECircuit<Variable> {
 pub fn generate_hash_witnesses(dir: &str) {
     println!("preparing solver...");
     ensure_directory_exists("./witnesses/hashtable");
-    let file_name = "solver_hashtable32.txt";
+    let file_name = "solver_hashtable64.txt";
     let w_s = if std::fs::metadata(file_name).is_ok() {
         println!("The solver exists!");
-        witness_solver::WitnessSolver::deserialize_from(std::fs::File::open(file_name).unwrap())
-            .unwrap()
+        let file = std::fs::File::open(&file_name).unwrap();
+        let reader = std::io::BufReader::new(file);
+        witness_solver::WitnessSolver::deserialize_from(reader).unwrap()
     } else {
         println!("The solver does not exist.");
         let compile_result =
@@ -150,4 +151,9 @@ pub fn generate_hash_witnesses(dir: &str) {
         "Generate hashtable witness Time: {:?}",
         end_time.duration_since(start_time)
     );
+}
+
+#[test]
+fn test_generate_hash_witnesses() {
+    generate_hash_witnesses("./data");
 }

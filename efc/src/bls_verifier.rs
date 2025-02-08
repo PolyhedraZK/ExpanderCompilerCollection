@@ -10,6 +10,7 @@ use expander_compiler::compile::CompileOptions;
 use expander_compiler::declare_circuit;
 use expander_compiler::frontend::compile_generic;
 use expander_compiler::frontend::internal::Serde;
+use expander_compiler::frontend::CompileResult;
 use expander_compiler::frontend::GenericDefine;
 use expander_compiler::frontend::HintRegistry;
 use expander_compiler::frontend::M31Config;
@@ -17,6 +18,7 @@ use expander_compiler::frontend::{RootAPI, Variable, M31};
 
 use serde::Deserialize;
 
+use crate::utils::convert_limbs;
 use crate::utils::ensure_directory_exists;
 use crate::utils::read_from_json_file;
 
@@ -32,6 +34,10 @@ pub struct Coordinate {
     pub a0: Limbs,
     #[serde(rename = "A1")]
     pub a1: Limbs,
+}
+
+pub fn convert_point(point: Coordinate) -> [[M31; 48]; 2] {
+    [convert_limbs(point.a0.limbs), convert_limbs(point.a1.limbs)]
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -73,15 +79,6 @@ declare_circuit!(PairingCircuit {
     hm: [[[Variable; 48]; 2]; 2],
     sig: [[[Variable; 48]; 2]; 2]
 });
-
-pub fn convert_limbs(limbs: Vec<u8>) -> [M31; 48] {
-    let converted: Vec<M31> = limbs.into_iter().map(|x| M31::from(x as u32)).collect();
-    converted.try_into().expect("Limbs should have 48 elements")
-}
-
-pub fn convert_point(point: Coordinate) -> [[M31; 48]; 2] {
-    [convert_limbs(point.a0.limbs), convert_limbs(point.a1.limbs)]
-}
 impl PairingCircuit<M31> {
     pub fn from_entry(entry: &PairingEntry) -> Self {
         PairingCircuit {
@@ -145,11 +142,12 @@ impl GenericDefine<M31Config> for PairingCircuit<Variable> {
 pub fn generate_pairing_witnesses(dir: &str) {
     println!("preparing solver...");
     ensure_directory_exists("./witnesses/pairing");
-    let file_name = "pairing.witness";
+    let file_name = "solver_pairing.txt";
     let w_s = if std::fs::metadata(file_name).is_ok() {
         println!("The solver exists!");
-        witness_solver::WitnessSolver::deserialize_from(std::fs::File::open(file_name).unwrap())
-            .unwrap()
+        let file = std::fs::File::open(&file_name).unwrap();
+        let reader = std::io::BufReader::new(file);
+        witness_solver::WitnessSolver::deserialize_from(reader).unwrap()
     } else {
         println!("The solver does not exist.");
         let compile_result =
@@ -158,7 +156,14 @@ pub fn generate_pairing_witnesses(dir: &str) {
             .witness_solver
             .serialize_into(std::fs::File::create(file_name).unwrap())
             .unwrap();
-        compile_result.witness_solver
+        let CompileResult {
+            witness_solver,
+            layered_circuit,
+        } = compile_result;
+        let file = std::fs::File::create("circuit_pairing.txt").unwrap();
+        let writer = std::io::BufWriter::new(file);
+        layered_circuit.serialize_into(writer).unwrap();
+        witness_solver
     };
 
     println!("Start generating witnesses...");
@@ -211,7 +216,11 @@ pub fn generate_pairing_witnesses(dir: &str) {
         end_time.duration_since(start_time)
     );
 }
-
+#[test]
+fn test_pairing(){
+    let dir = "./data";
+    generate_pairing_witnesses(dir);
+}
 // #[cfg(test)]
 // mod tests {
 //     use super::*;
