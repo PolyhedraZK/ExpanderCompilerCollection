@@ -152,9 +152,11 @@ pub fn generate_pairing_witnesses(dir: &str) {
         println!("The solver does not exist.");
         let compile_result =
             compile_generic(&PairingCircuit::default(), CompileOptions::default()).unwrap();
+        let file = std::fs::File::create(&file_name).unwrap();
+        let writer = std::io::BufWriter::new(file);
         compile_result
             .witness_solver
-            .serialize_into(std::fs::File::create(file_name).unwrap())
+            .serialize_into(writer)
             .unwrap();
         let CompileResult {
             witness_solver,
