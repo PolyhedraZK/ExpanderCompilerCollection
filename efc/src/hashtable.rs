@@ -155,6 +155,68 @@ pub fn generate_hash_witnesses(dir: &str) {
     );
 }
 
+pub fn end2end_hashtable_witnesses(
+    w_s: WitnessSolver<M31Config>,
+    hashtable_data: Vec<HashTableJson>,
+) {
+    let witness_solver = Arc::new(w_s);
+
+    println!("generating witnesses...");
+    let start_time = std::time::Instant::now();
+    let mut assignments = vec![];
+    for cur_hashtable_data in &hashtable_data {
+        let mut hash_assignment = HASHTABLECircuit::default();
+        for j in 0..32 {
+            hash_assignment.seed[j] = M31::from(cur_hashtable_data.seed[j] as u32);
+        }
+        hash_assignment.shuffle_round = M31::from(cur_hashtable_data.shuffle_round as u32);
+        for j in 0..4 {
+            hash_assignment.start_index[j] = M31::from(cur_hashtable_data.start_index[j] as u32);
+        }
+        for j in 0..HASHTABLESIZE {
+            for k in 0..32 {
+                hash_assignment.output[j][k] =
+                    M31::from(cur_hashtable_data.hash_outputs[j][k] as u32);
+            }
+        }
+        assignments.push(hash_assignment);
+    }
+
+    let end_time = std::time::Instant::now();
+    println!(
+        "assigned assignments time: {:?}",
+        end_time.duration_since(start_time)
+    );
+    let assignment_chunks: Vec<Vec<HASHTABLECircuit<M31>>> =
+        assignments.chunks(16).map(|x| x.to_vec()).collect();
+
+    let handles = assignment_chunks
+        .into_iter()
+        .enumerate()
+        .map(|(i, assignments)| {
+            let witness_solver = Arc::clone(&witness_solver);
+            thread::spawn(move || {
+                let mut hint_registry1 = HintRegistry::<M31>::new();
+                register_hint(&mut hint_registry1);
+                let witness = witness_solver
+                    .solve_witnesses_with_hints(&assignments, &mut hint_registry1)
+                    .unwrap();
+                let file_name = format!("./witnesses/hashtable/witness_{}.txt", i);
+                let file = std::fs::File::create(file_name).unwrap();
+                let writer = std::io::BufWriter::new(file);
+                witness.serialize_into(writer).unwrap();
+            })
+        })
+        .collect::<Vec<_>>();
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    let end_time = std::time::Instant::now();
+    println!(
+        "Generate hashtable witness Time: {:?}",
+        end_time.duration_since(start_time)
+    );
+}
 #[test]
 fn test_generate_hash_witnesses() {
     generate_hash_witnesses("./data");

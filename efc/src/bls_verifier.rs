@@ -14,6 +14,7 @@ use expander_compiler::frontend::CompileResult;
 use expander_compiler::frontend::GenericDefine;
 use expander_compiler::frontend::HintRegistry;
 use expander_compiler::frontend::M31Config;
+use expander_compiler::frontend::WitnessSolver;
 use expander_compiler::frontend::{RootAPI, Variable, M31};
 
 use serde::Deserialize;
@@ -218,8 +219,52 @@ pub fn generate_pairing_witnesses(dir: &str) {
         end_time.duration_since(start_time)
     );
 }
+
+pub fn end2end_pairing_witness(w_s: WitnessSolver<M31Config>, pairing_data: Vec<PairingEntry>) {
+    println!("Start generating witnesses...");
+    let start_time = std::time::Instant::now();
+    let mut assignments = vec![];
+    for cur_pairing_data in &pairing_data {
+        let pairing_assignment = PairingCircuit::from_entry(cur_pairing_data);
+        assignments.push(pairing_assignment);
+    }
+    let end_time = std::time::Instant::now();
+    println!(
+        "assigned assignments time: {:?}",
+        end_time.duration_since(start_time)
+    );
+    let assignment_chunks: Vec<Vec<PairingCircuit<M31>>> =
+        assignments.chunks(16).map(|x| x.to_vec()).collect();
+    let witness_solver = Arc::new(w_s);
+    let handles = assignment_chunks
+        .into_iter()
+        .enumerate()
+        .map(|(i, assignments)| {
+            let witness_solver = Arc::clone(&witness_solver);
+            thread::spawn(move || {
+                let mut hint_registry1 = HintRegistry::<M31>::new();
+                register_hint(&mut hint_registry1);
+                let witness = witness_solver
+                    .solve_witnesses_with_hints(&assignments, &mut hint_registry1)
+                    .unwrap();
+                let file_name = format!("./witnesses/pairing/witness_{}.txt", i);
+                let file = std::fs::File::create(file_name).unwrap();
+                let writer = std::io::BufWriter::new(file);
+                witness.serialize_into(writer).unwrap();
+            })
+        })
+        .collect::<Vec<_>>();
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    let end_time = std::time::Instant::now();
+    println!(
+        "Generate pairing witness Time: {:?}",
+        end_time.duration_since(start_time)
+    );
+}
 #[test]
-fn test_pairing(){
+fn test_pairing() {
     let dir = "./data";
     generate_pairing_witnesses(dir);
 }

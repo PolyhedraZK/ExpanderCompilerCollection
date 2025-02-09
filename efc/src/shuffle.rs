@@ -805,6 +805,100 @@ pub fn generate_shuffle_witnesses(dir: &str) {
     });
 }
 
+pub fn end2end_shuffle_witnesses(
+    w_s: WitnessSolver<M31Config>,
+    plain_validators: Vec<ValidatorPlain>,
+    shuffle_data: Vec<ShuffleJson>,
+    public_key_bls_list: Vec<Vec<String>>,
+    attestations: Vec<Attestation>,
+    pairing_data: Vec<PairingEntry>,
+) {
+    stacker::grow(32 * 1024 * 1024 * 1024, || {
+        println!("preparing solver...");
+        let witness_solver = Arc::new(w_s);
+
+        println!("generating witnesses...");
+        let start_time = std::time::Instant::now();
+
+        let mut handles = vec![];
+        let plain_validators = Arc::new(plain_validators);
+        let public_key_bls_list = Arc::new(public_key_bls_list);
+        let attestations = Arc::new(attestations);
+        let assignments = Arc::new(Mutex::new(vec![None; shuffle_data.len() / 2]));
+        let pairing_data = Arc::new(pairing_data);
+
+        for (i, shuffle_item) in shuffle_data.into_iter().enumerate().take(1024) {
+            let assignments = Arc::clone(&assignments);
+            let target_plain_validators = Arc::clone(&plain_validators);
+            let target_public_key_bls_list = Arc::clone(&public_key_bls_list);
+            let target_attestations = Arc::clone(&attestations);
+            let pairing_data = Arc::clone(&pairing_data);
+
+            let handle = thread::spawn(move || {
+                let mut assignment = ShuffleCircuit::<M31>::default();
+                assignment.from_plains(
+                    &shuffle_item,
+                    &target_plain_validators,
+                    &target_public_key_bls_list,
+                    &target_attestations[i],
+                    &pairing_data[i],
+                );
+
+                let mut assignments = assignments.lock().unwrap();
+                assignments[i] = Some(assignment);
+            });
+
+            handles.push(handle);
+        }
+
+        for handle in handles {
+            handle.join().expect("Thread panicked");
+        }
+
+        let end_time = std::time::Instant::now();
+        println!(
+            "assigned assignment data, time: {:?}",
+            end_time.duration_since(start_time)
+        );
+
+        let assignments = assignments
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|x| x.clone().unwrap())
+            .collect::<Vec<_>>();
+        let assignment_chunks: Vec<Vec<ShuffleCircuit<M31>>> =
+            assignments.chunks(16).map(|x| x.to_vec()).collect();
+
+        let handles = assignment_chunks
+            .into_iter()
+            .enumerate()
+            .map(|(i, assignments)| {
+                let witness_solver = Arc::clone(&witness_solver);
+                thread::spawn(move || {
+                    let mut hint_registry1 = HintRegistry::<M31>::new();
+                    register_hint(&mut hint_registry1);
+                    let witness = witness_solver
+                        .solve_witnesses_with_hints(&assignments, &mut hint_registry1)
+                        .unwrap();
+                    let file_name = format!("./witnesses/shuffle/witness_{}.txt", i);
+                    let file = std::fs::File::create(file_name).unwrap();
+                    let writer = std::io::BufWriter::new(file);
+                    witness.serialize_into(writer).unwrap();
+                })
+            })
+            .collect::<Vec<_>>();
+        for handle in handles {
+            handle.join().unwrap();
+        }
+        let end_time = std::time::Instant::now();
+        println!(
+            "Generate shuffle witness Time: {:?}",
+            end_time.duration_since(start_time)
+        );
+    });
+}
+
 // #[test]
 // fn test_generate_shuffle2_witnesses() {
 //     generate_shuffle_witnesses("./data");

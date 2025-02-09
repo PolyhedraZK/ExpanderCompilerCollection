@@ -616,7 +616,6 @@ impl<T: FieldParams> GField<T> {
     }
     pub fn check_mul<C: Config, B: RootAPI<C>>(&mut self, native: &mut B) {
         let commitment = native.get_random_value();
-        // let commitment = native.constant(1); //TBD
         let mut coefs_len = T::nb_limbs() as usize;
         for i in 0..self.mul_checks.len() {
             coefs_len = std::cmp::max(coefs_len, self.mul_checks[i].a.limbs.len());

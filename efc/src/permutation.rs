@@ -107,13 +107,13 @@ declare_circuit!(PermutationIndicesValidatorHashesCircuit {
 });
 impl PermutationIndicesValidatorHashesCircuit<M31> {
     pub fn from_entry(
-        real_keys: &[u64],                      
-        active_validator_bits_hash: &[u32],  
-        active_validator_bits: &[u64], 
+        real_keys: &[u64],
+        active_validator_bits_hash: &[u32],
+        active_validator_bits: &[u64],
         validator_hashes: &[Vec<u32>],
-        shuffle_indices: &[u64],  
+        shuffle_indices: &[u64],
         committee_indices: &[u64],
-        valid_validator_list: &[u64], 
+        valid_validator_list: &[u64],
     ) -> Self {
         let mut assignment = PermutationIndicesValidatorHashesCircuit {
             query_indices: [M31::from(0); QUERY_SIZE],
@@ -182,8 +182,7 @@ impl PermutationIndicesValidatorHashesCircuit<M31> {
                     M31::from(entry.table_validator_hashes[i][j]);
             }
             assignment.real_keys[i] = M31::from(entry.real_keys[i]);
-            assignment.active_validator_bits[i] =
-                M31::from(entry.active_validator_bits[i]);
+            assignment.active_validator_bits[i] = M31::from(entry.active_validator_bits[i]);
         }
         for i in 0..QUERY_SIZE {
             assignment.query_indices[i] = M31::from(entry.query_indices[i]);
@@ -212,19 +211,21 @@ pub fn distribute_sub_assignment2(
     slot: u64,
     validator_hashes: Vec<Vec<u32>>,
     active_validator_bits_hash: Vec<u32>,
-) -> (Vec<PermutationHashCircuit<M31>>, PermutationIndicesValidatorHashesCircuit<M31>) {
+) -> (
+    Vec<PermutationHashCircuit<M31>>,
+    PermutationIndicesValidatorHashesCircuit<M31>,
+) {
     if raw_query_bits.is_empty() {
         panic!("rawQueryBits is empty");
     }
 
     let mut tran_query_bits: Vec<Vec<u8>> = (0..raw_query_bits[0].len())
-    .map(|i| raw_query_bits.iter().map(|row| row[i]).collect())
-    .collect();
+        .map(|i| raw_query_bits.iter().map(|row| row[i]).collect())
+        .collect();
 
     let mut tran_query_indices: Vec<Vec<u64>> = (0..raw_query_indices[0].len())
         .map(|i| raw_query_indices.iter().map(|row| row[i]).collect())
         .collect();
-
 
     // padding
     let last_committee_size = *real_committee_size
@@ -416,7 +417,8 @@ impl GenericDefine<M31Config> for PermutationIndicesValidatorHashesCircuit<Varia
             POSEIDON_M31X16_FULL_ROUNDS,
             POSEIDON_M31X16_PARTIAL_ROUNDS,
         );
-        let active_validator_hash = params.hash_to_state_flatten(builder, &active_validator_16_bits);
+        let active_validator_hash =
+            params.hash_to_state_flatten(builder, &active_validator_16_bits);
         for (i, active_validator_hashbit) in active_validator_hash
             .iter()
             .enumerate()
@@ -427,7 +429,7 @@ impl GenericDefine<M31Config> for PermutationIndicesValidatorHashesCircuit<Varia
         //move inactive validators to the end
         let mut sorted_table_key = [Variable::default(); VALIDATOR_COUNT];
         sorted_table_key[..VALIDATOR_COUNT].copy_from_slice(&self.real_keys[..VALIDATOR_COUNT]); //if active, use curKey, else use curInactiveKey
-        //for the first one, if active, use 0, else use -ValidatorCount
+                                                                                                 //for the first one, if active, use 0, else use -ValidatorCount
         let shift = simple_select(
             builder,
             self.active_validator_bits[0],
@@ -503,9 +505,15 @@ impl PermutationIndicesValidatorHashBitCircuit<M31> {
             table_validator_hashes: [M31::from(0); VALIDATOR_COUNT],
             real_keys: [M31::from(0); VALIDATOR_COUNT],
         };
-        assignment.query_indices.copy_from_slice(&entry.query_indices);
-        assignment.active_validator_bits_hash.copy_from_slice(&entry.active_validator_bits_hash);
-        assignment.active_validator_bits.copy_from_slice(&entry.active_validator_bits);
+        assignment
+            .query_indices
+            .copy_from_slice(&entry.query_indices);
+        assignment
+            .active_validator_bits_hash
+            .copy_from_slice(&entry.active_validator_bits_hash);
+        assignment
+            .active_validator_bits
+            .copy_from_slice(&entry.active_validator_bits);
         assignment.real_keys.copy_from_slice(&entry.real_keys);
         let mut assignments = vec![];
         for i in 0..POSEIDON_M31X16_RATE {
@@ -543,7 +551,8 @@ impl GenericDefine<M31Config> for PermutationIndicesValidatorHashBitCircuit<Vari
             POSEIDON_M31X16_FULL_ROUNDS,
             POSEIDON_M31X16_PARTIAL_ROUNDS,
         );
-        let active_validator_hash = params.hash_to_state_flatten(builder, &active_validator_16_bits);
+        let active_validator_hash =
+            params.hash_to_state_flatten(builder, &active_validator_16_bits);
         for (i, active_validator_hashbit) in active_validator_hash
             .iter()
             .enumerate()
@@ -554,7 +563,7 @@ impl GenericDefine<M31Config> for PermutationIndicesValidatorHashBitCircuit<Vari
         //move inactive validators to the end
         let mut sorted_table_key = [Variable::default(); VALIDATOR_COUNT];
         sorted_table_key[..VALIDATOR_COUNT].copy_from_slice(&self.real_keys[..VALIDATOR_COUNT]); //if active, use curKey, else use curInactiveKey
-        //for the first one, if active, use 0, else use -ValidatorCount
+                                                                                                 //for the first one, if active, use 0, else use -ValidatorCount
         let shift = simple_select(
             builder,
             self.active_validator_bits[0],
@@ -623,8 +632,11 @@ pub fn generate_permutation_hashes_witness(dir: &str) {
             witness_solver::WitnessSolver::deserialize_from(reader).unwrap()
         } else {
             println!("The solver does not exist.");
-            let compile_result =
-                compile_generic(&PermutationIndicesValidatorHashesCircuit::default(), CompileOptions::default()).unwrap();
+            let compile_result = compile_generic(
+                &PermutationIndicesValidatorHashesCircuit::default(),
+                CompileOptions::default(),
+            )
+            .unwrap();
 
             let file = std::fs::File::create(&file_name).unwrap();
             let writer = std::io::BufWriter::new(file);
@@ -660,7 +672,8 @@ pub fn generate_permutation_hashes_witness(dir: &str) {
 
         let mut hint_registry = HintRegistry::<M31>::new();
         register_hint(&mut hint_registry);
-        let assignment = PermutationIndicesValidatorHashesCircuit::from_assignment(permutation_hash_data);
+        let assignment =
+            PermutationIndicesValidatorHashesCircuit::from_assignment(permutation_hash_data);
         let mut assignments = vec![];
         for _i in 0..16 {
             assignments.push(assignment.clone());
@@ -700,10 +713,10 @@ pub fn generate_permutation_hashes_witness(dir: &str) {
     });
 }
 
-
 pub fn generate_permutation_hashbit_witness(dir: &str) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
         println!("preparing solver...");
+        let initial_time = std::time::Instant::now();
         ensure_directory_exists("./witnesses/permutationhashbit");
         let file_name = format!("solver_permutationhashbit_{}.txt", VALIDATOR_COUNT);
         let w_s = if std::fs::metadata(&file_name).is_ok() {
@@ -713,8 +726,11 @@ pub fn generate_permutation_hashbit_witness(dir: &str) {
             witness_solver::WitnessSolver::deserialize_from(reader).unwrap()
         } else {
             println!("The solver does not exist.");
-            let compile_result =
-                compile_generic(&PermutationIndicesValidatorHashBitCircuit::default(), CompileOptions::default()).unwrap();
+            let compile_result = compile_generic(
+                &PermutationIndicesValidatorHashBitCircuit::default(),
+                CompileOptions::default(),
+            )
+            .unwrap();
             let file = std::fs::File::create(&file_name).unwrap();
             let writer = std::io::BufWriter::new(file);
             compile_result
@@ -749,8 +765,10 @@ pub fn generate_permutation_hashbit_witness(dir: &str) {
 
         let mut hint_registry = HintRegistry::<M31>::new();
         register_hint(&mut hint_registry);
-        let assignment = PermutationIndicesValidatorHashesCircuit::from_assignment(permutation_hash_data);
-        let target_assignments = PermutationIndicesValidatorHashBitCircuit::from_assignment(&assignment);
+        let assignment =
+            PermutationIndicesValidatorHashesCircuit::from_assignment(permutation_hash_data);
+        let target_assignments =
+            PermutationIndicesValidatorHashBitCircuit::from_assignment(&assignment);
         let mut assignments = vec![];
         for _i in 0..2 {
             assignments.extend(target_assignments.clone());
@@ -787,22 +805,74 @@ pub fn generate_permutation_hashbit_witness(dir: &str) {
             "Generate permutationhash witness Time: {:?}",
             end_time.duration_since(start_time)
         );
+        println!("total Time: {:?}", end_time.duration_since(initial_time));
     });
 }
+pub fn end2end_permutation_hashbit_witness(
+    w_s: WitnessSolver<M31Config>,
+    permutation_hash_data: Vec<PermutationHashEntry>,
+) {
+    stacker::grow(32 * 1024 * 1024 * 1024, || {
+        let witness_solver = Arc::new(w_s);
 
+        println!("Start generating permutationhashbit witnesses...");
+        let start_time = std::time::Instant::now();
+        let permutation_hash_data = &permutation_hash_data[0];
+
+        let mut hint_registry = HintRegistry::<M31>::new();
+        register_hint(&mut hint_registry);
+        let assignment =
+            PermutationIndicesValidatorHashesCircuit::from_assignment(permutation_hash_data);
+        let target_assignments =
+            PermutationIndicesValidatorHashBitCircuit::from_assignment(&assignment);
+        let mut assignments = vec![];
+        for _i in 0..2 {
+            assignments.extend(target_assignments.clone());
+        }
+        let assignment_chunks: Vec<Vec<PermutationIndicesValidatorHashBitCircuit<M31>>> =
+            assignments.chunks(16).map(|x| x.to_vec()).collect();
+
+        let handles = assignment_chunks
+            .into_iter()
+            .enumerate()
+            .map(|(i, assignments)| {
+                let witness_solver = Arc::clone(&witness_solver);
+                thread::spawn(move || {
+                    let mut hint_registry1 = HintRegistry::<M31>::new();
+                    register_hint(&mut hint_registry1);
+                    let witness = witness_solver
+                        .solve_witnesses_with_hints(&assignments, &mut hint_registry1)
+                        .unwrap();
+                    let file_name = format!("./witnesses/permutationhashbit/witness_{}.txt", i);
+                    let file = std::fs::File::create(file_name).unwrap();
+                    let writer = std::io::BufWriter::new(file);
+                    witness.serialize_into(writer).unwrap();
+                })
+            })
+            .collect::<Vec<_>>();
+        for handle in handles {
+            handle.join().unwrap();
+        }
+        let end_time = std::time::Instant::now();
+        println!(
+            "Generate permutationhash witness Time: {:?}",
+            end_time.duration_since(start_time)
+        );
+    });
+}
 #[test]
-fn test_permutation_hashes(){
+fn test_permutation_hashes() {
     let dir = "./data";
     generate_permutation_hashes_witness(dir);
 }
 #[test]
-fn test_permutation_hashbit(){
+fn test_permutation_hashbit() {
     let dir = "./data";
     generate_permutation_hashbit_witness(dir);
 }
 
 #[test]
-fn eval_permutation_hashbit(){
+fn eval_permutation_hashbit() {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
         let dir = "./data";
         println!("Start generating permutationhashbit witnesses...");
@@ -818,14 +888,20 @@ fn eval_permutation_hashbit(){
             end_time.duration_since(start_time)
         );
 
-        let assignment = PermutationIndicesValidatorHashesCircuit::from_assignment(permutation_hash_data);
+        let assignment =
+            PermutationIndicesValidatorHashesCircuit::from_assignment(permutation_hash_data);
         println!("Start permutationhashbit witnesses...");
-        let target_assignments = PermutationIndicesValidatorHashBitCircuit::from_assignment(&assignment);
+        let target_assignments =
+            PermutationIndicesValidatorHashBitCircuit::from_assignment(&assignment);
         println!("Start evaluating permutationhashbit witnesses...");
         for assignment in target_assignments {
             let mut hint_registry = HintRegistry::<M31>::new();
             register_hint(&mut hint_registry);
-            debug_eval(&PermutationIndicesValidatorHashBitCircuit::default(), &assignment, hint_registry);
+            debug_eval(
+                &PermutationIndicesValidatorHashBitCircuit::default(),
+                &assignment,
+                hint_registry,
+            );
         }
     });
 }
