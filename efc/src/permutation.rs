@@ -488,12 +488,12 @@ impl GenericDefine<M31Config> for PermutationIndicesValidatorHashesCircuit<Varia
 }
 //seperate PermutationIndicesValidatorHashesCircuit to 8 sub-circuits, leveraging avx512
 declare_circuit!(PermutationIndicesValidatorHashBitCircuit {
-    query_indices: [Variable; QUERY_SIZE],
-    query_validator_hashes: [Variable; QUERY_SIZE],
-    active_validator_bits_hash: [Variable; POSEIDON_M31X16_RATE],
-    active_validator_bits: [Variable; VALIDATOR_COUNT],
-    table_validator_hashes: [Variable; VALIDATOR_COUNT],
-    real_keys: [Variable; VALIDATOR_COUNT],
+    query_indices: [Variable; QUERY_SIZE],  //PCS: share with shuffle circuit
+    query_validator_hashes: [Variable; QUERY_SIZE], //PCS: share with shuffle circuit
+    active_validator_bits_hash: [Variable; POSEIDON_M31X16_RATE],   //PUBLIC
+    active_validator_bits: [Variable; VALIDATOR_COUNT], //HINT
+    table_validator_hashes: [Variable; VALIDATOR_COUNT],    //PCS: share with validatortree circuit
+    real_keys: [Variable; VALIDATOR_COUNT], //HINT
 });
 impl PermutationIndicesValidatorHashBitCircuit<M31> {
     pub fn from_assignment(entry: &PermutationIndicesValidatorHashesCircuit<M31>) -> Vec<Self> {
@@ -620,7 +620,7 @@ impl GenericDefine<M31Config> for PermutationIndicesValidatorHashBitCircuit<Vari
         // logup.final_check(builder);
     }
 }
-pub fn generate_permutation_hashes_witness(dir: &str) {
+pub fn generate_permutation_hashes_witnesses(dir: &str) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
         println!("preparing solver...");
         ensure_directory_exists("./witnesses/permutationhashes");
@@ -713,7 +713,7 @@ pub fn generate_permutation_hashes_witness(dir: &str) {
     });
 }
 
-pub fn generate_permutation_hashbit_witness(dir: &str) {
+pub fn generate_permutation_hashbit_witnesses(dir: &str) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
         println!("preparing solver...");
         let initial_time = std::time::Instant::now();
@@ -863,12 +863,12 @@ pub fn end2end_permutation_hashbit_witness(
 #[test]
 fn test_permutation_hashes() {
     let dir = "./data";
-    generate_permutation_hashes_witness(dir);
+    generate_permutation_hashes_witnesses(dir);
 }
 #[test]
 fn test_permutation_hashbit() {
     let dir = "./data";
-    generate_permutation_hashbit_witness(dir);
+    generate_permutation_hashbit_witnesses(dir);
 }
 
 #[test]

@@ -115,42 +115,42 @@ where
 
 // Define defines the circuit
 declare_circuit!(ShuffleCircuit {
-    start_index: Variable,
-    chunk_length: Variable,
-    shuffle_indices: [Variable; VALIDATOR_CHUNK_SIZE],
+    start_index: Variable,  //PUBLIC
+    chunk_length: Variable, //PUBLIC
+    shuffle_indices: [Variable; VALIDATOR_CHUNK_SIZE],  //PCS: share with permutation hash circuit
     committee_indices: [Variable; VALIDATOR_CHUNK_SIZE],
     pivots: [Variable; SHUFFLE_ROUND],
-    index_count: Variable,
-    position_results: [Variable; SHUFFLE_ROUND * VALIDATOR_CHUNK_SIZE],
-    position_bit_results: [Variable; SHUFFLE_ROUND * VALIDATOR_CHUNK_SIZE],
-    flip_results: [Variable; SHUFFLE_ROUND * VALIDATOR_CHUNK_SIZE],
+    index_count: Variable,  //PUBLIC
+    position_results: [Variable; SHUFFLE_ROUND * VALIDATOR_CHUNK_SIZE], //HINT
+    position_bit_results: [Variable; SHUFFLE_ROUND * VALIDATOR_CHUNK_SIZE], //HINT
+    flip_results: [Variable; SHUFFLE_ROUND * VALIDATOR_CHUNK_SIZE], //HINT
     //attestationdata
-    slot: [Variable; 8],
-    committee_index: [Variable; 8],
-    beacon_beacon_block_root: [Variable; 32],
-    source_epoch: [Variable; 8],
-    target_epoch: [Variable; 8],
-    source_root: [Variable; 32],
-    target_root: [Variable; 32],
+    slot: [Variable; 8],    //PUBLIC
+    committee_index: [Variable; 8], //PUBLIC
+    beacon_beacon_block_root: [Variable; 32],   //PUBLIC
+    source_epoch: [Variable; 8],    //PUBLIC
+    target_epoch: [Variable; 8],    //PUBLIC
+    source_root: [Variable; 32],    //PUBLIC
+    target_root: [Variable; 32],    //PUBLIC
     //attestationhm = hashtog2(attestationdata.signingroot()), a g2 point
-    attestation_hm: [[[Variable; 48]; 2]; 2], //public hm
+    attestation_hm: [[[Variable; 48]; 2]; 2], //PUBLIC
     //attestationsig
-    attestation_sig_bytes: [Variable; 96],
-    attestation_sig_g2: [[[Variable; 48]; 2]; 2], //public sig, unmarsalled from attestation_sig_bytes
-    aggregation_bits: [Variable; VALIDATOR_CHUNK_SIZE],
-    validator_hashes: [[Variable; POSEIDON_HASH_LENGTH]; VALIDATOR_CHUNK_SIZE],
-    aggregated_pubkey: [[Variable; 48]; 2], //public public_key
-    attestation_balance: [Variable; 8],
-    pubkeys_bls: [[[Variable; 48]; 2]; VALIDATOR_CHUNK_SIZE],
-    // validators:      [ValidatorSSZ;VALIDATOR_CHUNK_SIZE],
-    pubkey: [[Variable; 48]; VALIDATOR_CHUNK_SIZE],
-    withdrawal_credentials: [[Variable; 32]; VALIDATOR_CHUNK_SIZE],
-    effective_balance: [[Variable; 8]; VALIDATOR_CHUNK_SIZE],
-    slashed: [[Variable; 1]; VALIDATOR_CHUNK_SIZE],
-    activation_eligibility_epoch: [[Variable; 8]; VALIDATOR_CHUNK_SIZE],
-    activation_epoch: [[Variable; 8]; VALIDATOR_CHUNK_SIZE],
-    exit_epoch: [[Variable; 8]; VALIDATOR_CHUNK_SIZE],
-    withdrawable_epoch: [[Variable; 8]; VALIDATOR_CHUNK_SIZE],
+    attestation_sig_bytes: [Variable; 96], //PUBLIC
+    attestation_sig_g2: [[[Variable; 48]; 2]; 2], //PCS: public sig, share with bls_verifier circuit
+    aggregation_bits: [Variable; VALIDATOR_CHUNK_SIZE], //PUBLIC
+    validator_hashes: [[Variable; POSEIDON_HASH_LENGTH]; VALIDATOR_CHUNK_SIZE], //HINT, share with permutation circuit
+    aggregated_pubkey: [[Variable; 48]; 2], //PCS: public public_key, share with bls_verifier circuit
+    attestation_balance: [Variable; 8], //PUBLIC
+    pubkeys_bls: [[[Variable; 48]; 2]; VALIDATOR_CHUNK_SIZE],   //HINT
+    // validators:      [ValidatorSSZ;VALIDATOR_CHUNK_SIZE],  //HINT
+    pubkey: [[Variable; 48]; VALIDATOR_CHUNK_SIZE], //HINT
+    withdrawal_credentials: [[Variable; 32]; VALIDATOR_CHUNK_SIZE], //HINT
+    effective_balance: [[Variable; 8]; VALIDATOR_CHUNK_SIZE],//HINT
+    slashed: [[Variable; 1]; VALIDATOR_CHUNK_SIZE],//HINT
+    activation_eligibility_epoch: [[Variable; 8]; VALIDATOR_CHUNK_SIZE],//HINT
+    activation_epoch: [[Variable; 8]; VALIDATOR_CHUNK_SIZE],//HINT
+    exit_epoch: [[Variable; 8]; VALIDATOR_CHUNK_SIZE],//HINT
+    withdrawable_epoch: [[Variable; 8]; VALIDATOR_CHUNK_SIZE],//HINT
 });
 
 impl ShuffleCircuit<M31> {
