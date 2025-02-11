@@ -198,10 +198,10 @@ pub fn generate_pairing_witnesses(dir: &str) {
         .map(|(i, assignments)| {
             let witness_solver = Arc::clone(&witness_solver);
             thread::spawn(move || {
-                let mut hint_registry1 = HintRegistry::<M31>::new();
-                register_hint(&mut hint_registry1);
+                let mut hint_registry = HintRegistry::<M31>::new();
+                register_hint(&mut hint_registry);
                 let witness = witness_solver
-                    .solve_witnesses_with_hints(&assignments, &mut hint_registry1)
+                    .solve_witnesses_with_hints(&assignments, &mut hint_registry)
                     .unwrap();
                 let file_name = format!("./witnesses/pairing/witness_{}.txt", i);
                 let file = std::fs::File::create(file_name).unwrap();
@@ -221,9 +221,10 @@ pub fn generate_pairing_witnesses(dir: &str) {
 }
 
 pub fn end2end_pairing_witness(w_s: WitnessSolver<M31Config>, pairing_data: Vec<PairingEntry>) {
-    println!("Start generating witnesses...");
+    println!("Start generating pairing witnesses...");
     let start_time = std::time::Instant::now();
     let mut assignments = vec![];
+    let pairing_data = pairing_data.split_at(pairing_data.len() / 2).1.to_vec();
     for cur_pairing_data in &pairing_data {
         let pairing_assignment = PairingCircuit::from_entry(cur_pairing_data);
         assignments.push(pairing_assignment);
@@ -242,10 +243,10 @@ pub fn end2end_pairing_witness(w_s: WitnessSolver<M31Config>, pairing_data: Vec<
         .map(|(i, assignments)| {
             let witness_solver = Arc::clone(&witness_solver);
             thread::spawn(move || {
-                let mut hint_registry1 = HintRegistry::<M31>::new();
-                register_hint(&mut hint_registry1);
+                let mut hint_registry = HintRegistry::<M31>::new();
+                register_hint(&mut hint_registry);
                 let witness = witness_solver
-                    .solve_witnesses_with_hints(&assignments, &mut hint_registry1)
+                    .solve_witnesses_with_hints(&assignments, &mut hint_registry)
                     .unwrap();
                 let file_name = format!("./witnesses/pairing/witness_{}.txt", i);
                 let file = std::fs::File::create(file_name).unwrap();
