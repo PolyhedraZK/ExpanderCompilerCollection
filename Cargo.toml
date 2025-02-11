@@ -19,14 +19,14 @@ tiny-keccak = { version = "2.0", features = ["keccak"] }
 halo2curves = { git = "https://github.com/PolyhedraZK/halo2curves", default-features = false, features = [
     "bits",
 ] }
-arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
-mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
-gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
-expander_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev", package = "config" }
-expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev", package = "circuit" }
-gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
-gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
-mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
-expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev", package = "transcript" }
-crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev"}
+arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/dev_on_chain_verifier" }
+mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/dev_on_chain_verifier" }
+gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/dev_on_chain_verifier" }
+expander_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/dev_on_chain_verifier", package = "config" }
+expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/dev_on_chain_verifier", package = "circuit" }
+gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/dev_on_chain_verifier" }
+gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/dev_on_chain_verifier" }
+mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/dev_on_chain_verifier" }
+expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/dev_on_chain_verifier", package = "transcript" }
+crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/dev_on_chain_verifier"}
 
