@@ -6,6 +6,7 @@ use num_traits::cast::ToPrimitive;
 use sha2::{Digest, Sha256};
 use std::fs::{self, OpenOptions};
 use std::io::{self, BufRead, BufReader, Write};
+use std::time;
 const SHA256LEN: usize = 32;
 const CHUNK: usize = 64;
 const INIT0: u32 = 0x6A09E667;
@@ -646,13 +647,13 @@ impl MyDigest {
 #[kernel]
 fn sha256_37bytes<C: Config>(
     builder: &mut API<C>,
-    orign_data: &[InputVariable; 32],
+    orign_data: &[InputVariable; 37],
     output_data: &mut [OutputVariable; SHA256LEN],
 ) -> Vec<Variable> {
     let mut data = orign_data.to_vec();
-    for _ in 32..37 {
-        data.push(builder.constant(255));
-    }
+    // for _ in 32..37 {
+    //     data.push(builder.constant(255));
+    // }
     let n = data.len();
     if n != 32 + 1 + 4 {
         panic!("len(orignData) !=  32+1+4")
@@ -675,25 +676,34 @@ fn sha256_37bytes<C: Config>(
 #[test]
 fn zkcuda_sha256_37bytes() {
     let kernel_check_sha256_37bytes: Kernel<M31Config> = compile_sha256_37bytes().unwrap();
-        let data = [255; 32];
+        let data = [255; 37];
+        let repeat_time = 1024 * 1024*128/256;
         let mut hash = Sha256::new();
         hash.update(data);
         let output = hash.finalize();
         let mut input_vars = vec![];
         let mut output_vars = vec![];
-        for i in 0..32 {
+        for i in 0..37 {
             input_vars.push(M31::from(data[i] as u32));
         }
         for i in 0..32 {
             output_vars.push(M31::from(output[i] as u32));
         }
-
+        let mut new_input_vars = vec![];
+        for _ in 0..repeat_time {
+            new_input_vars.push(input_vars.clone());
+        }
         let mut ctx: Context<M31Config, DummyProvingSystem<M31Config>> = Context::default();
 
-        let a = ctx.copy_to_device(&input_vars, false);
+        let a = ctx.copy_to_device(&new_input_vars, false);
         let mut c = None;
+        let start_time = time::Instant::now();
         call_kernel!(ctx, kernel_check_sha256_37bytes, a, mut c);
-        let c = c.reshape(&[]);
-        let result: Vec<M31> = ctx.copy_to_host(c);
-        assert_eq!(result, output_vars);
+        let elapsed = start_time.elapsed();
+        println!("Time elapsed in call_kernel!() is: {:?}", elapsed);
+        // let c = c.reshape(&[repeat_time, 32]);
+        let result: Vec<Vec<M31>> = ctx.copy_to_host(c);
+        for i in 0..repeat_time {
+            assert_eq!(result[i], output_vars);
+        }
 }
