@@ -230,6 +230,11 @@ impl<C: Config> Instruction<C> {
                 Err(e) => EvalResult::Error(e),
             };
         }
+        if let Instruction::CustomGate { .. } = self {
+            return EvalResult::Error(Error::UserError(
+                "CustomGate currently unsupported".to_string(),
+            ));
+        }
         self.eval_unsafe(values)
     }
 }
@@ -522,5 +527,112 @@ impl<C: Config> RootCircuit<C> {
             res.push(values[o]);
         }
         Ok(res)
+    }
+
+    pub fn eval_safe_simd<SF: arith::SimdField<Scalar = C::CircuitField>>(
+        &self,
+        inputs: Vec<SF>,
+        public_inputs: &[SF],
+        hint_caller: &mut impl HintCaller<C::CircuitField>,
+    ) -> Result<Vec<SF>, Error> {
+        assert_eq!(inputs.len(), self.input_size());
+        let mut result_values = Vec::new();
+        self.eval_sub_safe_simd(
+            &self.circuits[&0],
+            inputs,
+            public_inputs,
+            hint_caller,
+            &mut result_values,
+        )?;
+        Ok(result_values)
+    }
+
+    fn eval_sub_safe_simd<SF: arith::SimdField<Scalar = C::CircuitField>>(
+        &self,
+        circuit: &Circuit<C>,
+        inputs: Vec<SF>,
+        public_inputs: &[SF],
+        hint_caller: &mut impl HintCaller<C::CircuitField>,
+        result_values: &mut Vec<SF>,
+    ) -> Result<(), Error> {
+        let mut values = vec![SF::zero(); 1];
+        values.extend(inputs);
+        for insn in circuit.instructions.iter() {
+            match insn {
+                Instruction::LinComb(lc) => {
+                    let res = lc.eval_simd(&values);
+                    values.push(res);
+                }
+                Instruction::Mul(inputs) => {
+                    let mut res = values[inputs[0]];
+                    for &i in inputs.iter().skip(1) {
+                        res *= values[i];
+                    }
+                    values.push(res);
+                }
+                Instruction::Hint {
+                    hint_id,
+                    inputs,
+                    num_outputs,
+                } => {
+                    let mut inputs_scalar = vec![Vec::with_capacity(inputs.len()); SF::PACK_SIZE];
+                    for x in inputs.iter().map(|i| values[*i]) {
+                        let tmp = x.unpack();
+                        for (i, y) in tmp.iter().enumerate() {
+                            inputs_scalar[i].push(*y);
+                        }
+                    }
+                    let mut outputs_tmp =
+                        vec![C::CircuitField::zero(); num_outputs * SF::PACK_SIZE];
+                    for (i, inputs) in inputs_scalar.iter().enumerate() {
+                        let outputs =
+                            match hints::safe_impl(hint_caller, *hint_id, inputs, *num_outputs) {
+                                Ok(outputs) => outputs,
+                                Err(e) => return Err(e),
+                            };
+                        for (j, x) in outputs.iter().enumerate() {
+                            outputs_tmp[j * SF::PACK_SIZE + i] = *x;
+                        }
+                    }
+                    for i in 0..*num_outputs {
+                        values.push(SF::pack(
+                            &outputs_tmp[i * SF::PACK_SIZE..(i + 1) * SF::PACK_SIZE],
+                        ));
+                    }
+                }
+                Instruction::ConstantLike(coef) => {
+                    let res = match coef {
+                        Coef::Constant(c) => SF::one().scale(c),
+                        Coef::PublicInput(i) => public_inputs[*i],
+                        Coef::Random => {
+                            return Err(Error::UserError(
+                                "random coef occured in witness solver".to_string(),
+                            ))
+                        }
+                    };
+                    values.push(res);
+                }
+                Instruction::SubCircuitCall {
+                    sub_circuit_id,
+                    inputs,
+                    ..
+                } => {
+                    self.eval_sub_safe_simd(
+                        &self.circuits[sub_circuit_id],
+                        inputs.iter().map(|&i| values[i]).collect(),
+                        public_inputs,
+                        hint_caller,
+                        &mut values,
+                    )?;
+                }
+                Instruction::CustomGate { .. } => {
+                    panic!("CustomGate currently unsupported");
+                }
+            }
+        }
+        for &o in circuit.outputs.iter() {
+            result_values.push(values[o]);
+        }
+        Ok(())
     }
 }
