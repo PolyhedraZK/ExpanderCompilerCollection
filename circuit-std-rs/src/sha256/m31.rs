@@ -419,10 +419,14 @@ pub fn sha256_37bytes<C: Config, B: RootAPI<C>>(
   pre_pad[64 - 37 - 2] = builder.constant((37) * 8 / 256); //length byte
   pre_pad[64 - 37 - 1] = builder.constant((32 + 1 + 4) * 8 - 256); //length byte
   data.append(&mut pre_pad); //append padding
-  let mut d = MyDigest::new(builder);
-  d.reset(builder);
-  d.chunk_write(builder, &data);
-  d.return_sum(builder).to_vec()
+  let mut loader = M31Loader::new();
+  let mut output = vec![];
+  loader.load(&[data.clone()].to_vec(), &mut output, builder);
+  let mut sum = vec![];
+  for i in 0..32 {
+    sum.push(output[0][i][0]);
+  }
+  sum
 }
 
 pub fn sha256_var_bytes<C: Config, B: RootAPI<C>>(
