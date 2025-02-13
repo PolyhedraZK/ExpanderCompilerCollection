@@ -1,3 +1,5 @@
+#![feature(min_specialization)]
+
 pub mod builder;
 pub mod circuit;
 pub mod compile;

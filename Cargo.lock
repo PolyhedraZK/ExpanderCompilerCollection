@@ -514,6 +514,7 @@ version = "0.1.0"
 dependencies = [
  "arith",
  "ark-bls12-381",
+ "ark-ff",
  "ark-std 0.4.0",
  "big-int",
  "circuit",
@@ -526,6 +527,7 @@ dependencies = [
  "num-traits",
  "rand",
  "sha2",
+ "tiny-keccak",
 ]
 
 [[package]]
@@ -896,6 +898,8 @@ dependencies = [
  "poly_commit",
  "polynomials",
  "rand",
+ "rayon",
+ "sha2",
  "sumcheck",
  "tiny-keccak",
  "transcript",

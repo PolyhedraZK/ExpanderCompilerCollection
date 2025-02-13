@@ -718,7 +718,7 @@ mod tests {
     fn get_random_layered_circuit<I: InputType>(
         rcc: &RandomCircuitConfig,
     ) -> Option<layered::Circuit<C, I>> {
-        let root = ir::dest::RootCircuitRelaxed::<C>::random(&rcc);
+        let root = ir::dest::RootCircuitRelaxed::<C>::random(rcc);
         let mut root = root.export_constraints();
         root.reassign_duplicate_sub_circuit_outputs();
         let root = root.remove_unreachable().0;
