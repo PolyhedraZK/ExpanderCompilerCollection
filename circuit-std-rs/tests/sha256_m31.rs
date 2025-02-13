@@ -62,7 +62,7 @@ fn test_sha256_37bytes() {
 fn debug_sha256_37bytes() {
     let mut hint_registry = HintRegistry::<M31>::new();
     hint_registry.register("myhint.tobinary", to_binary_hint);
-    let data = [255; 37];
+    let data = [0; 37];
     let mut hash = Sha256::new();
     hash.update(data);
     let output = hash.finalize();

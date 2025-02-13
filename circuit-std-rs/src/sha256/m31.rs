@@ -308,7 +308,8 @@ impl M31Loader {
       }
       self.get_rval_scalar(value as usize)
     } else {
-      api.constant(1)
+      let value = raw.parse::<u32>().unwrap();
+      api.constant(value)
     }
   }
 
@@ -336,16 +337,6 @@ impl M31Loader {
     self.register_lval(lval, [gate].to_vec());
   }
 
-  fn bitarray2m31<C: Config, B: RootAPI<C>>(api: &mut B, bits: &Vec<Variable>) -> [Variable; 2] {
-    if bits.len() >= 60 {
-      panic!("BitArrayToM31: length of bits must be less than 60");
-    }
-    [
-      from_binary(api, bits[..30].to_vec()),
-      from_binary(api, bits[30..].to_vec()),
-    ]
-  }
-
   pub fn load<C: Config, B: RootAPI<C>>(
     &mut self,
     input: &Vec<Vec<Variable>>,
@@ -363,7 +354,7 @@ impl M31Loader {
           let i = Self::parse_idx(&v, 3);
           let j = Self::parse_idx(&v, 4);
           let nbits = Self::parse_idx(&v, 5);
-          let decomposed = api.new_hint("tobits", &[input[i][j].clone()], nbits);
+          let decomposed = api.new_hint("myhint.tobinary", &[input[i][j].clone()], nbits);
           self.register_lval(lval, decomposed);
         }
         "extractbit" => {
@@ -386,13 +377,18 @@ impl M31Loader {
             let rval = self.parse_rval_scalar(&v, 3 + i, api);
             to_compose.push(rval);
           }
-          self.register_lval(lval, Self::bitarray2m31(api, &to_compose).to_vec());
+          // pad with high bits
+          while to_compose.len() < 32 {
+            to_compose.push(api.constant(0));
+          }
+          let composed = from_binary(api, to_compose);
+          self.register_lval(lval, [composed].to_vec());
         }
         "store" => {
-          assert_eq!(v[2], "o");
-          let i = Self::parse_idx(&v, 3);
-          let j = Self::parse_idx(&v, 4);
-          let idx = v[5][1..].parse::<usize>().unwrap();
+          assert_eq!(v[1], "o");
+          let i = Self::parse_idx(&v, 2);
+          let j = Self::parse_idx(&v, 3);
+          let idx = v[4][1..].parse::<usize>().unwrap();
           output.resize(i + 1, vec![]);
           output[i].resize(j + 1, vec![]);
           output[i][j] = self.symbols[idx].clone();
@@ -416,13 +412,22 @@ pub fn sha256_37bytes<C: Config, B: RootAPI<C>>(
   }
   let mut pre_pad = vec![builder.constant(0); 64 - 37];
   pre_pad[0] = builder.constant(128); //0x80
-  pre_pad[64 - 37 - 2] = builder.constant((37) * 8 / 256); //length byte
-  pre_pad[64 - 37 - 1] = builder.constant((32 + 1 + 4) * 8 - 256); //length byte
+                                      // pre_pad[64 - 37 - 2] = builder.constant((37) * 8 / 256); //length byte
+                                      // pre_pad[64 - 37 - 1] = builder.constant((32 + 1 + 4) * 8 - 256); //length byte
+  pre_pad[64 - 37 - 2] = builder.constant((37 * 8) >> 8 & 255); //length byte
+  pre_pad[64 - 37 - 1] = builder.constant((37 * 8) >> 0 & 255); //length byte
   data.append(&mut pre_pad); //append padding
   let mut loader = M31Loader::new();
   let mut output = vec![];
   loader.load(&[data.clone()].to_vec(), &mut output, builder);
   let mut sum = vec![];
+  assert!(output.len() == 1);
+  assert!(output[0].len() == 32);
+  // for i in 0..8 {
+  //   for j in 0..4 {
+  //     sum.push(output[0][i * 4 + (3 - j)][0]);
+  //   }
+  // }
   for i in 0..32 {
     sum.push(output[0][i][0]);
   }
