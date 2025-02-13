@@ -377,10 +377,6 @@ impl M31Loader {
             let rval = self.parse_rval_scalar(&v, 3 + i, api);
             to_compose.push(rval);
           }
-          // pad with high bits
-          while to_compose.len() < 32 {
-            to_compose.push(api.constant(0));
-          }
           let composed = from_binary(api, to_compose);
           self.register_lval(lval, [composed].to_vec());
         }
@@ -412,8 +408,6 @@ pub fn sha256_37bytes<C: Config, B: RootAPI<C>>(
   }
   let mut pre_pad = vec![builder.constant(0); 64 - 37];
   pre_pad[0] = builder.constant(128); //0x80
-                                      // pre_pad[64 - 37 - 2] = builder.constant((37) * 8 / 256); //length byte
-                                      // pre_pad[64 - 37 - 1] = builder.constant((32 + 1 + 4) * 8 - 256); //length byte
   pre_pad[64 - 37 - 2] = builder.constant((37 * 8) >> 8 & 255); //length byte
   pre_pad[64 - 37 - 1] = builder.constant((37 * 8) >> 0 & 255); //length byte
   data.append(&mut pre_pad); //append padding
