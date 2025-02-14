@@ -1,6 +1,6 @@
 use super::m31_utils::{
   big_array_add, big_endian_m31_array_put_uint32, bit_array_to_m31, bytes_to_bits, cap_sigma0,
-  cap_sigma1, ch, from_binary, m31_to_bit_array, maj, sigma0, sigma1,
+  cap_sigma1, ch, from_binary, m31_to_bit_array, maj, sigma0, sigma1, to_binary,
 };
 use expander_compiler::frontend::*;
 
@@ -350,11 +350,16 @@ impl M31Loader {
         "num_args" | "input" | "output" => {}
         "decompose" => {
           let lval = Self::parse_lval(&v);
-          assert_eq!(v[2], "i");
-          let i = Self::parse_idx(&v, 3);
-          let j = Self::parse_idx(&v, 4);
-          let nbits = Self::parse_idx(&v, 5);
-          let decomposed = api.new_hint("myhint.tobinary", &[input[i][j].clone()], nbits);
+          let decomposed = if v[2].eq("i") {
+            assert_eq!(v[2], "i");
+            let i = Self::parse_idx(&v, 3);
+            let j = Self::parse_idx(&v, 4);
+            let nbits = Self::parse_idx(&v, 5);
+            api.new_hint("myhint.tobinary", &[input[i][j].clone()], nbits)
+          } else {
+            let rval = self.parse_rval_scalar(&v, 2, api);
+            api.new_hint("myhint.tobinary", &[rval], 30)
+          };
           self.register_lval(lval, decomposed);
         }
         "extractbit" => {
@@ -368,6 +373,38 @@ impl M31Loader {
           let lhs = self.parse_rval_scalar(&v, 2, api);
           let rhs = self.parse_rval_scalar(&v, 3, api);
           self.bitwise_binary_gate(v[0], lval, lhs, rhs, api);
+        }
+        "zk.m31.compose" => {
+          let lval = Self::parse_lval(&v);
+          let n = Self::parse_idx(&v, 2);
+          let mut to_compose = vec![];
+          for i in 0..n {
+            let rval = self.parse_rval_scalar(&v, 3 + i, api);
+            to_compose.push(rval);
+          }
+          while to_compose.len() < 60 {
+            to_compose.push(api.constant(0));
+          }
+          let lo = from_binary(api, to_compose[..30].to_vec());
+          let hi = from_binary(api, to_compose[30..].to_vec());
+          self.register_lval(lval, [lo, hi].to_vec());
+        }
+        "zk.m31.add" => {
+          let lval = Self::parse_lval(&v);
+          let lhs = v[2][1..].parse::<usize>().unwrap();
+          let rhs = v[3][1..].parse::<usize>().unwrap();
+          assert_eq!(self.symbols[lhs].len(), 2);
+          assert_eq!(self.symbols[rhs].len(), 2);
+          let lhs = self.symbols[lhs].clone();
+          let rhs = self.symbols[rhs].clone();
+          let sum = big_array_add(api, &lhs, &rhs, 30);
+          self.register_lval(lval, sum);
+        }
+        "zk.m31.extract" => {
+          let lval = Self::parse_lval(&v);
+          let rval = v[2][1..].parse::<usize>().unwrap();
+          let idx = Self::parse_idx(&v, 3);
+          self.register_lval(lval, [self.symbols[rval][idx].clone()].to_vec());
         }
         "compose" => {
           let lval = Self::parse_lval(&v);
