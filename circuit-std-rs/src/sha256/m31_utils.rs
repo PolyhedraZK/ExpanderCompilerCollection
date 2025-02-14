@@ -12,7 +12,7 @@ pub fn bytes_to_bits<C: Config, B: RootAPI<C>>(api: &mut B, vals: &[Variable]) -
     }
     ret
 }
-pub fn right_shift<C: Config, B: RootAPI<C>>(
+pub fn left_shift<C: Config, B: RootAPI<C>>(
     api: &mut B,
     bits: &[Variable],
     shift: usize,
@@ -26,7 +26,7 @@ pub fn right_shift<C: Config, B: RootAPI<C>>(
     }
     shifted_bits
 }
-pub fn rotate_right(bits: &[Variable], shift: usize) -> Vec<Variable> {
+pub fn rotate_left(bits: &[Variable], shift: usize) -> Vec<Variable> {
     if bits.len() != 32 {
         panic!("RotateRight: len(bits) != 32");
     }
@@ -41,9 +41,9 @@ pub fn sigma0<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> Vec<V
     let bits1 = bits.to_vec();
     let bits2 = bits.to_vec();
     let bits3 = bits.to_vec();
-    let v1 = rotate_right(&bits1, 7);
-    let v2 = rotate_right(&bits2, 18);
-    let v3 = right_shift(api, &bits3, 3);
+    let v1 = rotate_left(&bits1, 7);
+    let v2 = rotate_left(&bits2, 18);
+    let v3 = left_shift(api, &bits3, 3);
     let mut ret = vec![];
     for i in 0..32 {
         let tmp = api.xor(v1[i], v2[i]);
@@ -58,9 +58,9 @@ pub fn sigma1<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> Vec<V
     let bits1 = bits.to_vec();
     let bits2 = bits.to_vec();
     let bits3 = bits.to_vec();
-    let v1 = rotate_right(&bits1, 17);
-    let v2 = rotate_right(&bits2, 19);
-    let v3 = right_shift(api, &bits3, 10);
+    let v1 = rotate_left(&bits1, 17);
+    let v2 = rotate_left(&bits2, 19);
+    let v3 = left_shift(api, &bits3, 10);
     let mut ret = vec![];
     for i in 0..32 {
         let tmp = api.xor(v1[i], v2[i]);
@@ -75,9 +75,9 @@ pub fn cap_sigma0<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> V
     let bits1 = bits.to_vec();
     let bits2 = bits.to_vec();
     let bits3 = bits.to_vec();
-    let v1 = rotate_right(&bits1, 2);
-    let v2 = rotate_right(&bits2, 13);
-    let v3 = rotate_right(&bits3, 22);
+    let v1 = rotate_left(&bits1, 2);
+    let v2 = rotate_left(&bits2, 13);
+    let v3 = rotate_left(&bits3, 22);
     let mut ret = vec![];
     for i in 0..32 {
         let tmp = api.xor(v1[i], v2[i]);
@@ -92,9 +92,9 @@ pub fn cap_sigma1<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> V
     let bits1 = bits.to_vec();
     let bits2 = bits.to_vec();
     let bits3 = bits.to_vec();
-    let v1 = rotate_right(&bits1, 6);
-    let v2 = rotate_right(&bits2, 11);
-    let v3 = rotate_right(&bits3, 25);
+    let v1 = rotate_left(&bits1, 6);
+    let v2 = rotate_left(&bits2, 11);
+    let v3 = rotate_left(&bits3, 25);
     let mut ret = vec![];
     for i in 0..32 {
         let tmp = api.xor(v1[i], v2[i]);
@@ -150,13 +150,15 @@ pub fn big_array_add<C: Config, B: RootAPI<C>>(
     }
     let mut c = vec![api.constant(0); a.len()];
     let mut carry = api.constant(0);
-    for i in 0..a.len() {
+    for i in 0..(a.len()-1) {
         c[i] = api.add(a[i], b[i]);
         c[i] = api.add(c[i], carry);
         carry = to_binary(api, c[i], nb_bits + 1)[nb_bits];
         let tmp = api.mul(carry, 1 << nb_bits);
         c[i] = api.sub(c[i], tmp);
     }
+    c[a.len()-1] = api.add(a[a.len()-1], b[a.len()-1]);
+    c[a.len()-1] = api.add(c[a.len()-1], carry);
     c
 }
 pub fn bit_array_to_m31<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> [Variable; 2] {
@@ -164,8 +166,8 @@ pub fn bit_array_to_m31<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]
         panic!("BitArrayToM31: length of bits must be less than 60");
     }
     [
-        from_binary(api, bits[..30].to_vec()),
-        from_binary(api, bits[30..].to_vec()),
+        from_binary(api, &bits[..30]),
+        from_binary(api, &bits[30..]),
     ]
 }
 
@@ -209,9 +211,12 @@ pub fn to_binary<C: Config, B: RootAPI<C>>(
     x: Variable,
     n_bits: usize,
 ) -> Vec<Variable> {
-    api.new_hint("myhint.tobinary", &[x], n_bits)
+    let res = api.new_hint("myhint.tobinary", &[x], n_bits);
+    let res_x = from_binary(api, &res);
+    api.assert_is_equal(x, res_x);
+    res
 }
-pub fn from_binary<C: Config, B: RootAPI<C>>(api: &mut B, bits: Vec<Variable>) -> Variable {
+pub fn from_binary<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> Variable {
     let mut res = api.constant(0);
     for (i, bit) in bits.iter().enumerate() {
         let coef = 1 << i;
@@ -306,8 +311,8 @@ pub fn idiv_mod_bit<C: Config, B: RootAPI<C>>(
     b: u64,
 ) -> (Variable, Variable) {
     let bits = to_binary(builder, a, 30);
-    let quotient = from_binary(builder, bits[b as usize..].to_vec());
-    let remainder = from_binary(builder, bits[..b as usize].to_vec());
+    let quotient = from_binary(builder, &bits[b as usize..]);
+    let remainder = from_binary(builder, &bits[..b as usize]);
     (quotient, remainder)
 }
 
