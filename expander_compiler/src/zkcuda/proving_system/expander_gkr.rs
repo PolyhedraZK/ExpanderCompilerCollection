@@ -21,6 +21,14 @@ use sumcheck::ProverScratchPad;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 
+// TODO: Move these to a config struct
+const MPI_SIZE: usize = 2;
+const GKR_PROVER_BINARY: &str = "/tmp/prove_gkr.bin";
+const GKR_VERIFIER_BINARY: &str = "/tmp/verify_gkr.bin";
+const PCS_COMMIT_BINARY: &str = "/tmp/commit_pcs.bin";
+const PCS_OPEN_BINARY: &str = "/tmp/open_pcs.bin";
+const PCS_VERIFY_BINARY: &str = "/tmp/verify_pcs.bin";
+
 #[allow(dead_code)]
 #[derive(Clone)]
 pub struct ExpanderGKRCommitment<C: Config> {
