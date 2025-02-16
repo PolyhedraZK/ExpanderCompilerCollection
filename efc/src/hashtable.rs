@@ -1,17 +1,18 @@
 use crate::utils::{ensure_directory_exists, read_from_json_file};
 use ark_std::primitive::u8;
-use circuit_std_rs::sha256::m31::check_sha256_37bytes;
-use circuit_std_rs::sha256::m31_utils::big_array_add;
+use circuit_std_rs::sha256::m31::{check_sha256_37bytes, check_sha256_37bytes_compress};
+use circuit_std_rs::sha256::m31_utils::{big_array_add, bytes_to_bits};
 use circuit_std_rs::utils::register_hint;
 use expander_compiler::circuit::ir::hint_normalized::witness_solver;
 use expander_compiler::frontend::extra::*;
 use expander_compiler::frontend::*;
 use serde::Deserialize;
+use std::hash::Hash;
 use std::sync::Arc;
 use std::thread;
 
 pub const SHA256LEN: usize = 32;
-pub const HASHTABLESIZE: usize = 64;
+pub const HASHTABLESIZE: usize = 90;
 #[derive(Clone, Copy, Debug)]
 pub struct HashTableParams {
     pub table_size: usize,
@@ -39,6 +40,36 @@ declare_circuit!(HASHTABLECircuit {
     seed: [PublicVariable; SHA256LEN],
     output: [[Variable; SHA256LEN]; HASHTABLESIZE],
 });
+// impl GenericDefine<M31Config> for HASHTABLECircuit<Variable> {
+//     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
+//         let mut seed_bits: Vec<Variable> = vec![];
+//         for i in 0..8{
+//             seed_bits.extend_from_slice(&bytes_to_bits(builder, &self.seed[i*4..(i+1)*4]));
+//         }
+//         let mut indices = vec![];
+//         for i in 0..HASHTABLESIZE {
+//             let mut index_bits = vec![];
+//             let i_byte = i as u32;
+//             for j in 0..8 {
+//                 index_bits.push(builder.constant(i_byte >> j & 1));
+//             }
+//             indices.push(index_bits);
+//         }
+//         let mut start_index_bits = vec![];
+//         for i in 0..4 {
+//             start_index_bits.extend_from_slice(&bytes_to_bits(builder, &self.start_index[i..i+1]));
+//         }
+//         for (i, index) in indices.iter().enumerate().take(HASHTABLESIZE) {
+//             let mut cur_input = Vec::<Variable>::new();
+//             cur_input.extend_from_slice(&seed_bits);
+//             cur_input.extend_from_slice(index);
+//             cur_input.extend_from_slice(&start_index_bits);
+//             let mut data = cur_input;
+//             data.append(&mut self.output[i].to_vec());
+//             check_sha256_37bytes_compress(builder, &data);
+//         }
+//     }
+// }
 impl GenericDefine<M31Config> for HASHTABLECircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut indices = vec![Vec::<Variable>::new(); HASHTABLESIZE];
@@ -77,6 +108,7 @@ pub fn generate_hash_witnesses(dir: &str) {
         println!("The solver does not exist.");
         let compile_result =
             compile_generic(&HASHTABLECircuit::default(), CompileOptions::default()).unwrap();
+        panic!("");
         let file = std::fs::File::create(&file_name).unwrap();
         let writer = std::io::BufWriter::new(file);
         compile_result
@@ -87,9 +119,9 @@ pub fn generate_hash_witnesses(dir: &str) {
             witness_solver,
             layered_circuit,
         } = compile_result;
-        let file = std::fs::File::create("circuit_hashtable32.txt").unwrap();
-        let writer = std::io::BufWriter::new(file);
-        layered_circuit.serialize_into(writer).unwrap();
+        // let file = std::fs::File::create("circuit_hashtable64.txt").unwrap();
+        // let writer = std::io::BufWriter::new(file);
+        // layered_circuit.serialize_into(writer).unwrap();
         witness_solver
     };
     let witness_solver = Arc::new(w_s);

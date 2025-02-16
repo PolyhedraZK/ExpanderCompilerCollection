@@ -1,6 +1,7 @@
+use std::array;
+
 use super::m31_utils::{
-    big_array_add, big_endian_m31_array_put_uint32, bit_array_to_m31, bytes_to_bits, cap_sigma0,
-    cap_sigma1, ch, m31_to_bit_array, maj, sigma0, sigma1,
+    big_array_add, big_endian_m31_array_put_uint32, bit_array_to_m31, bits_to_bytes, bytes_to_bits, cap_sigma0, cap_sigma1, ch, m31_to_bit_array, m31_to_bit_array_seperate, maj, sha_m31_add, sha_m31_add_to_32bits, sigma0, sigma1
 };
 use expander_compiler::frontend::*;
 
@@ -118,6 +119,14 @@ impl MyDigest {
         let tmp_h = self.h;
         self.h = self.block(api, tmp_h, p);
     }
+    fn chunk_write_compress<C: Config, B: RootAPI<C>>(&mut self, api: &mut B, p: &[Variable]) {
+        if p.len() != CHUNK*8 || self.nx != 0 {
+            panic!("p.len() != CHUNK || self.nx != 0");
+        }
+        self.len += CHUNK as u64;
+        let tmp_h = self.h;
+        self.h = self.block_37bytes_compress(api, tmp_h, p);
+    }
     fn return_sum<C: Config, B: RootAPI<C>>(&mut self, api: &mut B) -> [Variable; SHA256LEN] {
         let mut digest = [api.constant(0); SHA256LEN];
 
@@ -155,7 +164,7 @@ impl MyDigest {
                     let schedule_tmp1 = big_array_add(api, &term1, &term2, 30);
                     let schedule_tmp2 = big_array_add(api, &term3, &term4, 30);
                     let schedule = big_array_add(api, &schedule_tmp1, &schedule_tmp2, 30);
-                    let schedule_bits = m31_to_bit_array(api, &schedule)[..32].to_vec();
+                    let schedule_bits = m31_to_bit_array_seperate(api, &schedule, 2)[..32].to_vec();
                     msg_schedule.push(schedule_bits);
                 }
             }
@@ -169,12 +178,12 @@ impl MyDigest {
             let mut h = hh[7].to_vec();
 
             //rewrite
-            let mut a_bit = m31_to_bit_array(api, &a)[..32].to_vec();
-            let mut b_bit = m31_to_bit_array(api, &b)[..32].to_vec();
-            let mut c_bit = m31_to_bit_array(api, &c)[..32].to_vec();
-            let mut e_bit = m31_to_bit_array(api, &e)[..32].to_vec();
-            let mut f_bit = m31_to_bit_array(api, &f)[..32].to_vec();
-            let mut g_bit = m31_to_bit_array(api, &g)[..32].to_vec();
+            let mut a_bit = m31_to_bit_array_seperate(api, &a, 0)[..32].to_vec();
+            let mut b_bit = m31_to_bit_array_seperate(api, &b, 0)[..32].to_vec();
+            let mut c_bit = m31_to_bit_array_seperate(api, &c, 0)[..32].to_vec();
+            let mut e_bit = m31_to_bit_array_seperate(api, &e, 0)[..32].to_vec();
+            let mut f_bit = m31_to_bit_array_seperate(api, &f, 0)[..32].to_vec();
+            let mut g_bit = m31_to_bit_array_seperate(api, &g, 0)[..32].to_vec();
             for (t, schedule) in msg_schedule.iter().enumerate().take(64) {
                 let mut t1_term1 = [api.constant(0); 2];
                 t1_term1[0] = h[0];
@@ -196,17 +205,19 @@ impl MyDigest {
                 let t2_tmp4 = bit_array_to_m31(api, &t2_tmp3);
                 let t2 = big_array_add(api, &t2_tmp2, &t2_tmp4, 30);
                 let new_a_bit_tmp = big_array_add(api, &t1, &t2, 30);
-                let new_a_bit = m31_to_bit_array(api, &new_a_bit_tmp)[..32].to_vec();
+                let new_a_bit = m31_to_bit_array_seperate(api, &new_a_bit_tmp, 4)[..32].to_vec();
                 let new_e_bit_tmp = big_array_add(api, &d, &t1, 30);
-                let new_e_bit = m31_to_bit_array(api, &new_e_bit_tmp)[..32].to_vec();
+                let new_e_bit = m31_to_bit_array_seperate(api, &new_e_bit_tmp, 4)[..32].to_vec();
                 h = g;
                 g = f;
                 f = e;
                 d = c;
                 c = b;
                 b = a;
-                a = bit_array_to_m31(api, &new_a_bit).to_vec();
-                e = bit_array_to_m31(api, &new_e_bit).to_vec();
+                // a = bit_array_to_m31(api, &new_a_bit).to_vec();
+                a = new_a_bit_tmp;
+                // e = bit_array_to_m31(api, &new_e_bit).to_vec();
+                e = new_e_bit_tmp;
                 g_bit = f_bit;
                 f_bit = e_bit;
                 c_bit = b_bit;
@@ -214,56 +225,113 @@ impl MyDigest {
                 a_bit = new_a_bit;
                 e_bit = new_e_bit;
             }
-            let hh0_tmp1 = big_array_add(api, &hh[0], &a, 30);
-            let hh0_tmp2 = m31_to_bit_array(api, &hh0_tmp1);
-            hh[0] = bit_array_to_m31(api, &hh0_tmp2[..32])
-                .as_slice()
-                .try_into()
-                .unwrap();
-            let hh1_tmp1 = big_array_add(api, &hh[1], &b, 30);
-            let hh1_tmp2 = m31_to_bit_array(api, &hh1_tmp1);
-            hh[1] = bit_array_to_m31(api, &hh1_tmp2[..32])
-                .as_slice()
-                .try_into()
-                .unwrap();
-            let hh2_tmp1 = big_array_add(api, &hh[2], &c, 30);
-            let hh2_tmp2 = m31_to_bit_array(api, &hh2_tmp1);
-            hh[2] = bit_array_to_m31(api, &hh2_tmp2[..32])
-                .as_slice()
-                .try_into()
-                .unwrap();
-            let hh3_tmp1 = big_array_add(api, &hh[3], &d, 30);
-            let hh3_tmp2 = m31_to_bit_array(api, &hh3_tmp1);
-            hh[3] = bit_array_to_m31(api, &hh3_tmp2[..32])
-                .as_slice()
-                .try_into()
-                .unwrap();
-            let hh4_tmp1 = big_array_add(api, &hh[4], &e, 30);
-            let hh4_tmp2 = m31_to_bit_array(api, &hh4_tmp1);
-            hh[4] = bit_array_to_m31(api, &hh4_tmp2[..32])
-                .as_slice()
-                .try_into()
-                .unwrap();
-            let hh5_tmp1 = big_array_add(api, &hh[5], &f, 30);
-            let hh5_tmp2 = m31_to_bit_array(api, &hh5_tmp1);
-            hh[5] = bit_array_to_m31(api, &hh5_tmp2[..32])
-                .as_slice()
-                .try_into()
-                .unwrap();
-            let hh6_tmp1 = big_array_add(api, &hh[6], &g, 30);
-            let hh6_tmp2 = m31_to_bit_array(api, &hh6_tmp1);
-            hh[6] = bit_array_to_m31(api, &hh6_tmp2[..32])
-                .as_slice()
-                .try_into()
-                .unwrap();
-            let hh7_tmp1 = big_array_add(api, &hh[7], &h, 30);
-            let hh7_tmp2 = m31_to_bit_array(api, &hh7_tmp1);
-            hh[7] = bit_array_to_m31(api, &hh7_tmp2[..32])
-                .as_slice()
-                .try_into()
-                .unwrap();
+            hh[0] = sha_m31_add(api, &hh[0], &a, 30);
+            hh[1] = sha_m31_add(api, &hh[1], &b, 30);
+            hh[2] = sha_m31_add(api, &hh[2], &c, 30);
+            hh[3] = sha_m31_add(api, &hh[3], &d, 30);
+            hh[4] = sha_m31_add(api, &hh[4], &e, 30);
+            hh[5] = sha_m31_add(api, &hh[5], &f, 30);
+            hh[6] = sha_m31_add(api, &hh[6], &g, 30);
+            hh[7] = sha_m31_add(api, &hh[7], &h, 30);
             p = &p[CHUNK..];
         }
+        hh
+    }
+    //consider in a 64-byte block, only 8-th byte is different
+    //so we can skip the 0~7-th byte when doing second part
+    //in the first part, we can consider that 0~7-th, 8~22-th bytes are the same, so we can skip 22 bytes in the first part
+    fn block_37bytes_compress<C: Config, B: RootAPI<C>>(
+        &mut self,
+        api: &mut B,
+        h: [[Variable; 2]; 8],
+        p: &[Variable],
+    ) -> [[Variable; 2]; 8] {
+        let mut hh = h;
+        let mut msg_schedule = vec![];
+        for i in 0..16 {
+            msg_schedule.push(p[i * 32..i * 32 + 32].to_vec());
+        }
+        for i in 0..16 {
+            msg_schedule.push(p[i * 32..i * 32 + 32].to_vec());
+        }
+        for t in 16+16..64 {
+            let term1_tmp = sigma1(api, &msg_schedule[t - 2]);
+            let term1 = bit_array_to_m31(api, &term1_tmp);
+            let term2 = bit_array_to_m31(api, &msg_schedule[t - 7]);
+            let term3_tmp = sigma0(api, &msg_schedule[t - 15]);
+            let term3 = bit_array_to_m31(api, &term3_tmp);
+            let term4 = bit_array_to_m31(api, &msg_schedule[t - 16]);
+            let schedule_tmp1 = big_array_add(api, &term1, &term2, 30);
+            let schedule_tmp2 = big_array_add(api, &term3, &term4, 30);
+            let schedule = big_array_add(api, &schedule_tmp1, &schedule_tmp2, 30);
+            let schedule_bits = m31_to_bit_array_seperate(api, &schedule, 2)[..32].to_vec();
+            msg_schedule.push(schedule_bits);
+        }
+
+        //9-th round initial states
+        let mut a = vec![api.constant(250461879), api.constant(2)];
+        let mut b = vec![api.constant(88987086), api.constant(3)];
+        let mut c = vec![api.constant(304830514), api.constant(1)];
+        let mut d = vec![api.constant(644764128), api.constant(3)];
+        let mut e = vec![api.constant(617172613), api.constant(1)];
+        let mut f = vec![api.constant(813371380), api.constant(2)];
+        let mut g = vec![api.constant(58252441), api.constant(2)];
+        let mut h = vec![api.constant(446030276), api.constant(1)];
+
+        //rewrite
+        let mut a_bit = m31_to_bit_array_seperate(api, &a, 0)[..32].to_vec();
+        let mut b_bit = m31_to_bit_array_seperate(api, &b, 0)[..32].to_vec();
+        let mut c_bit = m31_to_bit_array_seperate(api, &c, 0)[..32].to_vec();
+        let mut e_bit = m31_to_bit_array_seperate(api, &e, 0)[..32].to_vec();
+        let mut f_bit = m31_to_bit_array_seperate(api, &f, 0)[..32].to_vec();
+        let mut g_bit = m31_to_bit_array_seperate(api, &g, 0)[..32].to_vec();
+        for (t, schedule) in msg_schedule.iter().enumerate().skip(8).take(64) {
+            let mut t1_term1 = [api.constant(0); 2];
+            t1_term1[0] = h[0];
+            t1_term1[1] = h[1];
+            let t1_term2_tmp = cap_sigma1(api, &e_bit);
+            let t1_term2 = bit_array_to_m31(api, &t1_term2_tmp);
+            let t1_term3_tmp = ch(api, &e_bit, &f_bit, &g_bit);
+            let t1_term3 = bit_array_to_m31(api, &t1_term3_tmp);
+            let t1_term4 = bit_array_to_m31(api, &self.kbits[t]); //rewrite to [2]frontend.Variable
+            let t1_term5 = bit_array_to_m31(api, schedule);
+            let tmp1 = big_array_add(api, &t1_term1, &t1_term2, 30);
+            let tmp2 = big_array_add(api, &t1_term3, &t1_term4, 30);
+            let tmp3 = big_array_add(api, &tmp1, &tmp2, 30);
+            let tmp4 = big_array_add(api, &tmp3, &t1_term5, 30);
+            let t1 = tmp4;
+            let t2_tmp1 = cap_sigma0(api, &a_bit);
+            let t2_tmp2 = bit_array_to_m31(api, &t2_tmp1);
+            let t2_tmp3 = maj(api, &a_bit, &b_bit, &c_bit);
+            let t2_tmp4 = bit_array_to_m31(api, &t2_tmp3);
+            let t2 = big_array_add(api, &t2_tmp2, &t2_tmp4, 30);
+            let new_a_bit_tmp = big_array_add(api, &t1, &t2, 30);
+            let new_a_bit = m31_to_bit_array_seperate(api, &new_a_bit_tmp, 4)[..32].to_vec();
+            let new_e_bit_tmp = big_array_add(api, &d, &t1, 30);
+            let new_e_bit = m31_to_bit_array_seperate(api, &new_e_bit_tmp, 4)[..32].to_vec();
+            h = g;
+            g = f;
+            f = e;
+            d = c;
+            c = b;
+            b = a;
+            a = bit_array_to_m31(api, &new_a_bit).to_vec();
+            e = bit_array_to_m31(api, &new_e_bit).to_vec();
+            g_bit = f_bit;
+            f_bit = e_bit;
+            c_bit = b_bit;
+            b_bit = a_bit;
+            a_bit = new_a_bit;
+            e_bit = new_e_bit;
+        }
+        hh[0] = sha_m31_add(api, &hh[0], &a, 30);
+        hh[1] = sha_m31_add(api, &hh[1], &b, 30);
+        hh[2] = sha_m31_add(api, &hh[2], &c, 30);
+        hh[3] = sha_m31_add(api, &hh[3], &d, 30);
+        hh[4] = sha_m31_add(api, &hh[4], &e, 30);
+        hh[5] = sha_m31_add(api, &hh[5], &f, 30);
+        hh[6] = sha_m31_add(api, &hh[6], &g, 30);
+        hh[7] = sha_m31_add(api, &hh[7], &h, 30);
         hh
     }
 }
@@ -285,6 +353,27 @@ pub fn sha256_37bytes<C: Config, B: RootAPI<C>>(
     let mut d = MyDigest::new(builder);
     d.reset(builder);
     d.chunk_write(builder, &data);
+    d.return_sum(builder).to_vec()
+}
+
+pub fn sha256_37bytes_compress<C: Config, B: RootAPI<C>>(
+    builder: &mut B,
+    orign_data: &[Variable],
+) -> Vec<Variable> {
+    let mut data = orign_data.to_vec();
+    let n = data.len();
+    if n != (32 + 1 + 4) * 8 {
+        panic!("len(orignData) !=  37 bytes")
+    }
+    let mut pre_pad = vec![builder.constant(0); (64 - 37)*8];
+    pre_pad[0] = builder.constant(1); //0x80
+    pre_pad[207] = builder.constant(1); //length byte
+    pre_pad[210] = builder.constant(1); //length byte
+    pre_pad[212] = builder.constant(1); //length byte
+    data.append(&mut pre_pad); //append padding
+    let mut d = MyDigest::new(builder);
+    d.reset(builder);
+    d.chunk_write_compress(builder, &data);
     d.return_sum(builder).to_vec()
 }
 
@@ -331,3 +420,17 @@ pub fn check_sha256_37bytes<C: Config, B: RootAPI<C>>(
     }
     result
 }
+
+
+pub fn check_sha256_37bytes_compress<C: Config, B: RootAPI<C>>(
+    builder: &mut B,
+    origin_data: &[Variable],
+) -> Vec<Variable> {
+    let output = origin_data[37*8..].to_vec();
+    let result = sha256_37bytes_compress(builder, &origin_data[..37*8]);
+    for i in 0..32 {
+        builder.assert_is_equal(result[i], output[i]);
+    }
+    result
+}
+

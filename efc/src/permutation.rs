@@ -273,7 +273,7 @@ impl GenericDefine<M31Config> for PermutationIndicesValidatorHashesCircuit<Varia
         for i in 0..VALIDATOR_COUNT / 16 {
             active_validator_16_bits.push(from_binary(
                 builder,
-                self.active_validator_bits[i * 16..(i + 1) * 16].to_vec(),
+                &self.active_validator_bits[i * 16..(i + 1) * 16],
             ));
         }
         let params = PoseidonM31Params::new(
@@ -407,7 +407,7 @@ impl GenericDefine<M31Config> for PermutationIndicesValidatorHashBitCircuit<Vari
         for i in 0..VALIDATOR_COUNT / 16 {
             active_validator_16_bits.push(from_binary(
                 builder,
-                self.active_validator_bits[i * 16..(i + 1) * 16].to_vec(),
+                &self.active_validator_bits[i * 16..(i + 1) * 16],
             ));
         }
         let params = PoseidonM31Params::new(

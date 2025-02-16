@@ -12,6 +12,14 @@ pub fn bytes_to_bits<C: Config, B: RootAPI<C>>(api: &mut B, vals: &[Variable]) -
     }
     ret
 }
+pub fn bits_to_bytes<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> Vec<Variable> {
+    let mut ret = vec![];
+    for i in 0..bits.len() / 8 {
+        let cur_bits = &bits[i * 8..(i + 1) * 8];
+        ret.push(from_binary(api, cur_bits));
+    }
+    ret
+}
 pub fn left_shift<C: Config, B: RootAPI<C>>(
     api: &mut B,
     bits: &[Variable],
@@ -161,6 +169,54 @@ pub fn big_array_add<C: Config, B: RootAPI<C>>(
     c[a.len()-1] = api.add(c[a.len()-1], carry);
     c
 }
+pub fn sha_m31_add<C: Config, B: RootAPI<C>>(
+    api: &mut B,
+    a: &[Variable],
+    b: &[Variable],
+    nb_bits: usize,
+) -> [Variable; 2] {
+    if a.len() != b.len() || a.len() != 2 {
+        panic!("BigArrayAdd: length of a and b must be equal");
+    }
+    let mut c = [api.constant(0); 2];
+    let mut carry = api.constant(0);
+    c[0] = api.add(a[0], b[0]);
+    c[0] = api.add(c[0], carry);
+    carry = to_binary(api, c[0], nb_bits + 1)[nb_bits];
+    let tmp = api.mul(carry, 1 << nb_bits);
+    c[0] = api.sub(c[0], tmp);
+    c[1] = api.add(a[1], b[1]);
+    c[1] = api.add(c[1], carry);
+    carry = to_binary(api, c[1], 3)[2];
+    let tmp = api.mul(carry, 1 << 2);
+    c[1] = api.sub(c[1], tmp);
+    c
+}
+pub fn sha_m31_add_to_32bits<C: Config, B: RootAPI<C>>(
+    api: &mut B,
+    a: &[Variable],
+    b: &[Variable],
+    nb_bits: usize,
+) -> [Variable; 32] {
+    if a.len() != b.len() || a.len() != 2 {
+        panic!("BigArrayAdd: length of a and b must be equal");
+    }
+    let mut c = [api.constant(0); 2];
+    let mut res = vec![];
+    let mut carry = api.constant(0);
+    c[0] = api.add(a[0], b[0]);
+    c[0] = api.add(c[0], carry);
+    let tmp1 = to_binary(api, c[0], nb_bits + 1);
+    carry = tmp1[nb_bits];
+    let tmp = api.mul(carry, 1 << nb_bits);
+    c[0] = api.sub(c[0], tmp);
+    c[1] = api.add(a[1], b[1]);
+    c[1] = api.add(c[1], carry);
+    let tmp2 = to_binary(api, c[1], 3)[..2].iter().rev().cloned().collect::<Vec<_>>();
+    res.extend_from_slice(tmp2.as_slice());
+    res.extend_from_slice(tmp1[..30].iter().rev().cloned().collect::<Vec<_>>().as_slice());    
+    res.try_into().unwrap()
+}
 pub fn bit_array_to_m31<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> [Variable; 2] {
     if bits.len() >= 60 {
         panic!("BitArrayToM31: length of bits must be less than 60");
@@ -204,6 +260,12 @@ pub fn m31_to_bit_array<C: Config, B: RootAPI<C>>(api: &mut B, m31: &[Variable])
     for val in m31 {
         bits.extend_from_slice(&to_binary(api, *val, 30));
     }
+    bits
+}
+pub fn m31_to_bit_array_seperate<C: Config, B: RootAPI<C>>(api: &mut B, m31: &[Variable], overflow: usize) -> Vec<Variable> {
+    let mut bits = vec![];
+    bits.extend_from_slice(&to_binary(api, m31[0], 30));
+    bits.extend_from_slice(&to_binary(api, m31[1], 2+overflow));
     bits
 }
 pub fn to_binary<C: Config, B: RootAPI<C>>(
