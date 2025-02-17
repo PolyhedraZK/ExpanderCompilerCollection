@@ -1,7 +1,7 @@
 use crate::utils::{ensure_directory_exists, read_from_json_file};
 use ark_std::primitive::u8;
-use circuit_std_rs::sha256::m31::{check_sha256_37bytes, check_sha256_37bytes_compress};
-use circuit_std_rs::sha256::m31_utils::{big_array_add, bytes_to_bits};
+use circuit_std_rs::sha256::m31::{check_sha256_37bytes, check_sha256_37bytes_256batch_compress, check_sha256_37bytes_compress};
+use circuit_std_rs::sha256::m31_utils::{big_array_add, big_array_add_reduce, bytes_to_bits};
 use circuit_std_rs::utils::register_hint;
 use expander_compiler::circuit::ir::hint_normalized::witness_solver;
 use expander_compiler::frontend::extra::*;
@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::thread;
 
 pub const SHA256LEN: usize = 32;
-pub const HASHTABLESIZE: usize = 90;
+pub const HASHTABLESIZE: usize = 64;
 #[derive(Clone, Copy, Debug)]
 pub struct HashTableParams {
     pub table_size: usize,
@@ -40,60 +40,60 @@ declare_circuit!(HASHTABLECircuit {
     seed: [PublicVariable; SHA256LEN],
     output: [[Variable; SHA256LEN]; HASHTABLESIZE],
 });
+impl GenericDefine<M31Config> for HASHTABLECircuit<Variable> {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
+        let mut seed_bits: Vec<Variable> = vec![];
+        for i in 0..8{
+            seed_bits.extend_from_slice(&bytes_to_bits(builder, &self.seed[i*4..(i+1)*4]));
+        }
+        let mut indices = vec![];
+        let var0 = builder.constant(0);
+        for i  in 0..HASHTABLESIZE {
+            //assume HASHTABLESIZE is less than 2^8
+            let var_i = builder.constant(i as u32);
+            let index = big_array_add_reduce(builder, &self.start_index, &[var_i, var0, var0, var0], 8);
+            indices.push(bytes_to_bits(builder, &index));
+        }
+        let mut round_bits = vec![];
+        round_bits.extend_from_slice(&bytes_to_bits(builder, &[self.shuffle_round]));
+        let mut inputs = vec![];
+        let mut outputs = vec![];
+        for (i, index) in indices.iter().enumerate().take(HASHTABLESIZE) {
+            let mut cur_input = Vec::<Variable>::new();
+            cur_input.extend_from_slice(&seed_bits);
+            cur_input.extend_from_slice(&index[8..]);
+            cur_input.extend_from_slice(&round_bits);
+            cur_input.extend_from_slice(&index[..8]);
+            inputs.push(cur_input);
+            outputs.push(self.output[i].to_vec());
+        }
+        check_sha256_37bytes_256batch_compress(builder, &inputs, &outputs);
+    }
+}
 // impl GenericDefine<M31Config> for HASHTABLECircuit<Variable> {
 //     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
-//         let mut seed_bits: Vec<Variable> = vec![];
-//         for i in 0..8{
-//             seed_bits.extend_from_slice(&bytes_to_bits(builder, &self.seed[i*4..(i+1)*4]));
+//         let mut indices = vec![Vec::<Variable>::new(); HASHTABLESIZE];
+//         if HASHTABLESIZE > 256 {
+//             panic!("HASHTABLESIZE > 256")
 //         }
-//         let mut indices = vec![];
-//         for i in 0..HASHTABLESIZE {
-//             let mut index_bits = vec![];
-//             let i_byte = i as u32;
-//             for j in 0..8 {
-//                 index_bits.push(builder.constant(i_byte >> j & 1));
-//             }
-//             indices.push(index_bits);
-//         }
-//         let mut start_index_bits = vec![];
-//         for i in 0..4 {
-//             start_index_bits.extend_from_slice(&bytes_to_bits(builder, &self.start_index[i..i+1]));
+//         let var0 = builder.constant(0);
+//         for (i, cur_index) in indices.iter_mut().enumerate().take(HASHTABLESIZE) {
+//             //assume HASHTABLESIZE is less than 2^8
+//             let var_i = builder.constant(i as u32);
+//             let index = big_array_add(builder, &self.start_index, &[var_i, var0, var0, var0], 8);
+//             *cur_index = index.to_vec();
 //         }
 //         for (i, index) in indices.iter().enumerate().take(HASHTABLESIZE) {
 //             let mut cur_input = Vec::<Variable>::new();
-//             cur_input.extend_from_slice(&seed_bits);
+//             cur_input.extend_from_slice(&self.seed);
+//             cur_input.push(self.shuffle_round);
 //             cur_input.extend_from_slice(index);
-//             cur_input.extend_from_slice(&start_index_bits);
 //             let mut data = cur_input;
 //             data.append(&mut self.output[i].to_vec());
-//             check_sha256_37bytes_compress(builder, &data);
+//             check_sha256_37bytes(builder, &data);
 //         }
 //     }
 // }
-impl GenericDefine<M31Config> for HASHTABLECircuit<Variable> {
-    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
-        let mut indices = vec![Vec::<Variable>::new(); HASHTABLESIZE];
-        if HASHTABLESIZE > 256 {
-            panic!("HASHTABLESIZE > 256")
-        }
-        let var0 = builder.constant(0);
-        for (i, cur_index) in indices.iter_mut().enumerate().take(HASHTABLESIZE) {
-            //assume HASHTABLESIZE is less than 2^8
-            let var_i = builder.constant(i as u32);
-            let index = big_array_add(builder, &self.start_index, &[var_i, var0, var0, var0], 8);
-            *cur_index = index.to_vec();
-        }
-        for (i, index) in indices.iter().enumerate().take(HASHTABLESIZE) {
-            let mut cur_input = Vec::<Variable>::new();
-            cur_input.extend_from_slice(&self.seed);
-            cur_input.push(self.shuffle_round);
-            cur_input.extend_from_slice(index);
-            let mut data = cur_input;
-            data.append(&mut self.output[i].to_vec());
-            check_sha256_37bytes(builder, &data);
-        }
-    }
-}
 
 pub fn generate_hash_witnesses(dir: &str) {
     println!("preparing solver...");
@@ -108,7 +108,6 @@ pub fn generate_hash_witnesses(dir: &str) {
         println!("The solver does not exist.");
         let compile_result =
             compile_generic(&HASHTABLECircuit::default(), CompileOptions::default()).unwrap();
-        panic!("");
         let file = std::fs::File::create(&file_name).unwrap();
         let writer = std::io::BufWriter::new(file);
         compile_result
@@ -119,9 +118,9 @@ pub fn generate_hash_witnesses(dir: &str) {
             witness_solver,
             layered_circuit,
         } = compile_result;
-        // let file = std::fs::File::create("circuit_hashtable64.txt").unwrap();
-        // let writer = std::io::BufWriter::new(file);
-        // layered_circuit.serialize_into(writer).unwrap();
+        let file = std::fs::File::create("circuit_hashtable64.txt").unwrap();
+        let writer = std::io::BufWriter::new(file);
+        layered_circuit.serialize_into(writer).unwrap();
         witness_solver
     };
     let witness_solver = Arc::new(w_s);
@@ -158,7 +157,6 @@ pub fn generate_hash_witnesses(dir: &str) {
     );
     let assignment_chunks: Vec<Vec<HASHTABLECircuit<M31>>> =
         assignments.chunks(16).map(|x| x.to_vec()).collect();
-
     let handles = assignment_chunks
         .into_iter()
         .enumerate()
@@ -221,7 +219,6 @@ pub fn end2end_hashtable_witnesses(
     );
     let assignment_chunks: Vec<Vec<HASHTABLECircuit<M31>>> =
         assignments.chunks(16).map(|x| x.to_vec()).collect();
-
     let handles = assignment_chunks
         .into_iter()
         .enumerate()
@@ -252,4 +249,34 @@ pub fn end2end_hashtable_witnesses(
 #[test]
 fn test_generate_hash_witnesses() {
     generate_hash_witnesses("./data");
+}
+
+#[test]
+fn test_hashtable(){
+    let dir = "./data";
+    let file_path = format!("{}/hash_assignment.json", dir);
+
+    let hashtable_data: Vec<HashTableJson> = read_from_json_file(&file_path).unwrap();
+    let mut assignments = vec![];
+    for cur_hashtable_data in &hashtable_data {
+        let mut hash_assignment = HASHTABLECircuit::default();
+        for j in 0..32 {
+            hash_assignment.seed[j] = M31::from(cur_hashtable_data.seed[j] as u32);
+        }
+        hash_assignment.shuffle_round = M31::from(cur_hashtable_data.shuffle_round as u32);
+        for j in 0..4 {
+            hash_assignment.start_index[j] = M31::from(cur_hashtable_data.start_index[j] as u32);
+        }
+        for j in 0..HASHTABLESIZE {
+            for k in 0..32 {
+                hash_assignment.output[j][k] =
+                    M31::from(cur_hashtable_data.hash_outputs[j%64][k] as u32);
+            }
+        }
+        assignments.push(hash_assignment);
+    }
+    let mut hint_registry = HintRegistry::<M31>::new();
+    register_hint(&mut hint_registry);
+    debug_eval(&HASHTABLECircuit::default(), &assignments[0], hint_registry);
+    println!("pass!");
 }

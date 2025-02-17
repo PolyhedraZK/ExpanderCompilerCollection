@@ -147,6 +147,40 @@ pub fn maj<C: Config, B: RootAPI<C>>(
     }
     ret
 }
+pub fn big_array_add_no_reduce<C: Config, B: RootAPI<C>>(
+    api: &mut B,
+    a: &[Variable],
+    b: &[Variable],
+) -> Vec<Variable> {
+    if a.len() != b.len() {
+        panic!("BigArrayAdd: length of a and b must be equal");
+    }
+    let mut c = vec![api.constant(0); a.len()];
+    for i in 0..a.len() {
+        c[i] = api.add(a[i], b[i]);
+    }
+    c
+}
+pub fn big_array_add_reduce<C: Config, B: RootAPI<C>>(
+    api: &mut B,
+    a: &[Variable],
+    b: &[Variable],
+    nb_bits: usize,
+) -> Vec<Variable> {
+    if a.len() != b.len() {
+        panic!("BigArrayAdd: length of a and b must be equal");
+    }
+    let mut c = vec![api.constant(0); a.len()];
+    let mut carry = api.constant(0);
+    for i in 0..a.len() {
+        c[i] = api.add(a[i], b[i]);
+        c[i] = api.add(c[i], carry);
+        carry = to_binary(api, c[i], nb_bits + 1)[nb_bits];
+        let tmp = api.mul(carry, 1 << nb_bits);
+        c[i] = api.sub(c[i], tmp);
+    }
+    c
+}
 pub fn big_array_add<C: Config, B: RootAPI<C>>(
     api: &mut B,
     a: &[Variable],
@@ -192,6 +226,29 @@ pub fn sha_m31_add<C: Config, B: RootAPI<C>>(
     c[1] = api.sub(c[1], tmp);
     c
 }
+pub fn sha_m31_26_add<C: Config, B: RootAPI<C>>(
+    api: &mut B,
+    a: &[Variable],
+    b: &[Variable],
+    nb_bits: usize,
+) -> [Variable; 2] {
+    if a.len() != b.len() || a.len() != 2 {
+        panic!("BigArrayAdd: length of a and b must be equal");
+    }
+    let mut c = [api.constant(0); 2];
+    let mut carry = api.constant(0);
+    c[0] = api.add(a[0], b[0]);
+    c[0] = api.add(c[0], carry);
+    carry = to_binary(api, c[0], nb_bits + 1)[nb_bits];
+    let tmp = api.mul(carry, 1 << nb_bits);
+    c[0] = api.sub(c[0], tmp);
+    c[1] = api.add(a[1], b[1]);
+    c[1] = api.add(c[1], carry);
+    carry = to_binary(api, c[1], 7)[6];
+    let tmp = api.mul(carry, 1 << 6);
+    c[1] = api.sub(c[1], tmp);
+    c
+}
 pub fn sha_m31_add_to_32bits<C: Config, B: RootAPI<C>>(
     api: &mut B,
     a: &[Variable],
@@ -227,7 +284,17 @@ pub fn bit_array_to_m31<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]
     ]
 }
 
-pub fn big_endian_m31_array_put_uint32<C: Config, B: RootAPI<C>>(
+pub fn bit_array_to_m31_26<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> [Variable; 2] {
+    if bits.len() >= 54 {
+        panic!("BitArrayToM31: length of bits must be less than 60");
+    }
+    [
+        from_binary(api, &bits[..26]),
+        from_binary(api, &bits[26..]),
+    ]
+}
+
+pub fn m31_array_put_uint32<C: Config, B: RootAPI<C>>(
     api: &mut B,
     b: &mut [Variable],
     x: [Variable; 2],
@@ -242,6 +309,21 @@ pub fn big_endian_m31_array_put_uint32<C: Config, B: RootAPI<C>>(
     b[0] = api.add(quo, shift);
 }
 
+
+pub fn m31_26_array_put_uint32<C: Config, B: RootAPI<C>>(
+    api: &mut B,
+    b: &mut [Variable],
+    x: [Variable; 2],
+) {
+    let mut quo = x[0];
+    for i in (1..=3).rev() {
+        let (q, r) = idiv_mod_bit(api, quo, 8);
+        b[i] = r;
+        quo = q;
+    }
+    let shift = api.mul(x[1], 1 << 2);
+    b[0] = api.add(quo, shift);
+}
 pub fn big_endian_put_uint64<C: Config, B: RootAPI<C>>(
     api: &mut B,
     b: &mut [Variable],
@@ -266,6 +348,15 @@ pub fn m31_to_bit_array_seperate<C: Config, B: RootAPI<C>>(api: &mut B, m31: &[V
     let mut bits = vec![];
     bits.extend_from_slice(&to_binary(api, m31[0], 30));
     bits.extend_from_slice(&to_binary(api, m31[1], 2+overflow));
+    bits
+}
+pub fn m31_26_to_bit_array_seperate<C: Config, B: RootAPI<C>>(api: &mut B, m31: &[Variable], overflow: usize) -> Vec<Variable> {
+    let mut bits = vec![];
+    let bits30 = to_binary(api, m31[0], 30);
+    bits.extend_from_slice(&bits30[..26]);
+    let carry = from_binary(api, &bits30[26..]);
+    let high = api.add(m31[1], carry);
+    bits.extend_from_slice(&to_binary(api, high, 6+overflow+1));
     bits
 }
 pub fn to_binary<C: Config, B: RootAPI<C>>(
@@ -439,7 +530,7 @@ impl Define<M31Config> for BITCONVERTCircuit<Variable> {
             builder.assert_is_equal(big_int_byte, self.big_int_bytes[i]);
         }
         let mut big_int_m31 = [builder.constant(0); 4];
-        big_endian_m31_array_put_uint32(builder, &mut big_int_m31, self.big_int_m31);
+        m31_array_put_uint32(builder, &mut big_int_m31, self.big_int_m31);
         for (i, val) in big_int_m31.iter().enumerate() {
             builder.assert_is_equal(val, self.big_int_m31_bytes[i]);
         }
