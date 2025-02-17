@@ -24,16 +24,16 @@ tiny-keccak = { version = "2.0", features = ["keccak"] }
 halo2curves = { git = "https://github.com/PolyhedraZK/halo2curves", default-features = false, features = [
     "bits",
 ] }
-arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
-mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
-gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
-expander_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev", package = "config" }
-expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev", package = "circuit" }
-expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev", package = "transcript" }
-gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
-gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
-mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
-crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev"}
-poly_commit = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev", package = "poly_commit" }
-polynomials = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
-sumcheck = { git = "https://github.com/PolyhedraZK/Expander", branch = "dev" }
+arith = { git = "https://github.com/PolyhedraZK/Expander" }
+mpi_config = { git = "https://github.com/PolyhedraZK/Expander" }
+gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander" }
+expander_config = { git = "https://github.com/PolyhedraZK/Expander", package = "config" }
+expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", package = "circuit" }
+expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", package = "transcript" }
+gkr = { git = "https://github.com/PolyhedraZK/Expander" }
+gf2 = { git = "https://github.com/PolyhedraZK/Expander" }
+mersenne31 = { git = "https://github.com/PolyhedraZK/Expander" }
+crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander"}
+poly_commit = { git = "https://github.com/PolyhedraZK/Expander", package = "poly_commit" }
+polynomials = { git = "https://github.com/PolyhedraZK/Expander" }
+sumcheck = { git = "https://github.com/PolyhedraZK/Expander" }
