@@ -7,7 +7,6 @@ use expander_compiler::circuit::ir::hint_normalized::witness_solver;
 use expander_compiler::frontend::extra::*;
 use expander_compiler::frontend::*;
 use serde::Deserialize;
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
 
@@ -169,11 +168,11 @@ impl PermutationIndicesValidatorHashesCircuit<M31> {
             table_validator_hashes: [[M31::from(0); POSEIDON_M31X16_RATE]; VALIDATOR_COUNT],
             real_keys: [M31::from(0); VALIDATOR_COUNT],
         };
-        for i in 0..VALIDATOR_COUNT {
-            assignment.real_keys[i] = M31::from(real_keys[i] as u32);
+        for (i, key) in real_keys.iter().enumerate().take(VALIDATOR_COUNT) {
+            assignment.real_keys[i] = M31::from(*key as u32);
         }
-        for i in 0..POSEIDON_M31X16_RATE {
-            assignment.active_validator_bits_hash[i] = M31::from(active_validator_bits_hash[i]);
+        for (i, elem) in active_validator_bits_hash.iter().enumerate().take(POSEIDON_M31X16_RATE) {
+            assignment.active_validator_bits_hash[i] = M31::from(*elem);
         }
 
         for i in 0..VALIDATOR_COUNT {
@@ -203,7 +202,7 @@ impl PermutationIndicesValidatorHashesCircuit<M31> {
                 if i < shuffle_indices.len() {
                     let valid_idx = valid_validator_list[shuffle_indices[i] as usize] as usize;
                     assignment.query_validator_hashes[i][j] =
-                        M31::from(validator_hashes[valid_idx][j] as u32);
+                        M31::from(validator_hashes[valid_idx][j]);
                 }
             }
         }

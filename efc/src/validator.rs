@@ -155,8 +155,8 @@ impl GenericDefine<M31Config> for ConvertValidatorListToMerkleTreeCircuit<Variab
         let sub_tree_root = params.hash_to_state_flatten(builder, &inputs);
 
         // Enforce equality between computed root and given root
-        for i in 0..POSEIDON_M31X16_RATE {
-            builder.assert_is_equal(sub_tree_root[i], self.subtree_root[i]);
+        for (i, elem) in sub_tree_root.iter().enumerate().take(POSEIDON_M31X16_RATE) {
+            builder.assert_is_equal(elem, self.subtree_root[i]);
         }
     }
 }
@@ -169,7 +169,7 @@ pub fn generate_validator_subtree_witnesses(dir: &str) {
         let file_name = "solver_validatorsubtree.txt";
         let w_s = if std::fs::metadata(file_name).is_ok() {
             println!("The solver exists!");
-            let file = std::fs::File::open(&file_name).unwrap();
+            let file = std::fs::File::open(file_name).unwrap();
             let reader = std::io::BufReader::new(file);
             witness_solver::WitnessSolver::deserialize_from(reader).unwrap()
         } else {
@@ -179,7 +179,7 @@ pub fn generate_validator_subtree_witnesses(dir: &str) {
                 CompileOptions::default(),
             )
             .unwrap();
-            let file = std::fs::File::create(&file_name).unwrap();
+            let file = std::fs::File::create(file_name).unwrap();
             let writer = std::io::BufWriter::new(file);
             compile_result
                 .witness_solver

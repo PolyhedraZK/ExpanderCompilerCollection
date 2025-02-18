@@ -81,7 +81,7 @@ pub fn get_solver<
 ) -> WitnessSolver<C> {
     ensure_directory_exists(dir);
     let file_name = format!("solver_{}.txt", circuit_name);
-    let w_s = if std::fs::metadata(&file_name).is_ok() {
+    if std::fs::metadata(&file_name).is_ok() {
         println!("The solver exists!");
         let file = std::fs::File::open(&file_name).unwrap();
         let reader = std::io::BufReader::new(file);
@@ -104,8 +104,7 @@ pub fn get_solver<
         let writer = std::io::BufWriter::new(file);
         layered_circuit.serialize_into(writer).unwrap();
         witness_solver
-    };
-    w_s
+    }
 }
 
 pub fn wait_for_file(directory: &str) {

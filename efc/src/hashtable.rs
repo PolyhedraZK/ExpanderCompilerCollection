@@ -1,13 +1,12 @@
 use crate::utils::{ensure_directory_exists, read_from_json_file};
 use ark_std::primitive::u8;
-use circuit_std_rs::sha256::m31::{check_sha256_37bytes, check_sha256_37bytes_256batch_compress, check_sha256_37bytes_compress};
-use circuit_std_rs::sha256::m31_utils::{big_array_add, big_array_add_reduce, bytes_to_bits};
+use circuit_std_rs::sha256::m31::check_sha256_37bytes_256batch_compress;
+use circuit_std_rs::sha256::m31_utils::{big_array_add_reduce, bytes_to_bits};
 use circuit_std_rs::utils::register_hint;
 use expander_compiler::circuit::ir::hint_normalized::witness_solver;
 use expander_compiler::frontend::extra::*;
 use expander_compiler::frontend::*;
 use serde::Deserialize;
-use std::hash::Hash;
 use std::sync::Arc;
 use std::thread;
 
@@ -43,15 +42,16 @@ declare_circuit!(HASHTABLECircuit {
 impl GenericDefine<M31Config> for HASHTABLECircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut seed_bits: Vec<Variable> = vec![];
-        for i in 0..8{
-            seed_bits.extend_from_slice(&bytes_to_bits(builder, &self.seed[i*4..(i+1)*4]));
+        for i in 0..8 {
+            seed_bits.extend_from_slice(&bytes_to_bits(builder, &self.seed[i * 4..(i + 1) * 4]));
         }
         let mut indices = vec![];
         let var0 = builder.constant(0);
-        for i  in 0..HASHTABLESIZE {
+        for i in 0..HASHTABLESIZE {
             //assume HASHTABLESIZE is less than 2^8
             let var_i = builder.constant(i as u32);
-            let index = big_array_add_reduce(builder, &self.start_index, &[var_i, var0, var0, var0], 8);
+            let index =
+                big_array_add_reduce(builder, &self.start_index, &[var_i, var0, var0, var0], 8);
             indices.push(bytes_to_bits(builder, &index));
         }
         let mut round_bits = vec![];
@@ -70,30 +70,6 @@ impl GenericDefine<M31Config> for HASHTABLECircuit<Variable> {
         check_sha256_37bytes_256batch_compress(builder, &inputs, &outputs);
     }
 }
-// impl GenericDefine<M31Config> for HASHTABLECircuit<Variable> {
-//     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
-//         let mut indices = vec![Vec::<Variable>::new(); HASHTABLESIZE];
-//         if HASHTABLESIZE > 256 {
-//             panic!("HASHTABLESIZE > 256")
-//         }
-//         let var0 = builder.constant(0);
-//         for (i, cur_index) in indices.iter_mut().enumerate().take(HASHTABLESIZE) {
-//             //assume HASHTABLESIZE is less than 2^8
-//             let var_i = builder.constant(i as u32);
-//             let index = big_array_add(builder, &self.start_index, &[var_i, var0, var0, var0], 8);
-//             *cur_index = index.to_vec();
-//         }
-//         for (i, index) in indices.iter().enumerate().take(HASHTABLESIZE) {
-//             let mut cur_input = Vec::<Variable>::new();
-//             cur_input.extend_from_slice(&self.seed);
-//             cur_input.push(self.shuffle_round);
-//             cur_input.extend_from_slice(index);
-//             let mut data = cur_input;
-//             data.append(&mut self.output[i].to_vec());
-//             check_sha256_37bytes(builder, &data);
-//         }
-//     }
-// }
 
 pub fn generate_hash_witnesses(dir: &str) {
     println!("preparing solver...");
@@ -101,14 +77,14 @@ pub fn generate_hash_witnesses(dir: &str) {
     let file_name = "solver_hashtable64.txt";
     let w_s = if std::fs::metadata(file_name).is_ok() {
         println!("The solver exists!");
-        let file = std::fs::File::open(&file_name).unwrap();
+        let file = std::fs::File::open(file_name).unwrap();
         let reader = std::io::BufReader::new(file);
         witness_solver::WitnessSolver::deserialize_from(reader).unwrap()
     } else {
         println!("The solver does not exist.");
         let compile_result =
             compile_generic(&HASHTABLECircuit::default(), CompileOptions::default()).unwrap();
-        let file = std::fs::File::create(&file_name).unwrap();
+        let file = std::fs::File::create(file_name).unwrap();
         let writer = std::io::BufWriter::new(file);
         compile_result
             .witness_solver
@@ -252,7 +228,7 @@ fn test_generate_hash_witnesses() {
 }
 
 #[test]
-fn test_hashtable(){
+fn test_hashtable() {
     let dir = "./data";
     let file_path = format!("{}/hash_assignment.json", dir);
 
@@ -270,7 +246,7 @@ fn test_hashtable(){
         for j in 0..HASHTABLESIZE {
             for k in 0..32 {
                 hash_assignment.output[j][k] =
-                    M31::from(cur_hashtable_data.hash_outputs[j%64][k] as u32);
+                    M31::from(cur_hashtable_data.hash_outputs[j % 64][k] as u32);
             }
         }
         assignments.push(hash_assignment);

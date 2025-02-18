@@ -685,14 +685,14 @@ pub fn generate_shuffle_witnesses(dir: &str) {
         let file_name = "solver_shuffle.txt";
         let w_s = if std::fs::metadata(file_name).is_ok() {
             println!("The solver exists!");
-            let file = std::fs::File::open(&file_name).unwrap();
+            let file = std::fs::File::open(file_name).unwrap();
             let reader = std::io::BufReader::new(file);
             witness_solver::WitnessSolver::deserialize_from(reader).unwrap()
         } else {
             println!("The solver does not exist.");
             let compile_result =
                 compile_generic(&ShuffleCircuit::default(), CompileOptions::default()).unwrap();
-            let file = std::fs::File::create(&file_name).unwrap();
+            let file = std::fs::File::create(file_name).unwrap();
             let writer = std::io::BufWriter::new(file);
             compile_result
                 .witness_solver

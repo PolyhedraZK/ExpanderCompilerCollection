@@ -359,14 +359,14 @@ pub fn end2end_witness_streamline(stage: &str) {
         let dir = "./witnesses/permutationquery";
         let circuit_name = "permutationquery";
         let solver_permutation_query =
-            get_solver(dir, &circuit_name, PermutationQueryCircuit::default());
+            get_solver(dir, circuit_name, PermutationQueryCircuit::default());
 
         //get the solver for permutation hash
         let dir = "./witnesses/permutationhashbit";
-        let circuit_name = format!("permutationhashbit_{}", VALIDATOR_COUNT);
+        let circuit_name = &format!("permutationhashbit_{}", VALIDATOR_COUNT);
         let solver_permutation_hash = get_solver(
             dir,
-            &circuit_name,
+            circuit_name,
             PermutationIndicesValidatorHashBitCircuit::default(),
         );
 
@@ -375,7 +375,7 @@ pub fn end2end_witness_streamline(stage: &str) {
         let circuit_name = "validatorsubtree";
         let solver_validator_subtree = get_solver(
             dir,
-            &circuit_name,
+            circuit_name,
             ConvertValidatorListToMerkleTreeCircuit::default(),
         );
 

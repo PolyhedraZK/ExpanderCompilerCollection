@@ -15,7 +15,6 @@ pub fn check_sha256<C: Config, B: RootAPI<C>>(
     let output = origin_data[37..].to_vec();
     let result = sha256_37bytes(builder, &origin_data[..37]);
     for i in 0..32 {
-        // builder.display(&format!("result:{}", i), result[i]);
         builder.assert_is_equal(result[i], output[i]);
     }
     result
@@ -23,12 +22,9 @@ pub fn check_sha256<C: Config, B: RootAPI<C>>(
 
 impl GenericDefine<M31Config> for SHA25637BYTESCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
-        for i in 0..18 {
-            let mut data = self.input.to_vec();
-            data[36] = builder.constant(i as u32);
-            data.append(&mut self.output.to_vec());
-            builder.memorized_simple_call(check_sha256, &data);
-        }
+        let mut data = self.input.to_vec();
+        data.append(&mut self.output.to_vec());
+        builder.memorized_simple_call(check_sha256, &data);
     }
 }
 
@@ -61,19 +57,20 @@ fn test_sha256_37bytes() {
 
 #[test]
 fn debug_sha256_37bytes() {
-    let mut hint_registry = HintRegistry::<M31>::new();
-    hint_registry.register("myhint.tobinary", to_binary_hint);
-    let mut data = [127; 37];
-    data[36] = 0;
-    let mut hash = Sha256::new();
-    hash.update(data);
-    let output = hash.finalize();
-    let mut assignment = SHA25637BYTESCircuit::default();
-    for i in 0..37 {
-        assignment.input[i] = M31::from(data[i] as u32);
+    for i in 0..255 {
+        let mut hint_registry = HintRegistry::<M31>::new();
+        hint_registry.register("myhint.tobinary", to_binary_hint);
+        let data = [i; 37];
+        let mut hash = Sha256::new();
+        hash.update(data);
+        let output = hash.finalize();
+        let mut assignment = SHA25637BYTESCircuit::default();
+        for i in 0..37 {
+            assignment.input[i] = M31::from(data[i] as u32);
+        }
+        for i in 0..32 {
+            assignment.output[i] = M31::from(output[i] as u32);
+        }
+        debug_eval(&SHA25637BYTESCircuit::default(), &assignment, hint_registry);
     }
-    for i in 0..32 {
-        assignment.output[i] = M31::from(output[i] as u32);
-    }
-    debug_eval(&SHA25637BYTESCircuit::default(), &assignment, hint_registry);
 }
