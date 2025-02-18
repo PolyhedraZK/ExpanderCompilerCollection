@@ -143,7 +143,7 @@ fn run_gkr<Cfg: GKRConfig>(args: &GKRExecArgs) {
             transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
             let mut cursor = Cursor::new(&proof_bytes);
             cursor.set_position(32);
-            let (verified, rz0, rz1, r_simd, r_mpi, claimed_v0, claimed_v1) = gkr_verify(
+            let (verified, rz0, rz1, r_simd, r_mpi, _claimed_v0, _claimed_v1) = gkr_verify(
                 &mpi_config,
                 &circuit,
                 &[],
