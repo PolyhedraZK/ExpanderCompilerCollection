@@ -1,4 +1,5 @@
 use std::{fmt::Debug, hash::Hash};
+use gkr::{M31ExtConfigPoseidonRaw, GF2ExtConfigSha2Orion, BN254ConfigSha2Raw};
 
 use crate::field::{Field, FieldRaw};
 
@@ -31,7 +32,7 @@ impl Config for M31Config {
 
     type DefaultSimdField = mersenne31::M31x16;
     type DefaultGKRFieldConfig = gkr_field_config::M31ExtConfig;
-    type DefaultGKRConfig = gkr::executor::M31ExtConfigSha2;
+    type DefaultGKRConfig = M31ExtConfigPoseidonRaw;
 
     const CONFIG_ID: usize = 1;
 }
@@ -44,7 +45,7 @@ impl Config for BN254Config {
 
     type DefaultSimdField = crate::field::BN254;
     type DefaultGKRFieldConfig = gkr_field_config::BN254Config;
-    type DefaultGKRConfig = gkr::executor::BN254ConfigMIMC5;
+    type DefaultGKRConfig = BN254ConfigSha2Raw;
 
     const CONFIG_ID: usize = 2;
 }
@@ -57,7 +58,7 @@ impl Config for GF2Config {
 
     type DefaultSimdField = gf2::GF2x8;
     type DefaultGKRFieldConfig = gkr_field_config::GF2ExtConfig;
-    type DefaultGKRConfig = gkr::executor::GF2ExtConfigSha2;
+    type DefaultGKRConfig = GF2ExtConfigSha2Orion;
 
     const CONFIG_ID: usize = 3;
 

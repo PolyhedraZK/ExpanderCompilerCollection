@@ -34,3 +34,11 @@ sha2 = "0.10.8"
 [[bin]]
 name = "trivial_circuit"
 path = "bin/trivial_circuit.rs"
+
+[[bin]]
+name = "gkr_exec"
+path = "bin/gkr_exec.rs"
+
+[[bin]]
+name = "pcs_exec"
+path = "bin/pcs_exec"
