@@ -41,4 +41,4 @@ path = "bin/gkr_exec.rs"
 
 [[bin]]
 name = "pcs_exec"
-path = "bin/pcs_exec"
+path = "bin/pcs_exec.rs"

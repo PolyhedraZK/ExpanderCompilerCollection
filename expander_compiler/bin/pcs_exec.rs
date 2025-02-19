@@ -1,55 +1,72 @@
-use std::io::Cursor;
-use std::fs;
+use std::io::{Cursor, Read};
+use std::fs::{self, read};
 use arith::{Field, FieldSerde};
 use clap::{Parser, Subcommand};
 
+use expander_compiler::frontend::extra;
 use expander_config::GKRConfig;
 use gkr::{executor::detect_field_type_from_circuit_file, gkr_configs::*, gkr_prove, gkr_verify};
 use gkr_field_config::{FieldType, GKRFieldConfig};
 use mpi_config::MPIConfig;
+use poly_commit::PCSForExpanderGKR;
 use sumcheck::ProverScratchPad;
 use expander_transcript::Transcript;
 use expander_circuit::Circuit;
 
+use poly_commit::{
+    expander_pcs_init_testing_only, raw::*, ExpanderGKRChallenge, PCSEmptyType,
+};
+use polynomials::{EqPolynomial, MultiLinearPoly, RefMultiLinearPoly};
+
+use rand::rngs::StdRng;
+use rand::SeedableRng;
+
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
-pub struct GKRExecArgs {
+pub struct PCSExecArgs {
     /// Fiat-Shamir Hash: SHA256, or Poseidon, or MiMC5
     // #[arg(short, long)]
     // pub fiat_shamir_hash: String,
 
-    /// Circuit File Path
-    #[arg(short, long)]
-    pub circuit_file: String,
+    /// One of M31, GF2, BN254
+    /// #[arg(short, long)]
+    pub field_type: String,
 
-    /// Prove or Verify
+    /// Commit, Open or Verify
     #[clap(subcommand)]
-    pub subcommands: GKRExecSubCommand,
-
-    /// Transcript state and input layer claims for PCS
-    #[arg(short, long)]
-    pub input_layer_state: String,
+    pub subcommands: PCSExecSubCommand,
 }
 
 #[derive(Debug, Subcommand, Clone)]
-pub enum GKRExecSubCommand {
-    Prove {
-        /// Witness File Path
+pub enum PCSExecSubCommand {
+    Commit {
+        /// If MPI_Size = 1, then the filename is exactly values_file_prefix
+        /// Otherwise, it should be values_file_prefix_rank
+        /// e.g. values_file_prefix_0, values_file_prefix_1, values_file_prefix_2
         #[arg(short, long)]
-        witness_file: String,
+        values_file_prefix: String,
 
-        /// Output Proof Path
+        /// Output Commitment and Extra Info File
         #[arg(short, long)]
-        output_gkr_proof_file: String,
+        output_commitment_file: String,
+    },
+    Open {
+        /// Input Commitment and Extra Info File from the Commit phase
+        #[arg(short, long)]
+        input_commitment_file: String,
+
+         /// Transcript state and input layer claims for PCS
+        #[arg(short, long)]
+        gkr_input_layer_state: String,
     },
     Verify {
-        /// Witness File Path
+        /// Input Commitment and Extra Info File from the Commit phase
         #[arg(short, long)]
-        witness_file: String,
+        input_commitment_file: String,
 
-        /// Output Proof Path
+         /// Transcript state and input layer claims for PCS
         #[arg(short, long)]
-        input_gkr_proof_file: String,
+        gkr_input_layer_state: String,
 
         /// MPI size
         #[arg(short, long, default_value_t = 1)]
@@ -57,133 +74,150 @@ pub enum GKRExecSubCommand {
     },
 }
 
-fn max_n_vars<C: GKRFieldConfig>(circuit: &Circuit<C>) -> (usize, usize) {
-    let mut max_num_input_var = 0;
-    let mut max_num_output_var = 0;
-    for layer in circuit.layers.iter() {
-        max_num_input_var = max_num_input_var.max(layer.input_var_num);
-        max_num_output_var = max_num_output_var.max(layer.output_var_num);
-    }
-    (max_num_input_var, max_num_output_var)
-}
-
-fn serialize_transcript_state_and_input_layer_claims<C: GKRFieldConfig, T: Transcript<C::ChallengeField>>(
-    transcript: &mut T,
-    rx: &Vec<C::ChallengeField>,
-    ry: &Option<Vec<C::ChallengeField>>,
-    rsimd: &Vec<C::ChallengeField>,
-    rmpi: &Vec<C::ChallengeField>,
-) -> Vec<u8> {
-    let mut state = transcript.hash_and_return_state();            
-    rx.serialize_into(&mut state).unwrap();
-    if let Some(ry) = ry {
-        ry.serialize_into(&mut state).unwrap();
+fn deserialize_local_values_from_file<F: Field>(values_file_prefix: String, mpi_config: &MPIConfig) -> Vec<F> {
+    let actual_values_file = if mpi_config.world_size == 1 {
+        values_file_prefix
     } else {
-        // if ry is None, serialize a zero-sized vector
-        Vec::<C::ChallengeField>::new().serialize_into(&mut state).unwrap();
-    }
-    rsimd.serialize_into(&mut state).unwrap();
-    rmpi.serialize_into(&mut state).unwrap();
-    state
+        format!("{}_{}", values_file_prefix, mpi_config.world_rank)
+    };
+    let mut reader = Cursor::new(fs::read(actual_values_file).unwrap());
+    Vec::<F>::deserialize_from(&mut reader).unwrap()
 }
 
-fn run_gkr<Cfg: GKRConfig>(args: &GKRExecArgs) {
+fn deserialize_transcript_state_and_input_layer_claims_from_file<C: GKRFieldConfig, T: Transcript<C::ChallengeField>>(
+    gkr_input_layer_state: String,
+) -> (Vec<u8>, Vec<C::ChallengeField>, Option<Vec<C::ChallengeField>>, Vec<C::ChallengeField>, Vec<C::ChallengeField>) {
+    let mut reader = Cursor::new(fs::read(gkr_input_layer_state).unwrap());
+    let transcript_state = Vec::<u8>::deserialize_from(&mut reader).unwrap();
+    let rx = Vec::<C::ChallengeField>::deserialize_from(&mut reader).unwrap();
+    let ry_data = Vec::<C::ChallengeField>::deserialize_from(&mut reader).unwrap();
+    let ry = if ry_data.is_empty() { None } else { Some(ry_data) };
+    let rsimd = Vec::<C::ChallengeField>::deserialize_from(&mut reader).unwrap();
+    let rmpi = Vec::<C::ChallengeField>::deserialize_from(&mut reader).unwrap();
+    
+    (transcript_state, rx, ry, rsimd, rmpi)
+}
+
+fn serialize_commitment_and_extra_info_into_file<C: GKRFieldConfig, T: Transcript<C::ChallengeField>, PCS: PCSForExpanderGKR<C, T>>(
+    filename: String,
+    commitment: &PCS::Commitment,
+    extra_info: &PCS::ScratchPad,
+    mpi_config: &MPIConfig,
+) {
+    if mpi_config.is_root() {
+        let mut writer = Cursor::new(Vec::<u8>::new());
+        commitment.serialize_into(&mut writer).unwrap();
+        let _ = extra_info; // TODO: Implement serialization for ScratchPad
+        // extra_info.serialize_into(&mut writer).unwrap();
+        fs::write(filename, &writer.into_inner()).expect("Unable to write commitment and extra info to file.");
+    }
+}
+
+fn deserialize_commitment_and_extra_info_from_file<C: GKRFieldConfig, T: Transcript<C::ChallengeField>, PCS: PCSForExpanderGKR<C, T>>(
+    filename: String,
+) -> (PCS::Commitment, PCS::ScratchPad) {
+    let mut reader = Cursor::new(fs::read(filename).unwrap());
+    let commitment = PCS::Commitment::deserialize_from(&mut reader).unwrap();
+    // let extra_info = PCS::ScratchPad::deserialize_from(&mut reader).unwrap();
+    let extra_info = Default::default();
+    (commitment, extra_info)
+}
+
+fn pcs_testing_setup_fixed_seed<C: GKRFieldConfig, T: Transcript<C::ChallengeField>>(
+    vals: &[C::SimdCircuitField],
+) -> (
+    RawExpanderGKRParams,
+    PCSEmptyType,
+    PCSEmptyType,
+    RawExpanderGKRScratchPad,
+) {
+    // We don't have an interface for the potential pcs setup
+    // So we're just going to use the testing setup with fixed seed
+    let mut rng = StdRng::from_seed([0; 32]);
+    expander_pcs_init_testing_only::<
+        C,
+        T,
+        RawExpanderGKR<_, _>,
+    >(
+        vals.len().trailing_zeros() as usize,
+        &MPIConfig::default(),
+        &mut rng,
+    )
+}
+
+
+fn run_pcs<Cfg: GKRConfig>(args: &PCSExecArgs) {
     let subcommands = args.subcommands.clone();
     let mut mpi_config = MPIConfig::new();
 
     match subcommands {
-        GKRExecSubCommand::Prove {
-            witness_file,
-            output_gkr_proof_file,
+        PCSExecSubCommand::Commit {
+            values_file_prefix,
+            output_commitment_file,
         } => {
-            let mut circuit =
-                Circuit::<Cfg::FieldConfig>::load_circuit::<Cfg>(&args.circuit_file);
-            circuit.load_witness_file(&witness_file);
-            let (max_num_input_var, max_num_output_var) = max_n_vars(&circuit);
-            let mut prover_scratch = ProverScratchPad::<Cfg::FieldConfig>::new(
-                max_num_input_var,
-                max_num_output_var,
-                mpi_config.world_size as usize,
-            );
+            let vals = deserialize_local_values_from_file::<<Cfg::FieldConfig as GKRFieldConfig>::SimdCircuitField>(values_file_prefix, &mpi_config);
+            assert!(vals.len() & (vals.len() - 1) == 0);
+            let (params, p_key, _v_key, mut scratch) = pcs_testing_setup_fixed_seed::<Cfg::FieldConfig, Cfg::Transcript>(&vals);
 
-            let mut transcript = <Cfg>::Transcript::new();
-            transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
-            circuit.evaluate();
-            let (claimed_v, rx, ry, rsimd, rmpi) = gkr_prove(
-                &circuit,
-                &mut prover_scratch,
-                &mut transcript,
-                &MPIConfig::new(),
+            let vals = vals.to_vec();
+            let poly_ref = RefMultiLinearPoly::from_ref(&vals);
+            let raw_commitment = RawExpanderGKR::<
+                Cfg::FieldConfig,
+                Cfg::Transcript,
+            >::commit(
+                &params,
+                &MPIConfig::default(),
+                &p_key,
+                &poly_ref,
+                &mut scratch,
             );
-            assert!(claimed_v.is_zero());
-
-            if mpi_config.is_root() {
-                let proof = transcript.finalize_and_get_proof();
-                fs::write(output_gkr_proof_file, &proof.bytes).expect("Unable to write proof to file.");
-                
-                let state = serialize_transcript_state_and_input_layer_claims::<Cfg::FieldConfig, _>(&mut transcript, &rx, &ry, &rsimd, &rmpi);
-                fs::write(args.input_layer_state.clone(), &state).expect("Unable to write transcript state to file.");   
-            }
+            serialize_commitment_and_extra_info_into_file::<Cfg::FieldConfig, Cfg::Transcript, RawExpanderGKR<_, _>>(output_commitment_file, &raw_commitment, &scratch, &mpi_config);
         }
-        GKRExecSubCommand::Verify {
-            witness_file,
-            input_gkr_proof_file,
+        PCSExecSubCommand::Open {
+            input_commitment_file,
+            gkr_input_layer_state,
+        } => {
+            let (commitment, extra_info) = deserialize_commitment_and_extra_info_from_file::<Cfg, extra::Transcript, PCSForExpanderGKR<Cfg>>(input_commitment_file);
+            let (transcript_state, rx, ry, rsimd, rmpi
+            ) = deserialize_transcript_state_and_input_layer_claims_from_file::<Cfg, extra::Transcript>(gkr_input_layer_state);
+        }
+        PCSExecSubCommand::Verify {
+            input_commitment_file,
+            gkr_input_layer_state,
             mpi_size,
         } => {
-            assert_eq!(mpi_config.world_size, 1);
-            mpi_config.world_size = mpi_size as i32;    
-
-            let mut circuit =
-                Circuit::<Cfg::FieldConfig>::load_circuit::<Cfg>(&args.circuit_file);
-            circuit.load_witness_file(&witness_file);
-
-            let proof_bytes = fs::read(input_gkr_proof_file).expect("Unable to read proof file.");
-
-            let mut transcript = <Cfg>::Transcript::new();
-            transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
-            let mut cursor = Cursor::new(&proof_bytes);
-            cursor.set_position(32);
-            let (verified, rz0, rz1, r_simd, r_mpi, _claimed_v0, _claimed_v1) = gkr_verify(
-                &mpi_config,
-                &circuit,
-                &[],
-                &<Cfg::FieldConfig as GKRFieldConfig>::ChallengeField::ZERO,
-                &mut transcript,
-                &mut cursor,
-            );
-            
-            let state = serialize_transcript_state_and_input_layer_claims::<Cfg::FieldConfig, _>(&mut transcript, &rz0, &rz1, &r_simd, &r_mpi);
-            fs::write(args.input_layer_state.clone(), &state).expect("Unable to write transcript state to file.");
-            assert!(verified);
-        }    
+            let (commitment, extra_info) = deserialize_commitment_and_extra_info_from_file::<Cfg, extra::Transcript, PCSForExpanderGKR<Cfg>>(input_commitment_file);
+            let (transcript_state, rx, ry, rsimd, rmpi
+            ) = deserialize_transcript_state_and_input_layer_claims_from_file::<Cfg, extra::Transcript>(gkr_input_layer_state);
+        }
     }
-
+    MPIConfig::finalize();
 }
 
 fn main() {
-    let gkr_exec_args = GKRExecArgs::parse();
+    let pcs_exec_args = PCSExecArgs::parse();
     
     // temporarily use sha2 for all 
     // let fs_hash_type = FiatShamirHashType::from_str(&gkr_exec_args.fiat_shamir_hash).unwrap();
-    let field_type = detect_field_type_from_circuit_file(&gkr_exec_args.circuit_file);
+    let field_type = &pcs_exec_args.field_type;
 
     // root_println!(mpi_config, "Fiat-Shamir Hash Type: {:?}", &fs_hash_type);
 
     #[allow(unreachable_patterns)]
-    match field_type.clone() {
-        FieldType::M31 => {
-            run_gkr::<M31ExtConfigSha2Raw>(
-                &gkr_exec_args,
+    match field_type.as_str() {
+        "M31" => {
+            run_pcs::<M31ExtConfigSha2Raw>(
+                &pcs_exec_args,
             )
         }
-        FieldType::GF2 => {
-            run_gkr::<GF2ExtConfigSha2Raw>(
-                &gkr_exec_args,
+        "GF2" => {
+            run_pcs::<GF2ExtConfigSha2Raw>(
+                &pcs_exec_args,
             )
         }
-        FieldType::BN254 => {
-            run_gkr::<BN254ConfigSha2Raw>(
-                &gkr_exec_args,
+        "BN254" => {
+            run_pcs::<BN254ConfigSha2Raw>(
+                &pcs_exec_args,
             )
         }
         _ => panic!(
@@ -191,6 +225,4 @@ fn main() {
             field_type
         ),
     }
-
-    MPIConfig::finalize();
 }
