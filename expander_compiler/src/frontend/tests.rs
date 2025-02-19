@@ -6,10 +6,8 @@ use crate::{
 };
 
 use super::{
-    api::BasicAPI,
-    builder::{RootBuilder, Variable},
+    builder::Variable,
     circuit::*,
-    compile,
     variables::DumpLoadTwoVariables,
 };
 

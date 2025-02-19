@@ -1,5 +1,4 @@
 use expander_compiler::frontend::*;
-use extra::UnconstrainedAPI;
 
 declare_circuit!(Circuit {
     input: PublicVariable,
