@@ -4,7 +4,7 @@ mod tests {
         element::{from_interface, value_of},
         emparam::Bls12381Fp,
     };
-    use expander_compiler::{builder, frontend::*};
+    use expander_compiler::frontend::*;
     use num_bigint::BigInt;
     #[test]
     fn test_from_interface() {
