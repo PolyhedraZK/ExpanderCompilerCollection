@@ -165,7 +165,6 @@ pub use declare_circuit_num_vars;
 use crate::circuit::config::Config;
 
 use super::api::RootAPI;
-use super::builder::RootBuilder;
 
 pub trait Define<C: Config> {
     fn define<Builder: RootAPI<C>>(&self, api: &mut Builder);
