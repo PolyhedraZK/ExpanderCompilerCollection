@@ -198,3 +198,55 @@ fn zkcuda_2_simd() {
     let proof = ctx.to_proof();
     assert!(proof.verify());
 }
+
+fn to_binary<C: Config>(api: &mut API<C>, x: Variable, n_bits: usize) -> Vec<Variable> {
+    api.new_hint("myhint.tobinary", &[x], n_bits)
+}
+
+fn to_binary_hint(x: &[M31], y: &mut [M31]) -> Result<(), Error> {
+    let t = x[0].to_u256();
+    for (i, k) in y.iter_mut().enumerate() {
+        *k = M31::from_u256(t >> i as u32 & 1);
+    }
+    Ok(())
+}
+
+#[kernel]
+fn convert_to_binary<C: Config>(api: &mut API<C>, x: &InputVariable, y: &mut [OutputVariable; 8]) {
+    let bits = to_binary(api, *x, 8);
+    for i in 0..8 {
+        y[i] = bits[i];
+    }
+}
+
+#[test]
+fn zkcuda_to_binary() {
+    let mut hint_registry = HintRegistry::<M31>::new();
+    hint_registry.register("myhint.tobinary", to_binary_hint);
+
+    let kernel: Kernel<M31Config> = compile_convert_to_binary().unwrap();
+    let mut ctx: Context<M31Config, DummyProvingSystem<M31Config>, _> = Context::new(hint_registry);
+
+    let a = M31::from(0x55);
+    let a = ctx.copy_to_device(&a, false);
+    let a = a.reshape(&[1]);
+    let mut b: DeviceMemoryHandle = None;
+    call_kernel!(ctx, kernel, a, mut b);
+    let b = b.reshape(&[8]);
+    let result: Vec<M31> = ctx.copy_to_host(b);
+    assert_eq!(
+        result,
+        vec![
+            M31::from(1),
+            M31::from(0),
+            M31::from(1),
+            M31::from(0),
+            M31::from(1),
+            M31::from(0),
+            M31::from(1),
+            M31::from(0)
+        ]
+    );
+    let proof = ctx.to_proof();
+    assert!(proof.verify());
+}

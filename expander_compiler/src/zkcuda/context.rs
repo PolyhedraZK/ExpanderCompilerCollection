@@ -1,6 +1,7 @@
 use arith::SimdField;
 
 use crate::field::FieldArith;
+use crate::hints::registry::{EmptyHintCaller, HintCaller};
 use crate::utils::misc::next_power_of_two;
 use crate::zkcuda::vec_shaped::unflatten_shaped;
 use crate::{circuit::config::Config, utils::pool::Pool};
@@ -44,10 +45,12 @@ pub struct WrappedProof<C: Config, P: ProvingSystem<C>> {
     pub is_broadcast: Vec<bool>,
 }
 
-pub struct Context<C: Config, P: ProvingSystem<C>> {
+pub struct Context<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField> = EmptyHintCaller>
+{
     pub kernels: Pool<Kernel<C>>,
     pub device_memories: Vec<DeviceMemory<C, P>>,
     pub proofs: Vec<WrappedProof<C, P>>,
+    pub hint_caller: H,
 }
 
 pub struct CombinedProof<C: Config, P: ProvingSystem<C>> {
@@ -62,6 +65,7 @@ impl<C: Config, P: ProvingSystem<C>> Default for Context<C, P> {
             kernels: Pool::new(),
             device_memories: vec![],
             proofs: vec![],
+            hint_caller: EmptyHintCaller::new(),
         }
     }
 }
@@ -216,7 +220,16 @@ impl Reshape for DeviceMemoryHandle {
     }
 }
 
-impl<C: Config, P: ProvingSystem<C>> Context<C, P> {
+impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, P, H> {
+    pub fn new(hint_caller: H) -> Self {
+        Context {
+            kernels: Pool::new(),
+            device_memories: vec![],
+            proofs: vec![],
+            hint_caller,
+        }
+    }
+
     fn make_device_mem(
         &mut self,
         values: Vec<C::DefaultSimdField>,
@@ -468,11 +481,7 @@ impl<C: Config, P: ProvingSystem<C>> Context<C, P> {
             }
             let ws_outputs = kernel
                 .witness_solver
-                .eval_safe_simd(
-                    ws_inputs,
-                    &[],
-                    &mut crate::hints::registry::HintRegistry::new(), // TODO: use null hint registry or enable hints
-                )
+                .eval_safe_simd(ws_inputs, &[], &mut self.hint_caller)
                 .unwrap(); // TODO: handle error
             for (i, ws_input) in kernel.witness_solver_io.iter().enumerate() {
                 if ws_input.output_offset.is_none() {
