@@ -10,8 +10,7 @@ use expander_compiler::{
     compile::CompileOptions,
     declare_circuit,
     frontend::{
-        compile_generic, extra::debug_eval, GenericDefine, HintRegistry, M31Config, RootAPI,
-        Variable, M31,
+        compile_generic, extra::debug_eval, Define, HintRegistry, M31Config, RootAPI, Variable, M31,
     },
 };
 
@@ -21,7 +20,7 @@ declare_circuit!(E6AddCircuit {
     z: [[[Variable; 48]; 2]; 3],
 });
 
-impl GenericDefine<M31Config> for E6AddCircuit<Variable> {
+impl Define<M31Config> for E6AddCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext6 = Ext6::new(builder);
         let x_e6 = GE6 {
@@ -207,7 +206,7 @@ declare_circuit!(E6SubCircuit {
     z: [[[Variable; 48]; 2]; 3],
 });
 
-impl GenericDefine<M31Config> for E6SubCircuit<Variable> {
+impl Define<M31Config> for E6SubCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext6 = Ext6::new(builder);
 
@@ -399,7 +398,7 @@ declare_circuit!(E6MulCircuit {
     z: [[[Variable; 48]; 2]; 3],
 });
 
-impl GenericDefine<M31Config> for E6MulCircuit<Variable> {
+impl Define<M31Config> for E6MulCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext6 = Ext6::new(builder);
 
@@ -591,7 +590,7 @@ declare_circuit!(E6SquareCircuit {
     z: [[[Variable; 48]; 2]; 3],
 });
 
-impl GenericDefine<M31Config> for E6SquareCircuit<Variable> {
+impl Define<M31Config> for E6SquareCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext6 = Ext6::new(builder);
 
@@ -732,7 +731,7 @@ declare_circuit!(E6DivCircuit {
     z: [[[Variable; 48]; 2]; 3],
 });
 
-impl GenericDefine<M31Config> for E6DivCircuit<Variable> {
+impl Define<M31Config> for E6DivCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext6 = Ext6::new(builder);
 
@@ -925,7 +924,7 @@ declare_circuit!(E6MulByNonResidueCircuit {
     c: [[[Variable; 48]; 2]; 3], // Public variable
 });
 
-impl GenericDefine<M31Config> for E6MulByNonResidueCircuit<Variable> {
+impl Define<M31Config> for E6MulByNonResidueCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext6 = Ext6::new(builder);
 
@@ -1073,7 +1072,7 @@ declare_circuit!(E6MulByE2Circuit {
     c: [[[Variable; 48]; 2]; 3], // Public variable
 });
 
-impl GenericDefine<M31Config> for E6MulByE2Circuit<Variable> {
+impl Define<M31Config> for E6MulByE2Circuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext6 = Ext6::new(builder);
 
@@ -1233,7 +1232,7 @@ declare_circuit!(E6MulBy01Circuit {
     c: [[[Variable; 48]; 2]; 3], // Public variable
 });
 
-impl GenericDefine<M31Config> for E6MulBy01Circuit<Variable> {
+impl Define<M31Config> for E6MulBy01Circuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext6 = Ext6::new(builder);
 
@@ -1409,7 +1408,7 @@ declare_circuit!(E6NegCircuit {
     c: [[[Variable; 48]; 2]; 3], // Public variable
 });
 
-impl GenericDefine<M31Config> for E6NegCircuit<Variable> {
+impl Define<M31Config> for E6NegCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext6 = Ext6::new(builder);
 
@@ -1547,7 +1546,7 @@ declare_circuit!(E6InverseCircuit {
     c: [[[Variable; 48]; 2]; 3], // Public variable
 });
 
-impl GenericDefine<M31Config> for E6InverseCircuit<Variable> {
+impl Define<M31Config> for E6InverseCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext6 = Ext6::new(builder);
 

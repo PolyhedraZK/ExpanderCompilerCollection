@@ -7,7 +7,7 @@ declare_circuit!(PoseidonSpongeLen8Circuit {
 });
 
 impl Define<M31Config> for PoseidonSpongeLen8Circuit<Variable> {
-    fn define(&self, builder: &mut API<M31Config>) {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let params = PoseidonM31Params::new(
             builder,
             POSEIDON_M31X16_RATE,
@@ -60,7 +60,7 @@ declare_circuit!(PoseidonSpongeLen16Circuit {
 });
 
 impl Define<M31Config> for PoseidonSpongeLen16Circuit<Variable> {
-    fn define(&self, builder: &mut API<M31Config>) {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let params = PoseidonM31Params::new(
             builder,
             POSEIDON_M31X16_RATE,

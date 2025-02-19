@@ -20,7 +20,7 @@ pub fn check_sha256<C: Config, B: RootAPI<C>>(
     result
 }
 
-impl GenericDefine<M31Config> for SHA25637BYTESCircuit<Variable> {
+impl Define<M31Config> for SHA25637BYTESCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         for _ in 0..8 {
             let mut data = self.input.to_vec();

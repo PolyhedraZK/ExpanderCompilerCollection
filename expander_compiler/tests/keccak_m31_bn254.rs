@@ -54,7 +54,11 @@ fn compress_bits(b: Vec<usize>) -> Vec<usize> {
     res
 }
 
-fn check_bits<C: Config>(api: &mut API<C>, mut a: Vec<Variable>, b_compressed: Vec<Variable>) {
+fn check_bits<C: Config>(
+    api: &mut impl RootAPI<C>,
+    mut a: Vec<Variable>,
+    b_compressed: Vec<Variable>,
+) {
     if a.len() != CHECK_BITS || C::CircuitField::FIELD_SIZE <= PARTITION_BITS {
         panic!("gg");
     }
@@ -72,7 +76,7 @@ fn check_bits<C: Config>(api: &mut API<C>, mut a: Vec<Variable>, b_compressed: V
     }
 }
 
-fn from_my_bit_form<C: Config>(api: &mut API<C>, x: Variable) -> Variable {
+fn from_my_bit_form<C: Config>(api: &mut impl RootAPI<C>, x: Variable) -> Variable {
     let t = api.sub(1, x);
     api.div(t, 2, true)
 }
@@ -87,7 +91,7 @@ fn to_my_bit_form<C: Config>(x: usize) -> C::CircuitField {
 }
 
 fn xor_in<C: Config>(
-    api: &mut API<C>,
+    api: &mut impl RootAPI<C>,
     mut s: Vec<Vec<Variable>>,
     buf: Vec<Vec<Variable>>,
 ) -> Vec<Vec<Variable>> {
@@ -101,7 +105,7 @@ fn xor_in<C: Config>(
     s
 }
 
-fn keccak_f<C: Config>(api: &mut API<C>, mut a: Vec<Vec<Variable>>) -> Vec<Vec<Variable>> {
+fn keccak_f<C: Config>(api: &mut impl RootAPI<C>, mut a: Vec<Vec<Variable>>) -> Vec<Vec<Variable>> {
     let mut b = vec![vec![api.constant(0); 64]; 25];
     let mut c = vec![vec![api.constant(0); 64]; 5];
     let mut d = vec![vec![api.constant(0); 64]; 5];
@@ -185,7 +189,7 @@ fn keccak_f<C: Config>(api: &mut API<C>, mut a: Vec<Vec<Variable>>) -> Vec<Vec<V
     a
 }
 
-fn xor<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
+fn xor<C: Config>(api: &mut impl RootAPI<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
     let nbits = a.len();
     let mut bits_res = vec![api.constant(0); nbits];
     for i in 0..nbits {
@@ -194,7 +198,7 @@ fn xor<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<V
     bits_res
 }
 
-fn and<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
+fn and<C: Config>(api: &mut impl RootAPI<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
     let nbits = a.len();
     let mut bits_res = vec![api.constant(0); nbits];
     for i in 0..nbits {
@@ -208,7 +212,7 @@ fn and<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<V
     bits_res
 }
 
-fn not<C: Config>(api: &mut API<C>, a: Vec<Variable>) -> Vec<Variable> {
+fn not<C: Config>(api: &mut impl RootAPI<C>, a: Vec<Variable>) -> Vec<Variable> {
     let mut bits_res = vec![api.constant(0); a.len()];
     for i in 0..a.len() {
         bits_res[i] = api.sub(0, a[i].clone());
@@ -246,7 +250,7 @@ declare_circuit!(Keccak256Circuit {
     out: [[PublicVariable; CHECK_PARTITIONS]; N_HASHES],
 });
 
-fn compute_keccak<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variable> {
+fn compute_keccak<C: Config>(api: &mut impl RootAPI<C>, p: &Vec<Variable>) -> Vec<Variable> {
     for x in p.iter() {
         let x_sqr = api.mul(x, x);
         api.assert_is_equal(x_sqr, 1);
@@ -274,7 +278,7 @@ fn compute_keccak<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variabl
 }
 
 impl<C: Config> Define<C> for Keccak256Circuit<Variable> {
-    fn define(&self, api: &mut API<C>) {
+    fn define<Builder: RootAPI<C>>(&self, api: &mut Builder) {
         for i in 0..N_HASHES {
             // You can use api.memorized_simple_call for sub-circuits
             // let out = api.memorized_simple_call(compute_keccak, &self.p[i].to_vec());
@@ -285,7 +289,8 @@ impl<C: Config> Define<C> for Keccak256Circuit<Variable> {
 }
 
 fn keccak_big_field<C: Config, const N_WITNESSES: usize>(field_name: &str) {
-    let compile_result: CompileResult<C> = compile(&Keccak256Circuit::default()).unwrap();
+    let compile_result: CompileResult<C> =
+        compile_generic(&Keccak256Circuit::default(), CompileOptions::default()).unwrap();
     let CompileResult {
         witness_solver,
         layered_circuit,

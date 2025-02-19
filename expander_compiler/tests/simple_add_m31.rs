@@ -6,7 +6,7 @@ declare_circuit!(Circuit {
 });
 
 impl Define<M31Config> for Circuit<Variable> {
-    fn define(&self, builder: &mut API<M31Config>) {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let sum = builder.add(self.x[0], self.x[1]);
         let sum = builder.add(sum, 123);
         builder.assert_is_equal(sum, self.sum);
@@ -15,7 +15,7 @@ impl Define<M31Config> for Circuit<Variable> {
 
 #[test]
 fn test_circuit_eval_simple() {
-    let compile_result = compile(&Circuit::default()).unwrap();
+    let compile_result = compile_generic(&Circuit::default(), CompileOptions::default()).unwrap();
     let assignment = Circuit::<M31> {
         sum: M31::from(126),
         x: [M31::from(1), M31::from(2)],

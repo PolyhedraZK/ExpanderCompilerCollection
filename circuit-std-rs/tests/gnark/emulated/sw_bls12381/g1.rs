@@ -7,8 +7,7 @@ use expander_compiler::{
     compile::CompileOptions,
     declare_circuit,
     frontend::{
-        compile_generic, extra::debug_eval, GenericDefine, HintRegistry, M31Config, RootAPI,
-        Variable, M31,
+        compile_generic, extra::debug_eval, Define, HintRegistry, M31Config, RootAPI, Variable, M31,
     },
 };
 
@@ -18,7 +17,7 @@ declare_circuit!(G1AddCircuit {
     r: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for G1AddCircuit<Variable> {
+impl Define<M31Config> for G1AddCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g1 = G1::new(builder);
         let p1_g1 = G1Affine {

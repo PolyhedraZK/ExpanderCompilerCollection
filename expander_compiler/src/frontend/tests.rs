@@ -1,6 +1,8 @@
 use crate::{
     circuit::config::M31Config,
+    compile::CompileOptions,
     field::{FieldArith, M31},
+    frontend::{compile_generic, RootAPI},
 };
 
 use super::{
@@ -60,7 +62,7 @@ declare_circuit!(Circuit2 {
 });
 
 impl Define<M31Config> for Circuit2<Variable> {
-    fn define(&self, builder: &mut RootBuilder<M31Config>) {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let sum = builder.add(self.x[0], self.x[1]);
         let sum = builder.add(sum, 123);
         builder.assert_is_equal(sum, self.sum);
@@ -69,7 +71,7 @@ impl Define<M31Config> for Circuit2<Variable> {
 
 #[test]
 fn test_circuit_eval_simple() {
-    let compile_result = compile(&Circuit2::default()).unwrap();
+    let compile_result = compile_generic(&Circuit2::default(), CompileOptions::default()).unwrap();
     let assignment = Circuit2::<M31> {
         sum: M31::from(126),
         x: [M31::from(1), M31::from(2)],

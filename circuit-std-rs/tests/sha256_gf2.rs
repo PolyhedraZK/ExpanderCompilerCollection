@@ -16,7 +16,7 @@ declare_circuit!(SHA256CircuitCompressionOnly {
     output: [Variable; 256],
 });
 
-impl GenericDefine<GF2Config> for SHA256CircuitCompressionOnly<Variable> {
+impl Define<GF2Config> for SHA256CircuitCompressionOnly<Variable> {
     fn define<Builder: RootAPI<GF2Config>>(&self, api: &mut Builder) {
         let hasher = SHA256GF2::new();
         let mut state = SHA256_INIT_STATE
@@ -91,7 +91,7 @@ declare_circuit!(SHA256Circuit {
     output: [Variable; OUTPUT_LEN],
 });
 
-impl GenericDefine<GF2Config> for SHA256Circuit<Variable> {
+impl Define<GF2Config> for SHA256Circuit<Variable> {
     fn define<Builder: RootAPI<GF2Config>>(&self, api: &mut Builder) {
         let mut hasher = SHA256GF2::new();
         hasher.update(&self.input);

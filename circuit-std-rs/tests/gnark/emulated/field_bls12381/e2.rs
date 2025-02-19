@@ -7,7 +7,7 @@ use expander_compiler::frontend::compile_generic;
 use expander_compiler::{
     compile::CompileOptions,
     declare_circuit,
-    frontend::{extra::debug_eval, GenericDefine, HintRegistry, M31Config, RootAPI, Variable, M31},
+    frontend::{extra::debug_eval, Define, HintRegistry, M31Config, RootAPI, Variable, M31},
 };
 declare_circuit!(E2AddCircuit {
     x: [[Variable; 48]; 2],
@@ -15,7 +15,7 @@ declare_circuit!(E2AddCircuit {
     z: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E2AddCircuit<Variable> {
+impl Define<M31Config> for E2AddCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext2 = Ext2::new(builder);
         let x_e2 = GE2 {
@@ -102,7 +102,7 @@ declare_circuit!(E2SubCircuit {
     z: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E2SubCircuit<Variable> {
+impl Define<M31Config> for E2SubCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext2 = Ext2::new(builder);
         let x_e2 = GE2 {
@@ -191,7 +191,7 @@ declare_circuit!(E2DoubleCircuit {
     z: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E2DoubleCircuit<Variable> {
+impl Define<M31Config> for E2DoubleCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext2 = Ext2::new(builder);
         let x_e2 = GE2 {
@@ -260,7 +260,7 @@ declare_circuit!(E2MulCircuit {
     z: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E2MulCircuit<Variable> {
+impl Define<M31Config> for E2MulCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext2 = Ext2::new(builder);
         let x_e2 = GE2 {
@@ -346,7 +346,7 @@ declare_circuit!(E2SquareCircuit {
     z: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E2SquareCircuit<Variable> {
+impl Define<M31Config> for E2SquareCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext2 = Ext2::new(builder);
         let x_e2 = GE2 {
@@ -415,7 +415,7 @@ declare_circuit!(E2DivCircuit {
     z: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E2DivCircuit<Variable> {
+impl Define<M31Config> for E2DivCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext2 = Ext2::new(builder);
         let x_e2 = GE2 {
@@ -500,7 +500,7 @@ declare_circuit!(E2MulByElementCircuit {
     c: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E2MulByElementCircuit<Variable> {
+impl Define<M31Config> for E2MulByElementCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext2 = Ext2::new(builder);
         let a_e2 = GE2 {
@@ -581,7 +581,7 @@ declare_circuit!(E2MulByNonResidueCircuit {
     c: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E2MulByNonResidueCircuit<Variable> {
+impl Define<M31Config> for E2MulByNonResidueCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext2 = Ext2::new(builder);
         let a_e2 = GE2 {
@@ -657,7 +657,7 @@ declare_circuit!(E2NegCircuit {
     c: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E2NegCircuit<Variable> {
+impl Define<M31Config> for E2NegCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext2 = Ext2::new(builder);
         let a_e2 = GE2 {
@@ -726,7 +726,7 @@ declare_circuit!(E2ConjugateCircuit {
     c: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E2ConjugateCircuit<Variable> {
+impl Define<M31Config> for E2ConjugateCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext2 = Ext2::new(builder);
         let a_e2 = GE2 {
@@ -795,7 +795,7 @@ declare_circuit!(E2InverseCircuit {
     c: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E2InverseCircuit<Variable> {
+impl Define<M31Config> for E2InverseCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext2 = Ext2::new(builder);
         let a_e2 = GE2 {

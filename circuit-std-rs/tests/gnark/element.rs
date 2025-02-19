@@ -4,7 +4,7 @@ mod tests {
         element::{from_interface, value_of},
         emparam::Bls12381Fp,
     };
-    use expander_compiler::frontend::*;
+    use expander_compiler::{builder, frontend::*};
     use num_bigint::BigInt;
     #[test]
     fn test_from_interface() {
@@ -38,7 +38,7 @@ mod tests {
         target: [[Variable; 48]; 8],
     });
     impl Define<M31Config> for VALUECircuit<Variable> {
-        fn define(&self, builder: &mut API<M31Config>) {
+        fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
             let v1 = 1111111u32;
             let v2 = 22222222222222u64;
             let v3 = 333333usize;
@@ -78,7 +78,8 @@ mod tests {
             0x08080808,
         ];
         let values_u8: Vec<Vec<u8>> = values.iter().map(|v| v.to_le_bytes().to_vec()).collect();
-        let compile_result = compile(&VALUECircuit::default()).unwrap();
+        let compile_result =
+            compile_generic(&VALUECircuit::default(), CompileOptions::default()).unwrap();
         let mut assignment = VALUECircuit::<M31>::default();
         for i in 0..values_u8.len() {
             for j in 0..values_u8[i].len() {

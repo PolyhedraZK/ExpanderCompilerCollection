@@ -6,7 +6,7 @@ declare_circuit!(Circuit {
     sum: Variable,
 });
 
-impl GenericDefine<M31Config> for Circuit<Variable> {
+impl Define<M31Config> for Circuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut sum = builder.constant(0);
         for i in 0..16 {

@@ -19,7 +19,7 @@ pub use crate::hints::registry::{EmptyHintCaller, HintCaller, HintRegistry};
 pub use crate::utils::error::Error;
 pub use api::{BasicAPI, RootAPI};
 pub use builder::Variable;
-pub use circuit::{Define, GenericDefine};
+pub use circuit::Define;
 pub use witness::WitnessSolver;
 
 pub mod internal {
@@ -41,7 +41,7 @@ pub mod extra {
 
     pub fn debug_eval<
         C: Config,
-        Cir: internal::DumpLoadTwoVariables<Variable> + GenericDefine<C> + Clone,
+        Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone,
         CA: internal::DumpLoadTwoVariables<C::CircuitField>,
         H: HintCaller<C::CircuitField>,
     >(
@@ -104,10 +104,7 @@ pub fn compile<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define
     })
 }
 
-fn build_generic<
-    C: Config,
-    Cir: internal::DumpLoadTwoVariables<Variable> + GenericDefine<C> + Clone,
->(
+fn build_generic<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone>(
     circuit: &Cir,
 ) -> ir::source::RootCircuit<C> {
     let (num_inputs, num_public_inputs) = circuit.num_vars();
@@ -123,7 +120,7 @@ fn build_generic<
 
 pub fn compile_generic<
     C: Config,
-    Cir: internal::DumpLoadTwoVariables<Variable> + GenericDefine<C> + Clone,
+    Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone,
 >(
     circuit: &Cir,
     options: CompileOptions,
@@ -138,7 +135,7 @@ pub fn compile_generic<
 
 pub fn compile_generic_cross_layer<
     C: Config,
-    Cir: internal::DumpLoadTwoVariables<Variable> + GenericDefine<C> + Clone,
+    Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone,
 >(
     circuit: &Cir,
     options: CompileOptions,

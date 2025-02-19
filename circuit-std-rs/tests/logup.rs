@@ -21,7 +21,7 @@ fn logup_test() {
 }
 
 declare_circuit!(LogUpRangeproofCircuit { test: Variable });
-impl GenericDefine<M31Config> for LogUpRangeproofCircuit<Variable> {
+impl Define<M31Config> for LogUpRangeproofCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut table = LogUpRangeProofTable::new(8);
         table.initial(builder);
