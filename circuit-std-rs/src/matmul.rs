@@ -1,7 +1,6 @@
-use crate::{StdCircuit, StdCircuitGeneric};
+use crate::StdCircuitGeneric;
 use arith::Field;
 use expander_compiler::frontend::*;
-use std::collections::HashMap;
 use std::convert::From;
 use std::ops::{AddAssign, Mul};
 
@@ -26,7 +25,6 @@ pub type MatMulCircuit = _MatMulCircuit<Variable>;
 
 impl<C: Config> GenericDefine<C> for MatMulCircuit {
     fn define<Builder: RootAPI<C>>(&self, builder: &mut Builder) {
-       
         // [m1,n1] represents the first matrix's dimension
         let m1 = self.first_mat.len();
         let n1 = self.first_mat[0].len();

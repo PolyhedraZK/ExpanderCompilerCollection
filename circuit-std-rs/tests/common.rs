@@ -43,7 +43,8 @@ where
     Cir: StdCircuitGeneric<Cfg>,
 {
     let mut rng = thread_rng();
-    let compile_result: CompileResult<Cfg> = compile_generic(&Cir::new_circuit(params), CompileOptions::default()).unwrap();
+    let compile_result: CompileResult<Cfg> =
+        compile_generic(&Cir::new_circuit(params), CompileOptions::default()).unwrap();
     let assignment = Cir::new_assignment(params, &mut rng);
     let witness = compile_result
         .witness_solver
