@@ -59,28 +59,51 @@ impl<C: Config> GenericDefine<C> for MatMulCircuit {
 
         let mut aux_res = vec![zero; m1];
 
-        // calculate second_mat * aux_mat,  result_mat * aux_mat
-        for i in 0..m2 {
-            for j in 0..n2 {
+        // calculate second_mat * aux_mat,
+        // for i in 0..m2 {
+        //     for j in 0..n2 {
+        //         // aux_second[i] += self.second_mat[i][j] * aux_mat[j];
+        //         let mul_second = builder.mul(self.second_mat[i][j], aux_mat[j]);
+        //         aux_second[i] = builder.add(aux_second[i], mul_second);
+        //     }
+        // }
+        for (i, aux_item) in aux_second.iter_mut().enumerate() {
+            for (j, item) in aux_mat.iter().enumerate() {
                 // aux_second[i] += self.second_mat[i][j] * aux_mat[j];
-                let mul_second = builder.mul(self.second_mat[i][j], aux_mat[j]);
-                aux_second[i] = builder.add(aux_second[i], mul_second);
+                let mul_second = builder.mul(self.second_mat[i][j], item);
+                *aux_item = builder.add(*aux_item, mul_second);
             }
         }
-        for i in 0..m1 {
-            for j in 0..n2 {
-                // aux_res[i] += self.result_mat[i][j] * aux_mat[j];
-                let mul_res = builder.mul(self.result_mat[i][j], aux_mat[j]);
-                aux_res[i] = builder.add(aux_res[i], mul_res);
+
+        // calculate result_mat * aux_second
+        // for i in 0..m1 {
+        //     for j in 0..n2 {
+        //         // aux_res[i] += self.result_mat[i][j] * aux_mat[j];
+        //         let mul_res = builder.mul(self.result_mat[i][j], aux_mat[j]);
+        //         aux_res[i] = builder.add(aux_res[i], mul_res);
+        //     }
+        // }
+        for (i, aux_item) in aux_res.iter_mut().enumerate() {
+            for (j, item) in aux_mat.iter().enumerate() {
+                // aux_second[i] += self.second_mat[i][j] * aux_mat[j];
+                let mul_res = builder.mul(self.result_mat[i][j], item);
+                *aux_item = builder.add(*aux_item, mul_res);
             }
         }
 
         // calculate first_mat * aux_second
-        for i in 0..m1 {
-            for j in 0..n1 {
-                //self.first_mat[i] += self.first_mat[i][j] * aux_second[j];
-                let mul_result = builder.mul(self.first_mat[i][j], aux_second[j]);
-                aux_first[i] = builder.add(aux_first[i], mul_result);
+        // for i in 0..m1 {
+        //     for j in 0..n1 {
+        //         //self.first_mat[i] += self.first_mat[i][j] * aux_second[j];
+        //         let mul_result = builder.mul(self.first_mat[i][j], aux_second[j]);
+        //         aux_first[i] = builder.add(aux_first[i], mul_result);
+        //     }
+        // }
+        for (i, aux_item) in aux_first.iter_mut().enumerate() {
+            for (j, item) in aux_second.iter().enumerate() {
+                // aux_second[i] += self.second_mat[i][j] * aux_mat[j];
+                let mul_res = builder.mul(self.first_mat[i][j], item);
+                *aux_item = builder.add(*aux_item, mul_res);
             }
         }
 
@@ -144,9 +167,10 @@ impl<C: Config> StdCircuitGeneric<C> for MatMulCircuit {
 }
 
 // this helper calculates matrix c = a * b;
+#[allow(clippy::needless_range_loop)]
 fn matrix_multiply<C: Config>(
-    a: &Vec<Vec<C::CircuitField>>,
-    b: &Vec<Vec<C::CircuitField>>,
+    a: &[Vec<C::CircuitField>],
+    b: &[Vec<C::CircuitField>],
 ) -> Vec<Vec<C::CircuitField>> {
     let m1 = a.len();
     let n1 = a[0].len();
