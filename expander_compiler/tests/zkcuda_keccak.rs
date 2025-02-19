@@ -5,6 +5,11 @@ use expander_compiler::zkcuda::{context::*, kernel::*};
 use rand::{Rng, SeedableRng};
 use tiny_keccak::Hasher;
 
+// We will show two ways to archive the same goal: compute multiple Keccak hashes in parallel.
+// The first way is to run multiple kernels in parallel, each of which computes a single Keccak hash. (Recommended)
+// The second way is to run a single kernel that computes multiple Keccak hashes.
+const N_PARALLEL: usize = 4;
+
 const CHECK_BITS: usize = 256;
 const PARTITION_BITS: usize = 30;
 const CHECK_PARTITIONS: usize = (CHECK_BITS + PARTITION_BITS - 1) / PARTITION_BITS;
@@ -241,12 +246,7 @@ fn copy_out_unaligned(s: Vec<Vec<Variable>>, rate: usize, output_len: usize) -> 
     out
 }
 
-#[kernel]
-fn compute_keccak<C: Config>(
-    api: &mut API<C>,
-    p: &[InputVariable; 64 * 8],
-    out: &mut [OutputVariable; CHECK_PARTITIONS],
-) {
+fn compute_keccak_inner<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variable> {
     for x in p.iter() {
         let x_sqr = api.mul(x, x);
         api.assert_is_equal(x_sqr, 1);
@@ -270,15 +270,34 @@ fn compute_keccak<C: Config>(
     }
     ss = xor_in(api, ss, p);
     ss = keccak_f(api, ss);
-    let outc = compress_bits_var(api, copy_out_unaligned(ss, 136, 32));
+    compress_bits_var(api, copy_out_unaligned(ss, 136, 32))
+}
+
+#[kernel]
+fn compute_keccak<C: Config>(
+    api: &mut API<C>,
+    p: &[InputVariable; 64 * 8],
+    out: &mut [OutputVariable; CHECK_PARTITIONS],
+) {
+    let outc = api.memorized_simple_call(compute_keccak_inner, p);
     for i in 0..CHECK_PARTITIONS {
         out[i] = outc[i];
     }
 }
 
+#[kernel]
+fn compute_multiple_keccak<C: Config>(
+    api: &mut API<C>,
+    p: &[[InputVariable; 64 * 8]; N_PARALLEL],
+    out: &mut [[OutputVariable; CHECK_PARTITIONS]; N_PARALLEL],
+) {
+    for i in 0..N_PARALLEL {
+        compute_keccak(api, &p[i], &mut out[i]);
+    }
+}
+
 #[test]
-fn zkcuda_keccak() {
-    const N_PARALLEL: usize = 4;
+fn zkcuda_keccak_1() {
     let kernel: Kernel<M31Config> = compile_compute_keccak().unwrap();
     println!("compile ok");
 
@@ -324,8 +343,64 @@ fn zkcuda_keccak() {
     println!("call kernel ok");
     let out: Vec<Vec<M31>> = ctx.copy_to_host(out);
     println!("copy to host ok");
-    //assert_eq!(out, expected_res);
+    assert_eq!(out, expected_res);
     assert_eq!(out[0][0], expected_res[0][0]);
+
+    let proof = ctx.to_proof();
+    println!("proof generation ok");
+    assert!(proof.verify());
+    println!("verify ok");
+}
+
+#[test]
+fn zkcuda_keccak_2() {
+    let kernel: Kernel<M31Config> = compile_compute_multiple_keccak().unwrap();
+    println!("compile ok");
+
+    let mut ctx: Context<M31Config, ExpanderGKRProvingSystem<M31Config>> = Context::default();
+    let mut p: Vec<Vec<M31>> = vec![];
+    let mut data: Vec<Vec<u8>> = vec![];
+    let mut expected_res: Vec<Vec<M31>> = vec![];
+    let mut rng = rand::rngs::StdRng::seed_from_u64(1237);
+    for i in 0..N_PARALLEL {
+        p.push(vec![]);
+        data.push(vec![]);
+        for _ in 0..64 {
+            data[i].push(rng.gen());
+        }
+        let mut hash = tiny_keccak::Keccak::v256();
+        hash.update(&data[i]);
+        let mut output = [0u8; 32];
+        hash.finalize(&mut output);
+        for j in 0..64 {
+            for k in 0..8 {
+                p[i].push(to_my_bit_form::<M31Config>((data[i][j] >> k) as usize & 1));
+            }
+        }
+        let mut out_bits = vec![0; 256];
+        for j in 0..32 {
+            for k in 0..8 {
+                out_bits[j * 8 + k] = (output[j] >> k) as usize & 1;
+            }
+        }
+        let out_compressed = compress_bits(out_bits);
+        assert_eq!(out_compressed.len(), CHECK_PARTITIONS);
+        expected_res.push(vec![]);
+        for j in 0..CHECK_PARTITIONS {
+            expected_res[i].push(M31::from(out_compressed[j] as u32));
+        }
+    }
+
+    println!("prepare data ok");
+    let p = ctx.copy_to_device(&vec![p], false);
+    println!("copy to device ok");
+    let mut out = None;
+    call_kernel!(ctx, kernel, p, mut out);
+    println!("call kernel ok");
+    let out: Vec<Vec<Vec<M31>>> = ctx.copy_to_host(out);
+    println!("copy to host ok");
+    assert_eq!(out[0], expected_res);
+    assert_eq!(out[0][0][0], expected_res[0][0]);
 
     let proof = ctx.to_proof();
     println!("proof generation ok");
