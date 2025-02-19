@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::convert::From;
 
 use ethnum::U256;
 use tiny_keccak::Hasher;
@@ -40,6 +41,13 @@ impl Variable {
 
 pub fn new_variable(id: usize) -> Variable {
     Variable { id }
+}
+
+// impl Variable for From<usize> trait
+impl From<usize> for Variable {
+    fn from(id: usize) -> Self {
+        Variable { id }
+    }
 }
 
 pub fn get_variable_id(v: Variable) -> usize {
