@@ -289,6 +289,8 @@ impl<T: FieldParams> GField<T> {
         };
         T::bits_per_limb() + nb_limbs_overflow + a.overflow + b.overflow
     }
+
+    #[allow(clippy::manual_div_ceil)]
     pub fn call_mul_hint<C: Config, B: RootAPI<C>>(
         &mut self,
         native: &mut B,

@@ -1,7 +1,6 @@
 use expander_compiler::frontend::*;
 use num_bigint::BigInt;
 use num_traits::cast::ToPrimitive;
-use sha2::digest::typenum::Cmp;
 
 pub fn bytes_to_bits<C: Config, B: RootAPI<C>>(api: &mut B, vals: &[Variable]) -> Vec<Variable> {
     let mut ret = to_binary(api, vals[0], 8);
