@@ -5,11 +5,7 @@ use crate::{
     frontend::{compile_generic, RootAPI},
 };
 
-use super::{
-    builder::Variable,
-    circuit::*,
-    variables::DumpLoadTwoVariables,
-};
+use super::{builder::Variable, circuit::*, variables::DumpLoadTwoVariables};
 
 declare_circuit!(Circuit1 {
     a: Variable,
