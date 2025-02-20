@@ -43,7 +43,7 @@ fn sha256_37bytes<C: Config>(
 
 
 #[test]
-fn zkcuda_sha256_37bytes_1() {
+fn zkcuda_sha256_37bytes_globalhint() {
     println!("Global hints:");
     let filename = "log.txt";
     let file = File::open(filename).unwrap();
@@ -101,6 +101,46 @@ fn zkcuda_sha256_37bytes_1() {
         new_input_vars.push(input_vars.clone());
     }
     let mut ctx: Context<M31Config, ExpanderGKRProvingSystem<M31Config>> = Context::default();
+
+    let a = ctx.copy_to_device(&new_input_vars, false);
+    let mut c = None;
+    let start_time = time::Instant::now();
+    call_kernel!(ctx, kernel_check_sha256_37bytes, a, mut c);
+    let elapsed = start_time.elapsed();
+    println!("Time elapsed in call_kernel!() is: {:?}", elapsed);
+    // let c = c.reshape(&[repeat_time, 32]);
+    let result: Vec<Vec<M31>> = ctx.copy_to_host(c);
+    for i in 0..repeat_time {
+        assert_eq!(result[i], output_vars);
+    }
+}
+
+
+
+#[test]
+fn zkcuda_sha256_37bytes_hint() {
+    let mut hint_registry = HintRegistry::<M31>::new();
+    hint_registry.register("myhint.tobinary", to_binary_hint);
+    let kernel_check_sha256_37bytes: Kernel<M31Config> = compile_sha256_37bytes().unwrap();
+    println!("compile_sha256_37bytes() done");
+    let data = [255; 37];
+    let repeat_time = 64;
+    let mut hash = Sha256::new();
+    hash.update(data);
+    let output = hash.finalize();
+    let mut input_vars = vec![];
+    let mut output_vars = vec![];
+    for i in 0..37 {
+        input_vars.push(M31::from(data[i] as u32));
+    }
+    for i in 0..32 {
+        output_vars.push(M31::from(output[i] as u32));
+    }
+    let mut new_input_vars = vec![];
+    for _ in 0..repeat_time {
+        new_input_vars.push(input_vars.clone());
+    }
+    let mut ctx: Context<M31Config, ExpanderGKRProvingSystem<M31Config>, _> = Context::new(hint_registry);
 
     let a = ctx.copy_to_device(&new_input_vars, false);
     let mut c = None;

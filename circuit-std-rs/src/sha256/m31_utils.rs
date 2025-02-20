@@ -376,75 +376,71 @@ pub fn m31_26_to_bit_array_seperate<C: Config, B: RootAPI<C>>(
     bits.extend_from_slice(&to_binary(api, high, 6 + overflow + 1));
     bits
 }
-// pub fn to_binary<C: Config, B: RootAPI<C>>(
-//     api: &mut B,
-//     x: Variable,
-//     n_bits: usize,
-// ) -> Vec<Variable> {
-//     let res = api.new_hint("myhint.tobinary", &[x], n_bits);
-//     println!("tobinary:");
-//     for i in 0..n_bits {
-//         api.display("", res[i]);
-//     }
-//     let res_x = from_binary(api, &res);
-//     api.assert_is_equal(x, res_x);
-//     res
-// }
-pub fn extract_and_remove_tobinary_section(file_path: &str) -> io::Result<Vec<u32>> {
-    let file = OpenOptions::new().read(true).write(true).open(file_path)?;
-    let reader = BufReader::new(&file);
-
-    let mut lines = reader.lines().filter_map(Result::ok).collect::<Vec<String>>();
-    let mut extracted_numbers = Vec::new();
-    let mut new_lines = Vec::new();
-
-    let mut found_tobinary = false;
-    let mut found_section = false;
-
-    for line in lines.iter() {
-        if line.trim() == "tobinary:" {
-            if found_tobinary {
-                new_lines.push(line.clone()); 
-                found_section = true;
-            } else {
-                found_tobinary = true; 
-            }
-        } else if found_tobinary && !found_section {
-            let nums = line
-                .split(',')
-                .filter_map(|s| s.trim().parse::<u32>().ok())
-                .collect::<Vec<u32>>();
-
-            extracted_numbers.extend(nums);
-        } else {
-            new_lines.push(line.clone()); 
-        }
-    }
-    fs::write(file_path, new_lines.join("\n"))?;
-
-    Ok(extracted_numbers)
-}
 pub fn to_binary<C: Config, B: RootAPI<C>>(
     api: &mut B,
     x: Variable,
     n_bits: usize,
 ) -> Vec<Variable> {
-    let mut res = vec![];
-    match extract_and_remove_tobinary_section("./log.txt") {
-        Ok(numbers) => {
-            println!("Extracted numbers: {:?}", numbers);
-            if n_bits == 30 {
-                println!("hit!");
-            }
-            for i in 0..n_bits {
-                let number_var = api.constant(numbers[i]);
-                res.push(number_var);
-            }
-        },
-        Err(e) => eprintln!("Error: {}", e),
-    }
+    let res = api.new_hint("myhint.tobinary", &[x], n_bits);
+    let res_x = from_binary(api, &res);
+    api.assert_is_equal(x, res_x);
     res
 }
+// pub fn extract_and_remove_tobinary_section(file_path: &str) -> io::Result<Vec<u32>> {
+//     let file = OpenOptions::new().read(true).write(true).open(file_path)?;
+//     let reader = BufReader::new(&file);
+
+//     let mut lines = reader.lines().filter_map(Result::ok).collect::<Vec<String>>();
+//     let mut extracted_numbers = Vec::new();
+//     let mut new_lines = Vec::new();
+
+//     let mut found_tobinary = false;
+//     let mut found_section = false;
+
+//     for line in lines.iter() {
+//         if line.trim() == "tobinary:" {
+//             if found_tobinary {
+//                 new_lines.push(line.clone()); 
+//                 found_section = true;
+//             } else {
+//                 found_tobinary = true; 
+//             }
+//         } else if found_tobinary && !found_section {
+//             let nums = line
+//                 .split(',')
+//                 .filter_map(|s| s.trim().parse::<u32>().ok())
+//                 .collect::<Vec<u32>>();
+
+//             extracted_numbers.extend(nums);
+//         } else {
+//             new_lines.push(line.clone()); 
+//         }
+//     }
+//     fs::write(file_path, new_lines.join("\n"))?;
+
+//     Ok(extracted_numbers)
+// }
+// pub fn to_binary<C: Config, B: RootAPI<C>>(
+//     api: &mut B,
+//     x: Variable,
+//     n_bits: usize,
+// ) -> Vec<Variable> {
+//     let mut res = vec![];
+//     match extract_and_remove_tobinary_section("./log.txt") {
+//         Ok(numbers) => {
+//             println!("Extracted numbers: {:?}", numbers);
+//             if n_bits == 30 {
+//                 println!("hit!");
+//             }
+//             for i in 0..n_bits {
+//                 let number_var = api.constant(numbers[i]);
+//                 res.push(number_var);
+//             }
+//         },
+//         Err(e) => eprintln!("Error: {}", e),
+//     }
+//     res
+// }
 pub fn from_binary<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> Variable {
     let mut res = api.constant(0);
     for (i, bit) in bits.iter().enumerate() {

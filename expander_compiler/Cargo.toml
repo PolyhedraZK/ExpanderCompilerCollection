@@ -26,6 +26,8 @@ crosslayer_prototype.workspace = true
 poly_commit.workspace = true
 polynomials.workspace = true
 sumcheck.workspace = true
+num-bigint = "0.4.6"
+num-traits = "0.2.19"
 
 [dev-dependencies]
 rayon = "1.9"
