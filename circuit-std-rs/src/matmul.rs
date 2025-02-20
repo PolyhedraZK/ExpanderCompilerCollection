@@ -45,13 +45,13 @@ impl<C: Config> GenericDefine<C> for MatMulCircuit {
         let randomness = builder.get_random_value();
 
         let mut aux_mat = Vec::new();
-        let mut chanllenge = randomness;
+        let mut challenge = randomness;
         aux_mat.push(Variable::from(1));
 
         // construct the aux matrix = [1, randomness, randomness^2, ..., randomness^（n-1）]
         for _ in 0..n2 - 1 {
-            chanllenge = builder.mul(chanllenge, randomness);
-            aux_mat.push(chanllenge);
+            challenge = builder.mul(challenge, randomness);
+            aux_mat.push(challenge);
         }
 
         let mut aux_second = vec![zero; m2];
@@ -161,7 +161,7 @@ fn matrix_multiply<C: Config>(
 
     assert_eq!(n1, m2, "n1 ! = m2 ");
 
-    // initilize the result matrix
+    // initialize the result matrix
     let mut c = vec![vec![C::CircuitField::default(); n2]; m1];
 
     // FIXME: optimize calculating the multiplication for super large matrix.
