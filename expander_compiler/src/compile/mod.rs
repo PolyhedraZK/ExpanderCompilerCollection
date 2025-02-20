@@ -236,19 +236,37 @@ pub fn compile<C: Config, I: InputType>(
     compile_with_options(r_source, CompileOptions::default())
 }
 
-pub fn compile_with_options<C: Config, I: InputType>(
-    r_source: &ir::source::RootCircuit<C>,
-    options: CompileOptions,
-) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C, I>), Error> {
-    let (r_hint_normalized_opt, mut src_im) = compile_step_1(r_source)?;
-
-    let ho_stats = r_hint_normalized_opt.get_stats();
+pub fn print_ir_stats<C: Config>(r_hint_normalized: &ir::hint_normalized::RootCircuit<C>) {
+    let ho_stats = r_hint_normalized.get_stats();
     print_info("built hint normalized ir");
     print_stat("numInputs", ho_stats.num_inputs, false);
     print_stat("numConstraints", ho_stats.num_constraints, false);
     print_stat("numInsns", ho_stats.num_insns, false);
     print_stat("numVars", ho_stats.num_variables, false);
     print_stat("numTerms", ho_stats.num_terms, true);
+}
+
+pub fn print_layered_circuit_stats<C: Config, I: InputType>(lc: &layered::Circuit<C, I>) {
+    let lc_stats = lc.get_stats();
+    print_info("built layered circuit");
+    print_stat("numSegment", lc_stats.num_segments, false);
+    print_stat("numLayer", lc_stats.num_layers, false);
+    print_stat("numUsedInputs", lc_stats.num_inputs, false);
+    print_stat("numUsedVariables", lc_stats.num_used_gates, false);
+    print_stat("numVariables", lc_stats.num_total_gates, false);
+    print_stat("numAdd", lc_stats.num_expanded_add, false);
+    print_stat("numCst", lc_stats.num_expanded_cst, false);
+    print_stat("numMul", lc_stats.num_expanded_mul, false);
+    print_stat("totalCost", lc_stats.total_cost, true);
+}
+
+pub fn compile_with_options<C: Config, I: InputType>(
+    r_source: &ir::source::RootCircuit<C>,
+    options: CompileOptions,
+) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C, I>), Error> {
+    let (r_hint_normalized_opt, mut src_im) = compile_step_1(r_source)?;
+
+    print_ir_stats(&r_hint_normalized_opt);
 
     let (r_hint_less, mut r_hint_exported) = r_hint_normalized_opt.remove_and_export_hints();
     r_hint_exported
@@ -266,17 +284,7 @@ pub fn compile_with_options<C: Config, I: InputType>(
 
     let lc = compile_step_3(lc)?;
 
-    let lc_stats = lc.get_stats();
-    print_info("built layered circuit");
-    print_stat("numSegment", lc_stats.num_segments, false);
-    print_stat("numLayer", lc_stats.num_layers, false);
-    print_stat("numUsedInputs", lc_stats.num_inputs, false);
-    print_stat("numUsedVariables", lc_stats.num_used_gates, false);
-    print_stat("numVariables", lc_stats.num_total_gates, false);
-    print_stat("numAdd", lc_stats.num_expanded_add, false);
-    print_stat("numCst", lc_stats.num_expanded_cst, false);
-    print_stat("numMul", lc_stats.num_expanded_mul, false);
-    print_stat("totalCost", lc_stats.total_cost, true);
+    print_layered_circuit_stats(&lc);
 
     hl_im.compose_in_place(&dest_im);
 

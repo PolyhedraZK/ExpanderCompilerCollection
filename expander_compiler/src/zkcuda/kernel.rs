@@ -1,3 +1,7 @@
+use crate::compile::{
+    compile_step_1, compile_step_2, compile_step_3, compile_step_4, print_ir_stats,
+    print_layered_circuit_stats,
+};
 use crate::frontend::*;
 use crate::{
     circuit::{
@@ -230,10 +234,11 @@ where
     }
     c0.outputs.extend_from_slice(&output_vars_ids);
     // compile step 1
-    let (r_hint_normalized_opt, src_im) = crate::compile::compile_step_1(&r_source)?;
+    let (r_hint_normalized_opt, src_im) = compile_step_1(&r_source)?;
     for (i, x) in src_im.mapping().iter().enumerate() {
         assert_eq!(i, *x);
     }
+    print_ir_stats(&r_hint_normalized_opt);
     // export hints
     let (mut r_hint_less, mut r_hint_exported) = r_hint_normalized_opt.remove_and_export_hints();
     // remove additional hints, move them to user outputs
@@ -282,10 +287,8 @@ where
         rhl_c0.outputs.push(i);
     }
     // compile step 2
-    let (mut r_dest_opt, hl_im) = crate::compile::compile_step_2::<C, NormalInputType>(
-        r_hint_less,
-        CompileOptions::default(),
-    )?;
+    let (mut r_dest_opt, hl_im) =
+        compile_step_2::<C, NormalInputType>(r_hint_less, CompileOptions::default())?;
     for (i, x) in hl_im.mapping().iter().enumerate() {
         assert_eq!(i, *x);
     }
@@ -308,10 +311,11 @@ where
             assert_eq!(*x, EMPTY);
         }
     }
-    let lc = crate::compile::compile_step_3(lc)?;
+    let lc = compile_step_3(lc)?;
+    print_layered_circuit_stats(&lc);
     // compile step 4
     let mut tmp_im = InputMapping::new_identity(r_hint_exported.input_size());
-    let mut r_hint_exported_opt = crate::compile::compile_step_4(r_hint_exported, &mut tmp_im)?;
+    let mut r_hint_exported_opt = compile_step_4(r_hint_exported, &mut tmp_im)?;
     for (i, x) in tmp_im.mapping().iter().enumerate() {
         assert_eq!(i, *x);
     }
