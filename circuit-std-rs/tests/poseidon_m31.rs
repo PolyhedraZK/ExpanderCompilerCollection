@@ -1,4 +1,4 @@
-use circuit_std_rs::poseidon_m31::*;
+use circuit_std_rs::{poseidon_m31::*, utils::register_hint};
 use expander_compiler::frontend::*;
 
 declare_circuit!(PoseidonSpongeLen8Circuit {
@@ -72,7 +72,7 @@ impl Define<M31Config> for PoseidonSpongeLen16Circuit<Variable> {
             POSEIDON_M31X16_FULL_ROUNDS,
             POSEIDON_M31X16_PARTIAL_ROUNDS,
         );
-        let res = params.hash_to_state(builder, &self.inputs);
+        let res = params.hash_to_state_flatten(builder, &self.inputs);
         (0..params.width).for_each(|i| builder.assert_is_equal(res[i], self.outputs[i]));
     }
 }
@@ -85,7 +85,8 @@ fn test_poseidon_m31x16_hash_to_state_input_len16() {
         CompileOptions::default(),
     )
     .unwrap();
-
+    let mut hint_registry = HintRegistry::<M31>::new();
+    register_hint(&mut hint_registry);
     let assignment = PoseidonSpongeLen16Circuit::<M31> {
         inputs: [M31::from(114514); 16],
         outputs: [
@@ -109,7 +110,7 @@ fn test_poseidon_m31x16_hash_to_state_input_len16() {
     };
     let witness = compile_result
         .witness_solver
-        .solve_witness(&assignment)
+        .solve_witness_with_hints(&assignment, &mut hint_registry)
         .unwrap();
     let output = compile_result.layered_circuit.run(&witness);
     assert_eq!(output, vec![true]);
