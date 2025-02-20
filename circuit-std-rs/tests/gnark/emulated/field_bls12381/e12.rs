@@ -11,7 +11,7 @@ use expander_compiler::{
     compile::CompileOptions,
     declare_circuit,
     frontend::{
-        compile_generic, extra::debug_eval, Define, HintRegistry, M31Config, RootAPI, Variable, M31,
+        compile, extra::debug_eval, Define, HintRegistry, M31Config, RootAPI, Variable, M31,
     },
 };
 
@@ -124,7 +124,7 @@ impl Define<M31Config> for E12AddCircuit<Variable> {
 }
 #[test]
 fn test_e12_add() {
-    compile_generic(&E12AddCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E12AddCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E12AddCircuit::<M31> {
@@ -469,7 +469,7 @@ impl Define<M31Config> for E12SubCircuit<Variable> {
 
 #[test]
 fn test_e12_sub() {
-    compile_generic(&E12SubCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E12SubCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
 
@@ -816,7 +816,7 @@ impl Define<M31Config> for E12MulCircuit<Variable> {
 
 #[test]
 fn test_e12_mul() {
-    compile_generic(&E12MulCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E12MulCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
 
@@ -1162,7 +1162,7 @@ impl Define<M31Config> for E12DivCircuit<Variable> {
 
 #[test]
 fn test_e12_div() {
-    compile_generic(&E12DivCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E12DivCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
 
@@ -1476,7 +1476,7 @@ impl Define<M31Config> for E12SquareCircuit<Variable> {
 
 #[test]
 fn test_e12_square() {
-    compile_generic(&E12SquareCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E12SquareCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
 
@@ -1717,7 +1717,7 @@ impl Define<M31Config> for E12ConjugateCircuit<Variable> {
 
 #[test]
 fn test_e12_conjugate() {
-    compile_generic(&E12ConjugateCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E12ConjugateCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
 
@@ -1958,7 +1958,7 @@ impl Define<M31Config> for E12InverseCircuit<Variable> {
 
 #[test]
 fn test_e12_inverse() {
-    compile_generic(&E12InverseCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E12InverseCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
 

@@ -10,7 +10,7 @@ use expander_compiler::{
     compile::CompileOptions,
     declare_circuit,
     frontend::{
-        compile_generic, extra::debug_eval, Define, HintRegistry, M31Config, RootAPI, Variable, M31,
+        compile, extra::debug_eval, Define, HintRegistry, M31Config, RootAPI, Variable, M31,
     },
 };
 
@@ -76,7 +76,7 @@ impl Define<M31Config> for E6AddCircuit<Variable> {
 #[test]
 fn test_e6_add() {
     // let compile_result = compile(&E2AddCircuit::default()).unwrap();
-    compile_generic(&E6AddCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E6AddCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E6AddCircuit::<M31> {
@@ -268,7 +268,7 @@ impl Define<M31Config> for E6SubCircuit<Variable> {
 
 #[test]
 fn test_e6_sub() {
-    compile_generic(&E6SubCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E6SubCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
 
@@ -460,7 +460,7 @@ impl Define<M31Config> for E6MulCircuit<Variable> {
 
 #[test]
 fn test_e6_mul() {
-    compile_generic(&E6MulCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E6MulCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
 
@@ -637,7 +637,7 @@ impl Define<M31Config> for E6SquareCircuit<Variable> {
 
 #[test]
 fn test_e6_square() {
-    compile_generic(&E6SquareCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E6SquareCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
 
@@ -971,7 +971,7 @@ impl Define<M31Config> for E6MulByNonResidueCircuit<Variable> {
 
 #[test]
 fn test_e6_mul_by_non_residue() {
-    compile_generic(
+    compile(
         &E6MulByNonResidueCircuit::default(),
         CompileOptions::default(),
     )
@@ -1124,7 +1124,7 @@ impl Define<M31Config> for E6MulByE2Circuit<Variable> {
 
 #[test]
 fn test_e6_mul_by_e2() {
-    compile_generic(&E6MulByE2Circuit::default(), CompileOptions::default()).unwrap();
+    compile(&E6MulByE2Circuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
 
@@ -1454,7 +1454,7 @@ impl Define<M31Config> for E6NegCircuit<Variable> {
 
 #[test]
 fn test_e6_neg() {
-    compile_generic(&E6NegCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E6NegCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
 
@@ -1592,7 +1592,7 @@ impl Define<M31Config> for E6InverseCircuit<Variable> {
 
 #[test]
 fn test_e6_inverse() {
-    compile_generic(&E6InverseCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E6InverseCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
 

@@ -2,7 +2,7 @@ use crate::{
     circuit::config::M31Config,
     compile::CompileOptions,
     field::{FieldArith, M31},
-    frontend::{compile_generic, RootAPI},
+    frontend::{compile, RootAPI},
 };
 
 use super::{builder::Variable, circuit::*, variables::DumpLoadTwoVariables};
@@ -65,7 +65,7 @@ impl Define<M31Config> for Circuit2<Variable> {
 
 #[test]
 fn test_circuit_eval_simple() {
-    let compile_result = compile_generic(&Circuit2::default(), CompileOptions::default()).unwrap();
+    let compile_result = compile(&Circuit2::default(), CompileOptions::default()).unwrap();
     let assignment = Circuit2::<M31> {
         sum: M31::from(126),
         x: [M31::from(1), M31::from(2)],

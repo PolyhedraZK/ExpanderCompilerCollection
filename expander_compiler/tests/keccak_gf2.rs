@@ -308,8 +308,7 @@ fn keccak_gf2_test<I: InputType>(
 
 #[test]
 fn keccak_gf2_main() {
-    let compile_result =
-        compile_generic(&Keccak256Circuit::default(), CompileOptions::default()).unwrap();
+    let compile_result = compile(&Keccak256Circuit::default(), CompileOptions::default()).unwrap();
     let CompileResult {
         witness_solver,
         layered_circuit,

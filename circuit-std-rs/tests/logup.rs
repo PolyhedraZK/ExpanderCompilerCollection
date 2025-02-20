@@ -45,7 +45,7 @@ fn rangeproof_logup_test() {
     hint_registry.register("myhint.querycounthint", query_count_hint);
     hint_registry.register("myhint.rangeproofhint", rangeproof_hint);
     //compile and test
-    let compile_result = compile_generic(
+    let compile_result = compile(
         &LogUpRangeproofCircuit::default(),
         CompileOptions::default(),
     )

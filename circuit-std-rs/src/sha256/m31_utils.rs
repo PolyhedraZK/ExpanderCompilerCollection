@@ -343,8 +343,7 @@ fn test_idiv_mod_bit() {
     let mut hint_registry = HintRegistry::<M31>::new();
     hint_registry.register("myhint.tobinary", to_binary_hint);
     //compile and test
-    let compile_result =
-        compile_generic(&IDIVMODBITCircuit::default(), CompileOptions::default()).unwrap();
+    let compile_result = compile(&IDIVMODBITCircuit::default(), CompileOptions::default()).unwrap();
     let assignment = IDIVMODBITCircuit::<M31> {
         value: M31::from(3845),
         quotient: M31::from(15),
@@ -385,8 +384,7 @@ fn test_bit_convert() {
     let mut hint_registry = HintRegistry::<M31>::new();
     hint_registry.register("myhint.tobinary", to_binary_hint);
     //compile and test
-    let compile_result =
-        compile_generic(&BITCONVERTCircuit::default(), CompileOptions::default()).unwrap();
+    let compile_result = compile(&BITCONVERTCircuit::default(), CompileOptions::default()).unwrap();
     let assignment = BITCONVERTCircuit::<M31> {
         big_int: M31::from(3845),
         big_int_bytes: [

@@ -14,7 +14,7 @@ impl Define<M31Config> for Circuit<Variable> {
 
 #[test]
 fn example_full() {
-    let compile_result = compile_generic(&Circuit::default(), CompileOptions::default()).unwrap();
+    let compile_result = compile(&Circuit::default(), CompileOptions::default()).unwrap();
     let assignment = Circuit::<M31> {
         x: M31::from(123),
         y: M31::from(123),

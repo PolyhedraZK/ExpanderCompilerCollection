@@ -23,7 +23,11 @@ impl Define<M31Config> for PoseidonSpongeLen8Circuit<Variable> {
 #[test]
 // NOTE(HS) Poseidon Mersenne-31 Width-16 Sponge tested over input length 8
 fn test_poseidon_m31x16_hash_to_state_input_len8() {
-    let compile_result = compile(&PoseidonSpongeLen8Circuit::default()).unwrap();
+    let compile_result = compile(
+        &PoseidonSpongeLen8Circuit::default(),
+        CompileOptions::default(),
+    )
+    .unwrap();
 
     let assignment = PoseidonSpongeLen8Circuit::<M31> {
         inputs: [M31::from(114514); 8],
@@ -76,7 +80,11 @@ impl Define<M31Config> for PoseidonSpongeLen16Circuit<Variable> {
 #[test]
 // NOTE(HS) Poseidon Mersenne-31 Width-16 Sponge tested over input length 16
 fn test_poseidon_m31x16_hash_to_state_input_len16() {
-    let compile_result = compile(&PoseidonSpongeLen16Circuit::default()).unwrap();
+    let compile_result = compile(
+        &PoseidonSpongeLen16Circuit::default(),
+        CompileOptions::default(),
+    )
+    .unwrap();
 
     let assignment = PoseidonSpongeLen16Circuit::<M31> {
         inputs: [M31::from(114514); 16],

@@ -20,7 +20,7 @@ impl Define<M31Config> for Circuit<Variable> {
 }
 
 fn mul_fanout_limit(limit: usize) {
-    let compile_result = compile_generic(
+    let compile_result = compile(
         &Circuit::default(),
         CompileOptions::default().with_mul_fanout_limit(limit),
     )

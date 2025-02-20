@@ -33,7 +33,7 @@ impl Define<M31Config> for Circuit<Variable> {
 
 #[test]
 fn test_300() {
-    let compile_result = compile_generic(&Circuit::default(), CompileOptions::default()).unwrap();
+    let compile_result = compile(&Circuit::default(), CompileOptions::default()).unwrap();
     for i in 0..300 {
         let assignment = Circuit::<M31> {
             input: M31::from(i as u32),

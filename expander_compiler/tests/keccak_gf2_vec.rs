@@ -227,7 +227,7 @@ fn keccak_gf2_vec() {
     circuit.p = vec![vec![Variable::default(); 64 * 8]; N_HASHES];
     circuit.out = vec![vec![Variable::default(); 32 * 8]; N_HASHES];
 
-    let compile_result = compile_generic(&circuit, CompileOptions::default()).unwrap();
+    let compile_result = compile(&circuit, CompileOptions::default()).unwrap();
     let CompileResult {
         witness_solver,
         layered_circuit,

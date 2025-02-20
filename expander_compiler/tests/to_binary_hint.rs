@@ -42,7 +42,7 @@ fn test_300() {
     let mut hint_registry = HintRegistry::<M31>::new();
     hint_registry.register("myhint.tobinary", to_binary_hint);
 
-    let compile_result = compile_generic(&Circuit::default(), CompileOptions::default()).unwrap();
+    let compile_result = compile(&Circuit::default(), CompileOptions::default()).unwrap();
     for i in 0..300 {
         let assignment = Circuit::<M31> {
             input: M31::from(i as u32),
@@ -73,7 +73,7 @@ fn test_300_closure() {
         },
     );
 
-    let compile_result = compile_generic(&Circuit::default(), CompileOptions::default()).unwrap();
+    let compile_result = compile(&Circuit::default(), CompileOptions::default()).unwrap();
     for i in 0..300 {
         let assignment = Circuit::<M31> {
             input: M31::from(i as u32),

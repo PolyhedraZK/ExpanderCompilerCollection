@@ -78,8 +78,7 @@ mod tests {
             0x08080808,
         ];
         let values_u8: Vec<Vec<u8>> = values.iter().map(|v| v.to_le_bytes().to_vec()).collect();
-        let compile_result =
-            compile_generic(&VALUECircuit::default(), CompileOptions::default()).unwrap();
+        let compile_result = compile(&VALUECircuit::default(), CompileOptions::default()).unwrap();
         let mut assignment = VALUECircuit::<M31>::default();
         for i in 0..values_u8.len() {
             for j in 0..values_u8[i].len() {

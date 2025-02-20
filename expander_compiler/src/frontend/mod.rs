@@ -93,17 +93,6 @@ pub struct CompileResultCrossLayer<C: Config> {
     pub layered_circuit: layered::Circuit<C, CrossLayerInputType>,
 }
 
-pub fn compile<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone>(
-    circuit: &Cir,
-) -> Result<CompileResult<C>, Error> {
-    let root = build(circuit);
-    let (irw, lc) = crate::compile::compile::<C, _>(&root)?;
-    Ok(CompileResult {
-        witness_solver: WitnessSolver { circuit: irw },
-        layered_circuit: lc,
-    })
-}
-
 fn build_generic<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone>(
     circuit: &Cir,
 ) -> ir::source::RootCircuit<C> {
@@ -118,10 +107,7 @@ fn build_generic<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Defi
     root_builder.build()
 }
 
-pub fn compile_generic<
-    C: Config,
-    Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone,
->(
+pub fn compile<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone>(
     circuit: &Cir,
     options: CompileOptions,
 ) -> Result<CompileResult<C>, Error> {

@@ -21,7 +21,7 @@ fn example<C: Config>() {
     let n_witnesses = <C::DefaultSimdField as arith::SimdField>::PACK_SIZE;
     println!("n_witnesses: {}", n_witnesses);
     let compile_result: CompileResult<C> =
-        compile_generic(&Circuit::default(), CompileOptions::default()).unwrap();
+        compile(&Circuit::default(), CompileOptions::default()).unwrap();
     let mut s = [C::CircuitField::zero(); 100];
     let mut rng = rand::rngs::StdRng::seed_from_u64(1235);
     for i in 0..s.len() {

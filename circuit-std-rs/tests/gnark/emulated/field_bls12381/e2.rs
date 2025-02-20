@@ -3,7 +3,7 @@ use circuit_std_rs::gnark::{
     emulated::field_bls12381::e2::{Ext2, GE2},
     hints::register_hint,
 };
-use expander_compiler::frontend::compile_generic;
+use expander_compiler::frontend::compile;
 use expander_compiler::{
     compile::CompileOptions,
     declare_circuit,
@@ -41,7 +41,7 @@ impl Define<M31Config> for E2AddCircuit<Variable> {
 
 #[test]
 fn test_e2_add() {
-    compile_generic(&E2AddCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E2AddCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2AddCircuit::<M31> {
@@ -135,7 +135,7 @@ impl Define<M31Config> for E2SubCircuit<Variable> {
 #[test]
 fn test_e2_sub() {
     // let compile_result = compile(&E2SubCircuit::default()).unwrap();
-    compile_generic(&E2SubCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E2SubCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2SubCircuit::<M31> {
@@ -216,7 +216,7 @@ impl Define<M31Config> for E2DoubleCircuit<Variable> {
 #[test]
 fn test_e2_double() {
     // let compile_result = compile(&E2DoubleCircuit::default()).unwrap();
-    compile_generic(&E2DoubleCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E2DoubleCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2DoubleCircuit::<M31> {
@@ -289,7 +289,7 @@ impl Define<M31Config> for E2MulCircuit<Variable> {
 #[test]
 fn test_e2_mul() {
     // let compile_result = compile(&E2MulCircuit::default()).unwrap();
-    compile_generic(&E2MulCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E2MulCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2MulCircuit::<M31> {
@@ -371,7 +371,7 @@ impl Define<M31Config> for E2SquareCircuit<Variable> {
 #[test]
 fn test_e2_square() {
     // let compile_result = compile(&E2SquareCircuit::default()).unwrap();
-    compile_generic(&E2SquareCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E2SquareCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2SquareCircuit::<M31> {
@@ -443,7 +443,7 @@ impl Define<M31Config> for E2DivCircuit<Variable> {
 
 #[test]
 fn test_e2_div() {
-    compile_generic(&E2DivCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E2DivCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2DivCircuit::<M31> {
@@ -526,7 +526,7 @@ impl Define<M31Config> for E2MulByElementCircuit<Variable> {
 #[test]
 fn test_e2_mul_by_element() {
     // let compile_result = compile(&E2MulByElementCircuit::default()).unwrap();
-    compile_generic(&E2MulByElementCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E2MulByElementCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2MulByElementCircuit::<M31> {
@@ -605,7 +605,7 @@ impl Define<M31Config> for E2MulByNonResidueCircuit<Variable> {
 
 #[test]
 fn test_e2_mul_by_non_residue() {
-    compile_generic(
+    compile(
         &E2MulByNonResidueCircuit::default(),
         CompileOptions::default(),
     )
@@ -682,7 +682,7 @@ impl Define<M31Config> for E2NegCircuit<Variable> {
 #[test]
 fn test_e2_neg() {
     // let compile_result = compile(&E2NegCircuit::default()).unwrap();
-    compile_generic(&E2NegCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E2NegCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2NegCircuit::<M31> {
@@ -751,7 +751,7 @@ impl Define<M31Config> for E2ConjugateCircuit<Variable> {
 #[test]
 fn test_e2_conjugate() {
     // let compile_result = compile(&E2ConjugateCircuit::default()).unwrap();
-    compile_generic(&E2ConjugateCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E2ConjugateCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2ConjugateCircuit::<M31> {
@@ -819,7 +819,7 @@ impl Define<M31Config> for E2InverseCircuit<Variable> {
 
 #[test]
 fn test_e2_inverse() {
-    compile_generic(&E2InverseCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E2InverseCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2InverseCircuit::<M31> {

@@ -290,7 +290,7 @@ impl<C: Config> Define<C> for Keccak256Circuit<Variable> {
 
 fn keccak_big_field<C: Config, const N_WITNESSES: usize>(field_name: &str) {
     let compile_result: CompileResult<C> =
-        compile_generic(&Keccak256Circuit::default(), CompileOptions::default()).unwrap();
+        compile(&Keccak256Circuit::default(), CompileOptions::default()).unwrap();
     let CompileResult {
         witness_solver,
         layered_circuit,

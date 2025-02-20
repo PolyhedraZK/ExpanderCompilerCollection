@@ -9,7 +9,7 @@ use clap::Parser;
 use expander_compiler::compile::CompileOptions;
 use expander_compiler::field::Field;
 use expander_compiler::frontend::{
-    compile_generic, BN254Config, CompileResult, Define, M31Config, RootAPI,
+    compile, BN254Config, CompileResult, Define, M31Config, RootAPI,
 };
 use expander_compiler::utils::serde::Serde;
 use expander_compiler::{
@@ -46,7 +46,7 @@ fn build<C: Config>() {
     let assignment = TrivialCircuit::<C::CircuitField>::random_witnesses();
 
     let compile_result =
-        compile_generic::<C, _>(&TrivialCircuit::new(), CompileOptions::default()).unwrap();
+        compile::<C, _>(&TrivialCircuit::new(), CompileOptions::default()).unwrap();
 
     let CompileResult {
         witness_solver,

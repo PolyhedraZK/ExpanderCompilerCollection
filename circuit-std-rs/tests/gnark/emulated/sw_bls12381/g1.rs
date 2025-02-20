@@ -7,7 +7,7 @@ use expander_compiler::{
     compile::CompileOptions,
     declare_circuit,
     frontend::{
-        compile_generic, extra::debug_eval, Define, HintRegistry, M31Config, RootAPI, Variable, M31,
+        compile, extra::debug_eval, Define, HintRegistry, M31Config, RootAPI, Variable, M31,
     },
 };
 
@@ -89,7 +89,7 @@ impl Define<M31Config> for G1AddCircuit<Variable> {
 
 #[test]
 fn test_g1_add() {
-    compile_generic(&G1AddCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&G1AddCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = G1AddCircuit::<M31> {
