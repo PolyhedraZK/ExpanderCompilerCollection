@@ -382,20 +382,30 @@ pub fn m31_26_to_bit_array_seperate<C: Config>(
     bits.extend_from_slice(&to_binary(api, high, 6 + overflow + 1));
     bits
 }
+// pub fn to_binary<C: Config>(
+//     api: &mut API<C>,
+//     x: Variable,
+//     n_bits: usize,
+// ) -> Vec<Variable> {
+//     unsafe{
+//         let mut hint_idx = GLOBAL_HINT_IDX.lock().unwrap();
+//         let res_u32 = GLOBAL_HINTS.lock().unwrap()[*hint_idx].clone();
+//         *hint_idx += 1;
+//         let res = res_u32.iter().map(|&bit| api.constant(bit)).collect::<Vec<_>>();
+//         let res_x = from_binary(api, &res);
+//         api.assert_is_equal(x, res_x);
+//         res
+//     }
+// }
 pub fn to_binary<C: Config>(
     api: &mut API<C>,
     x: Variable,
     n_bits: usize,
 ) -> Vec<Variable> {
-    unsafe{
-        let mut hint_idx = GLOBAL_HINT_IDX.lock().unwrap();
-        let res_u32 = GLOBAL_HINTS.lock().unwrap()[*hint_idx].clone();
-        *hint_idx += 1;
-        let res = res_u32.iter().map(|&bit| api.constant(bit)).collect::<Vec<_>>();
-        let res_x = from_binary(api, &res);
-        api.assert_is_equal(x, res_x);
-        res
-    }
+    let res = api.new_hint("myhint.tobinary", &[x], n_bits);
+    let res_x = from_binary(api, &res);
+    api.assert_is_equal(x, res_x);
+    res
 }
 
 pub fn from_binary<C: Config>(api: &mut API<C>, bits: &[Variable]) -> Variable {

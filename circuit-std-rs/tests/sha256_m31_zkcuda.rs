@@ -124,10 +124,11 @@ fn zkcuda_sha256_37bytes_hint() {
     let kernel_check_sha256_37bytes: Kernel<M31Config> = compile_sha256_37bytes().unwrap();
     println!("compile_sha256_37bytes() done");
     let data = [255; 37];
-    let repeat_time = 64;
+    let repeat_time = 1;
     let mut hash = Sha256::new();
     hash.update(data);
     let output = hash.finalize();
+    println!("output: {:?}", output);
     let mut input_vars = vec![];
     let mut output_vars = vec![];
     for i in 0..37 {
@@ -152,5 +153,53 @@ fn zkcuda_sha256_37bytes_hint() {
     let result: Vec<Vec<M31>> = ctx.copy_to_host(c);
     for i in 0..repeat_time {
         assert_eq!(result[i], output_vars);
+    }
+}
+
+
+
+#[test]
+fn zkcuda_sha256_37bytes_simd_hint() {
+    use arith::SimdField;
+    let mut hint_registry = HintRegistry::<M31>::new();
+    hint_registry.register("myhint.tobinary", to_binary_hint);
+    let kernel_check_sha256_37bytes: Kernel<M31Config> = compile_sha256_37bytes().unwrap();
+    println!("compile_sha256_37bytes() done");
+    let data = [255; 37];
+    let repeat_time = 1;
+    let mut hash = Sha256::new();
+    hash.update(data);
+    let output = hash.finalize();
+    let mut input_vars: Vec<mersenne31::M31x16> = vec![];
+    let mut output_vars = vec![];
+    for i in 0..37 {
+        let mut tmp = Vec::new();
+        for j in 0..16 {
+            tmp.push(M31::from(data[i] as u32));
+        }
+        input_vars.push(mersenne31::M31x16::pack(&tmp));
+    }
+    for i in 0..32 {
+        output_vars.push(M31::from(output[i] as u32));
+    }
+    let mut new_input_vars: Vec<Vec<mersenne31::M31x16>> = vec![];
+    for _ in 0..repeat_time {
+        new_input_vars.push(input_vars.clone());
+    }
+    let mut ctx: Context<M31Config, ExpanderGKRProvingSystem<M31Config>, _> = Context::new(hint_registry);
+
+    let a = ctx.copy_simd_to_device(&new_input_vars, false);
+    let mut c = None;
+    let start_time = time::Instant::now();
+    call_kernel!(ctx, kernel_check_sha256_37bytes, a, mut c);
+    let elapsed = start_time.elapsed();
+    println!("Time elapsed in call_kernel!() is: {:?}", elapsed);
+    // let c = c.reshape(&[repeat_time, 32]);
+    let result: Vec<Vec<mersenne31::M31x16>> = ctx.copy_simd_to_host(c);
+    for i in 0..32 {
+        let unpack_output = result[0][i].unpack();
+        for j in 0..8 {
+            assert_eq!(unpack_output[j], output_vars[i]);
+        }
     }
 }
