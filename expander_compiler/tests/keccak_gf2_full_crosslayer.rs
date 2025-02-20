@@ -230,8 +230,7 @@ impl Define<GF2Config> for Keccak256Circuit<Variable> {
 #[test]
 fn keccak_gf2_full_crosslayer() {
     let compile_result =
-        compile_generic_cross_layer(&Keccak256Circuit::default(), CompileOptions::default())
-            .unwrap();
+        compile_cross_layer(&Keccak256Circuit::default(), CompileOptions::default()).unwrap();
     let CompileResultCrossLayer {
         witness_solver,
         layered_circuit,

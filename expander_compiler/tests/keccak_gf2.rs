@@ -319,8 +319,7 @@ fn keccak_gf2_main() {
 #[test]
 fn keccak_gf2_main_cross_layer() {
     let compile_result =
-        compile_generic_cross_layer(&Keccak256Circuit::default(), CompileOptions::default())
-            .unwrap();
+        compile_cross_layer(&Keccak256Circuit::default(), CompileOptions::default()).unwrap();
     let CompileResultCrossLayer {
         witness_solver,
         layered_circuit,
