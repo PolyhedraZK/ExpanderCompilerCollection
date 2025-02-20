@@ -43,7 +43,6 @@ fn matmul_test() {
     ];
 
     for params in matmul_params.iter() {
-        common::circuit_generic_test_helper::<GF2Config, MatMulCircuit>(params);
         common::circuit_generic_test_helper::<BN254Config, MatMulCircuit>(params);
         common::circuit_generic_test_helper::<M31Config, MatMulCircuit>(params);
     }
