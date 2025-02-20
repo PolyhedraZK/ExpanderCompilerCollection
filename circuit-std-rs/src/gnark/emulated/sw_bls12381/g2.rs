@@ -5,7 +5,7 @@ use crate::gnark::emulated::field_bls12381::e2::GE2;
 use crate::sha256::m31_utils::*;
 use crate::utils::simple_select;
 use expander_compiler::declare_circuit;
-use expander_compiler::frontend::{Config, GenericDefine, M31Config, RootAPI, Variable};
+use expander_compiler::frontend::{Config, Define, M31Config, RootAPI, Variable};
 use num_bigint::BigInt;
 use std::str::FromStr;
 
@@ -543,7 +543,7 @@ declare_circuit!(G2UncompressCircuit {
     y: [[[Variable; 48]; 2]; 2],
 });
 
-impl GenericDefine<M31Config> for G2UncompressCircuit<Variable> {
+impl Define<M31Config> for G2UncompressCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g2 = G2::new(builder);
         let g2_res = g2.uncompressed(builder, &self.x);
@@ -568,7 +568,7 @@ declare_circuit!(MapToG2Circuit {
     out: [[[Variable; 48]; 2]; 2],
 });
 
-impl GenericDefine<M31Config> for MapToG2Circuit<Variable> {
+impl Define<M31Config> for MapToG2Circuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g2 = G2::new(builder);
         let in0 = GE2::from_vars(self.in0[0].to_vec(), self.in0[1].to_vec());
@@ -591,7 +591,7 @@ declare_circuit!(HashToG2Circuit {
     out: [[[Variable; 48]; 2]; 2],
 });
 
-impl GenericDefine<M31Config> for HashToG2Circuit<Variable> {
+impl Define<M31Config> for HashToG2Circuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g2 = G2::new(builder);
         let (hm0, hm1) = g2.hash_to_fp(builder, &self.msg);

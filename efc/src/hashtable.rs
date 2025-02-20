@@ -39,7 +39,7 @@ declare_circuit!(HASHTABLECircuit {
     seed: [PublicVariable; SHA256LEN],
     output: [[Variable; SHA256LEN]; HASHTABLESIZE],
 });
-impl GenericDefine<M31Config> for HASHTABLECircuit<Variable> {
+impl Define<M31Config> for HASHTABLECircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut indices = vec![Vec::<Variable>::new(); HASHTABLESIZE];
         if HASHTABLESIZE > 256 {
@@ -75,7 +75,7 @@ pub fn generate_hash_witnesses(dir: &str) {
     } else {
         println!("The solver does not exist.");
         let compile_result =
-            compile_generic(&HASHTABLECircuit::default(), CompileOptions::default()).unwrap();
+            compile(&HASHTABLECircuit::default(), CompileOptions::default()).unwrap();
         compile_result
             .witness_solver
             .serialize_into(std::fs::File::create(file_name).unwrap())

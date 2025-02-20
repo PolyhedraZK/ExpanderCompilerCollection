@@ -34,7 +34,7 @@ fn rc() -> Vec<u64> {
 }
 
 fn xor_in<C: Config>(
-    api: &mut API<C>,
+    api: &mut impl RootAPI<C>,
     mut s: Vec<Vec<Variable>>,
     buf: Vec<Vec<Variable>>,
 ) -> Vec<Vec<Variable>> {
@@ -48,7 +48,7 @@ fn xor_in<C: Config>(
     s
 }
 
-fn keccak_f<C: Config>(api: &mut API<C>, mut a: Vec<Vec<Variable>>) -> Vec<Vec<Variable>> {
+fn keccak_f<C: Config>(api: &mut impl RootAPI<C>, mut a: Vec<Vec<Variable>>) -> Vec<Vec<Variable>> {
     let mut b = vec![vec![api.constant(0); 64]; 25];
     let mut c = vec![vec![api.constant(0); 64]; 5];
     let mut d = vec![vec![api.constant(0); 64]; 5];
@@ -132,7 +132,7 @@ fn keccak_f<C: Config>(api: &mut API<C>, mut a: Vec<Vec<Variable>>) -> Vec<Vec<V
     a
 }
 
-fn xor<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
+fn xor<C: Config>(api: &mut impl RootAPI<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
     let nbits = a.len();
     let mut bits_res = vec![api.constant(0); nbits];
     for i in 0..nbits {
@@ -141,7 +141,7 @@ fn xor<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<V
     bits_res
 }
 
-fn and<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
+fn and<C: Config>(api: &mut impl RootAPI<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
     let nbits = a.len();
     let mut bits_res = vec![api.constant(0); nbits];
     for i in 0..nbits {
@@ -150,7 +150,7 @@ fn and<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<V
     bits_res
 }
 
-fn not<C: Config>(api: &mut API<C>, a: Vec<Variable>) -> Vec<Variable> {
+fn not<C: Config>(api: &mut impl RootAPI<C>, a: Vec<Variable>) -> Vec<Variable> {
     let mut bits_res = vec![api.constant(0); a.len()];
     for i in 0..a.len() {
         bits_res[i] = api.sub(1, a[i].clone());
@@ -188,7 +188,7 @@ declare_circuit!(Keccak256Circuit {
     out: [[PublicVariable]],
 });
 
-fn compute_keccak<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variable> {
+fn compute_keccak<C: Config>(api: &mut impl RootAPI<C>, p: &Vec<Variable>) -> Vec<Variable> {
     let mut ss = vec![vec![api.constant(0); 64]; 25];
     let mut new_p = p.clone();
     let mut append_data = vec![0; 136 - 64];
@@ -211,7 +211,7 @@ fn compute_keccak<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variabl
 }
 
 impl Define<GF2Config> for Keccak256Circuit<Variable> {
-    fn define(&self, api: &mut API<GF2Config>) {
+    fn define<Builder: RootAPI<GF2Config>>(&self, api: &mut Builder) {
         for i in 0..N_HASHES {
             let out = api.memorized_simple_call(compute_keccak, &self.p[i].to_vec());
             for j in 0..256 {
@@ -227,7 +227,7 @@ fn keccak_gf2_vec() {
     circuit.p = vec![vec![Variable::default(); 64 * 8]; N_HASHES];
     circuit.out = vec![vec![Variable::default(); 32 * 8]; N_HASHES];
 
-    let compile_result = compile(&circuit).unwrap();
+    let compile_result = compile(&circuit, CompileOptions::default()).unwrap();
     let CompileResult {
         witness_solver,
         layered_circuit,

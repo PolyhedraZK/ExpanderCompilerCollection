@@ -6,12 +6,15 @@
 
 use ark_std::test_rng;
 use clap::Parser;
+use expander_compiler::compile::CompileOptions;
 use expander_compiler::field::Field;
-use expander_compiler::frontend::{compile, BN254Config, CompileResult, Define, M31Config};
+use expander_compiler::frontend::{
+    compile, BN254Config, CompileResult, Define, M31Config, RootAPI,
+};
 use expander_compiler::utils::serde::Serde;
 use expander_compiler::{
     declare_circuit,
-    frontend::{BasicAPI, Config, Variable, API},
+    frontend::{Config, Variable},
 };
 
 /// Arguments for the command line
@@ -42,7 +45,8 @@ fn main() {
 fn build<C: Config>() {
     let assignment = TrivialCircuit::<C::CircuitField>::random_witnesses();
 
-    let compile_result = compile::<C, _>(&TrivialCircuit::new()).unwrap();
+    let compile_result =
+        compile::<C, _>(&TrivialCircuit::new(), CompileOptions::default()).unwrap();
 
     let CompileResult {
         witness_solver,
@@ -77,15 +81,15 @@ declare_circuit!(TrivialCircuit {
 });
 
 impl<C: Config> Define<C> for TrivialCircuit<Variable> {
-    fn define(&self, builder: &mut API<C>) {
-        let out = compute_output::<C>(builder, &self.input_layer);
+    fn define<Builder: RootAPI<C>>(&self, api: &mut Builder) {
+        let out = compute_output::<C>(api, &self.input_layer);
         out.iter().zip(self.output_layer.iter()).for_each(|(x, y)| {
-            builder.assert_is_equal(x, y);
+            api.assert_is_equal(x, y);
         });
     }
 }
 
-fn compute_output<C: Config>(api: &mut API<C>, input_layer: &[Variable]) -> Vec<Variable> {
+fn compute_output<C: Config>(api: &mut impl RootAPI<C>, input_layer: &[Variable]) -> Vec<Variable> {
     let mut cur_layer = input_layer.to_vec();
 
     (0..NUM_LAYERS).for_each(|_| {

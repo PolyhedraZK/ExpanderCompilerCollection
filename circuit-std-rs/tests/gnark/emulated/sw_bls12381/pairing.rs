@@ -10,7 +10,7 @@ use circuit_std_rs::{
 };
 use expander_compiler::{
     declare_circuit,
-    frontend::{extra::debug_eval, GenericDefine, HintRegistry, M31Config, RootAPI, Variable, M31},
+    frontend::{extra::debug_eval, Define, HintRegistry, M31Config, RootAPI, Variable, M31},
 };
 
 declare_circuit!(PairingCheckGKRCircuit {
@@ -20,7 +20,7 @@ declare_circuit!(PairingCheckGKRCircuit {
     in2_g2: [[[Variable; 48]; 2]; 2],
 });
 
-impl GenericDefine<M31Config> for PairingCheckGKRCircuit<Variable> {
+impl Define<M31Config> for PairingCheckGKRCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut pairing = Pairing::new(builder);
         let p1_g1 = G1Affine {

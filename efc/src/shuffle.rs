@@ -326,7 +326,7 @@ impl ShuffleCircuit<M31> {
         }
     }
 }
-impl GenericDefine<M31Config> for ShuffleCircuit<Variable> {
+impl Define<M31Config> for ShuffleCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g1 = G1::new(builder);
 
@@ -690,7 +690,7 @@ pub fn generate_shuffle_witnesses(dir: &str) {
         } else {
             println!("The solver does not exist.");
             let compile_result =
-                compile_generic(&ShuffleCircuit::default(), CompileOptions::default()).unwrap();
+                compile(&ShuffleCircuit::default(), CompileOptions::default()).unwrap();
             compile_result
                 .witness_solver
                 .serialize_into(std::fs::File::create(file_name).unwrap())
@@ -833,7 +833,7 @@ pub fn generate_shuffle_witnesses(dir: &str) {
 //     let file_name = "shuffle.witness";
 //     stacker::grow(32 * 1024 * 1024 * 1024, || {
 //         let compile_result =
-//             compile_generic(&ShuffleCircuit::default(), CompileOptions::default()).unwrap();
+//             compile(&ShuffleCircuit::default(), CompileOptions::default()).unwrap();
 //         compile_result
 //             .witness_solver
 //             .serialize_into(std::fs::File::create(file_name).unwrap())

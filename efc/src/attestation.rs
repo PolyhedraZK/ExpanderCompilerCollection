@@ -324,7 +324,7 @@ declare_circuit!(AttHashCircuit {
     outputs: [Variable; 32],
 });
 
-impl GenericDefine<M31Config> for AttHashCircuit<Variable> {
+impl Define<M31Config> for AttHashCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let att_ssz = AttestationDataSSZ {
             slot: self.slot,

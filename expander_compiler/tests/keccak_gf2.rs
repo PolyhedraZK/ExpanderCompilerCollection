@@ -215,7 +215,7 @@ fn compute_keccak<C: Config, B: RootAPI<C>>(api: &mut B, p: &Vec<Variable>) -> V
     copy_out_unaligned(ss, 136, 32)
 }
 
-impl GenericDefine<GF2Config> for Keccak256Circuit<Variable> {
+impl Define<GF2Config> for Keccak256Circuit<Variable> {
     fn define<Builder: RootAPI<GF2Config>>(&self, api: &mut Builder) {
         for i in 0..N_HASHES {
             // You can use api.memorized_simple_call for sub-circuits
@@ -308,8 +308,7 @@ fn keccak_gf2_test<I: InputType>(
 
 #[test]
 fn keccak_gf2_main() {
-    let compile_result =
-        compile_generic(&Keccak256Circuit::default(), CompileOptions::default()).unwrap();
+    let compile_result = compile(&Keccak256Circuit::default(), CompileOptions::default()).unwrap();
     let CompileResult {
         witness_solver,
         layered_circuit,
@@ -320,8 +319,7 @@ fn keccak_gf2_main() {
 #[test]
 fn keccak_gf2_main_cross_layer() {
     let compile_result =
-        compile_generic_cross_layer(&Keccak256Circuit::default(), CompileOptions::default())
-            .unwrap();
+        compile_cross_layer(&Keccak256Circuit::default(), CompileOptions::default()).unwrap();
     let CompileResultCrossLayer {
         witness_solver,
         layered_circuit,
