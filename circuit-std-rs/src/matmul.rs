@@ -46,70 +46,52 @@ impl<C: Config> GenericDefine<C> for MatMulCircuit {
 
         let mut aux_mat = Vec::new();
         let mut chanllenge = randomness;
+        aux_mat.push(Variable::from(1));
 
-        // construct the aux matrix = [randomness, randomness^2, randomness^3, ..., randomness^n2]
-        for i in 0..n2 {
-            aux_mat.push(chanllenge);
+        // construct the aux matrix = [1, randomness, randomness^2, ..., randomness^（n-1）]
+        for _ in 0..n2 - 1 {
             chanllenge = builder.mul(chanllenge, randomness);
-            aux_mat[i] = chanllenge;
+            aux_mat.push(chanllenge);
         }
 
         let mut aux_second = vec![zero; m2];
         let mut aux_first = vec![zero; m1];
-
         let mut aux_res = vec![zero; m1];
 
         // calculate second_mat * aux_mat,
-        // for i in 0..m2 {
-        //     for j in 0..n2 {
-        //         // aux_second[i] += self.second_mat[i][j] * aux_mat[j];
-        //         let mul_second = builder.mul(self.second_mat[i][j], aux_mat[j]);
-        //         aux_second[i] = builder.add(aux_second[i], mul_second);
-        //     }
-        // }
-        for (i, aux_item) in aux_second.iter_mut().enumerate() {
-            for (j, item) in aux_mat.iter().enumerate() {
-                // aux_second[i] += self.second_mat[i][j] * aux_mat[j];
-                let mul_second = builder.mul(self.second_mat[i][j], item);
-                *aux_item = builder.add(*aux_item, mul_second);
-            }
-        }
-
+        self.matrix_multiply(builder, &mut aux_second, &aux_mat, &self.second_mat);
         // calculate result_mat * aux_second
-        // for i in 0..m1 {
-        //     for j in 0..n2 {
-        //         // aux_res[i] += self.result_mat[i][j] * aux_mat[j];
-        //         let mul_res = builder.mul(self.result_mat[i][j], aux_mat[j]);
-        //         aux_res[i] = builder.add(aux_res[i], mul_res);
-        //     }
-        // }
-        for (i, aux_item) in aux_res.iter_mut().enumerate() {
-            for (j, item) in aux_mat.iter().enumerate() {
-                // aux_second[i] += self.second_mat[i][j] * aux_mat[j];
-                let mul_res = builder.mul(self.result_mat[i][j], item);
-                *aux_item = builder.add(*aux_item, mul_res);
-            }
-        }
-
+        self.matrix_multiply(builder, &mut aux_res, &aux_mat, &self.result_mat);
         // calculate first_mat * aux_second
-        // for i in 0..m1 {
-        //     for j in 0..n1 {
-        //         //self.first_mat[i] += self.first_mat[i][j] * aux_second[j];
-        //         let mul_result = builder.mul(self.first_mat[i][j], aux_second[j]);
-        //         aux_first[i] = builder.add(aux_first[i], mul_result);
-        //     }
-        // }
-        for (i, aux_item) in aux_first.iter_mut().enumerate() {
-            for (j, item) in aux_second.iter().enumerate() {
-                // aux_second[i] += self.second_mat[i][j] * aux_mat[j];
-                let mul_res = builder.mul(self.first_mat[i][j], item);
-                *aux_item = builder.add(*aux_item, mul_res);
-            }
-        }
+        self.matrix_multiply(builder, &mut aux_first, &aux_second, &self.first_mat);
 
         // compare aux_first with aux_res
         for i in 0..m1 {
             builder.assert_is_equal(aux_first[i], aux_res[i]);
+        }
+    }
+}
+
+impl MatMulCircuit {
+    // calculate origin_mat * aux_mat and store the result into target_mat
+    fn matrix_multiply<C: Config>(
+        &self,
+        builder: &mut impl RootAPI<C>,
+        target_mat: &mut [Variable], // target to modify
+        aux_mat: &[Variable],
+        origin_mat: &[Vec<Variable>],
+    ) {
+        // for i in 0..target_mat.len{
+        //     for j in 0..aux_mat.len {
+        //         let mul_result = builder.mul(origin_mat[i][j], aux_mat[j]);
+        //         target_mat[i] = builder.add(target_mat[i], mul_result);
+        //     }
+        // }
+        for (i, target_item) in target_mat.iter_mut().enumerate() {
+            for (j, item) in aux_mat.iter().enumerate() {
+                let mul_result = builder.mul(origin_mat[i][j], item);
+                *target_item = builder.add(*target_item, mul_result);
+            }
         }
     }
 }
