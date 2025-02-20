@@ -1,4 +1,5 @@
 use expander_compiler::frontend::*;
+use expander_compiler::utils::serde::Serde;
 use expander_compiler::zkcuda::proving_system::{DummyProvingSystem, ExpanderGKRProvingSystem};
 use expander_compiler::zkcuda::{context::*, kernel::*};
 
@@ -168,8 +169,12 @@ fn zkcuda_2() {
 #[test]
 fn zkcuda_2_simd() {
     use arith::SimdField;
-    let kernel_add_2: Kernel<M31Config> = compile_add_2_macro().unwrap();
+    let kernel_add_2_tmp: Kernel<M31Config> = compile_add_2_macro().unwrap();
     let kernel_add_16: Kernel<M31Config> = compile_add_16_macro().unwrap();
+
+    let mut buf: Vec<u8> = Vec::new();
+    kernel_add_2_tmp.serialize_into(&mut buf).unwrap();
+    let kernel_add_2: Kernel<M31Config> = Kernel::deserialize_from(&mut buf.as_slice()).unwrap();
 
     let mut ctx: Context<M31Config, DummyProvingSystem<M31Config>> = Context::default();
     let mut a: Vec<Vec<mersenne31::M31x16>> = vec![];
