@@ -148,6 +148,19 @@ impl Ext2 {
         let a1 = self.curve_f.is_zero(native, &z.a1);
         native.and(a0, a1)
     }
+    pub fn get_e2_sign<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        x: &GE2,
+        a0_zero_flag: Variable,
+    ) -> Variable {
+        let bit_a0 = self.curve_f.get_element_sign(native, &x.a0);
+        let bit_a1 = self.curve_f.get_element_sign(native, &x.a1);
+        let sgn2 = native.mul(a0_zero_flag, bit_a1);
+        let tmp0 = native.add(bit_a0, sgn2);
+        let tmp1 = native.mul(bit_a0, sgn2);
+        native.sub(tmp0, tmp1)
+    }
     pub fn add<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE2, y: &GE2) -> GE2 {
         let z0 = self.curve_f.add(native, &x.a0, &y.a0);
         let z1 = self.curve_f.add(native, &x.a1, &y.a1);
@@ -257,8 +270,8 @@ impl Ext2 {
         inv
     }
     pub fn assert_isequal<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE2, y: &GE2) {
-        self.curve_f.assert_isequal(native, &x.a0, &y.a0);
-        self.curve_f.assert_isequal(native, &x.a1, &y.a1);
+        self.curve_f.assert_is_equal(native, &x.a0, &y.a0);
+        self.curve_f.assert_is_equal(native, &x.a1, &y.a1);
     }
     pub fn select<C: Config, B: RootAPI<C>>(
         &mut self,

@@ -1,14 +1,11 @@
 use crate::gnark::limbs::*;
 use crate::gnark::utils::*;
-use crate::logup::{query_count_by_key_hint, query_count_hint, rangeproof_hint};
-use crate::sha256::m31_utils::to_binary_hint;
 use ark_bls12_381::Fq;
 use ark_bls12_381::Fq12;
 use ark_bls12_381::Fq2;
 use ark_bls12_381::Fq6;
 use ark_ff::fields::Field;
 use ark_ff::Zero;
-use expander_compiler::frontend::extra::*;
 use expander_compiler::frontend::*;
 use num_bigint::BigInt;
 use num_bigint::BigUint;
@@ -17,27 +14,6 @@ use num_traits::Signed;
 use num_traits::ToPrimitive;
 use std::str::FromStr;
 
-pub fn register_hint(hint_registry: &mut HintRegistry<M31>) {
-    hint_registry.register("myhint.tobinary", to_binary_hint);
-    hint_registry.register("myhint.mulhint", mul_hint);
-    hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
-    hint_registry.register("myhint.querycounthint", query_count_hint);
-    hint_registry.register("myhint.querycountbykeyhint", query_count_by_key_hint);
-    hint_registry.register("myhint.copyvarshint", copy_vars_hint);
-    hint_registry.register("myhint.divhint", div_hint);
-    hint_registry.register("myhint.invhint", inv_hint);
-    hint_registry.register("myhint.dive2hint", div_e2_hint);
-    hint_registry.register("myhint.inversee2hint", inverse_e2_hint);
-    hint_registry.register("myhint.copye2hint", copy_e2_hint);
-    hint_registry.register("myhint.dive6hint", div_e6_hint);
-    hint_registry.register("myhint.inversee6hint", inverse_e6_hint);
-    hint_registry.register("myhint.dive6by6hint", div_e6_by_6_hint);
-    hint_registry.register("myhint.dive12hint", div_e12_hint);
-    hint_registry.register("myhint.inversee12hint", inverse_e12_hint);
-    hint_registry.register("myhint.copye12hint", copy_e12_hint);
-    hint_registry.register("myhint.finalexphint", final_exp_hint);
-    hint_registry.register("myhint.rangeproofhint", rangeproof_hint);
-}
 pub fn mul_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     let nb_bits = inputs[0].to_u256().as_usize();
     let nb_limbs = inputs[1].to_u256().as_usize();
@@ -812,6 +788,19 @@ pub fn copy_vars_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> 
     outputs.copy_from_slice(&inputs[..outputs.len()]);
     Ok(())
 }
+pub fn copy_element_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+    if let Err(err) = unwrap_hint(
+        true,
+        true,
+        inputs,
+        outputs,
+        //copyE2Hint
+        |inputs| inputs,
+    ) {
+        panic!("copyElementHint: {}", err);
+    }
+    Ok(())
+}
 pub fn copy_e2_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     if let Err(err) = unwrap_hint(
         true,
@@ -822,6 +811,160 @@ pub fn copy_e2_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
         |inputs| inputs,
     ) {
         panic!("copyE2Hint: {}", err);
+    }
+    Ok(())
+}
+pub fn get_element_sqrt_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+    if let Err(err) = unwrap_hint(
+        true,
+        true,
+        inputs,
+        outputs,
+        //getElementSqrtHint
+        |inputs| {
+            let biguint_inputs = inputs
+                .iter()
+                .map(|x| x.to_biguint().unwrap())
+                .collect::<Vec<_>>();
+            let a = Fq::from(biguint_inputs[0].clone());
+            let (sqrt, is_square) = fq_has_sqrt(&a);
+            let sqrt_bigint = sqrt
+                .to_string()
+                .parse::<BigInt>()
+                .expect("Invalid decimal string");
+            vec![BigInt::from(is_square), sqrt_bigint]
+        },
+    ) {
+        panic!("getElementSqrtHint: {}", err);
+    }
+    Ok(())
+}
+pub fn get_e2_sqrt_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+    if let Err(err) = unwrap_hint(
+        true,
+        true,
+        inputs,
+        outputs,
+        //getElementSqrtHint
+        |inputs| {
+            let biguint_inputs = inputs
+                .iter()
+                .map(|x| x.to_biguint().unwrap())
+                .collect::<Vec<_>>();
+            let a0 = Fq::from(biguint_inputs[0].clone());
+            let a1 = Fq::from(biguint_inputs[1].clone());
+            let a = Fq2::new(a0, a1);
+            let (sqrt, is_square) = fq2_has_sqrt(&a);
+            let sqrt0_bigint = sqrt
+                .c0
+                .to_string()
+                .parse::<BigInt>()
+                .expect("Invalid decimal string");
+            let sqrt1_bigint = sqrt
+                .c1
+                .to_string()
+                .parse::<BigInt>()
+                .expect("Invalid decimal string");
+            vec![BigInt::from(is_square), sqrt0_bigint, sqrt1_bigint]
+        },
+    ) {
+        panic!("getElementSqrtHint: {}", err);
+    }
+    Ok(())
+}
+pub fn get_sqrt_x0x1_fq_new_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+    if let Err(err) = unwrap_hint(
+        true,
+        true,
+        inputs,
+        outputs,
+        //divE12Hint
+        |inputs| {
+            let biguint_inputs = inputs
+                .iter()
+                .map(|x| x.to_biguint().unwrap())
+                .collect::<Vec<_>>();
+
+            let g_x0 = Fq::from(biguint_inputs[0].clone());
+            let g_x1 = Fq::from(biguint_inputs[1].clone());
+            let t = Fq::from(biguint_inputs[2].clone());
+            let sgn_t = get_fq_sign(&t);
+            let (g_x0_sqrt, is_square0) = fq_has_sqrt(&g_x0);
+            let (g_x1_sqrt, is_square1) = fq_has_sqrt(&g_x1);
+            let mut y;
+            if is_square0 {
+                y = g_x0_sqrt;
+            } else if is_square1 {
+                y = g_x1_sqrt;
+            } else {
+                panic!("At least one should be square");
+            }
+            let sgn_y = get_fq_sign(&y);
+            if sgn_y != sgn_t {
+                y = -y;
+            }
+            let y_bigint = y
+                .to_string()
+                .parse::<BigInt>()
+                .expect("Invalid decimal string");
+            vec![BigInt::from(is_square0), y_bigint]
+        },
+    ) {
+        panic!("divE2Hint: {}", err);
+    }
+    Ok(())
+}
+pub fn get_sqrt_x0x1_fq2_new_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+    if let Err(err) = unwrap_hint(
+        true,
+        true,
+        inputs,
+        outputs,
+        //divE12Hint
+        |inputs| {
+            let biguint_inputs = inputs
+                .iter()
+                .map(|x| x.to_biguint().unwrap())
+                .collect::<Vec<_>>();
+
+            let g_x0_a0 = Fq::from(biguint_inputs[0].clone());
+            let g_x0_a1 = Fq::from(biguint_inputs[1].clone());
+            let g_x1_a0 = Fq::from(biguint_inputs[2].clone());
+            let g_x1_a1 = Fq::from(biguint_inputs[3].clone());
+            let t_a0 = Fq::from(biguint_inputs[4].clone());
+            let t_a1 = Fq::from(biguint_inputs[5].clone());
+
+            let g_x0 = Fq2::new(Fq::from(g_x0_a0), Fq::from(g_x0_a1));
+            let g_x1 = Fq2::new(Fq::from(g_x1_a0), Fq::from(g_x1_a1));
+            let t = Fq2::new(Fq::from(t_a0), Fq::from(t_a1));
+            let sgn_t = get_fq2_sign(&t);
+            let (g_x0_sqrt, is_square0) = fq2_has_sqrt(&g_x0);
+            let (g_x1_sqrt, is_square1) = fq2_has_sqrt(&g_x1);
+            let mut y;
+            if is_square0 {
+                y = g_x0_sqrt;
+            } else if is_square1 {
+                y = g_x1_sqrt;
+            } else {
+                panic!("At least one should be square");
+            }
+            let sgn_y = get_fq2_sign(&y);
+            if sgn_y != sgn_t {
+                y.c0 = -y.c0;
+                y.c1 = -y.c1;
+            }
+            let y0_c0_bigint =
+                y.c0.to_string()
+                    .parse::<BigInt>()
+                    .expect("Invalid decimal string");
+            let y0_c1_bigint =
+                y.c1.to_string()
+                    .parse::<BigInt>()
+                    .expect("Invalid decimal string");
+            vec![BigInt::from(is_square0), y0_c0_bigint, y0_c1_bigint]
+        },
+    ) {
+        panic!("divE2Hint: {}", err);
     }
     Ok(())
 }

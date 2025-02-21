@@ -366,12 +366,12 @@ impl Ext6 {
         let x3 = self.ext2.curve_f.mul_const(native, &y3, BigInt::from(6));
         let x4 = self.ext2.curve_f.mul_const(native, &y4, BigInt::from(6));
         let x5 = self.ext2.curve_f.mul_const(native, &y5, BigInt::from(6));
-        self.ext2.curve_f.assert_isequal(native, &x[0], &x0);
-        self.ext2.curve_f.assert_isequal(native, &x[1], &x1);
-        self.ext2.curve_f.assert_isequal(native, &x[2], &x2);
-        self.ext2.curve_f.assert_isequal(native, &x[3], &x3);
-        self.ext2.curve_f.assert_isequal(native, &x[4], &x4);
-        self.ext2.curve_f.assert_isequal(native, &x[5], &x5);
+        self.ext2.curve_f.assert_is_equal(native, &x[0], &x0);
+        self.ext2.curve_f.assert_is_equal(native, &x[1], &x1);
+        self.ext2.curve_f.assert_is_equal(native, &x[2], &x2);
+        self.ext2.curve_f.assert_is_equal(native, &x[3], &x3);
+        self.ext2.curve_f.assert_is_equal(native, &x[4], &x4);
+        self.ext2.curve_f.assert_is_equal(native, &x[5], &x5);
         [y0, y1, y2, y3, y4, y5]
     }
 }

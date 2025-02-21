@@ -54,6 +54,18 @@ pub fn get_variable_id(v: Variable) -> usize {
     v.id
 }
 
+pub fn ensure_variable_valid(v: Variable) {
+    if v.id == 0 {
+        panic!("Variable(0) is not allowed in API calls");
+    }
+}
+
+pub fn ensure_variables_valid(vs: &[Variable]) {
+    for v in vs {
+        ensure_variable_valid(*v);
+    }
+}
+
 pub enum VariableOrValue<F: Field> {
     Variable(Variable),
     Value(F),
@@ -76,13 +88,18 @@ impl<F: Field, T: Into<F> + NotVariable + Clone> ToVariableOrValue<F> for T {
 
 impl<F: Field> ToVariableOrValue<F> for Variable {
     fn convert_to_variable_or_value(self) -> VariableOrValue<F> {
+        // In almost all API functions, the argument is impl ToVariableOrValue<C::CircuitField>.
+        // (Actually it's all but new_hint and memorized_simple_call)
+        // We need to prevent invalid (default) Variables from passing into the functions.
+        // And here's the best location to do it.
+        ensure_variable_valid(self);
         VariableOrValue::Variable(self)
     }
 }
 
 impl<F: Field> ToVariableOrValue<F> for &Variable {
     fn convert_to_variable_or_value(self) -> VariableOrValue<F> {
-        VariableOrValue::Variable(*self)
+        (*self).convert_to_variable_or_value()
     }
 }
 
@@ -399,6 +416,7 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         inputs: &[Variable],
         num_outputs: usize,
     ) -> Vec<Variable> {
+        ensure_variables_valid(inputs);
         self.instructions.push(SourceInstruction::Hint {
             hint_id: hint_key_to_id(hint_key),
             inputs: inputs.iter().map(|v| v.id).collect(),
@@ -588,6 +606,7 @@ impl<C: Config> RootAPI<C> for RootBuilder<C> {
         f: F,
         inputs: &[Variable],
     ) -> Vec<Variable> {
+        ensure_variables_valid(inputs);
         let mut hasher = tiny_keccak::Keccak::v256();
         hasher.update(b"simple");
         hasher.update(&inputs.len().to_le_bytes());
