@@ -42,32 +42,39 @@ impl<C: Config> GenericDefine<C> for MatMulCircuit {
         builder.assert_is_equal(Variable::from(r1), Variable::from(m1));
         builder.assert_is_equal(Variable::from(r2), Variable::from(n2));
 
-        let randomness = builder.get_random_value();
+        let loop_count = if C::CircuitField::SIZE == M31::SIZE {
+            3
+        } else {
+            1
+        };
 
-        let mut aux_mat = Vec::new();
-        let mut challenge = randomness;
-        aux_mat.push(Variable::from(1));
+        for _ in 0..loop_count {
+            let randomness = builder.get_random_value();
+            let mut aux_mat = Vec::new();
+            let mut challenge = randomness;
 
-        // construct the aux matrix = [1, randomness, randomness^2, ..., randomness^（n-1）]
-        for _ in 0..n2 - 1 {
-            challenge = builder.mul(challenge, randomness);
-            aux_mat.push(challenge);
-        }
+            // construct the aux matrix = [1, randomness, randomness^2, ..., randomness^（n-1）]
+            aux_mat.push(Variable::from(1));
+            for _ in 0..n2 - 1 {
+                challenge = builder.mul(challenge, randomness);
+                aux_mat.push(challenge);
+            }
 
-        let mut aux_second = vec![zero; m2];
-        let mut aux_first = vec![zero; m1];
-        let mut aux_res = vec![zero; m1];
+            let mut aux_second = vec![zero; m2];
+            let mut aux_first = vec![zero; m1];
+            let mut aux_res = vec![zero; m1];
 
-        // calculate second_mat * aux_mat,
-        self.matrix_multiply(builder, &mut aux_second, &aux_mat, &self.second_mat);
-        // calculate result_mat * aux_second
-        self.matrix_multiply(builder, &mut aux_res, &aux_mat, &self.result_mat);
-        // calculate first_mat * aux_second
-        self.matrix_multiply(builder, &mut aux_first, &aux_second, &self.first_mat);
+            // calculate second_mat * aux_mat,
+            self.matrix_multiply(builder, &mut aux_second, &aux_mat, &self.second_mat);
+            // calculate result_mat * aux_second
+            self.matrix_multiply(builder, &mut aux_res, &aux_mat, &self.result_mat);
+            // calculate first_mat * aux_second
+            self.matrix_multiply(builder, &mut aux_first, &aux_second, &self.first_mat);
 
-        // compare aux_first with aux_res
-        for i in 0..m1 {
-            builder.assert_is_equal(aux_first[i], aux_res[i]);
+            // compare aux_first with aux_res
+            for i in 0..m1 {
+                builder.assert_is_equal(aux_first[i], aux_res[i]);
+            }
         }
     }
 }
