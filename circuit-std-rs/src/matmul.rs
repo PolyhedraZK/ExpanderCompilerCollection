@@ -1,4 +1,4 @@
-use crate::StdCircuitGeneric;
+use crate::StdCircuit;
 use arith::Field;
 use expander_compiler::frontend::*;
 use std::convert::From;
@@ -23,7 +23,7 @@ declare_circuit!(_MatMulCircuit {
 
 pub type MatMulCircuit = _MatMulCircuit<Variable>;
 
-impl<C: Config> GenericDefine<C> for MatMulCircuit {
+impl<C: Config> Define<C> for MatMulCircuit {
     fn define<Builder: RootAPI<C>>(&self, builder: &mut Builder) {
         // [m1,n1] represents the first matrix's dimension
         let m1 = self.first_mat.len();
@@ -103,7 +103,7 @@ impl MatMulCircuit {
     }
 }
 
-impl<C: Config> StdCircuitGeneric<C> for MatMulCircuit {
+impl<C: Config> StdCircuit<C> for MatMulCircuit {
     type Params = MatMulParams;
     type Assignment = _MatMulCircuit<C::CircuitField>;
 

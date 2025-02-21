@@ -43,8 +43,8 @@ fn matmul_test() {
     ];
 
     for params in matmul_params.iter() {
-        common::circuit_generic_test_helper::<BN254Config, MatMulCircuit>(params);
-        common::circuit_generic_test_helper::<M31Config, MatMulCircuit>(params);
+        common::circuit_test_helper::<BN254Config, MatMulCircuit>(params);
+        common::circuit_test_helper::<M31Config, MatMulCircuit>(params);
     }
 
     //let mut rng = rand::rngs::StdRng::seed_from_u64(1235);
