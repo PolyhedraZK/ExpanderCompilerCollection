@@ -1,11 +1,7 @@
 mod common;
 
-use circuit_std_rs::{
-    matmul::{MatMulCircuit, MatMulParams},
-    StdCircuit,
-};
-use expander_compiler::frontend::{extra::debug_eval, *};
-use rand::SeedableRng;
+use circuit_std_rs::matmul::{MatMulCircuit, MatMulParams};
+use expander_compiler::frontend::*;
 
 #[test]
 fn matmul_test() {
