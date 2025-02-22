@@ -1,3 +1,4 @@
+use circuit_std_rs::sha256::m31::check_sha256_37bytes_256batch_compress;
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::proving_system::{DummyProvingSystem, ExpanderGKRProvingSystem};
 use expander_compiler::zkcuda::{context::*, kernel::*};
@@ -124,7 +125,7 @@ fn zkcuda_sha256_37bytes_hint() {
     let kernel_check_sha256_37bytes: Kernel<M31Config> = compile_sha256_37bytes().unwrap();
     println!("compile_sha256_37bytes() done");
     let data = [255; 37];
-    let repeat_time = 1;
+    let repeat_time = 64;
     let mut hash = Sha256::new();
     hash.update(data);
     let output = hash.finalize();
@@ -202,4 +203,96 @@ fn zkcuda_sha256_37bytes_simd_hint() {
             assert_eq!(unpack_output[j], output_vars[i]);
         }
     }
+}
+
+#[kernel]
+fn check_hashtable<C: Config>(
+    builder: &mut API<C>,
+    input: &[InputVariable; 37],
+    output: &mut [OutputVariable; 64*32],
+) {
+    let mut seed_bits: Vec<Variable> = vec![];
+    for i in 0..8{
+        seed_bits.extend_from_slice(&bytes_to_bits(builder, &input[i*4..(i+1)*4]));
+    }
+    let mut indices = vec![];
+    let var0 = builder.constant(0);
+    for i  in 0..64 {
+        //assume HASHTABLESIZE is less than 2^8
+        let var_i = builder.constant(i as u32);
+        let index = big_array_add_reduce(builder, &input[33..37], &[var_i, var0, var0, var0], 8);
+        indices.push(bytes_to_bits(builder, &index));
+    }
+    let mut round_bits = vec![];
+    round_bits.extend_from_slice(&bytes_to_bits(builder, &[input[32]]));
+    let mut inputs = vec![];
+    for (i, index) in indices.iter().enumerate().take(64) {
+        let mut cur_input = Vec::<Variable>::new();
+        cur_input.extend_from_slice(&seed_bits);
+        cur_input.extend_from_slice(&index[8..]);
+        cur_input.extend_from_slice(&round_bits);
+        cur_input.extend_from_slice(&index[..8]);
+        inputs.push(cur_input);
+    }
+    println!("len of inputs: {}", inputs.len());
+    let res = sha256_37bytes_256batch_compress(builder, &inputs);
+    println!("len of res: {}", res.len());
+    for i in 0..64 {
+        for j in 0..32 {
+            output[i*32+j] = res[i][j];
+        }
+    }
+}
+
+
+
+
+#[test]
+fn zkcuda_hashtable_hint() {
+    let mut hint_registry = HintRegistry::<M31>::new();
+    hint_registry.register("myhint.tobinary", to_binary_hint);
+    let kernel_check_hashtable: Kernel<M31Config> = compile_check_hashtable().unwrap();
+    println!("compile_check_hashtable() done");
+    let data = [255; 32];
+    let mut expected_output = vec![];
+    let repeat_time = 64;
+    for i in 0..64 {
+        let mut hash = Sha256::new();
+        let mut new_data = vec![];
+        new_data.extend_from_slice(&data);
+        new_data.push(0);
+        new_data.push(i);
+        new_data.extend_from_slice(&vec![0,0,0]);
+        hash.update(new_data);
+        let output = hash.finalize();
+        expected_output.push(output);
+    }
+    let mut input_vars = vec![];
+    let mut output_vars = vec![];
+    for i in 0..32 {
+        input_vars.push(M31::from(data[i] as u32));
+    }
+    for i in 32..37{
+        input_vars.push(M31::from(0 as u32));
+    }
+    for i in 0..64 {
+        for j in 0..32 {
+            output_vars.push(M31::from(expected_output[i][j] as u32));
+        }
+    }
+    let mut new_input_vars = vec![];
+    for _ in 0..repeat_time {
+        new_input_vars.push(input_vars.clone());
+    }
+    let mut ctx: Context<M31Config, ExpanderGKRProvingSystem<M31Config>, _> = Context::new(hint_registry);
+
+    let a = ctx.copy_to_device(&new_input_vars, false);
+    let mut c = None;
+    let start_time = time::Instant::now();
+    call_kernel!(ctx, kernel_check_hashtable, a, mut c);
+    let elapsed = start_time.elapsed();
+    println!("Time elapsed in call_kernel!() is: {:?}", elapsed);
+    // let c = c.reshape(&[repeat_time, 32]);
+    let result: Vec<M31> = ctx.copy_to_host(c);
+    assert_eq!(result, output_vars);
 }

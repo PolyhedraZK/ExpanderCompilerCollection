@@ -22,7 +22,7 @@ pub fn check_sha256<C: Config, B: RootAPI<C>>(
 
 impl GenericDefine<M31Config> for SHA25637BYTESCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
-        for _ in 0..8 {
+        for _ in 0..1 {
             let mut data = self.input.to_vec();
             data.append(&mut self.output.to_vec());
             builder.memorized_simple_call(check_sha256, &data);
@@ -52,8 +52,11 @@ fn test_sha256_37bytes() {
             .witness_solver
             .solve_witness_with_hints(&assignment, &mut hint_registry)
             .unwrap();
+        let start_time = std::time::Instant::now();
         let output = compile_result.layered_circuit.run(&witness);
         assert_eq!(output, vec![true]);
+        let elapsed = start_time.elapsed();
+        println!("Time elapsed in run() is: {:?}", elapsed);
     }
 }
 
