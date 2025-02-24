@@ -23,10 +23,14 @@ pub struct DummyProof {
 
 impl Proof for DummyProof {}
 
+#[deprecated(
+    note = "DummyProvingSystem is a dummy implementation for testing purposes. Please use ExpanderGKRProvingSystem."
+)]
 pub struct DummyProvingSystem<C: Config> {
     _config: std::marker::PhantomData<C>,
 }
 
+#[allow(deprecated)]
 impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
     type Proof = DummyProof;
     type Commitment = DummyCommitment<C>;
