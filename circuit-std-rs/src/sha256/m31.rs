@@ -1,6 +1,6 @@
 use super::m31_utils::{
   big_array_add, big_endian_m31_array_put_uint32, bit_array_to_m31, bytes_to_bits, cap_sigma0,
-  cap_sigma1, ch, from_binary, m31_to_bit_array, maj, sigma0, sigma1, to_binary,
+  cap_sigma1, ch, m31_to_bit_array, maj, sigma0, sigma1,
 };
 use expander_compiler::frontend::*;
 
@@ -268,7 +268,7 @@ impl MyDigest {
   }
 }
 
-pub fn sha256_37bytes<C: Config, B: RootAPI<C>>(
+pub fn sha256_37bytes_compiled<C: Config, B: RootAPI<C>>(
   builder: &mut B,
   orign_data: &[Variable],
 ) -> Vec<Variable> {
@@ -338,4 +338,24 @@ pub fn check_sha256_37bytes<C: Config, B: RootAPI<C>>(
         builder.assert_is_equal(result[i], output[i]);
     }
     result
+}
+
+pub fn sha256_37bytes<C: Config, B: RootAPI<C>>(
+    builder: &mut B,
+    origin_data: &[Variable],
+) -> Vec<Variable> {
+    let mut data = origin_data.to_vec();
+    let n = data.len();
+    if n != 32 + 1 + 4 {
+        panic!("len(orignData) !=  32+1+4")
+    }
+    let mut pre_pad = vec![builder.constant(0); 64 - 37];
+    pre_pad[0] = builder.constant(128); //0x80
+    pre_pad[64 - 37 - 2] = builder.constant((37) * 8 / 256); //length byte
+    pre_pad[64 - 37 - 1] = builder.constant((32 + 1 + 4) * 8 - 256); //length byte
+    data.append(&mut pre_pad); //append padding
+    let mut d = MyDigest::new(builder);
+    d.reset(builder);
+    d.chunk_write(builder, &data);
+    d.return_sum(builder).to_vec()
 }
