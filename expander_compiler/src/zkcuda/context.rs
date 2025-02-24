@@ -617,7 +617,7 @@ impl<C: Config> ComputationGraph<C> {
         {
             if !P::verify(
                 &self.kernels[template.kernel_id],
-                &proof,
+                proof,
                 &template
                     .commitment_indices
                     .iter()
