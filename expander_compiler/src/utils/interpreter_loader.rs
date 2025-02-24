@@ -1,3 +1,6 @@
+use mersenne31::M31;
+use arith::FieldForECC;
+
 use crate::frontend::{Config, RootAPI, Variable};
 
 pub struct M31Loader {
@@ -8,6 +11,14 @@ impl M31Loader {
 
   pub fn new() -> Self {
     M31Loader { symbols: vec![] }
+  }
+
+  pub fn to_binary_hint(x: &[M31], y: &mut [M31]) -> Result<(), super::error::Error> {
+      let t = x[0].to_u256();
+      for (i, k) in y.iter_mut().enumerate() {
+          *k = M31::from_u256(t >> i as u32 & 1);
+      }
+      Ok(())
   }
 
   /// Add two m31 numbers
