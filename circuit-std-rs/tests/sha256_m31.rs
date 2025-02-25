@@ -20,7 +20,7 @@ pub fn check_sha256<C: Config, B: RootAPI<C>>(
     result
 }
 
-impl GenericDefine<M31Config> for SHA25637BYTESCircuit<Variable> {
+impl Define<M31Config> for SHA25637BYTESCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         for _ in 0..8 {
             let mut data = self.input.to_vec();
@@ -35,7 +35,7 @@ fn test_sha256_37bytes() {
     let mut hint_registry = HintRegistry::<M31>::new();
     hint_registry.register("myhint.tobinary", to_binary_hint);
     let compile_result =
-        compile_generic(&SHA25637BYTESCircuit::default(), CompileOptions::default()).unwrap();
+        compile(&SHA25637BYTESCircuit::default(), CompileOptions::default()).unwrap();
     for i in 0..1 {
         let data = [i; 37];
         let mut hash = Sha256::new();

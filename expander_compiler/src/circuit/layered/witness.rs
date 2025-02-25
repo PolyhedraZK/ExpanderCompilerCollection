@@ -1,12 +1,206 @@
-use super::*;
-use crate::{circuit::config::Config, field::FieldModulus, utils::serde::Serde};
+use std::any::{Any, TypeId};
+use std::mem;
 
-#[derive(Debug)]
+use arith::SimdField;
+
+use super::*;
+use crate::{
+    circuit::config::Config,
+    field::{Field, FieldModulus},
+    utils::serde::Serde,
+};
+
+#[derive(Clone, Debug)]
+pub enum WitnessValues<C: Config> {
+    Scalar(Vec<C::CircuitField>),
+    Simd(Vec<C::DefaultSimdField>),
+}
+
+#[derive(Clone, Debug)]
 pub struct Witness<C: Config> {
     pub num_witnesses: usize,
     pub num_inputs_per_witness: usize,
     pub num_public_inputs_per_witness: usize,
-    pub values: Vec<C::CircuitField>,
+    pub values: WitnessValues<C>,
+}
+
+fn unpack_block<F: Field, SF: arith::SimdField<Scalar = F>>(
+    s: &[SF],
+    a: usize,
+    b: usize,
+) -> Vec<(Vec<F>, Vec<F>)> {
+    let pack_size = SF::PACK_SIZE;
+    let mut res = Vec::with_capacity(pack_size);
+    for _ in 0..pack_size {
+        res.push((Vec::with_capacity(a), Vec::with_capacity(b)));
+    }
+    for x in s.iter().take(a) {
+        let tmp = x.unpack();
+        for j in 0..pack_size {
+            res[j].0.push(tmp[j]);
+        }
+    }
+    for x in s.iter().skip(a).take(b) {
+        let tmp = x.unpack();
+        for j in 0..pack_size {
+            res[j].1.push(tmp[j]);
+        }
+    }
+    res
+}
+
+fn pack_block<F: Field, SF: arith::SimdField<Scalar = F>>(
+    s: &[F],
+    a: usize,
+    b: usize,
+) -> (Vec<SF>, Vec<SF>) {
+    let pack_size = SF::PACK_SIZE;
+    let mut res = Vec::with_capacity(a);
+    let mut res2 = Vec::with_capacity(b);
+    let s_size = (s.len() / (a + b)).min(pack_size);
+    for i in 0..a {
+        let mut tmp = Vec::with_capacity(pack_size);
+        for j in 0..s_size {
+            tmp.push(s[j * (a + b) + i]);
+        }
+        // fill the rest with the last element
+        for _ in s_size..pack_size {
+            tmp.push(s[(s_size - 1) * (a + b) + i]);
+        }
+        res.push(SF::pack(&tmp));
+    }
+    for i in a..a + b {
+        let mut tmp = Vec::with_capacity(pack_size);
+        for j in 0..s_size {
+            tmp.push(s[j * (a + b) + i]);
+        }
+        // fill the rest with the last element
+        for _ in s_size..pack_size {
+            tmp.push(s[(s_size - 1) * (a + b) + i]);
+        }
+        res2.push(SF::pack(&tmp));
+    }
+    (res, res2)
+}
+
+fn use_simd<C: Config>(num_witnesses: usize) -> bool {
+    num_witnesses > 1 && C::DefaultSimdField::PACK_SIZE > 1
+}
+
+type UnpackedBlock<C> = Vec<(
+    Vec<<C as Config>::CircuitField>,
+    Vec<<C as Config>::CircuitField>,
+)>;
+
+pub struct WitnessIteratorScalar<'a, C: Config> {
+    witness: &'a Witness<C>,
+    index: usize,
+    buf_unpacked: UnpackedBlock<C>,
+}
+
+impl<'a, C: Config> Iterator for WitnessIteratorScalar<'a, C> {
+    type Item = (Vec<C::CircuitField>, Vec<C::CircuitField>);
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index >= self.witness.num_witnesses {
+            return None;
+        }
+        let a = self.witness.num_inputs_per_witness;
+        let b = self.witness.num_public_inputs_per_witness;
+        match &self.witness.values {
+            WitnessValues::Scalar(values) => {
+                let res = (
+                    values[self.index * (a + b)..self.index * (a + b) + a].to_vec(),
+                    values[self.index * (a + b) + a..self.index * (a + b) + a + b].to_vec(),
+                );
+                self.index += 1;
+                Some(res)
+            }
+            WitnessValues::Simd(values) => {
+                let pack_size = C::DefaultSimdField::PACK_SIZE;
+                if self.index % pack_size == 0 {
+                    self.buf_unpacked =
+                        unpack_block(&values[(self.index / pack_size) * (a + b)..], a, b);
+                }
+                let res = (
+                    mem::take(&mut self.buf_unpacked[self.index % pack_size].0),
+                    mem::take(&mut self.buf_unpacked[self.index % pack_size].1),
+                );
+                self.index += 1;
+                Some(res)
+            }
+        }
+    }
+}
+
+pub struct WitnessIteratorSimd<'a, C: Config> {
+    witness: &'a Witness<C>,
+    index: usize,
+}
+
+impl<'a, C: Config> Iterator for WitnessIteratorSimd<'a, C> {
+    type Item = (Vec<C::DefaultSimdField>, Vec<C::DefaultSimdField>);
+    fn next(&mut self) -> Option<Self::Item> {
+        let pack_size = C::DefaultSimdField::PACK_SIZE;
+        if self.index * pack_size >= self.witness.num_witnesses {
+            return None;
+        }
+        let a = self.witness.num_inputs_per_witness;
+        let b = self.witness.num_public_inputs_per_witness;
+        match &self.witness.values {
+            WitnessValues::Scalar(values) => {
+                let (inputs, public_inputs) =
+                    pack_block(&values[self.index * pack_size * (a + b)..], a, b);
+                self.index += 1;
+                Some((inputs, public_inputs))
+            }
+            WitnessValues::Simd(values) => {
+                let inputs = values[self.index * (a + b)..self.index * (a + b) + a].to_vec();
+                let public_inputs =
+                    values[self.index * (a + b) + a..self.index * (a + b) + a + b].to_vec();
+                self.index += 1;
+                Some((inputs, public_inputs))
+            }
+        }
+    }
+}
+
+impl<C: Config> Witness<C> {
+    pub fn iter_scalar(&self) -> WitnessIteratorScalar<'_, C> {
+        WitnessIteratorScalar {
+            witness: self,
+            index: 0,
+            buf_unpacked: Vec::new(),
+        }
+    }
+
+    pub fn iter_simd(&self) -> WitnessIteratorSimd<'_, C> {
+        WitnessIteratorSimd {
+            witness: self,
+            index: 0,
+        }
+    }
+
+    fn convert_to_simd(&mut self) {
+        let values = match &self.values {
+            WitnessValues::Scalar(values) => values,
+            WitnessValues::Simd(_) => {
+                return;
+            }
+        };
+        let mut res = Vec::new();
+        let a = self.num_inputs_per_witness + self.num_public_inputs_per_witness;
+        let pack_size = C::DefaultSimdField::PACK_SIZE;
+        let num_blocks = (self.num_witnesses + pack_size - 1) / pack_size;
+        for i in 0..num_blocks {
+            let tmp = pack_block::<C::CircuitField, C::DefaultSimdField>(
+                &values[i * pack_size * a..],
+                a,
+                0,
+            );
+            res.extend(tmp.0);
+        }
+        self.values = WitnessValues::Simd(res);
+    }
 }
 
 impl<C: Config, I: InputType> Circuit<C, I> {
@@ -14,24 +208,29 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         if witness.num_witnesses == 0 {
             panic!("expected at least 1 witness")
         }
-        let mut res = Vec::new();
-        let a = witness.num_inputs_per_witness;
-        let b = witness.num_public_inputs_per_witness;
-        for i in 0..witness.num_witnesses {
-            let (_, out) = self.eval_with_public_inputs(
-                witness.values[i * (a + b)..i * (a + b) + a].to_vec(),
-                &witness.values[i * (a + b) + a..i * (a + b) + a + b],
-            );
-            res.push(out);
+        if use_simd::<C>(witness.num_witnesses) {
+            let mut res = Vec::new();
+            for (inputs, public_inputs) in witness.iter_simd() {
+                let (_, out) = self.eval_with_public_inputs_simd(inputs, &public_inputs);
+                res.extend(out);
+            }
+            res.truncate(witness.num_witnesses);
+            res
+        } else {
+            let mut res = Vec::new();
+            for (inputs, public_inputs) in witness.iter_scalar() {
+                let (_, out) = self.eval_with_public_inputs(inputs, &public_inputs);
+                res.push(out);
+            }
+            res
         }
-        res
     }
 }
 
 impl<C: Config> Witness<C> {
     pub fn to_simd<T>(&self) -> (Vec<T>, Vec<T>)
     where
-        T: arith::SimdField<Scalar = C::CircuitField>,
+        T: arith::SimdField<Scalar = C::CircuitField> + 'static,
     {
         match self.num_witnesses.cmp(&T::PACK_SIZE) {
             std::cmp::Ordering::Less => {
@@ -50,23 +249,30 @@ impl<C: Config> Witness<C> {
             }
             std::cmp::Ordering::Equal => {}
         }
-        let ni = self.num_inputs_per_witness;
-        let np = self.num_public_inputs_per_witness;
-        let mut res = Vec::with_capacity(ni);
-        let mut res_public = Vec::with_capacity(np);
-        for i in 0..ni + np {
-            let mut values: Vec<C::CircuitField> = (0..self.num_witnesses.min(T::PACK_SIZE))
-                .map(|j| self.values[j * (ni + np) + i])
-                .collect();
-            values.resize(T::PACK_SIZE, C::CircuitField::zero());
-            let simd_value = T::pack(&values);
-            if i < ni {
-                res.push(simd_value);
-            } else {
-                res_public.push(simd_value);
+        let a = self.num_inputs_per_witness;
+        let b = self.num_public_inputs_per_witness;
+        match &self.values {
+            WitnessValues::Scalar(values) => pack_block(values, a, b),
+            WitnessValues::Simd(values) => {
+                if TypeId::of::<T>() == TypeId::of::<C::DefaultSimdField>() {
+                    let inputs = values[..a].to_vec();
+                    let public_inputs = values[a..a + b].to_vec();
+                    let tmp: Box<dyn Any> = Box::new((inputs, public_inputs));
+                    match tmp.downcast::<(Vec<T>, Vec<T>)>() {
+                        Ok(t) => {
+                            return *t;
+                        }
+                        Err(_) => panic!("downcast failed"),
+                    }
+                }
+                let mut tmp = Vec::new();
+                for (x, y) in self.iter_scalar().take(T::PACK_SIZE) {
+                    tmp.extend(x);
+                    tmp.extend(y);
+                }
+                pack_block(&tmp, a, b)
             }
         }
-        (res, res_public)
     }
 }
 
@@ -88,12 +294,16 @@ impl<C: Config> Serde for Witness<C> {
         for _ in 0..num_witnesses * (num_inputs_per_witness + num_public_inputs_per_witness) {
             values.push(C::CircuitField::deserialize_from(&mut reader)?);
         }
-        Ok(Self {
+        let mut res = Self {
             num_witnesses,
             num_inputs_per_witness,
             num_public_inputs_per_witness,
-            values,
-        })
+            values: WitnessValues::Scalar(values),
+        };
+        if use_simd::<C>(num_witnesses) {
+            res.convert_to_simd();
+        }
+        Ok(res)
     }
     fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> Result<(), std::io::Error> {
         self.num_witnesses.serialize_into(&mut writer)?;
@@ -101,9 +311,55 @@ impl<C: Config> Serde for Witness<C> {
         self.num_public_inputs_per_witness
             .serialize_into(&mut writer)?;
         C::CircuitField::MODULUS.serialize_into(&mut writer)?;
-        for v in &self.values {
-            v.serialize_into(&mut writer)?;
+        match &self.values {
+            WitnessValues::Scalar(values) => {
+                for v in values {
+                    v.serialize_into(&mut writer)?;
+                }
+            }
+            WitnessValues::Simd(_) => {
+                for (a, b) in self.iter_scalar() {
+                    for v in a {
+                        v.serialize_into(&mut writer)?;
+                    }
+                    for v in b {
+                        v.serialize_into(&mut writer)?;
+                    }
+                }
+            }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::circuit::config::M31Config;
+    use crate::field::M31;
+
+    #[test]
+    fn basic_simd() {
+        let n = 29;
+        let a = 17;
+        let b = 5;
+        let mut v = Vec::new();
+        for _ in 0..n * (a + b) {
+            v.push(M31::random_unsafe(&mut rand::thread_rng()));
+        }
+        let w1: Witness<M31Config> = Witness {
+            num_witnesses: n,
+            num_inputs_per_witness: a,
+            num_public_inputs_per_witness: b,
+            values: WitnessValues::<M31Config>::Scalar(v),
+        };
+        let mut w2 = w1.clone();
+        w2.convert_to_simd();
+        let w1_iv_sc = w1.iter_scalar().collect::<Vec<_>>();
+        let w2_iv_sc = w2.iter_scalar().collect::<Vec<_>>();
+        let w1_iv_sm = w1.iter_simd().collect::<Vec<_>>();
+        let w2_iv_sm = w2.iter_simd().collect::<Vec<_>>();
+        assert_eq!(w1_iv_sc, w2_iv_sc);
+        assert_eq!(w1_iv_sm, w2_iv_sm);
     }
 }
