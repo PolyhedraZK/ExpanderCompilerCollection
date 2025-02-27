@@ -125,18 +125,18 @@ declare_circuit!(ShuffleCircuit {
     position_bit_results: [Variable; SHUFFLE_ROUND * VALIDATOR_CHUNK_SIZE], //HINT
     flip_results: [Variable; SHUFFLE_ROUND * VALIDATOR_CHUNK_SIZE],     //HINT
     //attestationdata
-    slot: [Variable; 8],                      //PUBLIC
-    committee_index: [Variable; 8],           //PUBLIC
-    beacon_beacon_block_root: [Variable; 32], //PUBLIC
-    source_epoch: [Variable; 8],              //PUBLIC
-    target_epoch: [Variable; 8],              //PUBLIC
-    source_root: [Variable; 32],              //PUBLIC
-    target_root: [Variable; 32],              //PUBLIC
-    //attestationhm = hashtog2(attestationdata.signingroot()), a g2 point
-    attestation_hm: [[[Variable; 48]; 2]; 2], //PUBLIC
+    // slot: [Variable; 8],                      //PUBLIC
+    // committee_index: [Variable; 8],           //PUBLIC
+    // beacon_beacon_block_root: [Variable; 32], //PUBLIC
+    // source_epoch: [Variable; 8],              //PUBLIC
+    // target_epoch: [Variable; 8],              //PUBLIC
+    // source_root: [Variable; 32],              //PUBLIC
+    // target_root: [Variable; 32],              //PUBLIC
+    // //attestationhm = hashtog2(attestationdata.signingroot()), a g2 point
+    // attestation_hm: [[[Variable; 48]; 2]; 2], //PUBLIC
     //attestationsig
-    attestation_sig_bytes: [Variable; 96],              //PUBLIC
-    attestation_sig_g2: [[[Variable; 48]; 2]; 2], //PCS: public sig, share with bls_verifier circuit
+    // attestation_sig_bytes: [Variable; 96],              //PUBLIC
+    // attestation_sig_g2: [[[Variable; 48]; 2]; 2], //PCS: public sig, share with bls_verifier circuit
     aggregation_bits: [Variable; VALIDATOR_CHUNK_SIZE], //PUBLIC
     validator_hashes: [[Variable; POSEIDON_HASH_LENGTH]; VALIDATOR_CHUNK_SIZE], //HINT, share with permutation circuit
     aggregated_pubkey: [[Variable; 48]; 2], //PCS: public public_key, share with bls_verifier circuit
@@ -261,57 +261,57 @@ impl ShuffleCircuit<M31> {
                 self.withdrawable_epoch[i][j] = M31::from(*withdrawable_epoch_byte as u32);
             }
 
-            //assign slot
-            let slot = attestation.data.slot.to_le_bytes();
-            for (j, slot_byte) in slot.iter().enumerate() {
-                self.slot[j] = M31::from(*slot_byte as u32);
-            }
-            //assign committee_index
-            let committee_index = attestation.data.committee_index.to_le_bytes();
-            for (j, committee_index_byte) in committee_index.iter().enumerate() {
-                self.committee_index[j] = M31::from(*committee_index_byte as u32);
-            }
-            //assign beacon_beacon_block_root
-            let beacon_beacon_block_root = attestation.data.beacon_block_root.clone();
-            let beacon_beacon_block_root = STANDARD.decode(beacon_beacon_block_root).unwrap();
-            for (j, beacon_beacon_block_root_byte) in beacon_beacon_block_root.iter().enumerate() {
-                self.beacon_beacon_block_root[j] = M31::from(*beacon_beacon_block_root_byte as u32);
-            }
-            //assign source_epoch
-            let source_epoch = attestation.data.source.epoch.to_le_bytes();
-            for (j, source_epoch_byte) in source_epoch.iter().enumerate() {
-                self.source_epoch[j] = M31::from(*source_epoch_byte as u32);
-            }
-            //assign target_epoch
-            let target_epoch = attestation.data.target.epoch.to_le_bytes();
-            for (j, target_epoch_byte) in target_epoch.iter().enumerate() {
-                self.target_epoch[j] = M31::from(*target_epoch_byte as u32);
-            }
-            //assign source_root
-            let source_root = attestation.data.source.root.clone();
-            let source_root = STANDARD.decode(source_root).unwrap();
-            for (j, source_root_byte) in source_root.iter().enumerate() {
-                self.source_root[j] = M31::from(*source_root_byte as u32);
-            }
-            //assign target_root
-            let target_root = attestation.data.target.root.clone();
-            let target_root = STANDARD.decode(target_root).unwrap();
-            for (j, target_root_byte) in target_root.iter().enumerate() {
-                self.target_root[j] = M31::from(*target_root_byte as u32);
-            }
-            //assign attestation_hm
-            self.attestation_hm[0] = convert_point(pairing_entry.hm.p.x.clone());
-            self.attestation_hm[1] = convert_point(pairing_entry.hm.p.y.clone());
+            // //assign slot
+            // let slot = attestation.data.slot.to_le_bytes();
+            // for (j, slot_byte) in slot.iter().enumerate() {
+            //     self.slot[j] = M31::from(*slot_byte as u32);
+            // }
+            // //assign committee_index
+            // let committee_index = attestation.data.committee_index.to_le_bytes();
+            // for (j, committee_index_byte) in committee_index.iter().enumerate() {
+            //     self.committee_index[j] = M31::from(*committee_index_byte as u32);
+            // }
+            // //assign beacon_beacon_block_root
+            // let beacon_beacon_block_root = attestation.data.beacon_block_root.clone();
+            // let beacon_beacon_block_root = STANDARD.decode(beacon_beacon_block_root).unwrap();
+            // for (j, beacon_beacon_block_root_byte) in beacon_beacon_block_root.iter().enumerate() {
+            //     self.beacon_beacon_block_root[j] = M31::from(*beacon_beacon_block_root_byte as u32);
+            // }
+            // //assign source_epoch
+            // let source_epoch = attestation.data.source.epoch.to_le_bytes();
+            // for (j, source_epoch_byte) in source_epoch.iter().enumerate() {
+            //     self.source_epoch[j] = M31::from(*source_epoch_byte as u32);
+            // }
+            // //assign target_epoch
+            // let target_epoch = attestation.data.target.epoch.to_le_bytes();
+            // for (j, target_epoch_byte) in target_epoch.iter().enumerate() {
+            //     self.target_epoch[j] = M31::from(*target_epoch_byte as u32);
+            // }
+            // //assign source_root
+            // let source_root = attestation.data.source.root.clone();
+            // let source_root = STANDARD.decode(source_root).unwrap();
+            // for (j, source_root_byte) in source_root.iter().enumerate() {
+            //     self.source_root[j] = M31::from(*source_root_byte as u32);
+            // }
+            // //assign target_root
+            // let target_root = attestation.data.target.root.clone();
+            // let target_root = STANDARD.decode(target_root).unwrap();
+            // for (j, target_root_byte) in target_root.iter().enumerate() {
+            //     self.target_root[j] = M31::from(*target_root_byte as u32);
+            // }
+            // //assign attestation_hm
+            // self.attestation_hm[0] = convert_point(pairing_entry.hm.p.x.clone());
+            // self.attestation_hm[1] = convert_point(pairing_entry.hm.p.y.clone());
 
-            //assign attestation_sig_bytes
-            let attestation_sig_bytes = attestation.signature.clone();
-            let attestation_sig_bytes = STANDARD.decode(attestation_sig_bytes).unwrap();
-            for (j, attestation_sig_byte) in attestation_sig_bytes.iter().enumerate() {
-                self.attestation_sig_bytes[j] = M31::from(*attestation_sig_byte as u32);
-            }
-            //assign attestation_sig_g2
-            self.attestation_sig_g2[0] = convert_point(pairing_entry.signature.p.x.clone());
-            self.attestation_sig_g2[1] = convert_point(pairing_entry.signature.p.y.clone());
+            // //assign attestation_sig_bytes
+            // let attestation_sig_bytes = attestation.signature.clone();
+            // let attestation_sig_bytes = STANDARD.decode(attestation_sig_bytes).unwrap();
+            // for (j, attestation_sig_byte) in attestation_sig_bytes.iter().enumerate() {
+            //     self.attestation_sig_bytes[j] = M31::from(*attestation_sig_byte as u32);
+            // }
+            // //assign attestation_sig_g2
+            // self.attestation_sig_g2[0] = convert_point(pairing_entry.signature.p.x.clone());
+            // self.attestation_sig_g2[1] = convert_point(pairing_entry.signature.p.y.clone());
         }
     }
     pub fn from_pubkey_bls(&mut self, committee_indices: Vec<u32>, pubkey_bls: Vec<Vec<String>>) {
@@ -445,50 +445,51 @@ impl GenericDefine<M31Config> for ShuffleCircuit<Variable> {
                 builder.assert_is_equal(hashbit, self.validator_hashes[index][i]);
             }
         }
-        // attestation
-        let att_ssz = AttestationDataSSZ {
-            slot: self.slot,
-            committee_index: self.committee_index,
-            beacon_block_root: self.beacon_beacon_block_root,
-            source_epoch: self.source_epoch,
-            target_epoch: self.target_epoch,
-            source_root: self.source_root,
-            target_root: self.target_root,
-        };
-        let mut g2 = G2::new(builder);
-        // domain
-        let domain = [
-            1, 0, 0, 0, 187, 164, 218, 150, 53, 76, 159, 37, 71, 108, 241, 188, 105, 191, 88, 58,
-            127, 158, 10, 240, 73, 48, 91, 98, 222, 103, 102, 64,
-        ];
-        let mut domain_var = vec![];
-        for domain_byte in domain.iter() {
-            domain_var.push(builder.constant(*domain_byte as u32));
-        }
-        let att_hash = att_ssz.att_data_signing_root(builder, &domain_var); //msg
-                                                                            //map to hm
-        let (hm0, hm1) = g2.hash_to_fp(builder, &att_hash);
-        let hm_g2 = g2.map_to_g2(builder, &hm0, &hm1);
-        let expected_hm_g2 = G2AffP::from_vars(
-            self.attestation_hm[0][0].to_vec(),
-            self.attestation_hm[0][1].to_vec(),
-            self.attestation_hm[1][0].to_vec(),
-            self.attestation_hm[1][1].to_vec(),
-        );
-        g2.assert_is_equal(builder, &hm_g2, &expected_hm_g2);
-        // unmarshal attestation sig
-        let sig_g2 = g2.uncompressed(builder, &self.attestation_sig_bytes);
-        let expected_sig_g2 = G2AffP::from_vars(
-            self.attestation_sig_g2[0][0].to_vec(),
-            self.attestation_sig_g2[0][1].to_vec(),
-            self.attestation_sig_g2[1][0].to_vec(),
-            self.attestation_sig_g2[1][1].to_vec(),
-        );
-        g2.assert_is_equal(builder, &sig_g2, &expected_sig_g2);
-        g2.ext2.curve_f.check_mul(builder);
-        g2.ext2.curve_f.table.final_check(builder);
-        g2.ext2.curve_f.table.final_check(builder);
-        g2.ext2.curve_f.table.final_check(builder);
+        // // attestation
+        // let att_ssz = AttestationDataSSZ {
+        //     slot: self.slot,
+        //     committee_index: self.committee_index,
+        //     beacon_block_root: self.beacon_beacon_block_root,
+        //     source_epoch: self.source_epoch,
+        //     target_epoch: self.target_epoch,
+        //     source_root: self.source_root,
+        //     target_root: self.target_root,
+        // };
+        // let mut g2 = G2::new(builder);
+        // // domain
+        // let domain = [
+        //     1, 0, 0, 0, 187, 164, 218, 150, 53, 76, 159, 37, 71, 108, 241, 188, 105, 191, 88, 58,
+        //     127, 158, 10, 240, 73, 48, 91, 98, 222, 103, 102, 64,
+        // ];
+        // let mut domain_var = vec![];
+        // for domain_byte in domain.iter() {
+        //     domain_var.push(builder.constant(*domain_byte as u32));
+        // }
+        // let att_hash = att_ssz.att_data_signing_root(builder, &domain_var); //msg
+        //                                                                     // map to hm
+        // let (hm0, hm1) = g2.hash_to_fp(builder, &att_hash);
+        // let hm_g2 = g2.map_to_g2(builder, &hm0, &hm1);
+        // let expected_hm_g2 = G2AffP::from_vars(
+        //     self.attestation_hm[0][0].to_vec(),
+        //     self.attestation_hm[0][1].to_vec(),
+        //     self.attestation_hm[1][0].to_vec(),
+        //     self.attestation_hm[1][1].to_vec(),
+        // );
+        // g2.assert_is_equal(builder, &hm_g2, &expected_hm_g2);
+        // // unmarshal attestation sig
+        // let sig_g2 = g2.uncompressed(builder, &self.attestation_sig_bytes);
+        // let expected_sig_g2 = G2AffP::from_vars(
+        //     self.attestation_sig_g2[0][0].to_vec(),
+        //     self.attestation_sig_g2[0][1].to_vec(),
+        //     self.attestation_sig_g2[1][0].to_vec(),
+        //     self.attestation_sig_g2[1][1].to_vec(),
+        // );
+        // g2.assert_is_equal(builder, &sig_g2, &expected_sig_g2);
+
+        // g2.ext2.curve_f.check_mul(builder);
+        // g2.ext2.curve_f.table.final_check(builder);
+        // g2.ext2.curve_f.table.final_check(builder);
+        // g2.ext2.curve_f.table.final_check(builder);
 
         g1.curve_f.check_mul(builder);
         g1.curve_f.table.final_check(builder);
@@ -682,7 +683,7 @@ pub fn generate_shuffle_witnesses(dir: &str) {
         println!("preparing solver...");
         ensure_directory_exists("./witnesses/shuffle");
 
-        let file_name = "solver_shuffle.txt";
+        let file_name = "solver_shuffle1.txt";
         let w_s = if std::fs::metadata(file_name).is_ok() {
             println!("The solver exists!");
             let file = std::fs::File::open(file_name).unwrap();
@@ -899,10 +900,10 @@ pub fn end2end_shuffle_witnesses(
     });
 }
 
-// #[test]
-// fn test_generate_shuffle2_witnesses() {
-//     generate_shuffle_witnesses("./data");
-// }
+#[test]
+fn test_generate_shuffle_witnesses() {
+    generate_shuffle_witnesses("./data");
+}
 
 // #[test]
 // fn run_shuffle2() {

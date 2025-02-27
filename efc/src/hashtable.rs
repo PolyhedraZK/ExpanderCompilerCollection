@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::thread;
 
 pub const SHA256LEN: usize = 32;
-pub const HASHTABLESIZE: usize = 64;
+pub const HASHTABLESIZE: usize = 256;
 #[derive(Clone, Copy, Debug)]
 pub struct HashTableParams {
     pub table_size: usize,
@@ -73,8 +73,8 @@ impl GenericDefine<M31Config> for HASHTABLECircuit<Variable> {
 
 pub fn generate_hash_witnesses(dir: &str) {
     println!("preparing solver...");
-    ensure_directory_exists("./witnesses/hashtable");
-    let file_name = "solver_hashtable64.txt";
+    ensure_directory_exists("./witnesses/hashtable256");
+    let file_name = "solver_hashtable256.txt";
     let w_s = if std::fs::metadata(file_name).is_ok() {
         println!("The solver exists!");
         let file = std::fs::File::open(file_name).unwrap();
@@ -94,7 +94,7 @@ pub fn generate_hash_witnesses(dir: &str) {
             witness_solver,
             layered_circuit,
         } = compile_result;
-        let file = std::fs::File::create("circuit_hashtable64.txt").unwrap();
+        let file = std::fs::File::create("circuit_hashtable256.txt").unwrap();
         let writer = std::io::BufWriter::new(file);
         layered_circuit.serialize_into(writer).unwrap();
         witness_solver
@@ -120,7 +120,7 @@ pub fn generate_hash_witnesses(dir: &str) {
         for j in 0..HASHTABLESIZE {
             for k in 0..32 {
                 hash_assignment.output[j][k] =
-                    M31::from(cur_hashtable_data.hash_outputs[j][k] as u32);
+                    M31::from(cur_hashtable_data.hash_outputs[j%64][k] as u32);
             }
         }
         assignments.push(hash_assignment);
@@ -144,7 +144,7 @@ pub fn generate_hash_witnesses(dir: &str) {
                 let witness = witness_solver
                     .solve_witnesses_with_hints(&assignments, &mut hint_registry)
                     .unwrap();
-                let file_name = format!("./witnesses/hashtable/witness_{}.txt", i);
+                let file_name = format!("./witnesses/hashtable256/witness_{}.txt", i);
                 let file = std::fs::File::create(file_name).unwrap();
                 let writer = std::io::BufWriter::new(file);
                 witness.serialize_into(writer).unwrap();

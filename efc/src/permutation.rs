@@ -140,7 +140,7 @@ fn test_permutationquery() {
     );
 }
 
-pub const QUERY_SIZE: usize = 1024 * 1024;
+pub const QUERY_SIZE: usize = 1024 * 1024 * 2;
 pub const VALIDATOR_COUNT: usize = QUERY_SIZE * 2;
 declare_circuit!(PermutationIndicesValidatorHashesCircuit {
     query_indices: [Variable; QUERY_SIZE],
@@ -224,16 +224,16 @@ impl PermutationIndicesValidatorHashesCircuit<M31> {
         for i in 0..VALIDATOR_COUNT {
             for j in 0..POSEIDON_M31X16_RATE {
                 assignment.table_validator_hashes[i][j] =
-                    M31::from(entry.table_validator_hashes[i][j]);
+                    M31::from(entry.table_validator_hashes[i%QUERY_SIZE][j]);
             }
-            assignment.real_keys[i] = M31::from(entry.real_keys[i]);
-            assignment.active_validator_bits[i] = M31::from(entry.active_validator_bits[i]);
+            assignment.real_keys[i] = M31::from(entry.real_keys[i%QUERY_SIZE]);
+            assignment.active_validator_bits[i] = M31::from(entry.active_validator_bits[i%QUERY_SIZE]);
         }
         for i in 0..QUERY_SIZE {
-            assignment.query_indices[i] = M31::from(entry.query_indices[i]);
+            assignment.query_indices[i] = M31::from(entry.query_indices[i%(QUERY_SIZE/2)]);
             for j in 0..POSEIDON_M31X16_RATE {
                 assignment.query_validator_hashes[i][j] =
-                    M31::from(entry.query_validator_hashes[i][j]);
+                    M31::from(entry.query_validator_hashes[i%(QUERY_SIZE/2)][j]);
             }
         }
         for i in 0..POSEIDON_M31X16_RATE {
@@ -596,6 +596,7 @@ pub fn generate_permutation_hashbit_witnesses(dir: &str) {
                 CompileOptions::default(),
             )
             .unwrap();
+            // panic!("Please check the code below");
             let file = std::fs::File::create(&file_name).unwrap();
             let writer = std::io::BufWriter::new(file);
             compile_result

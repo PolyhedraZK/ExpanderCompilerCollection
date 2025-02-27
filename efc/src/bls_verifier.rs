@@ -1,10 +1,13 @@
 use std::sync::Arc;
 use std::thread;
+use crate::attestation::{Attestation, AttestationDataSSZ};
 
 use circuit_std_rs::gnark::emulated::sw_bls12381::g1::*;
 use circuit_std_rs::gnark::emulated::sw_bls12381::g2::*;
 use circuit_std_rs::gnark::emulated::sw_bls12381::pairing::*;
 use circuit_std_rs::utils::register_hint;
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
 use expander_compiler::circuit::ir::hint_normalized::witness_solver;
 use expander_compiler::compile::CompileOptions;
 use expander_compiler::declare_circuit;
@@ -143,7 +146,7 @@ impl GenericDefine<M31Config> for PairingCircuit<Variable> {
 pub fn generate_pairing_witnesses(dir: &str) {
     println!("preparing solver...");
     ensure_directory_exists("./witnesses/pairing");
-    let file_name = "solver_pairing.txt";
+    let file_name = "solver_pairing1.txt";
     let w_s = if std::fs::metadata(file_name).is_ok() {
         println!("The solver exists!");
         let file = std::fs::File::open(file_name).unwrap();
@@ -153,6 +156,7 @@ pub fn generate_pairing_witnesses(dir: &str) {
         println!("The solver does not exist.");
         let compile_result =
             compile_generic(&PairingCircuit::default(), CompileOptions::default()).unwrap();
+        panic!("");
         let file = std::fs::File::create(file_name).unwrap();
         let writer = std::io::BufWriter::new(file);
         compile_result
@@ -264,10 +268,228 @@ pub fn end2end_pairing_witness(w_s: WitnessSolver<M31Config>, pairing_data: Vec<
         end_time.duration_since(start_time)
     );
 }
+
 #[test]
 fn test_pairing() {
     let dir = "./data";
     generate_pairing_witnesses(dir);
+}
+
+declare_circuit!(BLSVERIFIERCircuit {
+    pubkey: [[Variable; 48]; 2],
+
+    attestation_sig_bytes: [Variable; 96],              //PUBLIC
+    slot: [Variable; 8],                      //PUBLIC
+    committee_index: [Variable; 8],           //PUBLIC
+    beacon_beacon_block_root: [Variable; 32], //PUBLIC
+    source_epoch: [Variable; 8],              //PUBLIC
+    target_epoch: [Variable; 8],              //PUBLIC
+    source_root: [Variable; 32],              //PUBLIC
+    target_root: [Variable; 32],              //PUBLIC
+});
+
+impl BLSVERIFIERCircuit<M31> {
+    pub fn from_entry(&mut self, entry: &PairingEntry, attestation: &Attestation){
+        self.pubkey = [
+                convert_limbs(entry.pub_key.x.limbs.clone()),
+                convert_limbs(entry.pub_key.y.limbs.clone()),
+            ];
+        //assign slot
+        let slot = attestation.data.slot.to_le_bytes();
+        for (j, slot_byte) in slot.iter().enumerate() {
+            self.slot[j] = M31::from(*slot_byte as u32);
+        }
+        //assign committee_index
+        let committee_index = attestation.data.committee_index.to_le_bytes();
+        for (j, committee_index_byte) in committee_index.iter().enumerate() {
+            self.committee_index[j] = M31::from(*committee_index_byte as u32);
+        }
+        //assign beacon_beacon_block_root
+        let beacon_beacon_block_root = attestation.data.beacon_block_root.clone();
+        let beacon_beacon_block_root = STANDARD.decode(beacon_beacon_block_root).unwrap();
+        for (j, beacon_beacon_block_root_byte) in beacon_beacon_block_root.iter().enumerate() {
+            self.beacon_beacon_block_root[j] = M31::from(*beacon_beacon_block_root_byte as u32);
+        }
+        //assign source_epoch
+        let source_epoch = attestation.data.source.epoch.to_le_bytes();
+        for (j, source_epoch_byte) in source_epoch.iter().enumerate() {
+            self.source_epoch[j] = M31::from(*source_epoch_byte as u32);
+        }
+        //assign target_epoch
+        let target_epoch = attestation.data.target.epoch.to_le_bytes();
+        for (j, target_epoch_byte) in target_epoch.iter().enumerate() {
+            self.target_epoch[j] = M31::from(*target_epoch_byte as u32);
+        }
+        //assign source_root
+        let source_root = attestation.data.source.root.clone();
+        let source_root = STANDARD.decode(source_root).unwrap();
+        for (j, source_root_byte) in source_root.iter().enumerate() {
+            self.source_root[j] = M31::from(*source_root_byte as u32);
+        }
+        //assign target_root
+        let target_root = attestation.data.target.root.clone();
+        let target_root = STANDARD.decode(target_root).unwrap();
+        for (j, target_root_byte) in target_root.iter().enumerate() {
+            self.target_root[j] = M31::from(*target_root_byte as u32);
+        }
+
+        //assign attestation_sig_bytes
+        let attestation_sig_bytes = attestation.signature.clone();
+        let attestation_sig_bytes = STANDARD.decode(attestation_sig_bytes).unwrap();
+        for (j, attestation_sig_byte) in attestation_sig_bytes.iter().enumerate() {
+            self.attestation_sig_bytes[j] = M31::from(*attestation_sig_byte as u32);
+        }
+    }
+}
+impl GenericDefine<M31Config> for BLSVERIFIERCircuit<Variable> {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
+        let mut pairing = Pairing::new(builder);
+        let one_g1 = G1Affine::one(builder);
+        let pubkey_g1 = G1Affine::from_vars(self.pubkey[0].to_vec(), self.pubkey[1].to_vec());
+
+        let att_ssz = AttestationDataSSZ {
+            slot: self.slot,
+            committee_index: self.committee_index,
+            beacon_block_root: self.beacon_beacon_block_root,
+            source_epoch: self.source_epoch,
+            target_epoch: self.target_epoch,
+            source_root: self.source_root,
+            target_root: self.target_root,
+        };
+        let mut g2 = G2::new(builder);
+        // domain
+        let domain = [
+            1, 0, 0, 0, 187, 164, 218, 150, 53, 76, 159, 37, 71, 108, 241, 188, 105, 191, 88, 58,
+            127, 158, 10, 240, 73, 48, 91, 98, 222, 103, 102, 64,
+        ];
+        let mut domain_var = vec![];
+        for domain_byte in domain.iter() {
+            domain_var.push(builder.constant(*domain_byte as u32));
+        }
+        let att_hash = att_ssz.att_data_signing_root(builder, &domain_var); //msg
+        let (hm0, hm1) = g2.hash_to_fp(builder, &att_hash);
+        let hm_g2 = g2.map_to_g2(builder, &hm0, &hm1);
+        // unmarshal attestation sig
+        let sig_g2 = g2.uncompressed(builder, &self.attestation_sig_bytes);
+
+        let neg_sig_g2 = g2.neg(builder, &sig_g2);
+
+        let p_array = vec![one_g1, pubkey_g1];
+        let mut q_array = [
+            G2Affine {
+                p: neg_sig_g2,
+                lines: LineEvaluations::default(),
+            },
+            G2Affine {
+                p: hm_g2,
+                lines: LineEvaluations::default(),
+            },
+        ];
+        pairing
+            .pairing_check(builder, &p_array, &mut q_array)
+            .unwrap();
+        pairing.ext12.ext6.ext2.curve_f.check_mul(builder);
+        pairing.ext12.ext6.ext2.curve_f.table.final_check(builder);
+        pairing.ext12.ext6.ext2.curve_f.table.final_check(builder);
+        pairing.ext12.ext6.ext2.curve_f.table.final_check(builder);
+        // pairing.ext12.ext6.ext2.curve_f.table.final_check(builder);
+        g2.ext2.curve_f.check_mul(builder);
+        g2.ext2.curve_f.table.final_check(builder);
+        g2.ext2.curve_f.table.final_check(builder);
+        g2.ext2.curve_f.table.final_check(builder);
+        // g2.ext2.curve_f.table.final_check(builder);
+    }
+}
+pub fn generate_blsverifier_circuit(dir: &str) {
+    println!("preparing solver...");
+    let circuit_name = "pairing_3checks";
+    let witnesses_dir = format!("./witnesses/{}", circuit_name);
+    ensure_directory_exists(&witnesses_dir);
+    let file_name = &format!("solver_{}.txt", circuit_name);
+    let w_s = if std::fs::metadata(file_name).is_ok() {
+        println!("The solver exists!");
+        let file = std::fs::File::open(file_name).unwrap();
+        let reader = std::io::BufReader::new(file);
+        witness_solver::WitnessSolver::deserialize_from(reader).unwrap()
+    } else {
+        println!("The solver does not exist.");
+        let compile_result =
+            compile_generic(&BLSVERIFIERCircuit::default(), CompileOptions::default()).unwrap();
+        let file = std::fs::File::create(file_name).unwrap();
+        let writer = std::io::BufWriter::new(file);
+        compile_result
+            .witness_solver
+            .serialize_into(writer)
+            .unwrap();
+        let CompileResult {
+            witness_solver,
+            layered_circuit,
+        } = compile_result;
+        let file = std::fs::File::create(format!("circuit_{}.txt", circuit_name)).unwrap();
+        let writer = std::io::BufWriter::new(file);
+        layered_circuit.serialize_into(writer).unwrap();
+        witness_solver
+    };
+
+    println!("Start generating witnesses...");
+    let start_time = std::time::Instant::now();
+    let file_path = format!("{}/pairing_assignment.json", dir);
+    let pairing_data: Vec<PairingEntry> = read_from_json_file(&file_path).unwrap();
+
+    let file_path = format!("{}/slotAttestationsFolded.json", dir);
+    let attestations: Vec<Attestation> = read_from_json_file(&file_path).unwrap();
+
+    let end_time = std::time::Instant::now();
+    println!(
+        "loaded pairing data time: {:?}",
+        end_time.duration_since(start_time)
+    );
+    let mut assignments = vec![];
+    for (cur_pairing_data, cur_attestation) in pairing_data.iter().zip(attestations.iter()) {
+        let mut pairing_assignment = BLSVERIFIERCircuit::<M31>::default();
+        pairing_assignment.from_entry(cur_pairing_data, cur_attestation);
+        assignments.push(pairing_assignment);
+    }
+    let end_time = std::time::Instant::now();
+    println!(
+        "assigned assignments time: {:?}",
+        end_time.duration_since(start_time)
+    );
+    let assignment_chunks: Vec<Vec<BLSVERIFIERCircuit<M31>>> =
+        assignments.chunks(16).map(|x| x.to_vec()).collect();
+    let witness_solver = Arc::new(w_s);
+    let handles = assignment_chunks
+        .into_iter()
+        .enumerate()
+        .map(|(i, assignments)| {
+            let witness_solver = Arc::clone(&witness_solver);
+            let witnesses_dir_clone = witnesses_dir.clone();
+            thread::spawn(move || {
+                let mut hint_registry = HintRegistry::<M31>::new();
+                register_hint(&mut hint_registry);
+                let witness = witness_solver
+                    .solve_witnesses_with_hints(&assignments, &mut hint_registry)
+                    .unwrap();
+                let file_name = format!("{}/witness_{}.txt", witnesses_dir_clone, i);
+                let file = std::fs::File::create(file_name).unwrap();
+                let writer = std::io::BufWriter::new(file);
+                witness.serialize_into(writer).unwrap();
+            })
+        })
+        .collect::<Vec<_>>();
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    let end_time = std::time::Instant::now();
+    println!(
+        "Generate pairing witness Time: {:?}",
+        end_time.duration_since(start_time)
+    );
+}
+#[test]
+fn test_blsverifier() {
+    let dir = "./data";
+    generate_blsverifier_circuit(dir);
 }
 // #[cfg(test)]
 // mod tests {
