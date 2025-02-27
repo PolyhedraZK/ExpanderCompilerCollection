@@ -1,5 +1,5 @@
 use circuit_std_rs::sha256::{
-  m31::{sha256_37bytes, sha256_37bytes_compiled},
+  m31::{check_sha256_37bytes, sha256_37bytes, sha256_37bytes_compiled},
   m31_utils::to_binary_hint,
 };
 use expander_compiler::frontend::*;
@@ -32,7 +32,6 @@ macro_rules! declare_check {
   };
 }
 
-declare_check!(check_sha256, sha256_37bytes);
 declare_check!(check_sha256_compiled, sha256_37bytes_compiled);
 
 macro_rules! declare_define {
@@ -49,7 +48,7 @@ macro_rules! declare_define {
   };
 }
 
-declare_define!(SHA25637BYTESCircuit, check_sha256);
+declare_define!(SHA25637BYTESCircuit, check_sha256_37bytes);
 declare_define!(SHA25637BYTESCircuitCompiled, check_sha256_compiled);
 
 macro_rules! test_case {
