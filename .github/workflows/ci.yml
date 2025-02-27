@@ -62,7 +62,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, ubuntu-22.04, macos-latest]
     steps:
       - uses: styfle/cancel-workflow-action@0.11.0
       - uses: actions/checkout@v4
@@ -74,7 +74,7 @@ jobs:
           prefix-key: "mpi-v5.0.5" # update me if brew formula changes to a new version
       - if: matrix.os == 'macos-latest'
         run: brew install openmpi
-      - if: matrix.os == 'ubuntu-latest'
+      - if: ${{ (matrix.os == 'ubuntu-latest') || (matrix.os == 'ubuntu-22.04') }}
         run: sudo apt-get update && sudo apt-get install libopenmpi-dev -y
       - run: cargo test
 
@@ -96,7 +96,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-22.04, macos-latest]
     needs: build-rust
     steps:
       - uses: styfle/cancel-workflow-action@0.11.0
@@ -113,7 +113,7 @@ jobs:
           merge-multiple: true
       - if: matrix.os == 'macos-latest'
         run: brew install openmpi
-      - if: matrix.os == 'ubuntu-latest'
+      - if: matrix.os == 'ubuntu-22.04'
         run: sudo apt-get update && sudo apt-get install libopenmpi-dev -y
       - run: |
           mkdir -p ~/.cache/ExpanderCompilerCollection
@@ -135,7 +135,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: ./artifacts
-          pattern: build-ubuntu-latest
+          pattern: build-ubuntu-22.04
           merge-multiple: true
       - run: |
           sudo apt-get update && sudo apt-get install libopenmpi-dev -y
