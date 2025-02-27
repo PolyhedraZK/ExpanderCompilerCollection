@@ -330,7 +330,7 @@ pub fn sha256_var_bytes<C: Config, B: RootAPI<C>>(
 
 pub fn check_sha256_37bytes<C: Config, B: RootAPI<C>>(
     builder: &mut B,
-    origin_data: &[Variable],
+    origin_data: &Vec<Variable>,
 ) -> Vec<Variable> {
     let output = origin_data[37..].to_vec();
     let result = sha256_37bytes(builder, &origin_data[..37]);
