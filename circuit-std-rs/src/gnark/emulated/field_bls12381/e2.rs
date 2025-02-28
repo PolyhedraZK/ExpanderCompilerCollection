@@ -6,7 +6,7 @@ use num_bigint::BigInt;
 use std::collections::HashMap;
 
 pub type CurveF = GField<Bls12381Fp>;
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct GE2 {
     pub a0: Element<Bls12381Fp>,
     pub a1: Element<Bls12381Fp>,

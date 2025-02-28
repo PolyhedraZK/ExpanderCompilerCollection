@@ -9,18 +9,19 @@ use crate::{
     },
     StdCircuit,
 };
+use std::fmt;
 
 use expander_compiler::{
     declare_circuit,
     frontend::{extra::debug_eval, Define, HintRegistry, M31Config, RootAPI, Variable, M31},
 };
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct PairingParams {
     pub in1_g1: G1Affine,
-    pub in2_g1: AffinePoint<Bls12381Fp>,
-    pub in1_g2: AffinePoint<Bls12381Fp>,
-    pub in2_g2: AffinePoint<Bls12381Fp>,
+    pub in2_g1: G1Affine,
+    pub in1_g2: G2Affine,
+    pub in2_g2: G2Affine,
 }
 
 declare_circuit!(PairingCheckGKRCircuit {
@@ -171,7 +172,25 @@ impl Define<M31Config> for PairingCheckGKRCircuit<Variable> {
     }
 }
 
-impl StdCircuit for PairingCheckGKRCircuit<Variable> {
-    type Params = LogUpParams;
-    type Assignment = _LogUpCircuit<C::CircuitField>;
+impl StdCircuit<M31Config> for PairingCheckGKRCircuit<Variable> {
+    type Params = PairingParams;
+    type Assignment = PairingCheckGKRCircuit<<expander_compiler::frontend::M31Config as expander_compiler::frontend::Config>::CircuitField>;
+
+    fn new_circuit(params: &Self::Params) -> Self {
+        let mut circuit = Self::default();
+        circuit.in1_g1 = params.in1_g1;
+        circuit.in2_g1 = params.in2_g1;
+        circuit.in1_g2 = params.in1_g2;
+
+        // circuit.table_values.resize(
+        //     params.n_table_rows,
+        //     vec![Variable::default(); params.value_len],
+        // );
+
+        circuit
+    }
+
+    fn new_assignment(params: &Self::Params, rng: impl rand::RngCore) -> Self::Assignment {
+        todo!()
+    }
 }

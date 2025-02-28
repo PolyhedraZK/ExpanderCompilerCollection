@@ -1,7 +1,7 @@
 use num_bigint::BigInt;
 use num_traits::ConstZero;
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, Debug)]
 pub struct Bls12381Fp {}
 impl Bls12381Fp {
     pub fn nb_limbs() -> u32 {

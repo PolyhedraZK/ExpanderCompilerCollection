@@ -7,12 +7,13 @@ use crate::utils::simple_select;
 use expander_compiler::declare_circuit;
 use expander_compiler::frontend::{Config, Define, M31Config, RootAPI, Variable};
 use num_bigint::BigInt;
+use std::fmt::{Debug, Formatter, Result};
 use std::str::FromStr;
 
 const M_COMPRESSED_SMALLEST: u8 = 0b100 << 5;
 const M_COMPRESSED_LARGEST: u8 = 0b101 << 5;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct G2AffP {
     pub x: GE2,
     pub y: GE2,
@@ -35,7 +36,7 @@ impl G2AffP {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Debug)]
 pub struct LineEvaluation {
     pub r0: GE2,
     pub r1: GE2,
@@ -43,6 +44,7 @@ pub struct LineEvaluation {
 
 type LineEvaluationArray = [[Option<Box<LineEvaluation>>; 63]; 2];
 
+#[derive(Clone, Debug)]
 pub struct LineEvaluations(pub LineEvaluationArray);
 
 impl Default for LineEvaluations {
@@ -57,6 +59,8 @@ impl LineEvaluations {
             .all(|row| row.iter().all(|cell| cell.is_none()))
     }
 }
+
+#[derive(Clone)]
 pub struct G2Affine {
     pub p: G2AffP,
     pub lines: LineEvaluations,
@@ -535,6 +539,16 @@ impl G2 {
 
         //TBD: subgroup check, do we need to do that? Since we are pretty sure that the sig bytes are correct, its unmashalling must be on the right curve?
         G2AffP { x: px, y }
+    }
+}
+
+impl Debug for G2Affine {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        f.debug_struct("G2Affine")
+            .field("P", &self.p)
+            //.field("P.y", &self.p.y)
+            .field("lines", &self.lines)
+            .finish()
     }
 }
 

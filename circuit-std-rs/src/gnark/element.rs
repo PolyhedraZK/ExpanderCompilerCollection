@@ -5,7 +5,7 @@ use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use std::any::Any;
 use std::cmp::Ordering;
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct Element<T: FieldParams> {
     pub limbs: Vec<Variable>,
     pub overflow: u32,
