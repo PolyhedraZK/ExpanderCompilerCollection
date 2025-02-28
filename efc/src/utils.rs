@@ -26,7 +26,7 @@ pub fn run_circuit<C: Config>(compile_result: &CompileResult<C>, witness: Witnes
     );
 
     let (simd_input, simd_public_input) = witness.to_simd::<C::DefaultSimdField>();
-    println!("{} {}", simd_input.len(), simd_public_input.len());
+    log::debug!("{} {}", simd_input.len(), simd_public_input.len());
     expander_circuit.layers[0].input_vals = simd_input;
     expander_circuit.public_input = simd_public_input.clone();
 
@@ -65,9 +65,9 @@ pub fn ensure_directory_exists(dir: &str) {
 
     if !path.exists() {
         fs::create_dir_all(path).expect("Failed to create directory");
-        println!("Directory created: {}", dir);
+        log::debug!("Directory created: {}", dir);
     } else {
-        println!("Directory already exists: {}", dir);
+        log::debug!("Directory already exists: {}", dir);
     }
 }
 
@@ -82,12 +82,12 @@ pub fn get_solver<
     ensure_directory_exists(dir);
     let file_name = format!("solver_{}.txt", circuit_name);
     if std::fs::metadata(&file_name).is_ok() {
-        println!("The solver exists!");
+        log::debug!("The solver exists!");
         let file = std::fs::File::open(&file_name).unwrap();
         let reader = std::io::BufReader::new(file);
         witness_solver::WitnessSolver::deserialize_from(reader).unwrap()
     } else {
-        println!("The solver {} does not exist.", file_name);
+        log::debug!("The solver {} does not exist.", file_name);
         let compile_result = compile_generic(&circuit, CompileOptions::default()).unwrap();
         let file = std::fs::File::create(&file_name).unwrap();
         let writer = std::io::BufWriter::new(file);
@@ -106,7 +106,11 @@ pub fn get_solver<
         witness_solver
     }
 }
-
+pub fn write_witness_to_file<C: Config>(file_name: &str, witness: Witness<C>) {
+    let file = std::fs::File::create(file_name).unwrap();
+    let writer = std::io::BufWriter::new(file);
+    witness.serialize_into(writer).unwrap();
+}
 pub fn wait_for_file(directory: &str) {
     let path = Path::new(directory);
 
@@ -115,13 +119,13 @@ pub fn wait_for_file(directory: &str) {
             let file_count = entries.count();
 
             if file_count == 1 {
-                println!("Found exactly one file, proceeding...");
+                log::debug!("Found exactly one file, proceeding...");
                 break;
             } else {
-                println!("File count: {}. Waiting...", file_count);
+                log::debug!("File count: {}. Waiting...", file_count);
             }
         } else {
-            println!("Failed to read directory: {}", directory);
+            log::debug!("Failed to read directory: {}", directory);
         }
 
         thread::sleep(Duration::from_millis(500));

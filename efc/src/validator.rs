@@ -30,11 +30,6 @@ pub struct ValidatorPlain {
     #[serde(default)]
     pub withdrawable_epoch: u64,
 }
-pub fn read_validators(dir: &str) -> Vec<ValidatorPlain> {
-    let file_path = format!("{}/validatorList.json", dir);
-    let validaotrs: Vec<ValidatorPlain> = read_from_json_file(&file_path).unwrap();
-    validaotrs
-}
 
 #[derive(Clone, Copy)]
 pub struct ValidatorSSZ {
@@ -163,17 +158,17 @@ impl GenericDefine<M31Config> for ConvertValidatorListToMerkleTreeCircuit<Variab
 
 pub fn generate_validator_subtree_witnesses(dir: &str) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
-        println!("preparing solver...");
+        log::debug!("preparing solver...");
         ensure_directory_exists("./witnesses/validatorsubtree");
 
         let file_name = "solver_validatorsubtree.txt";
         let w_s = if std::fs::metadata(file_name).is_ok() {
-            println!("The solver exists!");
+            log::debug!("The solver exists!");
             let file = std::fs::File::open(file_name).unwrap();
             let reader = std::io::BufReader::new(file);
             witness_solver::WitnessSolver::deserialize_from(reader).unwrap()
         } else {
-            println!("The solver does not exist.");
+            log::debug!("The solver does not exist.");
             let compile_result = compile_generic(
                 &ConvertValidatorListToMerkleTreeCircuit::default(),
                 CompileOptions::default(),
@@ -196,13 +191,13 @@ pub fn generate_validator_subtree_witnesses(dir: &str) {
         };
         let witness_solver = Arc::new(w_s);
 
-        println!("generating witnesses...");
+        log::debug!("generating witnesses...");
         let start_time = std::time::Instant::now();
         let file_path = format!("{}/validatorsubtree_assignment.json", dir);
         let validator_subtree_data: Vec<ValidatorSubTreeJson> =
             read_from_json_file(&file_path).unwrap();
         let end_time = std::time::Instant::now();
-        println!(
+        log::debug!(
             "loaed assignment data, time: {:?}",
             end_time.duration_since(start_time)
         );
@@ -229,7 +224,7 @@ pub fn generate_validator_subtree_witnesses(dir: &str) {
         }
 
         let end_time = std::time::Instant::now();
-        println!(
+        log::debug!(
             "assigned assignment data, time: {:?}",
             end_time.duration_since(start_time)
         );
@@ -265,7 +260,7 @@ pub fn generate_validator_subtree_witnesses(dir: &str) {
             handle.join().unwrap();
         }
         let end_time = std::time::Instant::now();
-        println!(
+        log::debug!(
             "Generate validatorsubtree witness Time: {:?}",
             end_time.duration_since(start_time)
         );
@@ -278,7 +273,7 @@ pub fn end2end_validator_subtree_witnesses(
 ) {
     let witness_solver = Arc::new(w_s);
 
-    println!("gStart enerating validator_subtree witnesses...");
+    log::debug!("gStart enerating validator_subtree witnesses...");
     let start_time = std::time::Instant::now();
     let mut handles = vec![];
     let assignments = Arc::new(Mutex::new(vec![None; validator_subtree_data.len()]));
@@ -302,7 +297,7 @@ pub fn end2end_validator_subtree_witnesses(
     }
 
     let end_time = std::time::Instant::now();
-    println!(
+    log::debug!(
         "assigned assignment data, time: {:?}",
         end_time.duration_since(start_time)
     );
@@ -337,7 +332,7 @@ pub fn end2end_validator_subtree_witnesses(
         handle.join().unwrap();
     }
     let end_time = std::time::Instant::now();
-    println!(
+    log::debug!(
         "Generate validatorsubtree witness Time: {:?}",
         end_time.duration_since(start_time)
     );
@@ -351,7 +346,7 @@ fn test_validator_subtree() {
 #[test]
 // NOTE(HS) Poseidon Mersenne-31 Width-16 Sponge tested over input length 16
 fn run_validator_subtree() {
-    println!("preparing solver...");
+    log::debug!("preparing solver...");
     ensure_directory_exists("./witnesses/validatorsubtree");
 
     let file_name = "solver_validatorsubtree.txt";
@@ -376,13 +371,13 @@ fn run_validator_subtree() {
 
     let witness_solver = Arc::new(witness_solver);
 
-    println!("generating witnesses...");
+    log::debug!("generating witnesses...");
     let start_time = std::time::Instant::now();
     let file_path = format!("{}/validatorsubtree_assignment.json", "./data");
     let validator_subtree_data: Vec<ValidatorSubTreeJson> =
         read_from_json_file(&file_path).unwrap();
     let end_time = std::time::Instant::now();
-    println!(
+    log::debug!(
         "loaed assignment data, time: {:?}",
         end_time.duration_since(start_time)
     );
@@ -409,7 +404,7 @@ fn run_validator_subtree() {
     }
 
     let end_time = std::time::Instant::now();
-    println!(
+    log::debug!(
         "assigned assignment data, time: {:?}",
         end_time.duration_since(start_time)
     );

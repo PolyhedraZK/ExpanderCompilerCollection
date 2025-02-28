@@ -420,11 +420,4 @@ mod tests {
 
         debug_eval(&AttHashCircuit::default(), &assignment, hint_registry);
     }
-
-    // #[test]
-    // fn read_attestation() {
-    //     let file_path = "./data/slotAttestationsFolded.json";
-    //     let attestations: Vec<Attestation> = read_from_json_file(file_path).unwrap();
-    //     println!("attestations[0]:{:?}", attestations[0]);
-    // }
 }

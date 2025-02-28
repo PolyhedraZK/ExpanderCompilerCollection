@@ -2,7 +2,7 @@ use crate::attestation::{Attestation, AttestationDataSSZ};
 use crate::bls::check_pubkey_key_bls;
 use crate::bls_verifier::{convert_point, G1Json, PairingEntry};
 use crate::utils::{ensure_directory_exists, read_from_json_file};
-use crate::validator::{read_validators, ValidatorPlain, ValidatorSSZ};
+use crate::validator::{ValidatorPlain, ValidatorSSZ};
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use circuit_std_rs::gnark::emulated::sw_bls12381::g1::*;
@@ -159,8 +159,6 @@ impl ShuffleCircuit<M31> {
         shuffle_json: &ShuffleJson,
         plain_validators: &[ValidatorPlain],
         pubkey_bls: &[Vec<String>],
-        attestation: &Attestation,
-        pairing_entry: &PairingEntry,
     ) {
         if shuffle_json.committee_indices.len() != VALIDATOR_CHUNK_SIZE {
             panic!("committee_indices length is not equal to VALIDATOR_CHUNK_SIZE");
@@ -680,17 +678,17 @@ pub fn aggregate_attestation_public_key2<C: Config, B: RootAPI<C>>(
 }
 pub fn generate_shuffle_witnesses(dir: &str) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
-        println!("preparing solver...");
+        log::debug!("preparing solver...");
         ensure_directory_exists("./witnesses/shuffle");
 
         let file_name = "solver_shuffle1.txt";
         let w_s = if std::fs::metadata(file_name).is_ok() {
-            println!("The solver exists!");
+            log::debug!("The solver exists!");
             let file = std::fs::File::open(file_name).unwrap();
             let reader = std::io::BufReader::new(file);
             witness_solver::WitnessSolver::deserialize_from(reader).unwrap()
         } else {
-            println!("The solver does not exist.");
+            log::debug!("The solver does not exist.");
             let compile_result =
                 compile_generic(&ShuffleCircuit::default(), CompileOptions::default()).unwrap();
             let file = std::fs::File::create(file_name).unwrap();
@@ -710,19 +708,17 @@ pub fn generate_shuffle_witnesses(dir: &str) {
         };
         let witness_solver = Arc::new(w_s);
 
-        println!("generating witnesses...");
+        log::debug!("generating witnesses...");
         let start_time = std::time::Instant::now();
-        let plain_validators = read_validators(dir);
+        let file_path = format!("{}/validatorList.json", dir);
+        let plain_validators: Vec<ValidatorPlain> = read_from_json_file(&file_path).unwrap();
+
         let file_path = format!("{}/shuffle_assignment.json", dir);
         let shuffle_data: Vec<ShuffleJson> = read_from_json_file(&file_path).unwrap();
         let file_path = format!("{}/pubkeyBLSList.json", dir);
         let public_key_bls_list: Vec<Vec<String>> = read_from_json_file(&file_path).unwrap();
-        let file_path = format!("{}/slotAttestationsFolded.json", dir);
-        let attestations: Vec<Attestation> = read_from_json_file(&file_path).unwrap();
-        let file_path = format!("{}/pairing_assignment.json", dir);
-        let pairing_data: Vec<PairingEntry> = read_from_json_file(&file_path).unwrap();
         let end_time = std::time::Instant::now();
-        println!(
+        log::debug!(
             "loaed assignment data, time: {:?}",
             end_time.duration_since(start_time)
         );
@@ -730,16 +726,12 @@ pub fn generate_shuffle_witnesses(dir: &str) {
         let mut handles = vec![];
         let plain_validators = Arc::new(plain_validators);
         let public_key_bls_list = Arc::new(public_key_bls_list);
-        let attestations = Arc::new(attestations);
         let assignments = Arc::new(Mutex::new(vec![None; shuffle_data.len() / 2]));
-        let pairing_data = Arc::new(pairing_data);
 
         for (i, shuffle_item) in shuffle_data.into_iter().enumerate().take(1024) {
             let assignments = Arc::clone(&assignments);
             let target_plain_validators = Arc::clone(&plain_validators);
             let target_public_key_bls_list = Arc::clone(&public_key_bls_list);
-            let target_attestations = Arc::clone(&attestations);
-            let pairing_data = Arc::clone(&pairing_data);
 
             let handle = thread::spawn(move || {
                 let mut assignment = ShuffleCircuit::<M31>::default();
@@ -747,8 +739,6 @@ pub fn generate_shuffle_witnesses(dir: &str) {
                     &shuffle_item,
                     &target_plain_validators,
                     &target_public_key_bls_list,
-                    &target_attestations[i],
-                    &pairing_data[i],
                 );
 
                 let mut assignments = assignments.lock().unwrap();
@@ -763,7 +753,7 @@ pub fn generate_shuffle_witnesses(dir: &str) {
         }
 
         let end_time = std::time::Instant::now();
-        println!(
+        log::debug!(
             "assigned assignment data, time: {:?}",
             end_time.duration_since(start_time)
         );
@@ -799,7 +789,7 @@ pub fn generate_shuffle_witnesses(dir: &str) {
             handle.join().unwrap();
         }
         let end_time = std::time::Instant::now();
-        println!(
+        log::debug!(
             "Generate shuffle witness Time: {:?}",
             end_time.duration_since(start_time)
         );
@@ -811,29 +801,23 @@ pub fn end2end_shuffle_witnesses(
     plain_validators: Vec<ValidatorPlain>,
     shuffle_data: Vec<ShuffleJson>,
     public_key_bls_list: Vec<Vec<String>>,
-    attestations: Vec<Attestation>,
-    pairing_data: Vec<PairingEntry>,
 ) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
-        println!("preparing solver...");
+        log::debug!("preparing solver...");
         let witness_solver = Arc::new(w_s);
 
-        println!("Start generating shuffle witnesses...");
+        log::debug!("Start generating shuffle witnesses...");
         let start_time = std::time::Instant::now();
 
         let mut handles = vec![];
         let plain_validators = Arc::new(plain_validators);
         let public_key_bls_list = Arc::new(public_key_bls_list);
-        let attestations = Arc::new(attestations);
         let assignments = Arc::new(Mutex::new(vec![None; shuffle_data.len() / 2]));
-        let pairing_data = Arc::new(pairing_data);
 
         for (i, shuffle_item) in shuffle_data.into_iter().enumerate().take(1024) {
             let assignments = Arc::clone(&assignments);
             let target_plain_validators = Arc::clone(&plain_validators);
             let target_public_key_bls_list = Arc::clone(&public_key_bls_list);
-            let target_attestations = Arc::clone(&attestations);
-            let pairing_data = Arc::clone(&pairing_data);
 
             let handle = thread::spawn(move || {
                 let mut assignment = ShuffleCircuit::<M31>::default();
@@ -841,8 +825,6 @@ pub fn end2end_shuffle_witnesses(
                     &shuffle_item,
                     &target_plain_validators,
                     &target_public_key_bls_list,
-                    &target_attestations[i],
-                    &pairing_data[i],
                 );
 
                 let mut assignments = assignments.lock().unwrap();
@@ -857,7 +839,7 @@ pub fn end2end_shuffle_witnesses(
         }
 
         let end_time = std::time::Instant::now();
-        println!(
+        log::debug!(
             "assigned assignment data, time: {:?}",
             end_time.duration_since(start_time)
         );
@@ -893,7 +875,7 @@ pub fn end2end_shuffle_witnesses(
             handle.join().unwrap();
         }
         let end_time = std::time::Instant::now();
-        println!(
+        log::debug!(
             "Generate shuffle witness Time: {:?}",
             end_time.duration_since(start_time)
         );

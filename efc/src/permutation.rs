@@ -1,4 +1,6 @@
-use crate::utils::{ensure_directory_exists, read_from_json_file};
+use crate::utils::{
+    ensure_directory_exists, get_solver, read_from_json_file, write_witness_to_file,
+};
 use circuit_std_rs::logup::LogUpSingleKeyTable;
 use circuit_std_rs::poseidon_m31::*;
 use circuit_std_rs::sha256::m31_utils::*;
@@ -79,32 +81,42 @@ pub fn end2end_permutation_query_witness(
     permutation_query_data: Vec<PermutationQueryEntry>,
 ) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
-        let witness_solver = Arc::new(w_s);
+        let circuit_name = "permutationquery";
 
-        println!("Start generating permutation query witnesses...");
+        let witnesses_dir = format!("./witnesses/{}", circuit_name);
+        ensure_directory_exists(&witnesses_dir);
+
+        //get assignments
         let start_time = std::time::Instant::now();
-
-        let mut hint_registry = HintRegistry::<M31>::new();
-        register_hint(&mut hint_registry);
         let assignments = PermutationQueryCircuit::from_entries(&permutation_query_data);
+        let end_time = std::time::Instant::now();
+        log::debug!(
+            "assigned assignments time: {:?}",
+            end_time.duration_since(start_time)
+        );
         let assignment_chunks: Vec<Vec<PermutationQueryCircuit<M31>>> =
             assignments.chunks(16).map(|x| x.to_vec()).collect();
 
+        //generate witnesses (multi-thread)
+        log::debug!("Start generating  {} witnesses...", circuit_name);
+        let witness_solver = Arc::new(w_s);
         let handles = assignment_chunks
             .into_iter()
             .enumerate()
             .map(|(i, assignments)| {
                 let witness_solver = Arc::clone(&witness_solver);
+                let witnesses_dir_clone = witnesses_dir.clone();
                 thread::spawn(move || {
+                    //TODO: hint_registry cannot be shared/cloned
                     let mut hint_registry = HintRegistry::<M31>::new();
                     register_hint(&mut hint_registry);
                     let witness = witness_solver
                         .solve_witnesses_with_hints(&assignments, &mut hint_registry)
                         .unwrap();
-                    let file_name = format!("./witnesses/permutationquery/witness_{}.txt", i);
-                    let file = std::fs::File::create(file_name).unwrap();
-                    let writer = std::io::BufWriter::new(file);
-                    witness.serialize_into(writer).unwrap();
+                    write_witness_to_file(
+                        &format!("{}/witness_{}.txt", witnesses_dir_clone, i),
+                        witness,
+                    )
                 })
             })
             .collect::<Vec<_>>();
@@ -112,8 +124,9 @@ pub fn end2end_permutation_query_witness(
             handle.join().unwrap();
         }
         let end_time = std::time::Instant::now();
-        println!(
-            "Generate permutation query witness Time: {:?}",
+        log::debug!(
+            "Generate {} witness Time: {:?}",
+            circuit_name,
             end_time.duration_since(start_time)
         );
     });
@@ -171,7 +184,11 @@ impl PermutationIndicesValidatorHashesCircuit<M31> {
         for (i, key) in real_keys.iter().enumerate().take(VALIDATOR_COUNT) {
             assignment.real_keys[i] = M31::from(*key as u32);
         }
-        for (i, elem) in active_validator_bits_hash.iter().enumerate().take(POSEIDON_M31X16_RATE) {
+        for (i, elem) in active_validator_bits_hash
+            .iter()
+            .enumerate()
+            .take(POSEIDON_M31X16_RATE)
+        {
             assignment.active_validator_bits_hash[i] = M31::from(*elem);
         }
 
@@ -224,16 +241,17 @@ impl PermutationIndicesValidatorHashesCircuit<M31> {
         for i in 0..VALIDATOR_COUNT {
             for j in 0..POSEIDON_M31X16_RATE {
                 assignment.table_validator_hashes[i][j] =
-                    M31::from(entry.table_validator_hashes[i%QUERY_SIZE][j]);
+                    M31::from(entry.table_validator_hashes[i % QUERY_SIZE][j]);
             }
-            assignment.real_keys[i] = M31::from(entry.real_keys[i%QUERY_SIZE]);
-            assignment.active_validator_bits[i] = M31::from(entry.active_validator_bits[i%QUERY_SIZE]);
+            assignment.real_keys[i] = M31::from(entry.real_keys[i % QUERY_SIZE]);
+            assignment.active_validator_bits[i] =
+                M31::from(entry.active_validator_bits[i % QUERY_SIZE]);
         }
         for i in 0..QUERY_SIZE {
-            assignment.query_indices[i] = M31::from(entry.query_indices[i%(QUERY_SIZE/2)]);
+            assignment.query_indices[i] = M31::from(entry.query_indices[i % (QUERY_SIZE / 2)]);
             for j in 0..POSEIDON_M31X16_RATE {
                 assignment.query_validator_hashes[i][j] =
-                    M31::from(entry.query_validator_hashes[i%(QUERY_SIZE/2)][j]);
+                    M31::from(entry.query_validator_hashes[i % (QUERY_SIZE / 2)][j]);
             }
         }
         for i in 0..POSEIDON_M31X16_RATE {
@@ -485,85 +503,66 @@ impl GenericDefine<M31Config> for PermutationIndicesValidatorHashBitCircuit<Vari
         // logup.final_check(builder);
     }
 }
+fn get_assignments_from_data(
+    permutation_hash_data: Vec<PermutationHashEntry>,
+) -> Vec<PermutationIndicesValidatorHashesCircuit<M31>> {
+    let mut assignments = vec![];
+    for i in 0..16 {
+        let assignment =
+            PermutationIndicesValidatorHashesCircuit::from_assignment(&permutation_hash_data[i]);
+        assignments.push(assignment);
+    }
+    assignments
+}
+fn get_assignments_from_json(dir: &str) -> Vec<PermutationIndicesValidatorHashesCircuit<M31>> {
+    let file_path = format!("{}/permutationhash_assignment.json", dir);
+    let permutation_hash_data: Vec<PermutationHashEntry> = read_from_json_file(&file_path).unwrap();
+    get_assignments_from_data(permutation_hash_data)
+}
 pub fn generate_permutation_hashes_witnesses(dir: &str) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
-        println!("preparing solver...");
-        ensure_directory_exists("./witnesses/permutationhashes");
-        let file_name = format!("solver_permutationhashes_{}.txt", VALIDATOR_COUNT);
-        let w_s = if std::fs::metadata(&file_name).is_ok() {
-            println!("The solver exists!");
-            let file = std::fs::File::open(&file_name).unwrap();
-            let reader = std::io::BufReader::new(file);
-            witness_solver::WitnessSolver::deserialize_from(reader).unwrap()
-        } else {
-            println!("The solver does not exist.");
-            let compile_result = compile_generic(
-                &PermutationIndicesValidatorHashesCircuit::default(),
-                CompileOptions::default(),
-            )
-            .unwrap();
+        let circuit_name = &format!("permutationhashes_{}", VALIDATOR_COUNT);
 
-            let file = std::fs::File::create(&file_name).unwrap();
-            let writer = std::io::BufWriter::new(file);
-            compile_result
-                .witness_solver
-                .serialize_into(writer)
-                .unwrap();
-            let CompileResult {
-                witness_solver,
-                layered_circuit,
-            } = compile_result;
-            let circuit_name = format!("circuit_permutationhashes_{}.txt", VALIDATOR_COUNT);
-            let file = std::fs::File::create(&circuit_name).unwrap();
-            let writer = std::io::BufWriter::new(file);
-            layered_circuit.serialize_into(writer).unwrap();
-            witness_solver
-        };
-
-        let witness_solver = Arc::new(w_s);
-
-        println!("Start generating permutationhash witnesses...");
-        let start_time = std::time::Instant::now();
-        let file_path = format!("{}/permutationhash_assignment.json", dir);
-
-        let permutation_hash_data: Vec<PermutationHashEntry> =
-            read_from_json_file(&file_path).unwrap();
-        let permutation_hash_data = &permutation_hash_data[0];
-        let end_time = std::time::Instant::now();
-        println!(
-            "loaded permutationhash data time: {:?}",
-            end_time.duration_since(start_time)
+        //get solver
+        log::debug!("preparing {} solver...", circuit_name);
+        let witnesses_dir = format!("./witnesses/{}", circuit_name);
+        let w_s = get_solver(
+            &witnesses_dir,
+            circuit_name,
+            PermutationIndicesValidatorHashesCircuit::default(),
         );
 
-        let mut hint_registry = HintRegistry::<M31>::new();
-        register_hint(&mut hint_registry);
-        let assignment =
-            PermutationIndicesValidatorHashesCircuit::from_assignment(permutation_hash_data);
-        let mut assignments = vec![];
-        for _i in 0..16 {
-            assignments.push(assignment.clone());
-        }
+        //TODO: assignments should be different
+        //get assignments
+        let start_time = std::time::Instant::now();
+        let assignments = get_assignments_from_json(dir);
+        let end_time = std::time::Instant::now();
+        log::debug!(
+            "assigned assignments time: {:?}",
+            end_time.duration_since(start_time)
+        );
         let assignment_chunks: Vec<Vec<PermutationIndicesValidatorHashesCircuit<M31>>> =
             assignments.chunks(16).map(|x| x.to_vec()).collect();
 
+        //generate witnesses (multi-thread)
+        log::debug!("Start generating witnesses...");
+        let witness_solver = Arc::new(w_s);
         let handles = assignment_chunks
             .into_iter()
             .enumerate()
             .map(|(i, assignments)| {
                 let witness_solver = Arc::clone(&witness_solver);
+                let witnesses_dir_clone = witnesses_dir.clone();
                 thread::spawn(move || {
                     let mut hint_registry = HintRegistry::<M31>::new();
                     register_hint(&mut hint_registry);
-                    // let witness = witness_solver
-                    //     .solve_witness_with_hints(&assignments[0], &mut hint_registry)
-                    //     .unwrap();
                     let witness = witness_solver
                         .solve_witnesses_with_hints(&assignments, &mut hint_registry)
                         .unwrap();
-                    let file_name = format!("./witnesses/permutationhashes/witness_{}.txt", i);
-                    let file = std::fs::File::create(file_name).unwrap();
-                    let writer = std::io::BufWriter::new(file);
-                    witness.serialize_into(writer).unwrap();
+                    write_witness_to_file(
+                        &format!("{}/witness_{}.txt", witnesses_dir_clone, i),
+                        witness,
+                    )
                 })
             })
             .collect::<Vec<_>>();
@@ -571,8 +570,9 @@ pub fn generate_permutation_hashes_witnesses(dir: &str) {
             handle.join().unwrap();
         }
         let end_time = std::time::Instant::now();
-        println!(
-            "Generate permutationhash witness Time: {:?}",
+        log::debug!(
+            "Generate {} witness Time: {:?}",
+            circuit_name,
             end_time.duration_since(start_time)
         );
     });
@@ -580,43 +580,20 @@ pub fn generate_permutation_hashes_witnesses(dir: &str) {
 
 pub fn generate_permutation_hashbit_witnesses(dir: &str) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
-        println!("preparing solver...");
-        let initial_time = std::time::Instant::now();
-        ensure_directory_exists("./witnesses/permutationhashbit");
-        let file_name = format!("solver_permutationhashbit_{}.txt", VALIDATOR_COUNT);
-        let w_s = if std::fs::metadata(&file_name).is_ok() {
-            println!("The solver exists!");
-            let file = std::fs::File::open(&file_name).unwrap();
-            let reader = std::io::BufReader::new(file);
-            witness_solver::WitnessSolver::deserialize_from(reader).unwrap()
-        } else {
-            println!("The solver does not exist.");
-            let compile_result = compile_generic(
-                &PermutationIndicesValidatorHashBitCircuit::default(),
-                CompileOptions::default(),
-            )
-            .unwrap();
-            // panic!("Please check the code below");
-            let file = std::fs::File::create(&file_name).unwrap();
-            let writer = std::io::BufWriter::new(file);
-            compile_result
-                .witness_solver
-                .serialize_into(writer)
-                .unwrap();
-            let CompileResult {
-                witness_solver,
-                layered_circuit,
-            } = compile_result;
-            let circuit_name = format!("circuit_permutationhashbit_{}.txt", VALIDATOR_COUNT);
-            let file = std::fs::File::create(&circuit_name).unwrap();
-            let writer = std::io::BufWriter::new(file);
-            layered_circuit.serialize_into(writer).unwrap();
-            witness_solver
-        };
+        let circuit_name = &format!("permutationhashbit_{}", VALIDATOR_COUNT);
 
-        let witness_solver = Arc::new(w_s);
+        //get solver
+        log::debug!("preparing {} solver...", circuit_name);
+        let witnesses_dir = format!("./witnesses/{}", circuit_name);
+        let w_s = get_solver(
+            &witnesses_dir,
+            circuit_name,
+            PermutationIndicesValidatorHashBitCircuit::default(),
+        );
 
-        println!("Start generating permutationhashbit witnesses...");
+        //TODO: assignments should be different
+
+        log::debug!("Start generating permutationhashbit witnesses...");
         let start_time = std::time::Instant::now();
         let file_path = format!("{}/permutationhash_assignment.json", dir);
 
@@ -624,7 +601,7 @@ pub fn generate_permutation_hashbit_witnesses(dir: &str) {
             read_from_json_file(&file_path).unwrap();
         let permutation_hash_data = &permutation_hash_data[0];
         let end_time = std::time::Instant::now();
-        println!(
+        log::debug!(
             "loaded permutationhash data time: {:?}",
             end_time.duration_since(start_time)
         );
@@ -642,6 +619,7 @@ pub fn generate_permutation_hashbit_witnesses(dir: &str) {
         let assignment_chunks: Vec<Vec<PermutationIndicesValidatorHashBitCircuit<M31>>> =
             assignments.chunks(16).map(|x| x.to_vec()).collect();
 
+        let witness_solver = Arc::new(w_s);
         let handles = assignment_chunks
             .into_iter()
             .enumerate()
@@ -667,11 +645,11 @@ pub fn generate_permutation_hashbit_witnesses(dir: &str) {
             handle.join().unwrap();
         }
         let end_time = std::time::Instant::now();
-        println!(
-            "Generate permutationhash witness Time: {:?}",
+        log::debug!(
+            "Generate {} witness Time: {:?}",
+            circuit_name,
             end_time.duration_since(start_time)
         );
-        println!("total Time: {:?}", end_time.duration_since(initial_time));
     });
 }
 pub fn end2end_permutation_hashbit_witness(
@@ -681,7 +659,7 @@ pub fn end2end_permutation_hashbit_witness(
     stacker::grow(32 * 1024 * 1024 * 1024, || {
         let witness_solver = Arc::new(w_s);
 
-        println!("Start generating permutationhashbit witnesses...");
+        log::debug!("Start generating permutationhashbit witnesses...");
         let start_time = std::time::Instant::now();
         let permutation_hash_data = &permutation_hash_data[0];
 
@@ -720,7 +698,7 @@ pub fn end2end_permutation_hashbit_witness(
             handle.join().unwrap();
         }
         let end_time = std::time::Instant::now();
-        println!(
+        log::debug!(
             "Generate permutationhash witness Time: {:?}",
             end_time.duration_since(start_time)
         );
@@ -741,7 +719,7 @@ fn test_permutation_hashbit() {
 fn eval_permutation_hashbit() {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
         let dir = "./data";
-        println!("Start generating permutationhashbit witnesses...");
+        log::debug!("Start generating permutationhashbit witnesses...");
         let start_time = std::time::Instant::now();
         let file_path = format!("{}/permutationhash_assignment.json", dir);
 
@@ -749,17 +727,17 @@ fn eval_permutation_hashbit() {
             read_from_json_file(&file_path).unwrap();
         let permutation_hash_data = &permutation_hash_data[0];
         let end_time = std::time::Instant::now();
-        println!(
+        log::debug!(
             "loaded permutationhash data time: {:?}",
             end_time.duration_since(start_time)
         );
 
         let assignment =
             PermutationIndicesValidatorHashesCircuit::from_assignment(permutation_hash_data);
-        println!("Start permutationhashbit witnesses...");
+        log::debug!("Start permutationhashbit witnesses...");
         let target_assignments =
             PermutationIndicesValidatorHashBitCircuit::from_assignment(&assignment);
-        println!("Start evaluating permutationhashbit witnesses...");
+        log::debug!("Start evaluating permutationhashbit witnesses...");
         for assignment in target_assignments {
             let mut hint_registry = HintRegistry::<M31>::new();
             register_hint(&mut hint_registry);
