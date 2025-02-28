@@ -14,6 +14,7 @@ use num_bigint::BigInt;
 const M_COMPRESSED_SMALLEST: u8 = 0b100 << 5;
 const M_COMPRESSED_LARGEST: u8 = 0b101 << 5;
 
+// TODO: refactor G1Affine, G2Affine all with AffinePoint
 #[derive(Default, Clone)]
 pub struct G1Affine {
     pub x: Element<Bls12381Fp>,

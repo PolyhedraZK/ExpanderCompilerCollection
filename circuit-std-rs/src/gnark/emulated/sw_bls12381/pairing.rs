@@ -3,6 +3,7 @@ use super::g2::G2AffP;
 use super::g2::G2Affine;
 use super::g2::LineEvaluation;
 use super::g2::LineEvaluations;
+use super::point::AffinePoint;
 use super::point::Curve;
 use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::emparam::Bls12381Fr;
@@ -12,6 +13,7 @@ use crate::gnark::emulated::field_bls12381::e2::*;
 use crate::gnark::emulated::field_bls12381::e6::GE6;
 use expander_compiler::frontend::{Config, Error, RootAPI};
 use num_bigint::BigInt;
+use sha2::digest::KeyInit;
 
 const LOOP_COUNTER: [i8; 64] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -27,7 +29,7 @@ impl Pairing {
     pub fn new<C: Config, B: RootAPI<C>>(native: &mut B) -> Self {
         let curve_f = CurveF::new(native, Bls12381Fp {});
         let ext12 = Ext12::new(native);
-        let curve = Curve::new(native, &CurveParams::get_bls12381_params());
+        let curve = Curve::new(native, &CurveParams::get_bls12381_params(), Bls12381Fp {});
         Self {
             curve_f,
             ext12,
@@ -447,6 +449,7 @@ impl Pairing {
     }
 
     pub fn assert_is_on_curve<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, p: G1Affine) {
-        self.curve.assert_is_on_curve(native, p);
+        let p_affine = AffinePoint { x: p.x, y: p.y };
+        self.curve.assert_is_on_curve(native, &p_affine);
     }
 }

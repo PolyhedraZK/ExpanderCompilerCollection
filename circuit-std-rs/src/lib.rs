@@ -7,6 +7,7 @@ pub use logup::{LogUpCircuit, LogUpParams};
 pub mod matmul;
 
 pub mod gnark;
+pub mod pairing;
 pub mod poseidon_m31;
 pub mod sha256;
 pub mod utils;
