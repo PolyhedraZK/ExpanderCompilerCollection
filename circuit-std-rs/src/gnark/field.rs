@@ -370,7 +370,7 @@ impl<T: FieldParams> GField<T> {
             c,
             k,
             r: r.clone(),
-            p: p.unwrap_or(Element::<T>::default()),
+            p: p.unwrap_or_default(),
         };
         self.mul_checks.push(mc);
     }

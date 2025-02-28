@@ -7,14 +7,7 @@ pub struct GE12 {
     pub c0: GE6,
     pub c1: GE6,
 }
-impl GE12 {
-    pub fn clone(&self) -> Self {
-        GE12 {
-            c0: self.c0.clone(),
-            c1: self.c1.clone(),
-        }
-    }
-}
+
 pub struct Ext12 {
     pub ext6: Ext6,
 }
