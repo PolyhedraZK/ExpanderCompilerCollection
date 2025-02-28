@@ -3,7 +3,10 @@ use super::g2::G2AffP;
 use super::g2::G2Affine;
 use super::g2::LineEvaluation;
 use super::g2::LineEvaluations;
+use super::point::Curve;
 use crate::gnark::emparam::Bls12381Fp;
+use crate::gnark::emparam::Bls12381Fr;
+use crate::gnark::emparam::CurveParams;
 use crate::gnark::emulated::field_bls12381::e12::*;
 use crate::gnark::emulated::field_bls12381::e2::*;
 use crate::gnark::emulated::field_bls12381::e6::GE6;
@@ -17,13 +20,19 @@ const LOOP_COUNTER: [i8; 64] = [
 pub struct Pairing {
     pub ext12: Ext12,
     pub curve_f: CurveF,
+    pub curve: Curve<Bls12381Fp, Bls12381Fr>,
 }
 
 impl Pairing {
     pub fn new<C: Config, B: RootAPI<C>>(native: &mut B) -> Self {
         let curve_f = CurveF::new(native, Bls12381Fp {});
         let ext12 = Ext12::new(native);
-        Self { curve_f, ext12 }
+        let curve = Curve::new(native, &CurveParams::get_bls12381_params());
+        Self {
+            curve_f,
+            ext12,
+            curve,
+        }
     }
     pub fn pairing_check<C: Config, B: RootAPI<C>>(
         &mut self,
@@ -435,5 +444,9 @@ impl Pairing {
             x: copy_q_acc_x,
             y: copy_q_acc_y,
         }
+    }
+
+    pub fn assert_is_on_curve<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, p: G1Affine) {
+        self.curve.assert_is_on_curve(native, p);
     }
 }
