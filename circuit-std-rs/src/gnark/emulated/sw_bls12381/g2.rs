@@ -83,7 +83,7 @@ impl G2 {
     }
     pub fn neg<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, p: &G2AffP) -> G2AffP {
         let yr = self.ext2.neg(native, &p.y);
-        G2AffP::new(p.x.my_clone(), yr)
+        G2AffP::new(p.x.clone(), yr)
     }
     pub fn copy_g2_aff_p<C: Config, B: RootAPI<C>>(
         &mut self,
@@ -218,7 +218,7 @@ impl G2 {
 
         let third_root_one_g1 = value_of::<C, B, Bls12381Fp>(native, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436".to_string()));
 
-        let mut t_double_mul = G2AffP::new(t_double.x.my_clone(), t_double.y.my_clone());
+        let mut t_double_mul = G2AffP::new(t_double.x.clone(), t_double.y.clone());
         t_double_mul.x = self
             .ext2
             .mul_by_element(native, &t_double_mul.x, &third_root_one_g1);
@@ -278,12 +278,12 @@ impl G2 {
         let g_x1 = self.ext2.mul(native, &xi_3_t_6, &g_x0);
 
         let inputs = vec![
-            g_x0.a0.my_clone(),
-            g_x0.a1.my_clone(),
-            g_x1.a0.my_clone(),
-            g_x1.a1.my_clone(),
-            in0.a0.my_clone(),
-            in0.a1.my_clone(),
+            g_x0.a0.clone(),
+            g_x0.a1.clone(),
+            g_x1.a0.clone(),
+            g_x1.a1.clone(),
+            in0.a0.clone(),
+            in0.a1.clone(),
         ];
         let output = self
             .ext2
@@ -291,8 +291,8 @@ impl G2 {
             .new_hint(native, "myhint.getsqrtx0x1fq2newhint", 3, inputs);
         let is_square = self.ext2.curve_f.is_zero(native, &output[0]); // is_square = 0 if g_x0 has not square root, 1 otherwise
         let y = GE2 {
-            a0: output[1].my_clone(),
-            a1: output[2].my_clone(),
+            a0: output[1].clone(),
+            a1: output[2].clone(),
         };
 
         let y_sq = self.ext2.square(native, &y);
@@ -308,7 +308,7 @@ impl G2 {
         native.assert_is_equal(sgn_in, sgn_y);
 
         let out_b0 = self.ext2.select(native, is_square, &x1, &x0);
-        let out_b1 = y.my_clone();
+        let out_b1 = y.clone();
         G2AffP {
             x: out_b0,
             y: out_b1,
@@ -321,7 +321,7 @@ impl G2 {
         coefficients: Vec<GE2>,
         x: &GE2,
     ) -> GE2 {
-        let mut dst = coefficients[coefficients.len() - 1].my_clone();
+        let mut dst = coefficients[coefficients.len() - 1].clone();
         if monic {
             dst = self.ext2.add(native, &dst, x);
         }
@@ -415,8 +415,8 @@ impl G2 {
     }
     pub fn g2_isogeny<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, p: &G2AffP) -> G2AffP {
         let mut p = G2AffP {
-            x: p.x.my_clone(),
-            y: p.y.my_clone(),
+            x: p.x.clone(),
+            y: p.y.clone(),
         };
         let den1 = self.g2_isogeny_y_denominator(native, &p.x);
         let den0 = self.g2_isogeny_x_denominator(native, &p.x);
