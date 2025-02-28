@@ -9,15 +9,7 @@ pub struct GE6 {
     pub b1: GE2,
     pub b2: GE2,
 }
-// impl GE6 {
-//     pub fn clone(&self) -> Self {
-//         GE6 {
-//             b0: self.b0.clone(),
-//             b1: self.b1.clone(),
-//             b2: self.b2.clone(),
-//         }
-//     }
-// }
+
 pub struct Ext6 {
     pub ext2: Ext2,
 }

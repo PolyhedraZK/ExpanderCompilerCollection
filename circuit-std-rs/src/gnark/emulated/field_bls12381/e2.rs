@@ -12,12 +12,6 @@ pub struct GE2 {
     pub a1: Element<Bls12381Fp>,
 }
 impl GE2 {
-    // pub fn clone(&self) -> Self {
-    //     GE2 {
-    //         a0: self.a0.clone(),
-    //         a1: self.a1.clone(),
-    //     }
-    // }
     pub fn from_vars(x: Vec<Variable>, y: Vec<Variable>) -> Self {
         GE2 {
             a0: Element::new(x, 0, false, false, false, Variable::default()),
