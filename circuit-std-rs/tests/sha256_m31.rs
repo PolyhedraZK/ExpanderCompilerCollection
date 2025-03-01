@@ -1,5 +1,5 @@
 use circuit_std_rs::sha256::{
-  m31::{check_sha256_37bytes, sha256_37bytes, sha256_37bytes_compiled},
+  m31::{check_sha256_37bytes, sha256_37bytes_compiled},
   m31_utils::to_binary_hint,
 };
 use expander_compiler::frontend::*;
