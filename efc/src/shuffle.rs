@@ -1,15 +1,12 @@
-use crate::attestation::{Attestation, AttestationDataSSZ};
 use crate::bls::check_pubkey_key_bls;
-use crate::bls_verifier::{convert_point, G1Json, PairingEntry};
-use crate::utils::{ensure_directory_exists, read_from_json_file};
+use crate::bls_verifier::G1Json;
+use crate::utils::{get_solver, read_from_json_file, write_witness_to_file};
 use crate::validator::{ValidatorPlain, ValidatorSSZ};
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use circuit_std_rs::gnark::emulated::sw_bls12381::g1::*;
-use circuit_std_rs::gnark::emulated::sw_bls12381::g2::{G2AffP, G2};
 use circuit_std_rs::sha256::m31_utils::big_array_add;
 use circuit_std_rs::utils::{register_hint, simple_select};
-use expander_compiler::circuit::ir::hint_normalized::witness_solver;
 use expander_compiler::frontend::extra::*;
 use expander_compiler::frontend::*;
 use serde::de::{Deserializer, SeqAccess, Visitor};
@@ -109,7 +106,6 @@ where
             Ok(outer)
         }
     }
-
     deserializer.deserialize_seq(ValidatorHashesVisitor)
 }
 
@@ -124,20 +120,7 @@ declare_circuit!(ShuffleCircuit {
     position_results: [Variable; SHUFFLE_ROUND * VALIDATOR_CHUNK_SIZE], //HINT
     position_bit_results: [Variable; SHUFFLE_ROUND * VALIDATOR_CHUNK_SIZE], //HINT
     flip_results: [Variable; SHUFFLE_ROUND * VALIDATOR_CHUNK_SIZE],     //HINT
-    //attestationdata
-    // slot: [Variable; 8],                      //PUBLIC
-    // committee_index: [Variable; 8],           //PUBLIC
-    // beacon_beacon_block_root: [Variable; 32], //PUBLIC
-    // source_epoch: [Variable; 8],              //PUBLIC
-    // target_epoch: [Variable; 8],              //PUBLIC
-    // source_root: [Variable; 32],              //PUBLIC
-    // target_root: [Variable; 32],              //PUBLIC
-    // //attestationhm = hashtog2(attestationdata.signingroot()), a g2 point
-    // attestation_hm: [[[Variable; 48]; 2]; 2], //PUBLIC
-    //attestationsig
-    // attestation_sig_bytes: [Variable; 96],              //PUBLIC
-    // attestation_sig_g2: [[[Variable; 48]; 2]; 2], //PCS: public sig, share with bls_verifier circuit
-    aggregation_bits: [Variable; VALIDATOR_CHUNK_SIZE], //PUBLIC
+    aggregation_bits: [Variable; VALIDATOR_CHUNK_SIZE],                 //PUBLIC
     validator_hashes: [[Variable; POSEIDON_HASH_LENGTH]; VALIDATOR_CHUNK_SIZE], //HINT, share with permutation circuit
     aggregated_pubkey: [[Variable; 48]; 2], //PCS: public public_key, share with bls_verifier circuit
     attestation_balance: [Variable; 8],     //PUBLIC
@@ -258,58 +241,6 @@ impl ShuffleCircuit<M31> {
             for (j, withdrawable_epoch_byte) in withdrawable_epoch.iter().enumerate() {
                 self.withdrawable_epoch[i][j] = M31::from(*withdrawable_epoch_byte as u32);
             }
-
-            // //assign slot
-            // let slot = attestation.data.slot.to_le_bytes();
-            // for (j, slot_byte) in slot.iter().enumerate() {
-            //     self.slot[j] = M31::from(*slot_byte as u32);
-            // }
-            // //assign committee_index
-            // let committee_index = attestation.data.committee_index.to_le_bytes();
-            // for (j, committee_index_byte) in committee_index.iter().enumerate() {
-            //     self.committee_index[j] = M31::from(*committee_index_byte as u32);
-            // }
-            // //assign beacon_beacon_block_root
-            // let beacon_beacon_block_root = attestation.data.beacon_block_root.clone();
-            // let beacon_beacon_block_root = STANDARD.decode(beacon_beacon_block_root).unwrap();
-            // for (j, beacon_beacon_block_root_byte) in beacon_beacon_block_root.iter().enumerate() {
-            //     self.beacon_beacon_block_root[j] = M31::from(*beacon_beacon_block_root_byte as u32);
-            // }
-            // //assign source_epoch
-            // let source_epoch = attestation.data.source.epoch.to_le_bytes();
-            // for (j, source_epoch_byte) in source_epoch.iter().enumerate() {
-            //     self.source_epoch[j] = M31::from(*source_epoch_byte as u32);
-            // }
-            // //assign target_epoch
-            // let target_epoch = attestation.data.target.epoch.to_le_bytes();
-            // for (j, target_epoch_byte) in target_epoch.iter().enumerate() {
-            //     self.target_epoch[j] = M31::from(*target_epoch_byte as u32);
-            // }
-            // //assign source_root
-            // let source_root = attestation.data.source.root.clone();
-            // let source_root = STANDARD.decode(source_root).unwrap();
-            // for (j, source_root_byte) in source_root.iter().enumerate() {
-            //     self.source_root[j] = M31::from(*source_root_byte as u32);
-            // }
-            // //assign target_root
-            // let target_root = attestation.data.target.root.clone();
-            // let target_root = STANDARD.decode(target_root).unwrap();
-            // for (j, target_root_byte) in target_root.iter().enumerate() {
-            //     self.target_root[j] = M31::from(*target_root_byte as u32);
-            // }
-            // //assign attestation_hm
-            // self.attestation_hm[0] = convert_point(pairing_entry.hm.p.x.clone());
-            // self.attestation_hm[1] = convert_point(pairing_entry.hm.p.y.clone());
-
-            // //assign attestation_sig_bytes
-            // let attestation_sig_bytes = attestation.signature.clone();
-            // let attestation_sig_bytes = STANDARD.decode(attestation_sig_bytes).unwrap();
-            // for (j, attestation_sig_byte) in attestation_sig_bytes.iter().enumerate() {
-            //     self.attestation_sig_bytes[j] = M31::from(*attestation_sig_byte as u32);
-            // }
-            // //assign attestation_sig_g2
-            // self.attestation_sig_g2[0] = convert_point(pairing_entry.signature.p.x.clone());
-            // self.attestation_sig_g2[1] = convert_point(pairing_entry.signature.p.y.clone());
         }
     }
     pub fn from_pubkey_bls(&mut self, committee_indices: Vec<u32>, pubkey_bls: Vec<Vec<String>>) {
@@ -322,6 +253,55 @@ impl ShuffleCircuit<M31> {
                 self.pubkeys_bls[i][1][k] = M31::from(pubkey_y[k] as u32);
             }
         }
+    }
+    pub fn get_assignments_from_data(
+        shuffle_data: Vec<ShuffleJson>,
+        plain_validators: Vec<ValidatorPlain>,
+        public_key_bls_list: Vec<Vec<String>>,
+    ) -> Vec<Self> {
+        let mut handles = vec![];
+        let plain_validators = Arc::new(plain_validators);
+        let public_key_bls_list = Arc::new(public_key_bls_list);
+        let assignments = Arc::new(Mutex::new(vec![None; shuffle_data.len()]));
+        for (i, shuffle_item) in shuffle_data.into_iter().enumerate() {
+            let assignments = Arc::clone(&assignments);
+            let target_plain_validators = Arc::clone(&plain_validators);
+            let target_public_key_bls_list = Arc::clone(&public_key_bls_list);
+
+            let handle = thread::spawn(move || {
+                let mut assignment = ShuffleCircuit::<M31>::default();
+                assignment.from_plains(
+                    &shuffle_item,
+                    &target_plain_validators,
+                    &target_public_key_bls_list,
+                );
+
+                let mut assignments = assignments.lock().unwrap();
+                assignments[i] = Some(assignment);
+            });
+            handles.push(handle);
+        }
+        for handle in handles {
+            handle.join().expect("Thread panicked");
+        }
+        let assignments = assignments
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|x| x.clone().unwrap())
+            .collect::<Vec<_>>();
+        assignments
+    }
+    pub fn get_assignments_from_json(dir: &str) -> Vec<Self> {
+        let shuffle_data: Vec<ShuffleJson> = read_from_json_file(&format!("{}/shuffle.json", dir))
+            .expect("Failed to read shuffle.json");
+        let plain_validators: Vec<ValidatorPlain> =
+            read_from_json_file(&format!("{}/validator.json", dir))
+                .expect("Failed to read validator.json");
+        let public_key_bls_list: Vec<Vec<String>> =
+            read_from_json_file(&format!("{}/pubkey_bls.json", dir))
+                .expect("Failed to read pubkey_bls.json");
+        Self::get_assignments_from_data(shuffle_data, plain_validators, public_key_bls_list)
     }
 }
 impl GenericDefine<M31Config> for ShuffleCircuit<Variable> {
@@ -403,7 +383,7 @@ impl GenericDefine<M31Config> for ShuffleCircuit<Variable> {
             self.aggregated_pubkey[0].to_vec(),
             self.aggregated_pubkey[1].to_vec(),
         );
-        aggregate_attestation_public_key(
+        aggregate_attestation_public_key_flatten(
             builder,
             &mut g1,
             &pubkey_list_bls,
@@ -443,52 +423,6 @@ impl GenericDefine<M31Config> for ShuffleCircuit<Variable> {
                 builder.assert_is_equal(hashbit, self.validator_hashes[index][i]);
             }
         }
-        // // attestation
-        // let att_ssz = AttestationDataSSZ {
-        //     slot: self.slot,
-        //     committee_index: self.committee_index,
-        //     beacon_block_root: self.beacon_beacon_block_root,
-        //     source_epoch: self.source_epoch,
-        //     target_epoch: self.target_epoch,
-        //     source_root: self.source_root,
-        //     target_root: self.target_root,
-        // };
-        // let mut g2 = G2::new(builder);
-        // // domain
-        // let domain = [
-        //     1, 0, 0, 0, 187, 164, 218, 150, 53, 76, 159, 37, 71, 108, 241, 188, 105, 191, 88, 58,
-        //     127, 158, 10, 240, 73, 48, 91, 98, 222, 103, 102, 64,
-        // ];
-        // let mut domain_var = vec![];
-        // for domain_byte in domain.iter() {
-        //     domain_var.push(builder.constant(*domain_byte as u32));
-        // }
-        // let att_hash = att_ssz.att_data_signing_root(builder, &domain_var); //msg
-        //                                                                     // map to hm
-        // let (hm0, hm1) = g2.hash_to_fp(builder, &att_hash);
-        // let hm_g2 = g2.map_to_g2(builder, &hm0, &hm1);
-        // let expected_hm_g2 = G2AffP::from_vars(
-        //     self.attestation_hm[0][0].to_vec(),
-        //     self.attestation_hm[0][1].to_vec(),
-        //     self.attestation_hm[1][0].to_vec(),
-        //     self.attestation_hm[1][1].to_vec(),
-        // );
-        // g2.assert_is_equal(builder, &hm_g2, &expected_hm_g2);
-        // // unmarshal attestation sig
-        // let sig_g2 = g2.uncompressed(builder, &self.attestation_sig_bytes);
-        // let expected_sig_g2 = G2AffP::from_vars(
-        //     self.attestation_sig_g2[0][0].to_vec(),
-        //     self.attestation_sig_g2[0][1].to_vec(),
-        //     self.attestation_sig_g2[1][0].to_vec(),
-        //     self.attestation_sig_g2[1][1].to_vec(),
-        // );
-        // g2.assert_is_equal(builder, &sig_g2, &expected_sig_g2);
-
-        // g2.ext2.curve_f.check_mul(builder);
-        // g2.ext2.curve_f.table.final_check(builder);
-        // g2.ext2.curve_f.table.final_check(builder);
-        // g2.ext2.curve_f.table.final_check(builder);
-
         g1.curve_f.check_mul(builder);
         g1.curve_f.table.final_check(builder);
         g1.curve_f.table.final_check(builder);
@@ -555,6 +489,8 @@ pub fn flip_with_hash_bits<C: Config, B: RootAPI<C>>(
     for i in 0..cur_indices.len() {
         let tmp = builder.add(flip_results[i], 1);
         let ignore_flag = builder.is_zero(tmp);
+
+        //flip_results must be (pivot - cur_index) % indexCount
         let tmp = builder.sub(pivot, cur_indices[i]);
         let tmp = builder.sub(tmp, flip_results[i]);
         let flip_flag1 = builder.is_zero(tmp);
@@ -562,10 +498,11 @@ pub fn flip_with_hash_bits<C: Config, B: RootAPI<C>>(
         let tmp = builder.sub(tmp, cur_indices[i]);
         let tmp = builder.sub(tmp, flip_results[i]);
         let flip_flag2 = builder.is_zero(tmp);
-        let tmp = builder.or(flip_flag1, flip_flag2);
-        let flip_flag = builder.or(tmp, ignore_flag);
+        let tmp_flag = builder.or(flip_flag1, flip_flag2);
+        let flip_flag = builder.or(tmp_flag, ignore_flag);
         builder.assert_is_equal(flip_flag, 1);
 
+        //position_results must be max(cur_index, flip_results)
         let tmp = builder.sub(position_results[i], flip_results[i]);
         let position_flag1 = builder.is_zero(tmp);
         let tmp = builder.sub(position_results[i], cur_indices[i]);
@@ -573,12 +510,12 @@ pub fn flip_with_hash_bits<C: Config, B: RootAPI<C>>(
         let tmp = builder.or(position_flag1, position_flag2);
         let position_flag = builder.or(tmp, ignore_flag);
         builder.assert_is_equal(position_flag, 1);
-
         let tmp = builder.mul(2, position_results[i]);
         let tmp = builder.sub(tmp, flip_results[i]);
         let position_diff = builder.sub(tmp, cur_indices[i]);
         let zero_var = builder.constant(0);
         let position_diff = simple_select(builder, ignore_flag, zero_var, position_diff);
+        //check the position_diff later, should be < indexCount
         position_diffs.push(position_diff);
         res.push(simple_select(
             builder,
@@ -590,7 +527,7 @@ pub fn flip_with_hash_bits<C: Config, B: RootAPI<C>>(
     (res, position_diffs)
 }
 
-pub fn aggregate_attestation_public_key<C: Config, B: RootAPI<C>>(
+pub fn aggregate_attestation_public_key_flatten<C: Config, B: RootAPI<C>>(
     builder: &mut B,
     g1: &mut G1,
     pub_key: &[G1Affine],
@@ -636,7 +573,7 @@ pub fn aggregate_attestation_public_key<C: Config, B: RootAPI<C>>(
         .assert_is_equal(builder, &copy_aggregated_pubkey.y, &agg_pubkey.y);
 }
 
-pub fn aggregate_attestation_public_key2<C: Config, B: RootAPI<C>>(
+pub fn aggregate_attestation_public_key_unflatten<C: Config, B: RootAPI<C>>(
     builder: &mut B,
     g1: &mut G1,
     pub_key: &[G1Affine],
@@ -678,110 +615,44 @@ pub fn aggregate_attestation_public_key2<C: Config, B: RootAPI<C>>(
 }
 pub fn generate_shuffle_witnesses(dir: &str) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
-        log::debug!("preparing solver...");
-        ensure_directory_exists("./witnesses/shuffle");
+        let circuit_name = &format!("shuffle_{}", VALIDATOR_CHUNK_SIZE);
 
-        let file_name = "solver_shuffle1.txt";
-        let w_s = if std::fs::metadata(file_name).is_ok() {
-            log::debug!("The solver exists!");
-            let file = std::fs::File::open(file_name).unwrap();
-            let reader = std::io::BufReader::new(file);
-            witness_solver::WitnessSolver::deserialize_from(reader).unwrap()
-        } else {
-            log::debug!("The solver does not exist.");
-            let compile_result =
-                compile_generic(&ShuffleCircuit::default(), CompileOptions::default()).unwrap();
-            let file = std::fs::File::create(file_name).unwrap();
-            let writer = std::io::BufWriter::new(file);
-            compile_result
-                .witness_solver
-                .serialize_into(writer)
-                .unwrap();
-            let CompileResult {
-                witness_solver,
-                layered_circuit,
-            } = compile_result;
-            let file = std::fs::File::create("circuit_shuffle.txt").unwrap();
-            let writer = std::io::BufWriter::new(file);
-            layered_circuit.serialize_into(writer).unwrap();
-            witness_solver
-        };
-        let witness_solver = Arc::new(w_s);
+        //get solver
+        log::debug!("preparing {} solver...", circuit_name);
+        let witnesses_dir = format!("./witnesses/{}", circuit_name);
+        let w_s = get_solver(&witnesses_dir, circuit_name, ShuffleCircuit::default());
 
-        log::debug!("generating witnesses...");
+        //get assignments
         let start_time = std::time::Instant::now();
-        let file_path = format!("{}/validatorList.json", dir);
-        let plain_validators: Vec<ValidatorPlain> = read_from_json_file(&file_path).unwrap();
-
-        let file_path = format!("{}/shuffle_assignment.json", dir);
-        let shuffle_data: Vec<ShuffleJson> = read_from_json_file(&file_path).unwrap();
-        let file_path = format!("{}/pubkeyBLSList.json", dir);
-        let public_key_bls_list: Vec<Vec<String>> = read_from_json_file(&file_path).unwrap();
+        let assignments = ShuffleCircuit::get_assignments_from_json(dir);
         let end_time = std::time::Instant::now();
         log::debug!(
-            "loaed assignment data, time: {:?}",
+            "assigned assignments time: {:?}",
             end_time.duration_since(start_time)
         );
 
-        let mut handles = vec![];
-        let plain_validators = Arc::new(plain_validators);
-        let public_key_bls_list = Arc::new(public_key_bls_list);
-        let assignments = Arc::new(Mutex::new(vec![None; shuffle_data.len() / 2]));
-
-        for (i, shuffle_item) in shuffle_data.into_iter().enumerate().take(1024) {
-            let assignments = Arc::clone(&assignments);
-            let target_plain_validators = Arc::clone(&plain_validators);
-            let target_public_key_bls_list = Arc::clone(&public_key_bls_list);
-
-            let handle = thread::spawn(move || {
-                let mut assignment = ShuffleCircuit::<M31>::default();
-                assignment.from_plains(
-                    &shuffle_item,
-                    &target_plain_validators,
-                    &target_public_key_bls_list,
-                );
-
-                let mut assignments = assignments.lock().unwrap();
-                assignments[i] = Some(assignment);
-            });
-
-            handles.push(handle);
-        }
-
-        for handle in handles {
-            handle.join().expect("Thread panicked");
-        }
-
-        let end_time = std::time::Instant::now();
-        log::debug!(
-            "assigned assignment data, time: {:?}",
-            end_time.duration_since(start_time)
-        );
-
-        let assignments = assignments
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|x| x.clone().unwrap())
-            .collect::<Vec<_>>();
         let assignment_chunks: Vec<Vec<ShuffleCircuit<M31>>> =
             assignments.chunks(16).map(|x| x.to_vec()).collect();
 
+        //generate witnesses (multi-thread)
+        log::debug!("Start generating witnesses...");
+        let witness_solver = Arc::new(w_s);
         let handles = assignment_chunks
             .into_iter()
             .enumerate()
             .map(|(i, assignments)| {
                 let witness_solver = Arc::clone(&witness_solver);
+                let witnesses_dir_clone = witnesses_dir.clone();
                 thread::spawn(move || {
                     let mut hint_registry = HintRegistry::<M31>::new();
                     register_hint(&mut hint_registry);
                     let witness = witness_solver
                         .solve_witnesses_with_hints(&assignments, &mut hint_registry)
                         .unwrap();
-                    let file_name = format!("./witnesses/shuffle/witness_{}.txt", i);
-                    let file = std::fs::File::create(file_name).unwrap();
-                    let writer = std::io::BufWriter::new(file);
-                    witness.serialize_into(writer).unwrap();
+                    write_witness_to_file(
+                        &format!("{}/witness_{}.txt", witnesses_dir_clone, i),
+                        witness,
+                    )
                 })
             })
             .collect::<Vec<_>>();
@@ -790,7 +661,8 @@ pub fn generate_shuffle_witnesses(dir: &str) {
         }
         let end_time = std::time::Instant::now();
         log::debug!(
-            "Generate shuffle witness Time: {:?}",
+            "Generate {} witness Time: {:?}",
+            circuit_name,
             end_time.duration_since(start_time)
         );
     });
@@ -803,71 +675,44 @@ pub fn end2end_shuffle_witnesses(
     public_key_bls_list: Vec<Vec<String>>,
 ) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
-        log::debug!("preparing solver...");
-        let witness_solver = Arc::new(w_s);
+        let circuit_name = &format!("shuffle_{}", VALIDATOR_CHUNK_SIZE);
 
-        log::debug!("Start generating shuffle witnesses...");
+        //get solver
+        log::debug!("preparing {} solver...", circuit_name);
+        let witnesses_dir = format!("./witnesses/{}", circuit_name);
+
+        //get assignments
         let start_time = std::time::Instant::now();
-
-        let mut handles = vec![];
-        let plain_validators = Arc::new(plain_validators);
-        let public_key_bls_list = Arc::new(public_key_bls_list);
-        let assignments = Arc::new(Mutex::new(vec![None; shuffle_data.len() / 2]));
-
-        for (i, shuffle_item) in shuffle_data.into_iter().enumerate().take(1024) {
-            let assignments = Arc::clone(&assignments);
-            let target_plain_validators = Arc::clone(&plain_validators);
-            let target_public_key_bls_list = Arc::clone(&public_key_bls_list);
-
-            let handle = thread::spawn(move || {
-                let mut assignment = ShuffleCircuit::<M31>::default();
-                assignment.from_plains(
-                    &shuffle_item,
-                    &target_plain_validators,
-                    &target_public_key_bls_list,
-                );
-
-                let mut assignments = assignments.lock().unwrap();
-                assignments[i] = Some(assignment);
-            });
-
-            handles.push(handle);
-        }
-
-        for handle in handles {
-            handle.join().expect("Thread panicked");
-        }
-
+        let assignments = ShuffleCircuit::get_assignments_from_data(
+            shuffle_data,
+            plain_validators,
+            public_key_bls_list,
+        );
         let end_time = std::time::Instant::now();
         log::debug!(
-            "assigned assignment data, time: {:?}",
+            "assigned assignments time: {:?}",
             end_time.duration_since(start_time)
         );
-
-        let assignments = assignments
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|x| x.clone().unwrap())
-            .collect::<Vec<_>>();
         let assignment_chunks: Vec<Vec<ShuffleCircuit<M31>>> =
             assignments.chunks(16).map(|x| x.to_vec()).collect();
 
+        let witness_solver = Arc::new(w_s);
         let handles = assignment_chunks
             .into_iter()
             .enumerate()
             .map(|(i, assignments)| {
                 let witness_solver = Arc::clone(&witness_solver);
+                let witnesses_dir_clone = witnesses_dir.clone();
                 thread::spawn(move || {
                     let mut hint_registry = HintRegistry::<M31>::new();
                     register_hint(&mut hint_registry);
                     let witness = witness_solver
                         .solve_witnesses_with_hints(&assignments, &mut hint_registry)
                         .unwrap();
-                    let file_name = format!("./witnesses/shuffle/witness_{}.txt", i);
-                    let file = std::fs::File::create(file_name).unwrap();
-                    let writer = std::io::BufWriter::new(file);
-                    witness.serialize_into(writer).unwrap();
+                    write_witness_to_file(
+                        &format!("{}/witness_{}.txt", witnesses_dir_clone, i),
+                        witness,
+                    )
                 })
             })
             .collect::<Vec<_>>();
@@ -876,48 +721,9 @@ pub fn end2end_shuffle_witnesses(
         }
         let end_time = std::time::Instant::now();
         log::debug!(
-            "Generate shuffle witness Time: {:?}",
+            "Generate {} witness Time: {:?}",
+            circuit_name,
             end_time.duration_since(start_time)
         );
     });
 }
-
-#[test]
-fn test_generate_shuffle_witnesses() {
-    generate_shuffle_witnesses("./data");
-}
-
-// #[test]
-// fn run_shuffle2() {
-//     let dir = "./data";
-//     let mut hint_registry = HintRegistry::<M31>::new();
-//     register_hint(&mut hint_registry);
-//     let plain_validators = read_validators(dir);
-//     let file_path = format!("{}/shuffle_assignment.json", dir);
-//     let shuffle_data: Vec<ShuffleJson> = read_from_json_file(&file_path).unwrap();
-//     let file_path = format!("{}/pubkeyBLSList.json", dir);
-//     let public_key_bls_list: Vec<Vec<String>> = read_from_json_file(&file_path).unwrap();
-//     let file_path = format!("{}/slotAttestationsFolded.json", dir);
-//     let attestations: Vec<Attestation> = read_from_json_file(&file_path).unwrap();
-//     let file_path = format!("{}/pairing_assignment.json", dir);
-//     let pairing_data: Vec<PairingEntry> = read_from_json_file(&file_path).unwrap();
-
-//     let mut assignment = ShuffleCircuit::<M31>::default();
-//     assignment.from_plains(
-//         &shuffle_data[0],
-//         &plain_validators,
-//         &public_key_bls_list,
-//         &attestations[0],
-//         &pairing_data[0],
-//     );
-//     let file_name = "shuffle.witness";
-//     stacker::grow(32 * 1024 * 1024 * 1024, || {
-//         let compile_result =
-//             compile_generic(&ShuffleCircuit::default(), CompileOptions::default()).unwrap();
-//         compile_result
-//             .witness_solver
-//             .serialize_into(std::fs::File::create(file_name).unwrap())
-//             .unwrap();
-//         debug_eval(&ShuffleCircuit::default(), &assignment, hint_registry);
-//     });
-// }

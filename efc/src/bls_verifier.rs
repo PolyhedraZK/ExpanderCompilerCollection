@@ -84,6 +84,26 @@ declare_circuit!(BLSVERIFIERCircuit {
 });
 
 impl BLSVERIFIERCircuit<M31> {
+    pub fn get_assignments_from_data(
+        pairing_data: Vec<PairingEntry>,
+        attestations: Vec<Attestation>,
+    ) -> Vec<Self> {
+        let mut assignments = vec![];
+        for (cur_pairing_data, cur_attestation_data) in pairing_data.iter().zip(attestations.iter())
+        {
+            let mut pairing_assignment = BLSVERIFIERCircuit::default();
+            pairing_assignment.from_entry(cur_pairing_data, cur_attestation_data);
+            assignments.push(pairing_assignment);
+        }
+        assignments
+    }
+    pub fn get_assignments_from_json(dir: &str) -> Vec<Self> {
+        let file_path = format!("{}/pairing_assignment.json", dir);
+        let pairing_data: Vec<PairingEntry> = read_from_json_file(&file_path).unwrap();
+        let file_path = format!("{}/slotAttestationsFolded.json", dir);
+        let attestations: Vec<Attestation> = read_from_json_file(&file_path).unwrap();
+        BLSVERIFIERCircuit::get_assignments_from_data(pairing_data, attestations)
+    }
     pub fn from_entry(&mut self, entry: &PairingEntry, attestation: &Attestation) {
         self.pubkey = [
             convert_limbs(entry.pub_key.x.limbs.clone()),
@@ -195,25 +215,7 @@ impl GenericDefine<M31Config> for BLSVERIFIERCircuit<Variable> {
         // g2.ext2.curve_f.table.final_check(builder);
     }
 }
-pub fn get_assignments_from_data(
-    pairing_data: Vec<PairingEntry>,
-    attestations: Vec<Attestation>,
-) -> Vec<BLSVERIFIERCircuit<M31>> {
-    let mut assignments = vec![];
-    for (cur_pairing_data, cur_attestation_data) in pairing_data.iter().zip(attestations.iter()) {
-        let mut pairing_assignment = BLSVERIFIERCircuit::<M31>::default();
-        pairing_assignment.from_entry(cur_pairing_data, cur_attestation_data);
-        assignments.push(pairing_assignment);
-    }
-    assignments
-}
-pub fn get_assignments_from_json(dir: &str) -> Vec<BLSVERIFIERCircuit<M31>> {
-    let file_path = format!("{}/pairing_assignment.json", dir);
-    let pairing_data: Vec<PairingEntry> = read_from_json_file(&file_path).unwrap();
-    let file_path = format!("{}/slotAttestationsFolded.json", dir);
-    let attestations: Vec<Attestation> = read_from_json_file(&file_path).unwrap();
-    get_assignments_from_data(pairing_data, attestations)
-}
+
 pub fn generate_blsverifier_witnesses(dir: &str) {
     let circuit_name = "blsverifier_3checks";
 
@@ -224,7 +226,7 @@ pub fn generate_blsverifier_witnesses(dir: &str) {
 
     //get assignments
     let start_time = std::time::Instant::now();
-    let assignments = get_assignments_from_json(dir);
+    let assignments = BLSVERIFIERCircuit::<M31>::get_assignments_from_json(dir);
     let end_time = std::time::Instant::now();
     log::debug!(
         "assigned assignments time: {:?}",
@@ -279,7 +281,8 @@ pub fn end2end_blsverifier_witness(
 
     //get assignments
     let start_time = std::time::Instant::now();
-    let assignments = get_assignments_from_data(pairing_data, attestations);
+    let assignments =
+        BLSVERIFIERCircuit::<M31>::get_assignments_from_data(pairing_data, attestations);
     let end_time = std::time::Instant::now();
     log::debug!(
         "assigned assignments time: {:?}",

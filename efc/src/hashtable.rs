@@ -40,6 +40,36 @@ declare_circuit!(HASHTABLECircuit {
     seed: [PublicVariable; SHA256LEN],
     output: [[Variable; SHA256LEN]; HASHTABLESIZE],
 });
+impl HASHTABLECircuit<M31> {
+    pub fn from_entry(&mut self, entry: &HashTableJson) {
+        for i in 0..SHA256LEN {
+            self.seed[i] = M31::from(entry.seed[i] as u32);
+        }
+        self.shuffle_round = M31::from(entry.shuffle_round as u32);
+        for i in 0..4 {
+            self.start_index[i] = M31::from(entry.start_index[i] as u32);
+        }
+        for i in 0..HASHTABLESIZE {
+            for j in 0..SHA256LEN {
+                self.output[i][j] = M31::from(entry.hash_outputs[i][j] as u32);
+            }
+        }
+    }
+    pub fn get_assignments_from_data(hashtable_data: Vec<HashTableJson>) -> Vec<Self> {
+        let mut assignments = vec![];
+        for cur_hashtable_data in &hashtable_data {
+            let mut hash_assignment = HASHTABLECircuit::default();
+            hash_assignment.from_entry(cur_hashtable_data);
+            assignments.push(hash_assignment);
+        }
+        assignments
+    }
+    pub fn get_assignments_from_json(dir: &str) -> Vec<Self> {
+        let file_path = format!("{}/hash_assignment.json", dir);
+        let hashtable_data: Vec<HashTableJson> = read_from_json_file(&file_path).unwrap();
+        HASHTABLECircuit::get_assignments_from_data(hashtable_data)
+    }
+}
 impl GenericDefine<M31Config> for HASHTABLECircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut seed_bits: Vec<Variable> = vec![];
@@ -72,32 +102,6 @@ impl GenericDefine<M31Config> for HASHTABLECircuit<Variable> {
     }
 }
 
-pub fn get_assignments_from_data(hashtable_data: Vec<HashTableJson>) -> Vec<HASHTABLECircuit<M31>> {
-    let mut assignments = vec![];
-    for cur_hashtable_data in &hashtable_data {
-        let mut hash_assignment = HASHTABLECircuit::default();
-        for j in 0..32 {
-            hash_assignment.seed[j] = M31::from(cur_hashtable_data.seed[j] as u32);
-        }
-        hash_assignment.shuffle_round = M31::from(cur_hashtable_data.shuffle_round as u32);
-        for j in 0..4 {
-            hash_assignment.start_index[j] = M31::from(cur_hashtable_data.start_index[j] as u32);
-        }
-        for j in 0..HASHTABLESIZE {
-            for k in 0..32 {
-                hash_assignment.output[j][k] =
-                    M31::from(cur_hashtable_data.hash_outputs[j % 64][k] as u32);
-            }
-        }
-        assignments.push(hash_assignment);
-    }
-    assignments
-}
-pub fn get_assignments_from_json(dir: &str) -> Vec<HASHTABLECircuit<M31>> {
-    let file_path = format!("{}/hash_assignment.json", dir);
-    let hashtable_data: Vec<HashTableJson> = read_from_json_file(&file_path).unwrap();
-    get_assignments_from_data(hashtable_data)
-}
 pub fn generate_hash_witnesses(dir: &str) {
     let circuit_name = &format!("hashtable{}", HASHTABLESIZE);
 
@@ -108,7 +112,7 @@ pub fn generate_hash_witnesses(dir: &str) {
 
     //get assignments
     let start_time = std::time::Instant::now();
-    let assignments = get_assignments_from_json(dir);
+    let assignments = HASHTABLECircuit::get_assignments_from_json(dir);
     let end_time = std::time::Instant::now();
     log::debug!(
         "assigned assignments time: {:?}",
@@ -161,7 +165,7 @@ pub fn end2end_hashtable_witnesses(
 
     //get assignments
     let start_time = std::time::Instant::now();
-    let assignments = get_assignments_from_data(hashtable_data);
+    let assignments = HASHTABLECircuit::get_assignments_from_data(hashtable_data);
     let end_time = std::time::Instant::now();
     log::debug!(
         "assigned assignments time: {:?}",

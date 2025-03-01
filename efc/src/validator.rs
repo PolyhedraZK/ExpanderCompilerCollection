@@ -1,12 +1,11 @@
 use circuit_std_rs::poseidon_m31::*;
 use circuit_std_rs::utils::register_hint;
-use expander_compiler::circuit::ir::hint_normalized::witness_solver;
-use expander_compiler::{frontend::*, utils::serde::Serde};
+use expander_compiler::frontend::*;
 use serde::Deserialize;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use crate::utils::{ensure_directory_exists, read_from_json_file};
+use crate::utils::*;
 pub const SUBTREE_DEPTH: usize = 10;
 pub const SUBTREE_NUM_DEPTH: usize = 11;
 pub const SUBTREE_SIZE: usize = 1 << SUBTREE_DEPTH;
@@ -129,6 +128,43 @@ impl ConvertValidatorListToMerkleTreeCircuit<M31> {
             self.subtree_root[i] = M31::from(validator_subtree_json.subtree_root[i]);
         }
     }
+    pub fn get_assignments_from_data(
+        validator_subtree_data: Vec<ValidatorSubTreeJson>,
+    ) -> Vec<Self> {
+        let mut handles = vec![];
+        let assignments = Arc::new(Mutex::new(vec![None; validator_subtree_data.len()]));
+
+        for (i, validator_subtree_item) in validator_subtree_data.into_iter().enumerate() {
+            let assignments = Arc::clone(&assignments);
+
+            let handle = thread::spawn(move || {
+                let mut assignment = ConvertValidatorListToMerkleTreeCircuit::<M31>::default();
+                assignment.from_assignment(&validator_subtree_item);
+
+                let mut assignments = assignments.lock().unwrap();
+                assignments[i] = Some(assignment);
+            });
+
+            handles.push(handle);
+        }
+        for handle in handles {
+            handle.join().expect("Thread panicked");
+        }
+
+        let assignments = assignments
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|x| x.clone().unwrap())
+            .collect::<Vec<_>>();
+        assignments
+    }
+    pub fn get_assignments_from_json(dir: &str) -> Vec<Self> {
+        let file_path = format!("{}/validatorsubtree_assignment.json", dir);
+        let validator_subtree_data: Vec<ValidatorSubTreeJson> =
+            read_from_json_file(&file_path).unwrap();
+        Self::get_assignments_from_data(validator_subtree_data)
+    }
 }
 impl GenericDefine<M31Config> for ConvertValidatorListToMerkleTreeCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
@@ -158,101 +194,46 @@ impl GenericDefine<M31Config> for ConvertValidatorListToMerkleTreeCircuit<Variab
 
 pub fn generate_validator_subtree_witnesses(dir: &str) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
-        log::debug!("preparing solver...");
-        ensure_directory_exists("./witnesses/validatorsubtree");
+        let circuit_name = &format!("validatorsubtree{}", SUBTREE_SIZE);
 
-        let file_name = "solver_validatorsubtree.txt";
-        let w_s = if std::fs::metadata(file_name).is_ok() {
-            log::debug!("The solver exists!");
-            let file = std::fs::File::open(file_name).unwrap();
-            let reader = std::io::BufReader::new(file);
-            witness_solver::WitnessSolver::deserialize_from(reader).unwrap()
-        } else {
-            log::debug!("The solver does not exist.");
-            let compile_result = compile_generic(
-                &ConvertValidatorListToMerkleTreeCircuit::default(),
-                CompileOptions::default(),
-            )
-            .unwrap();
-            let file = std::fs::File::create(file_name).unwrap();
-            let writer = std::io::BufWriter::new(file);
-            compile_result
-                .witness_solver
-                .serialize_into(writer)
-                .unwrap();
-            let CompileResult {
-                witness_solver,
-                layered_circuit,
-            } = compile_result;
-            let file = std::fs::File::create("circuit_validatorsubtree.txt").unwrap();
-            let writer = std::io::BufWriter::new(file);
-            layered_circuit.serialize_into(writer).unwrap();
-            witness_solver
-        };
-        let witness_solver = Arc::new(w_s);
-
-        log::debug!("generating witnesses...");
-        let start_time = std::time::Instant::now();
-        let file_path = format!("{}/validatorsubtree_assignment.json", dir);
-        let validator_subtree_data: Vec<ValidatorSubTreeJson> =
-            read_from_json_file(&file_path).unwrap();
-        let end_time = std::time::Instant::now();
-        log::debug!(
-            "loaed assignment data, time: {:?}",
-            end_time.duration_since(start_time)
+        //get solver
+        log::debug!("preparing {} solver...", circuit_name);
+        let witnesses_dir = format!("./witnesses/{}", circuit_name);
+        let w_s = get_solver(
+            &witnesses_dir,
+            circuit_name,
+            ConvertValidatorListToMerkleTreeCircuit::default(),
         );
 
-        let mut handles = vec![];
-        let assignments = Arc::new(Mutex::new(vec![None; validator_subtree_data.len()]));
-
-        for (i, validator_subtree_item) in validator_subtree_data.into_iter().enumerate() {
-            let assignments = Arc::clone(&assignments);
-
-            let handle = thread::spawn(move || {
-                let mut assignment = ConvertValidatorListToMerkleTreeCircuit::<M31>::default();
-                assignment.from_assignment(&validator_subtree_item);
-
-                let mut assignments = assignments.lock().unwrap();
-                assignments[i] = Some(assignment);
-            });
-
-            handles.push(handle);
-        }
-
-        for handle in handles {
-            handle.join().expect("Thread panicked");
-        }
-
+        let start_time = std::time::Instant::now();
+        let assignments = ConvertValidatorListToMerkleTreeCircuit::get_assignments_from_json(dir);
         let end_time = std::time::Instant::now();
         log::debug!(
             "assigned assignment data, time: {:?}",
             end_time.duration_since(start_time)
         );
-
-        let assignments = assignments
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|x| x.clone().unwrap())
-            .collect::<Vec<_>>();
         let assignment_chunks: Vec<Vec<ConvertValidatorListToMerkleTreeCircuit<M31>>> =
             assignments.chunks(16).map(|x| x.to_vec()).collect();
 
+        //generate witnesses (multi-thread)
+        log::debug!("Start generating witnesses...");
+        let witness_solver = Arc::new(w_s);
         let handles = assignment_chunks
             .into_iter()
             .enumerate()
             .map(|(i, assignments)| {
                 let witness_solver = Arc::clone(&witness_solver);
+                let witnesses_dir_clone = witnesses_dir.clone();
                 thread::spawn(move || {
                     let mut hint_registry = HintRegistry::<M31>::new();
                     register_hint(&mut hint_registry);
                     let witness = witness_solver
                         .solve_witnesses_with_hints(&assignments, &mut hint_registry)
                         .unwrap();
-                    let file_name = format!("./witnesses/validatorsubtree/witness_{}.txt", i);
-                    let file = std::fs::File::create(file_name).unwrap();
-                    let writer = std::io::BufWriter::new(file);
-                    witness.serialize_into(writer).unwrap();
+                    write_witness_to_file(
+                        &format!("{}/witness_{}.txt", witnesses_dir_clone, i),
+                        witness,
+                    )
                 })
             })
             .collect::<Vec<_>>();
@@ -261,7 +242,8 @@ pub fn generate_validator_subtree_witnesses(dir: &str) {
         }
         let end_time = std::time::Instant::now();
         log::debug!(
-            "Generate validatorsubtree witness Time: {:?}",
+            "Generate {} witness Time: {:?}",
+            circuit_name,
             end_time.duration_since(start_time)
         );
     });
@@ -271,60 +253,41 @@ pub fn end2end_validator_subtree_witnesses(
     w_s: WitnessSolver<M31Config>,
     validator_subtree_data: Vec<ValidatorSubTreeJson>,
 ) {
-    let witness_solver = Arc::new(w_s);
+    let circuit_name = &format!("validatorsubtree{}", SUBTREE_SIZE);
 
-    log::debug!("gStart enerating validator_subtree witnesses...");
+    log::debug!("preparing {} solver...", circuit_name);
+    let witnesses_dir = format!("./witnesses/{}", circuit_name);
+
     let start_time = std::time::Instant::now();
-    let mut handles = vec![];
-    let assignments = Arc::new(Mutex::new(vec![None; validator_subtree_data.len()]));
-
-    for (i, validator_subtree_item) in validator_subtree_data.into_iter().enumerate() {
-        let assignments = Arc::clone(&assignments);
-
-        let handle = thread::spawn(move || {
-            let mut assignment = ConvertValidatorListToMerkleTreeCircuit::<M31>::default();
-            assignment.from_assignment(&validator_subtree_item);
-
-            let mut assignments = assignments.lock().unwrap();
-            assignments[i] = Some(assignment);
-        });
-
-        handles.push(handle);
-    }
-
-    for handle in handles {
-        handle.join().expect("Thread panicked");
-    }
-
+    let assignments =
+        ConvertValidatorListToMerkleTreeCircuit::get_assignments_from_data(validator_subtree_data);
     let end_time = std::time::Instant::now();
     log::debug!(
         "assigned assignment data, time: {:?}",
         end_time.duration_since(start_time)
     );
-    let assignments = assignments
-        .lock()
-        .unwrap()
-        .iter()
-        .map(|x| x.clone().unwrap())
-        .collect::<Vec<_>>();
     let assignment_chunks: Vec<Vec<ConvertValidatorListToMerkleTreeCircuit<M31>>> =
         assignments.chunks(16).map(|x| x.to_vec()).collect();
 
+    //generate witnesses (multi-thread)
+    log::debug!("Start generating witnesses...");
+    let witness_solver = Arc::new(w_s);
     let handles = assignment_chunks
         .into_iter()
         .enumerate()
         .map(|(i, assignments)| {
             let witness_solver = Arc::clone(&witness_solver);
+            let witnesses_dir_clone = witnesses_dir.clone();
             thread::spawn(move || {
                 let mut hint_registry = HintRegistry::<M31>::new();
                 register_hint(&mut hint_registry);
                 let witness = witness_solver
                     .solve_witnesses_with_hints(&assignments, &mut hint_registry)
                     .unwrap();
-                let file_name = format!("./witnesses/validatorsubtree/witness_{}.txt", i);
-                let file = std::fs::File::create(file_name).unwrap();
-                let writer = std::io::BufWriter::new(file);
-                witness.serialize_into(writer).unwrap();
+                write_witness_to_file(
+                    &format!("{}/witness_{}.txt", witnesses_dir_clone, i),
+                    witness,
+                )
             })
         })
         .collect::<Vec<_>>();
@@ -333,96 +296,8 @@ pub fn end2end_validator_subtree_witnesses(
     }
     let end_time = std::time::Instant::now();
     log::debug!(
-        "Generate validatorsubtree witness Time: {:?}",
+        "Generate {} witness Time: {:?}",
+        circuit_name,
         end_time.duration_since(start_time)
     );
-}
-#[test]
-fn test_validator_subtree() {
-    let dir = "./data";
-    generate_validator_subtree_witnesses(dir);
-}
-
-#[test]
-// NOTE(HS) Poseidon Mersenne-31 Width-16 Sponge tested over input length 16
-fn run_validator_subtree() {
-    log::debug!("preparing solver...");
-    ensure_directory_exists("./witnesses/validatorsubtree");
-
-    let file_name = "solver_validatorsubtree.txt";
-    let compile_result = compile_generic(
-        &ConvertValidatorListToMerkleTreeCircuit::default(),
-        CompileOptions::default(),
-    )
-    .unwrap();
-    let file = std::fs::File::create(&file_name).unwrap();
-    let writer = std::io::BufWriter::new(file);
-    compile_result
-        .witness_solver
-        .serialize_into(writer)
-        .unwrap();
-    let CompileResult {
-        witness_solver,
-        layered_circuit,
-    } = compile_result;
-    let file = std::fs::File::create("circuit_validatorsubtree.txt").unwrap();
-    let writer = std::io::BufWriter::new(file);
-    layered_circuit.serialize_into(writer).unwrap();
-
-    let witness_solver = Arc::new(witness_solver);
-
-    log::debug!("generating witnesses...");
-    let start_time = std::time::Instant::now();
-    let file_path = format!("{}/validatorsubtree_assignment.json", "./data");
-    let validator_subtree_data: Vec<ValidatorSubTreeJson> =
-        read_from_json_file(&file_path).unwrap();
-    let end_time = std::time::Instant::now();
-    log::debug!(
-        "loaed assignment data, time: {:?}",
-        end_time.duration_since(start_time)
-    );
-
-    let mut handles = vec![];
-    let assignments = Arc::new(Mutex::new(vec![None; validator_subtree_data.len()]));
-
-    for (i, validator_subtree_item) in validator_subtree_data.into_iter().enumerate() {
-        let assignments = Arc::clone(&assignments);
-
-        let handle = thread::spawn(move || {
-            let mut assignment = ConvertValidatorListToMerkleTreeCircuit::<M31>::default();
-            assignment.from_assignment(&validator_subtree_item);
-
-            let mut assignments = assignments.lock().unwrap();
-            assignments[i] = Some(assignment);
-        });
-
-        handles.push(handle);
-    }
-
-    for handle in handles {
-        handle.join().expect("Thread panicked");
-    }
-
-    let end_time = std::time::Instant::now();
-    log::debug!(
-        "assigned assignment data, time: {:?}",
-        end_time.duration_since(start_time)
-    );
-
-    let assignments = assignments
-        .lock()
-        .unwrap()
-        .iter()
-        .map(|x| x.clone().unwrap())
-        .collect::<Vec<_>>();
-    let assignment_chunks: Vec<Vec<ConvertValidatorListToMerkleTreeCircuit<M31>>> =
-        assignments.chunks(16).map(|x| x.to_vec()).collect();
-
-    let mut hint_registry = HintRegistry::<M31>::new();
-    register_hint(&mut hint_registry);
-    let witness = witness_solver
-        .solve_witnesses_with_hints(&assignment_chunks[0], &mut hint_registry)
-        .unwrap();
-    let output = layered_circuit.run(&witness);
-    assert_eq!(output, vec![true]);
 }
