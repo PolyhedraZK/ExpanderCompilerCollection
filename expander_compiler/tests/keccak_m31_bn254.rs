@@ -1,11 +1,12 @@
 use ethnum::U256;
 use expander_compiler::field::{FieldArith, FieldModulus};
+use expander_compiler::frontend::api::UnconstrainedAPI;
 use expander_compiler::frontend::*;
 use internal::Serde;
 use rand::{Rng, SeedableRng};
 use tiny_keccak::Hasher;
 
-const N_HASHES: usize = 2;
+const N_HASHES: usize = 1;
 
 const CHECK_BITS: usize = 256;
 const PARTITION_BITS: usize = 30;
@@ -254,6 +255,11 @@ fn compute_keccak<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variabl
 
     let mut ss = vec![vec![api.constant(1); 64]; 25];
     let mut new_p = p.clone();
+    for _ in 0..60000 {
+        let x = api.unconstrained_identity(new_p[0]);
+        api.assert_is_equal(x, new_p[0]);
+        new_p[0] = x;
+    }
     let mut append_data = vec![0; 136 - 64];
     append_data[0] = 1;
     append_data[135 - 64] = 0x80;
@@ -349,7 +355,36 @@ fn keccak_big_field<C: Config, const N_WITNESSES: usize>(field_name: &str) {
     assert_eq!(res, expected_res);
     println!("test 3 passed");
 
-    let assignments_correct: Vec<Keccak256Circuit<C::CircuitField>> = (0..N_WITNESSES)
+    let mut expander_circuit = layered_circuit
+        .export_to_expander::<C::DefaultGKRFieldConfig>()
+        .flatten();
+    let config = expander_config::Config::<C::DefaultGKRConfig>::new(
+        expander_config::GKRScheme::Vanilla,
+        mpi_config::MPIConfig::new(),
+    );
+
+    let start = std::time::Instant::now();
+    let witness = witness_solver.solve_witness(&assignment).unwrap();
+    println!("time: {} ms", start.elapsed().as_millis());
+    let (simd_input, simd_public_input) = witness.to_simd::<C::DefaultSimdField>();
+    println!("{} {}", simd_input.len(), simd_public_input.len());
+    expander_circuit.layers[0].input_vals = simd_input;
+    expander_circuit.public_input = simd_public_input.clone();
+
+    expander_circuit.evaluate();
+    let (claimed_v, proof) = gkr::executor::prove(&mut expander_circuit, &config);
+    println!("time: {} ms", start.elapsed().as_millis());
+
+    let start = std::time::Instant::now();
+    assert!(gkr::executor::verify(
+        &mut expander_circuit,
+        &config,
+        &proof,
+        &claimed_v
+    ));
+    println!("time: {} ms", start.elapsed().as_millis());
+
+    /*let assignments_correct: Vec<Keccak256Circuit<C::CircuitField>> = (0..N_WITNESSES)
         .map(|i| assignments[i * 2].clone())
         .collect();
     let witness = witness_solver
@@ -379,7 +414,7 @@ fn keccak_big_field<C: Config, const N_WITNESSES: usize>(field_name: &str) {
         _ => panic!("unknown field"),
     };
     let writer = std::io::BufWriter::new(file);
-    witness_solver.serialize_into(writer).unwrap();
+    witness_solver.serialize_into(writer).unwrap();*/
 
     println!("dumped to files");
 }

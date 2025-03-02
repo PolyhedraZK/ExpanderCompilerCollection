@@ -1,4 +1,5 @@
 use expander_compiler::field::FieldArith;
+use expander_compiler::frontend::api::UnconstrainedAPI;
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::proving_system::ExpanderGKRProvingSystem;
 use expander_compiler::zkcuda::{context::*, kernel::*};
@@ -254,6 +255,11 @@ fn compute_keccak_inner<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<V
 
     let mut ss = vec![vec![api.constant(1); 64]; 25];
     let mut new_p = p.clone();
+    for _ in 0..100000 {
+        let x = api.unconstrained_identity(new_p[0]);
+        api.assert_is_equal(x, new_p[0]);
+        new_p[0] = x;
+    }
     let mut append_data = vec![0; 136 - 64];
     append_data[0] = 1;
     append_data[135 - 64] = 0x80;
@@ -279,7 +285,8 @@ fn compute_keccak<C: Config>(
     p: &[InputVariable; 64 * 8],
     out: &mut [OutputVariable; CHECK_PARTITIONS],
 ) {
-    let outc = api.memorized_simple_call(compute_keccak_inner, p);
+    //let outc = api.memorized_simple_call(compute_keccak_inner, p);
+    let outc = compute_keccak_inner(api, p);
     for i in 0..CHECK_PARTITIONS {
         out[i] = outc[i];
     }
@@ -339,7 +346,9 @@ fn zkcuda_keccak_1() {
     let p = ctx.copy_to_device(&p, false);
     println!("copy to device ok");
     let mut out = None;
+    let start = std::time::Instant::now();
     call_kernel!(ctx, kernel, p, mut out);
+    println!("time: {} ms", start.elapsed().as_millis());
     println!("call kernel ok");
     let out: Vec<Vec<M31>> = ctx.copy_to_host(out);
     println!("copy to host ok");
@@ -349,7 +358,9 @@ fn zkcuda_keccak_1() {
     let computation_graph = ctx.to_computation_graph();
     let proof = ctx.to_proof();
     println!("proof generation ok");
+    let start = std::time::Instant::now();
     assert!(computation_graph.verify(&proof));
+    println!("time: {} ms", start.elapsed().as_millis());
     println!("verify ok");
 }
 
