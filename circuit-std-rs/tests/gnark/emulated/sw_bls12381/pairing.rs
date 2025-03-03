@@ -13,6 +13,22 @@ use expander_compiler::{
     declare_circuit,
     frontend::{extra::debug_eval, Define, HintRegistry, M31Config, RootAPI, Variable, M31},
 };
+use rand::Rng;
+use rand_core::OsRng;
+
+fn random_g1_g2_affines() -> (G1Affine, G2Affine) {
+    let g1_aff_gen = G1Affine::generator();
+    let g2_aff_gen = G2Affine::generator();
+    let mut rng = OsRng;
+
+    let s1 = Scalar::random(&mut rng);
+    let s2 = Scalar::random(&mut rng);
+
+    let p = g1_aff_gen * s1;
+    let q = g2_aff_gen * s2;
+
+    (p.into(), q.into())
+}
 
 #[test]
 fn test_pairing_check_gkr() {
