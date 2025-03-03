@@ -17,7 +17,7 @@ declare_circuit!(PermutationHashCircuit {
     table: [Variable; TABLE_SIZE],
 });
 
-impl GenericDefine<M31Config> for PermutationHashCircuit<Variable> {
+impl Define<M31Config> for PermutationHashCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut table = LogUpSingleKeyTable::new(8);
         let mut table_key = vec![];
@@ -88,7 +88,7 @@ pub struct PermutationHashEntry {
     pub real_keys: Vec<u32>,
 }
 
-impl GenericDefine<M31Config> for PermutationIndicesValidatorHashesCircuit<Variable> {
+impl Define<M31Config> for PermutationIndicesValidatorHashesCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let zero_var = builder.constant(0);
         let neg_one_count = builder.sub(1, VALIDATOR_COUNT as u32);
@@ -192,7 +192,7 @@ pub fn generate_permutation_hashes_witness(dir: &str) {
             .unwrap()
         } else {
             println!("The solver does not exist.");
-            let compile_result = compile_generic(
+            let compile_result = compile(
                 &PermutationIndicesValidatorHashesCircuit::default(),
                 CompileOptions::default(),
             )

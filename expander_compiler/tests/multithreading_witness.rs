@@ -8,14 +8,14 @@ declare_circuit!(Circuit {
 });
 
 impl Define<M31Config> for Circuit<Variable> {
-    fn define(&self, builder: &mut API<M31Config>) {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         builder.assert_is_equal(self.x, self.y);
     }
 }
 
 #[test]
 fn multithreading_witness_solving() {
-    let compile_result = compile(&Circuit::default()).unwrap();
+    let compile_result = compile(&Circuit::default(), CompileOptions::default()).unwrap();
     let mut assignments = Vec::new();
     for _ in 0..1024 {
         assignments.push(Circuit::<M31> {

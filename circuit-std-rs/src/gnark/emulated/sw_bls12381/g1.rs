@@ -7,7 +7,7 @@ use crate::sha256::m31_utils::*;
 use crate::utils::simple_select;
 use expander_compiler::{
     declare_circuit,
-    frontend::{Config, GenericDefine, M31Config, RootAPI, Variable},
+    frontend::{Config, Define, M31Config, RootAPI, Variable},
 };
 use num_bigint::BigInt;
 
@@ -189,8 +189,8 @@ impl G1 {
         p: &G1Affine,
     ) -> G1Affine {
         let mut p = G1Affine {
-            x: p.x.my_clone(),
-            y: p.y.my_clone(),
+            x: p.x.clone(),
+            y: p.y.clone(),
         };
         let den1 = self.g1_isogeny_y_denominator(native, &p.x);
         let den0 = self.g1_isogeny_x_denominator(native, &p.x);
@@ -302,7 +302,7 @@ impl G1 {
         coefficients: Vec<Element<Bls12381Fp>>,
         x: &Element<Bls12381Fp>,
     ) -> Element<Bls12381Fp> {
-        let mut dst = coefficients[coefficients.len() - 1].my_clone();
+        let mut dst = coefficients[coefficients.len() - 1].clone();
         if monic {
             dst = self.curve_f.add(native, &dst, x);
         }
@@ -465,7 +465,7 @@ impl G1 {
         native.assert_is_equal(sgn_in, sgn_y);
 
         let out_b0 = self.curve_f.select(native, is_square, &x1, &tv3_div_tv4);
-        let out_b1 = res_y.my_clone();
+        let out_b1 = res_y.clone();
         G1Affine {
             x: out_b0,
             y: out_b1,
@@ -479,7 +479,7 @@ declare_circuit!(G1AddCircuit {
     r: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for G1AddCircuit<Variable> {
+impl Define<M31Config> for G1AddCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g1 = G1::new(builder);
         let p1_g1 = G1Affine::from_vars(self.p[0].to_vec(), self.p[1].to_vec());
@@ -503,7 +503,7 @@ declare_circuit!(G1UncompressCircuit {
     y: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for G1UncompressCircuit<Variable> {
+impl Define<M31Config> for G1UncompressCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g1 = G1::new(builder);
         let public_key = g1.uncompressed(builder, &self.x);
@@ -524,7 +524,7 @@ declare_circuit!(HashToG1Circuit {
     out: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for HashToG1Circuit<Variable> {
+impl Define<M31Config> for HashToG1Circuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g1 = G1::new(builder);
         let (hm0, hm1) = g1.hash_to_fp(builder, &self.msg);
@@ -548,7 +548,7 @@ mod tests {
     use expander_compiler::frontend::*;
     use expander_compiler::{
         compile::CompileOptions,
-        frontend::{compile_generic, HintRegistry, M31},
+        frontend::{compile, HintRegistry, M31},
     };
     use extra::debug_eval;
     use num_bigint::BigInt;
@@ -556,7 +556,7 @@ mod tests {
 
     #[test]
     fn test_g1_add() {
-        compile_generic(&G1AddCircuit::default(), CompileOptions::default()).unwrap();
+        compile(&G1AddCircuit::default(), CompileOptions::default()).unwrap();
         let mut hint_registry = HintRegistry::<M31>::new();
         register_hint(&mut hint_registry);
         let mut assignment = G1AddCircuit::<M31> {
@@ -609,7 +609,7 @@ mod tests {
 
     #[test]
     fn test_uncompress_g1() {
-        // compile_generic(&G1UncompressCircuit::default(), CompileOptions::default()).unwrap();
+        // compile(&G1UncompressCircuit::default(), CompileOptions::default()).unwrap();
         let mut hint_registry = HintRegistry::<M31>::new();
         register_hint(&mut hint_registry);
         let mut assignment = G1UncompressCircuit::<M31> {
@@ -637,7 +637,7 @@ mod tests {
 
     #[test]
     fn test_hash_to_g1() {
-        // compile_generic(&HashToG2Circuit::default(), CompileOptions::default()).unwrap();
+        // compile(&HashToG2Circuit::default(), CompileOptions::default()).unwrap();
         let mut hint_registry = HintRegistry::<M31>::new();
         register_hint(&mut hint_registry);
         let mut assignment = HashToG1Circuit::<M31> {

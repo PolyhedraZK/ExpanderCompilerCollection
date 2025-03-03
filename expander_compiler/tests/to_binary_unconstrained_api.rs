@@ -1,11 +1,10 @@
 use expander_compiler::frontend::*;
-use extra::UnconstrainedAPI;
 
 declare_circuit!(Circuit {
     input: PublicVariable,
 });
 
-fn to_binary<C: Config>(api: &mut API<C>, x: Variable, n_bits: usize) -> Vec<Variable> {
+fn to_binary<C: Config>(api: &mut impl RootAPI<C>, x: Variable, n_bits: usize) -> Vec<Variable> {
     let mut res = Vec::new();
     for i in 0..n_bits {
         let y = api.unconstrained_shift_r(x, i as u32);
@@ -14,7 +13,7 @@ fn to_binary<C: Config>(api: &mut API<C>, x: Variable, n_bits: usize) -> Vec<Var
     res
 }
 
-fn from_binary<C: Config>(api: &mut API<C>, bits: Vec<Variable>) -> Variable {
+fn from_binary<C: Config>(api: &mut impl RootAPI<C>, bits: Vec<Variable>) -> Variable {
     let mut res = api.constant(0);
     for i in 0..bits.len() {
         let coef = 1 << i;
@@ -25,7 +24,7 @@ fn from_binary<C: Config>(api: &mut API<C>, bits: Vec<Variable>) -> Variable {
 }
 
 impl Define<M31Config> for Circuit<Variable> {
-    fn define(&self, builder: &mut API<M31Config>) {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let bits = to_binary(builder, self.input, 8);
         let x = from_binary(builder, bits);
         builder.assert_is_equal(x, self.input);
@@ -34,7 +33,7 @@ impl Define<M31Config> for Circuit<Variable> {
 
 #[test]
 fn test_300() {
-    let compile_result = compile(&Circuit::default()).unwrap();
+    let compile_result = compile(&Circuit::default(), CompileOptions::default()).unwrap();
     for i in 0..300 {
         let assignment = Circuit::<M31> {
             input: M31::from(i as u32),

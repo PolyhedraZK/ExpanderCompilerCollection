@@ -8,9 +8,9 @@ use circuit_std_rs::utils::register_hint;
 use expander_compiler::circuit::ir::hint_normalized::witness_solver;
 use expander_compiler::compile::CompileOptions;
 use expander_compiler::declare_circuit;
-use expander_compiler::frontend::compile_generic;
+use expander_compiler::frontend::compile;
 use expander_compiler::frontend::internal::Serde;
-use expander_compiler::frontend::GenericDefine;
+use expander_compiler::frontend::Define;
 use expander_compiler::frontend::HintRegistry;
 use expander_compiler::frontend::M31Config;
 use expander_compiler::frontend::{RootAPI, Variable, M31};
@@ -100,7 +100,7 @@ impl PairingCircuit<M31> {
         }
     }
 }
-impl GenericDefine<M31Config> for PairingCircuit<Variable> {
+impl Define<M31Config> for PairingCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut pairing = Pairing::new(builder);
         let one_g1 = G1Affine::one(builder);
@@ -153,7 +153,7 @@ pub fn generate_pairing_witnesses(dir: &str) {
     } else {
         println!("The solver does not exist.");
         let compile_result =
-            compile_generic(&PairingCircuit::default(), CompileOptions::default()).unwrap();
+            compile(&PairingCircuit::default(), CompileOptions::default()).unwrap();
         compile_result
             .witness_solver
             .serialize_into(std::fs::File::create(file_name).unwrap())
@@ -231,7 +231,7 @@ pub fn generate_pairing_witnesses(dir: &str) {
 //         sig_byte: [Variable; 48]
 //     });
 
-//     impl GenericDefine<M31Config> for VerifySigCircuit<Variable> {
+//     impl Define<M31Config> for VerifySigCircuit<Variable> {
 //         fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
 //             let mut pairing = Pairing::new(builder);
 //             let one_g1 = G1Affine::one(builder);
