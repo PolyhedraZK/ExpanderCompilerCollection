@@ -77,7 +77,7 @@ impl M31Loader {
         self.symbols[rval][0]
     }
 
-    fn parse_lval(toks: &Vec<&str>) -> usize {
+    fn parse_lval(toks: &[&str]) -> usize {
         let raw = toks[1];
         assert!(raw.chars().nth(0).map_or(false, |c| c == '='));
         assert!(raw.chars().nth(1).map_or(false, |c| c == 'v'));
@@ -86,7 +86,7 @@ impl M31Loader {
 
     fn parse_rval_scalar<C: Config, B: RootAPI<C>>(
         &self,
-        toks: &Vec<&str>,
+        toks: &[&str],
         idx: usize,
         api: &mut B,
     ) -> Variable {
@@ -103,7 +103,7 @@ impl M31Loader {
         }
     }
 
-    fn parse_idx(toks: &Vec<&str>, idx: usize) -> usize {
+    fn parse_idx(toks: &[&str], idx: usize) -> usize {
         let raw = toks[idx];
         raw.parse::<usize>().unwrap()
     }
@@ -131,7 +131,7 @@ impl M31Loader {
     pub fn load<C: Config, B: RootAPI<C>>(
         &mut self,
         fname: &str,
-        input: &Vec<Vec<Variable>>,
+        input: &[Vec<Variable>],
         output: &mut Vec<Vec<Vec<Variable>>>,
         api: &mut B,
     ) {
