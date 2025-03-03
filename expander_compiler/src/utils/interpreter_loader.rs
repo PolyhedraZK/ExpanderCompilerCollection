@@ -7,6 +7,12 @@ pub struct M31Loader {
     symbols: Vec<Vec<Variable>>,
 }
 
+impl Default for M31Loader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl M31Loader {
     pub fn new() -> Self {
         M31Loader { symbols: vec![] }
@@ -142,7 +148,7 @@ impl M31Loader {
                         let i = Self::parse_idx(&v, 3);
                         let j = Self::parse_idx(&v, 4);
                         let nbits = Self::parse_idx(&v, 5);
-                        api.new_hint("myhint.tobinary", &[input[i][j].clone()], nbits)
+                        api.new_hint("myhint.tobinary", &[input[i][j]], nbits)
                     } else {
                         let rval = self.parse_rval_scalar(&v, 2, api);
                         api.new_hint("myhint.tobinary", &[rval], 30)
@@ -153,7 +159,7 @@ impl M31Loader {
                     let lval = Self::parse_lval(&v);
                     let rval = v[2][1..].parse::<usize>().unwrap();
                     let i = Self::parse_idx(&v, 3);
-                    self.register_lval(lval, [self.symbols[rval][i].clone()].to_vec());
+                    self.register_lval(lval, [self.symbols[rval][i]].to_vec());
                 }
                 "xor" | "and" | "or" | "mul" => {
                     let lval = Self::parse_lval(&v);
@@ -191,7 +197,7 @@ impl M31Loader {
                     let lval = Self::parse_lval(&v);
                     let rval = v[2][1..].parse::<usize>().unwrap();
                     let idx = Self::parse_idx(&v, 3);
-                    self.register_lval(lval, [self.symbols[rval][idx].clone()].to_vec());
+                    self.register_lval(lval, [self.symbols[rval][idx]].to_vec());
                 }
                 "compose" => {
                     let lval = Self::parse_lval(&v);
