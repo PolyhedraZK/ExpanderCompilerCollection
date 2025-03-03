@@ -33,7 +33,7 @@ jobs:
           path: target/release/libec_go_lib.*
 
   upload-rust:
-    needs: [build-rust, test-rust, test-rust-avx512, lint]
+    needs: [build-rust, test-rust, lint]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
     steps:

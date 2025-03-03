@@ -4,7 +4,8 @@ members = [
     "circuit-std-rs",
     "expander_compiler",
     "expander_compiler/ec_go_lib",
-    "expander_compiler/macros"
+    "expander_compiler/macros",
+    "efc"
 ]
 
 [profile.test]
