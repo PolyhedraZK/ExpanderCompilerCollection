@@ -45,6 +45,10 @@ fn example<C: Config>() {
         .layered_circuit
         .export_to_expander::<C::DefaultGKRFieldConfig>()
         .flatten();
+    // TODO: add a unified function to prepare the circuit in Expander
+    expander_circuit.identify_rnd_coefs();
+    expander_circuit.identify_structure_info();
+
     let config = expander_config::Config::<C::DefaultGKRConfig>::new(
         expander_config::GKRScheme::Vanilla,
         mpi_config::MPIConfig::new(),
