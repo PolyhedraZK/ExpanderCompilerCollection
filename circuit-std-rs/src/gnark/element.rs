@@ -5,7 +5,7 @@ use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use std::any::Any;
 use std::cmp::Ordering;
-#[derive(Default, Clone)]
+//#[derive(Default, Clone)]
 pub struct Element<T: FieldParams> {
     pub limbs: Vec<Variable>,
     pub overflow: u32,
@@ -35,32 +35,29 @@ impl<T: FieldParams> Element<T> {
             _marker: std::marker::PhantomData,
         }
     }
-    pub fn my_default() -> Self {
-        Self {
-            limbs: Vec::new(),
-            overflow: 0,
-            internal: false,
-            mod_reduced: false,
-            is_evaluated: false,
-            evaluation: Variable::default(),
-            _marker: std::marker::PhantomData,
-        }
-    }
-    pub fn my_clone(&self) -> Self {
-        Self {
-            limbs: self.limbs.clone(),
-            overflow: self.overflow,
-            internal: self.internal,
-            mod_reduced: self.mod_reduced,
-            is_evaluated: self.is_evaluated,
-            evaluation: self.evaluation,
-            _marker: std::marker::PhantomData,
-        }
-    }
+
     pub fn is_empty(&self) -> bool {
         self.limbs.is_empty()
     }
 }
+
+impl<T: FieldParams> Clone for Element<T> {
+    fn clone(&self) -> Self {
+        let mut r = Element::new(Vec::new(), 0, false, false, false, Variable::default());
+        r.limbs = self.limbs.clone();
+        r.overflow = self.overflow;
+        r.internal = self.internal;
+        r.mod_reduced = self.mod_reduced;
+        r
+    }
+}
+
+impl<T: FieldParams> Default for Element<T> {
+    fn default() -> Self {
+        Element::new(Vec::new(), 0, false, false, false, Variable::default())
+    }
+}
+
 pub fn value_of<C: Config, B: RootAPI<C>, T: FieldParams>(
     api: &mut B,
     constant: Box<dyn Any>,
@@ -68,6 +65,7 @@ pub fn value_of<C: Config, B: RootAPI<C>, T: FieldParams>(
     let r: Element<T> = new_const_element::<C, B, T>(api, constant);
     r
 }
+
 pub fn new_const_element<C: Config, B: RootAPI<C>, T: FieldParams>(
     api: &mut B,
     v: Box<dyn Any>,
@@ -75,6 +73,10 @@ pub fn new_const_element<C: Config, B: RootAPI<C>, T: FieldParams>(
     let fp = T::modulus();
     // convert to big.Int
     let mut b_value = from_interface(v);
+    //if neg, add modulus
+    if b_value < BigInt::from(0) {
+        b_value += &fp;
+    }
     // mod reduce
     if fp.cmp(&b_value) != Ordering::Equal {
         b_value %= fp;
@@ -105,7 +107,6 @@ pub fn copy<T: FieldParams>(e: &Element<T>) -> Element<T> {
 }
 pub fn from_interface(input: Box<dyn Any>) -> BigInt {
     let r;
-
     if let Some(v) = input.downcast_ref::<BigInt>() {
         r = v.clone();
     } else if let Some(v) = input.downcast_ref::<u8>() {
@@ -137,6 +138,5 @@ pub fn from_interface(input: Box<dyn Any>) -> BigInt {
     } else {
         panic!("value to BigInt not supported");
     }
-
     r
 }

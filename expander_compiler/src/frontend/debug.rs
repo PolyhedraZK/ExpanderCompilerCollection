@@ -12,7 +12,9 @@ use crate::{
 
 use super::{
     api::{BasicAPI, RootAPI, UnconstrainedAPI},
-    builder::{get_variable_id, new_variable, ToVariableOrValue, VariableOrValue},
+    builder::{
+        ensure_variables_valid, get_variable_id, new_variable, ToVariableOrValue, VariableOrValue,
+    },
     Variable,
 };
 
@@ -133,6 +135,7 @@ impl<C: Config, H: HintCaller<C::CircuitField>> BasicAPI<C> for DebugBuilder<C, 
         inputs: &[Variable],
         num_outputs: usize,
     ) -> Vec<Variable> {
+        ensure_variables_valid(inputs);
         let inputs: Vec<C::CircuitField> =
             inputs.iter().map(|v| self.convert_to_value(v)).collect();
         match self
@@ -405,6 +408,7 @@ impl<C: Config, H: HintCaller<C::CircuitField>> RootAPI<C> for DebugBuilder<C, H
         f: F,
         inputs: &[Variable],
     ) -> Vec<Variable> {
+        ensure_variables_valid(inputs);
         let inputs = inputs.to_vec();
         f(self, &inputs)
     }

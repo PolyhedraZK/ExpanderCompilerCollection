@@ -7,14 +7,14 @@ declare_circuit!(Circuit {
 });
 
 impl Define<M31Config> for Circuit<Variable> {
-    fn define(&self, builder: &mut API<M31Config>) {
-        builder.assert_is_equal(self.x, self.y);
+    fn define<Builder: RootAPI<M31Config>>(&self, api: &mut Builder) {
+        api.assert_is_equal(self.x, self.y);
     }
 }
 
 #[test]
 fn example_full() {
-    let compile_result = compile(&Circuit::default()).unwrap();
+    let compile_result = compile(&Circuit::default(), CompileOptions::default()).unwrap();
     let assignment = Circuit::<M31> {
         x: M31::from(123),
         y: M31::from(123),

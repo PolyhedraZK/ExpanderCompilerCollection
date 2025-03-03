@@ -1,14 +1,12 @@
-use circuit_std_rs::gnark::{
-    element::Element,
-    emulated::sw_bls12381::g1::{G1Affine, G1},
-    hints::register_hint,
+use circuit_std_rs::{
+    gnark::emulated::sw_bls12381::g1::{G1Affine, G1},
+    utils::register_hint,
 };
 use expander_compiler::{
     compile::CompileOptions,
     declare_circuit,
     frontend::{
-        compile_generic, extra::debug_eval, GenericDefine, HintRegistry, M31Config, RootAPI,
-        Variable, M31,
+        compile, extra::debug_eval, Define, HintRegistry, M31Config, RootAPI, Variable, M31,
     },
 };
 
@@ -18,69 +16,18 @@ declare_circuit!(G1AddCircuit {
     r: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for G1AddCircuit<Variable> {
+impl Define<M31Config> for G1AddCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g1 = G1::new(builder);
-        let p1_g1 = G1Affine {
-            x: Element::new(
-                self.p[0].to_vec(),
-                0,
-                false,
-                false,
-                false,
-                Variable::default(),
-            ),
-            y: Element::new(
-                self.p[1].to_vec(),
-                0,
-                false,
-                false,
-                false,
-                Variable::default(),
-            ),
-        };
-        let p2_g1 = G1Affine {
-            x: Element::new(
-                self.q[0].to_vec(),
-                0,
-                false,
-                false,
-                false,
-                Variable::default(),
-            ),
-            y: Element::new(
-                self.q[1].to_vec(),
-                0,
-                false,
-                false,
-                false,
-                Variable::default(),
-            ),
-        };
-        let r_g1 = G1Affine {
-            x: Element::new(
-                self.r[0].to_vec(),
-                0,
-                false,
-                false,
-                false,
-                Variable::default(),
-            ),
-            y: Element::new(
-                self.r[1].to_vec(),
-                0,
-                false,
-                false,
-                false,
-                Variable::default(),
-            ),
-        };
+        let p1_g1 = G1Affine::from_vars(self.p[0].to_vec(), self.p[1].to_vec());
+        let p2_g1 = G1Affine::from_vars(self.q[0].to_vec(), self.q[1].to_vec());
+        let r_g1 = G1Affine::from_vars(self.r[0].to_vec(), self.r[1].to_vec());
         let mut r = g1.add(builder, &p1_g1, &p2_g1);
         for _ in 0..16 {
             r = g1.add(builder, &r, &p2_g1);
         }
-        g1.curve_f.assert_isequal(builder, &r.x, &r_g1.x);
-        g1.curve_f.assert_isequal(builder, &r.y, &r_g1.y);
+        g1.curve_f.assert_is_equal(builder, &r.x, &r_g1.x);
+        g1.curve_f.assert_is_equal(builder, &r.y, &r_g1.y);
         g1.curve_f.check_mul(builder);
         g1.curve_f.table.final_check(builder);
         g1.curve_f.table.final_check(builder);
@@ -90,7 +37,7 @@ impl GenericDefine<M31Config> for G1AddCircuit<Variable> {
 
 #[test]
 fn test_g1_add() {
-    compile_generic(&G1AddCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&G1AddCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = G1AddCircuit::<M31> {
