@@ -322,7 +322,7 @@ impl G2 {
         x: &GE2,
     ) -> GE2 {
         let mut dst = coefficients[coefficients.len() - 1].clone();
-        if (monic) {
+        if monic {
             dst = self.ext2.add(native, &dst, x);
         }
         for i in (0..coefficients.len() - 1).rev() {
