@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::*;
+use super::{Config, Instruction};
 
 impl<C: Config> fmt::Display for Instruction<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

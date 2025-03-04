@@ -1,12 +1,16 @@
-use crate::gnark::limbs::*;
-use crate::gnark::utils::*;
+use crate::gnark::limbs::{
+    bigint_to_m31, decompose, m31_to_bigint, m31_to_bigint_array, recompose,
+};
+use crate::gnark::utils::{
+    fq2_has_sqrt, fq_has_sqrt, get_fq2_sign, get_fq_sign, nb_multiplication_res_limbs,
+};
 use ark_bls12_381::Fq;
 use ark_bls12_381::Fq12;
 use ark_bls12_381::Fq2;
 use ark_bls12_381::Fq6;
 use ark_ff::fields::Field;
 use ark_ff::Zero;
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{Error, FieldModulus, M31};
 use num_bigint::BigInt;
 use num_bigint::BigUint;
 use num_traits::One;

@@ -8,7 +8,7 @@ use expander_compiler::{
     utils::serde::Serde,
 };
 
-use super::*;
+use super::{match_config_id, ByteArray, Config};
 
 #[repr(C)]
 pub struct CompileResult {

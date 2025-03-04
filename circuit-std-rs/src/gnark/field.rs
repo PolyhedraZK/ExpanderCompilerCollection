@@ -1,10 +1,10 @@
-use crate::gnark::element::*;
+use crate::gnark::element::{new_internal_element, value_of, Element};
 use crate::gnark::emparam::FieldParams;
-use crate::gnark::utils::*;
+use crate::gnark::utils::{hash_to_fp_variable, nb_multiplication_res_limbs, sub_padding};
 use crate::logup::LogUpRangeProofTable;
 use crate::sha256::m31_utils::to_binary;
 use crate::utils::simple_select;
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{Config, RootAPI, Variable};
 use num_bigint::BigInt;
 use num_traits::Signed;
 use num_traits::ToPrimitive;

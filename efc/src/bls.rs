@@ -3,7 +3,7 @@ use circuit_std_rs::sha256::m31_utils::{
     big_is_zero, big_less_than, bigint_to_m31_array, to_binary,
 };
 use circuit_std_rs::utils::{simple_lookup2, simple_select};
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{Config, RootAPI, Variable};
 use num_bigint::BigInt;
 use std::str::FromStr;
 

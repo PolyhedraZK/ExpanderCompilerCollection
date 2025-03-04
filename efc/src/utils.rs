@@ -1,4 +1,7 @@
-use expander_compiler::{circuit::layered::witness::Witness, frontend::*};
+use expander_compiler::{
+    circuit::layered::witness::Witness,
+    frontend::{CompileResult, Config},
+};
 use serde::de::DeserializeOwned;
 use std::{fs, path::Path};
 

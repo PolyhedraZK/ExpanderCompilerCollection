@@ -2,7 +2,7 @@ use ark_bls12_381::Fq;
 use ark_ff::Field;
 use num_bigint::BigInt;
 
-use crate::gnark::element::*;
+use crate::gnark::element::Element;
 use crate::gnark::emparam::FieldParams;
 use crate::gnark::emulated::field_bls12381::e2::GE2;
 use crate::gnark::limbs::decompose;
@@ -12,7 +12,7 @@ use crate::sha256::m31_utils::from_binary;
 use crate::sha256::m31_utils::to_binary;
 use ark_bls12_381::Fq2;
 use ark_ff::Zero;
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{Config, RootAPI, Variable};
 
 pub fn nb_multiplication_res_limbs(len_left: usize, len_right: usize) -> usize {
     let res = len_left + len_right - 1;

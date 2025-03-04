@@ -1,6 +1,6 @@
 use crate::StdCircuit;
 use arith::Field;
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{declare_circuit, Config, Define, RootAPI, Variable, M31};
 use std::convert::From;
 use std::ops::{AddAssign, Mul};
 

@@ -1,4 +1,4 @@
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{Config, RootAPI, Variable};
 use tiny_keccak::{Hasher, Keccak};
 
 const POSEIDON_SEED_PREFIX: &str = "poseidon_seed";
