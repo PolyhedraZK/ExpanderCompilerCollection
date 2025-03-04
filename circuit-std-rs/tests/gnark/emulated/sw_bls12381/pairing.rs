@@ -2,7 +2,7 @@
 mod common;
 
 use ark_bls12_381::{
-    Bls12_381, Fr, G1Affine as BlsG1Affine, G1Projective, G2Affine as BlsG2Affine, G2Projective,
+    Fr, G1Affine as BlsG1Affine, G1Projective, G2Affine as BlsG2Affine, G2Projective,
 };
 use circuit_std_rs::utils::register_hint;
 use expander_compiler::{
@@ -15,22 +15,17 @@ use circuit_std_rs::{
         element::Element,
         emulated::{
             field_bls12381::e2::GE2,
-            sw_bls12381::{g1::*, g2::*, pairing::Pairing, point::AffinePoint},
+            sw_bls12381::{g1::*, g2::*, pairing::Pairing},
         },
     },
     StdCircuit,
 };
 
-use ark_ec::{AffineCurve, CurveCycle, ProjectiveCurve};
-use ark_ff::{AdditiveGroup, PrimeField, UniformRand};
-use rand::{thread_rng, SeedableRng};
-
-use std::{
-    default,
-    ops::{Mul, Neg},
-};
+use ark_ff::{AdditiveGroup, UniformRand};
+use rand::thread_rng;
 
 use ark_serialize::CanonicalSerialize;
+use std::ops::{Mul, Neg};
 
 #[derive(Clone, Debug, Default)]
 pub struct PairingParams {
@@ -412,14 +407,7 @@ fn pairing_random_test() {
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
 
-    let mut assignment = PairingCheckGKRCircuit::<M31> {
-        in1_g1: [[M31::from(0); 48]; 2],
-        in2_g1: [[M31::from(0); 48]; 2],
-        in1_g2: [[[M31::from(0); 48]; 2]; 2],
-        in2_g2: [[[M31::from(0); 48]; 2]; 2],
-    };
-
-    assignment = random_assignment(thread_rng());
+    let assignment = random_assignment(thread_rng());
     debug_eval(
         &PairingCheckGKRCircuit::default(),
         &assignment,
