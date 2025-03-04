@@ -1,6 +1,6 @@
 use num_bigint::BigInt;
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, Debug)]
 pub struct Bls12381Fp {}
 impl Bls12381Fp {
     pub fn nb_limbs() -> u32 {
@@ -69,4 +69,41 @@ impl FieldParams for Bls12381Fp {
     fn modulus() -> BigInt {
         Bls12381Fp::modulus()
     }
+}
+
+// CurveParams defines parameters of an elliptic curve in short Weierstrass form
+// given by the equation
+//
+//	Y² = X³ + aX + b
+//
+// The base point is defined by (Gx, Gy).
+#[derive(Clone, Debug)]
+pub struct CurveParams {
+    pub a: BigInt,
+    pub b: BigInt,
+    pub gx: BigInt,
+    pub gy: BigInt,
+    // Enable following items if needed in the future.
+    // pub gm: Vec<[BigInt; 2]>, m*base point coords
+    // pub eigenvalue: Option<BigInt>, endomorphism eigenvalue
+    // pub third_root_one: Option<BigInt>, endomorphism image scaler
+}
+
+impl CurveParams {
+    pub fn get_bls12381_params() -> Self {
+        let gx = BigInt::parse_bytes(b"3685416753713387016781088315183077757961620795782546409894578378688607592378376318836054947676345821548104185464507", 10).unwrap();
+        let gy = BigInt::parse_bytes(b"1339506544944476473020471379941921221584933875938349620426543736416511423956333506472724655353366534992391756441569", 10).unwrap();
+
+        CurveParams {
+            a: BigInt::ZERO,
+            b: BigInt::from(4),
+            gx,
+            gy,
+            // gm: compute_bls12381_table(),
+            // eigenvalue: Some(lambda),
+            // third_root_one: Some(omega),
+        }
+    }
+
+    // TODO add get_bn254_params, get_secp256k1_params etc. in the future.
 }
