@@ -8,7 +8,13 @@ declare_circuit!(Circuit {
 });
 
 fn to_binary<C: Config>(api: &mut impl RootAPI<C>, x: Variable, n_bits: usize) -> Vec<Variable> {
-    api.new_hint("myhint.tobinary", &[x], n_bits)
+    let bits = api.new_hint("myhint.tobinary", &[x], n_bits);
+    for bit in bits.iter() {
+        api.assert_is_bool(*bit);
+    }
+    let sum = from_binary(api, bits.to_vec());
+    api.assert_is_equal(sum, x);
+    bits
 }
 
 fn from_binary<C: Config>(api: &mut impl RootAPI<C>, bits: Vec<Variable>) -> Variable {
