@@ -1,4 +1,4 @@
-use expander_compiler::frontend::{BasicAPI, Config, HintRegistry, RootAPI, Variable, M31};
+use expander_compiler::frontend::{Config, HintRegistry, RootAPI, Variable, M31};
 
 use crate::{
     gnark::hints::{
