@@ -1,6 +1,3 @@
-#[path = "../../../common.rs"]
-mod common;
-
 use ark_bls12_381::{
     Fr, G1Affine as BlsG1Affine, G1Projective, G2Affine as BlsG2Affine, G2Projective,
 };
@@ -29,10 +26,10 @@ use std::ops::{Mul, Neg};
 
 #[derive(Clone, Debug, Default)]
 pub struct PairingParams {
-    pub in1_g1: BlsG1Affine,
-    pub in2_g1: BlsG1Affine,
-    pub in1_g2: BlsG2Affine,
-    pub in2_g2: BlsG2Affine,
+    pub _in1_g1: BlsG1Affine,
+    pub _in2_g1: BlsG1Affine,
+    pub _in1_g2: BlsG2Affine,
+    pub _in2_g2: BlsG2Affine,
 }
 
 declare_circuit!(PairingCheckGKRCircuit {
