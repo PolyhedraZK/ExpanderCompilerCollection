@@ -200,8 +200,8 @@ impl G1 {
         p: &G1Affine,
     ) -> G1Affine {
         let mut p = G1Affine {
-            x: p.x.my_clone(),
-            y: p.y.my_clone(),
+            x: p.x.clone(),
+            y: p.y.clone(),
         };
         let den1 = self.g1_isogeny_y_denominator(native, &p.x);
         let den0 = self.g1_isogeny_x_denominator(native, &p.x);
@@ -313,7 +313,7 @@ impl G1 {
         coefficients: Vec<Element<Bls12381Fp>>,
         x: &Element<Bls12381Fp>,
     ) -> Element<Bls12381Fp> {
-        let mut dst = coefficients[coefficients.len() - 1].my_clone();
+        let mut dst = coefficients[coefficients.len() - 1].clone();
         if monic {
             dst = self.curve_f.add(native, &dst, x);
         }
@@ -476,7 +476,7 @@ impl G1 {
         native.assert_is_equal(sgn_in, sgn_y);
 
         let out_b0 = self.curve_f.select(native, is_square, &x1, &tv3_div_tv4);
-        let out_b1 = res_y.my_clone();
+        let out_b1 = res_y.clone();
         G1Affine {
             x: out_b0,
             y: out_b1,

@@ -5,6 +5,7 @@ use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use std::any::Any;
 use std::cmp::Ordering;
+
 #[derive(Default, Clone, Debug)]
 pub struct Element<T: FieldParams> {
     pub limbs: Vec<Variable>,
@@ -35,32 +36,29 @@ impl<T: FieldParams> Element<T> {
             _marker: std::marker::PhantomData,
         }
     }
-    pub fn my_default() -> Self {
-        Self {
-            limbs: Vec::new(),
-            overflow: 0,
-            internal: false,
-            mod_reduced: false,
-            is_evaluated: false,
-            evaluation: Variable::default(),
-            _marker: std::marker::PhantomData,
-        }
-    }
-    pub fn my_clone(&self) -> Self {
-        Self {
-            limbs: self.limbs.clone(),
-            overflow: self.overflow,
-            internal: self.internal,
-            mod_reduced: self.mod_reduced,
-            is_evaluated: self.is_evaluated,
-            evaluation: self.evaluation,
-            _marker: std::marker::PhantomData,
-        }
-    }
+
     pub fn is_empty(&self) -> bool {
         self.limbs.is_empty()
     }
 }
+
+impl<T: FieldParams> Clone for Element<T> {
+    fn clone(&self) -> Self {
+        let mut r = Element::new(Vec::new(), 0, false, false, false, Variable::default());
+        r.limbs = self.limbs.clone();
+        r.overflow = self.overflow;
+        r.internal = self.internal;
+        r.mod_reduced = self.mod_reduced;
+        r
+    }
+}
+
+impl<T: FieldParams> Default for Element<T> {
+    fn default() -> Self {
+        Element::new(Vec::new(), 0, false, false, false, Variable::default())
+    }
+}
+
 pub fn value_of<C: Config, B: RootAPI<C>, T: FieldParams>(
     api: &mut B,
     constant: Box<dyn Any>,

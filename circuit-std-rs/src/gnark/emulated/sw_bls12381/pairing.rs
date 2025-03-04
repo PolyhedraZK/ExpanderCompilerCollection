@@ -130,14 +130,14 @@ impl Pairing {
                 .mul_014_by_014(native, &tmp0, &tmp1, &res.c0.b0, &res.c0.b1);
             res = GE12 {
                 c0: GE6 {
-                    b0: prod_lines[0].my_clone(),
-                    b1: prod_lines[1].my_clone(),
-                    b2: prod_lines[2].my_clone(),
+                    b0: prod_lines[0].clone(),
+                    b1: prod_lines[1].clone(),
+                    b2: prod_lines[2].clone(),
                 },
                 c1: GE6 {
-                    b0: res.c1.b0.my_clone(),
-                    b1: prod_lines[3].my_clone(),
-                    b2: prod_lines[4].my_clone(),
+                    b0: res.c1.b0.clone(),
+                    b1: prod_lines[3].clone(),
+                    b2: prod_lines[4].clone(),
                 },
             };
         } else {
@@ -292,7 +292,7 @@ impl Pairing {
         let tmp = self.ext12.ext6.ext2.add(native, &p1.x, &p2.x);
         let xr = self.ext12.ext6.ext2.sub(native, &xr, &tmp);
 
-        let r0 = λ1.my_clone();
+        let r0 = λ1.clone();
         let mut r1 = self.ext12.ext6.ext2.mul(native, &λ1, &p1.x);
         r1 = self.ext12.ext6.ext2.sub(native, &r1, &p1.y);
 
@@ -314,7 +314,7 @@ impl Pairing {
 
         let p = G2AffP { x: x4, y: y4 };
 
-        let r0 = λ2.my_clone();
+        let r0 = λ2.clone();
         let mut r1 = self.ext12.ext6.ext2.mul(native, &λ2, &p1.x);
         r1 = self.ext12.ext6.ext2.sub(native, &r1, &p1.y);
 
@@ -351,7 +351,7 @@ impl Pairing {
 
         let res = G2AffP { x: xr, y: yr };
 
-        let r0 = λ.my_clone();
+        let r0 = λ.clone();
         let mut r1 = self.ext12.ext6.ext2.mul(native, &λ, &p1.x);
         r1 = self.ext12.ext6.ext2.sub(native, &r1, &p1.y);
 
@@ -378,7 +378,7 @@ impl Pairing {
         let d = self.ext12.ext6.ext2.double(native, &p1.y);
         let λ1 = self.ext12.ext6.ext2.div(native, &n, &d);
 
-        let r0 = λ1.my_clone();
+        let r0 = λ1.clone();
         let mut r1 = self.ext12.ext6.ext2.mul(native, &λ1, &p1.x);
         r1 = self.ext12.ext6.ext2.sub(native, &r1, &p1.y);
 
@@ -396,7 +396,7 @@ impl Pairing {
         let λ2 = self.ext12.ext6.ext2.div(native, &d, &x1x2);
         let λ2 = self.ext12.ext6.ext2.sub(native, &λ2, &λ1);
 
-        let r0 = λ2.my_clone();
+        let r0 = λ2.clone();
         let mut r1 = self.ext12.ext6.ext2.mul(native, &λ2, &p1.x);
         r1 = self.ext12.ext6.ext2.sub(native, &r1, &p1.y);
 
@@ -429,7 +429,7 @@ impl Pairing {
         let d = self.ext12.ext6.ext2.double(native, &p1.y);
         let λ = self.ext12.ext6.ext2.div(native, &n, &d);
 
-        let r0 = λ.my_clone();
+        let r0 = λ.clone();
         let mut r1 = self.ext12.ext6.ext2.mul(native, &λ, &p1.x);
         r1 = self.ext12.ext6.ext2.sub(native, &r1, &p1.y);
 

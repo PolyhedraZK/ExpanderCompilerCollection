@@ -12,12 +12,6 @@ pub struct GE2 {
     pub a1: Element<Bls12381Fp>,
 }
 impl GE2 {
-    pub fn my_clone(&self) -> Self {
-        GE2 {
-            a0: self.a0.my_clone(),
-            a1: self.a1.my_clone(),
-        }
-    }
     pub fn from_vars(x: Vec<Variable>, y: Vec<Variable>) -> Self {
         GE2 {
             a0: Element::new(x, 0, false, false, false, Variable::default()),
@@ -134,13 +128,13 @@ impl Ext2 {
         }
     }
     pub fn one(&mut self) -> GE2 {
-        let z0 = self.curve_f.one_const.my_clone();
-        let z1 = self.curve_f.zero_const.my_clone();
+        let z0 = self.curve_f.one_const.clone();
+        let z1 = self.curve_f.zero_const.clone();
         GE2 { a0: z0, a1: z1 }
     }
     pub fn zero(&mut self) -> GE2 {
-        let z0 = self.curve_f.zero_const.my_clone();
-        let z1 = self.curve_f.zero_const.my_clone();
+        let z0 = self.curve_f.zero_const.clone();
+        let z1 = self.curve_f.zero_const.clone();
         GE2 { a0: z0, a1: z1 }
     }
     pub fn is_zero<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, z: &GE2) -> Variable {
@@ -227,16 +221,11 @@ impl Ext2 {
         GE2 { a0: a, a1: b }
     }
     pub fn div<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE2, y: &GE2) -> GE2 {
-        let inputs = vec![
-            x.a0.my_clone(),
-            x.a1.my_clone(),
-            y.a0.my_clone(),
-            y.a1.my_clone(),
-        ];
+        let inputs = vec![x.a0.clone(), x.a1.clone(), y.a0.clone(), y.a1.clone()];
         let output = self.curve_f.new_hint(native, "myhint.dive2hint", 2, inputs);
         let div = GE2 {
-            a0: output[0].my_clone(),
-            a1: output[1].my_clone(),
+            a0: output[0].clone(),
+            a1: output[1].clone(),
         };
         let _x = self.mul(native, &div, y);
         self.assert_isequal(native, x, &_x);
@@ -246,24 +235,24 @@ impl Ext2 {
         self.div(
             native,
             &GE2 {
-                a0: self.curve_f.one_const.my_clone(),
-                a1: self.curve_f.zero_const.my_clone(),
+                a0: self.curve_f.one_const.clone(),
+                a1: self.curve_f.zero_const.clone(),
             },
             x,
         )
     }
     pub fn inverse<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE2) -> GE2 {
-        let inputs = vec![x.a0.my_clone(), x.a1.my_clone()];
+        let inputs = vec![x.a0.clone(), x.a1.clone()];
         let output = self
             .curve_f
             .new_hint(native, "myhint.inversee2hint", 2, inputs);
         let inv = GE2 {
-            a0: output[0].my_clone(),
-            a1: output[1].my_clone(),
+            a0: output[0].clone(),
+            a1: output[1].clone(),
         };
         let one = GE2 {
-            a0: self.curve_f.one_const.my_clone(),
-            a1: self.curve_f.zero_const.my_clone(),
+            a0: self.curve_f.one_const.clone(),
+            a1: self.curve_f.zero_const.clone(),
         };
         let _one = self.mul(native, &inv, x);
         self.assert_isequal(native, &one, &_one);
@@ -285,7 +274,7 @@ impl Ext2 {
         GE2 { a0, a1 }
     }
     pub fn conjugate<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE2) -> GE2 {
-        let z0 = x.a0.my_clone();
+        let z0 = x.a0.clone();
         let z1 = self.curve_f.neg(native, &x.a1);
         GE2 { a0: z0, a1: z1 }
     }
@@ -302,7 +291,7 @@ impl Ext2 {
             .unwrap()
             .get(&coef)
             .unwrap()
-            .my_clone();
+            .clone();
         self.mul(native, x, &y)
     }
     pub fn mul_by_non_residue1_power1<C: Config, B: RootAPI<C>>(
@@ -398,20 +387,20 @@ impl Ext2 {
         GE2 { a0: a, a1: b }
     }
     pub fn non_residue<C: Config, B: RootAPI<C>>(&mut self, _native: &mut B) -> GE2 {
-        let one = self.curve_f.one_const.my_clone();
+        let one = self.curve_f.one_const.clone();
         GE2 {
-            a0: one.my_clone(),
-            a1: one.my_clone(),
+            a0: one.clone(),
+            a1: one.clone(),
         }
     }
     pub fn copy<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE2) -> GE2 {
-        let inputs = vec![x.a0.my_clone(), x.a1.my_clone()];
+        let inputs = vec![x.a0.clone(), x.a1.clone()];
         let output = self
             .curve_f
             .new_hint(native, "myhint.copye2hint", 2, inputs);
         let res = GE2 {
-            a0: output[0].my_clone(),
-            a1: output[1].my_clone(),
+            a0: output[0].clone(),
+            a1: output[1].clone(),
         };
         self.assert_isequal(native, x, &res);
         res
