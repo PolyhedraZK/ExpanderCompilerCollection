@@ -1,6 +1,2 @@
 [toolchain]
 channel = "nightly-2024-09-01"
-components = ["clippy"]
-
-[clippy]
-deny = ["manual_clone", "manual_default", "wildcard_imports"]

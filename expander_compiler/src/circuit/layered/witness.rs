@@ -3,12 +3,8 @@ use std::mem;
 
 use arith::SimdField;
 
-use super::*;
-use crate::{
-    circuit::config::Config,
-    field::{Field, FieldModulus},
-    utils::serde::Serde,
-};
+use super::{Circuit, FieldForECC, InputType};
+use crate::{circuit::config::Config, field::Field, utils::serde::Serde};
 
 #[derive(Clone, Debug)]
 pub enum WitnessValues<C: Config> {

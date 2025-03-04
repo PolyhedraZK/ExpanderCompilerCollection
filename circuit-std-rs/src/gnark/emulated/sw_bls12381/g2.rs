@@ -1,8 +1,8 @@
-use crate::gnark::element::*;
+use crate::gnark::element::{value_of, Element};
 use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::emulated::field_bls12381::e2::Ext2;
 use crate::gnark::emulated::field_bls12381::e2::GE2;
-use crate::sha256::m31_utils::*;
+use crate::sha256::m31_utils::{big_less_than, from_binary, to_binary};
 use crate::utils::simple_select;
 use expander_compiler::declare_circuit;
 use expander_compiler::frontend::{Config, Define, M31Config, RootAPI, Variable};
@@ -322,7 +322,7 @@ impl G2 {
         x: &GE2,
     ) -> GE2 {
         let mut dst = coefficients[coefficients.len() - 1].clone();
-        if monic {
+        if (monic) {
             dst = self.ext2.add(native, &dst, x);
         }
         for i in (0..coefficients.len() - 1).rev() {

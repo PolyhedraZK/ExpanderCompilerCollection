@@ -2,7 +2,11 @@ use std::io::{Error as IoError, Read, Write};
 
 use crate::{field::FieldModulus, utils::serde::Serde};
 
-use super::*;
+use super::{
+    Allocation, ChildSpec, Circuit, Coef, Config, CrossLayerInput, CrossLayerInputUsize,
+    FieldForECC, Gate, GateAdd, GateConst, GateCustom, GateMul, Input, InputType, NormalInput,
+    NormalInputUsize, Segment,
+};
 
 impl<C: Config> Serde for Coef<C> {
     fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
