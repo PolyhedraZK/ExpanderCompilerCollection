@@ -1,5 +1,4 @@
 use num_bigint::BigInt;
-use num_traits::ConstZero;
 
 #[derive(Default, Clone, Copy, Debug)]
 pub struct Bls12381Fp {}
@@ -84,6 +83,7 @@ pub struct CurveParams {
     pub b: BigInt,
     pub gx: BigInt,
     pub gy: BigInt,
+    // Enable following items if needed in the future.
     // pub gm: Vec<[BigInt; 2]>, m*base point coords
     // pub eigenvalue: Option<BigInt>, endomorphism eigenvalue
     // pub third_root_one: Option<BigInt>, endomorphism image scaler

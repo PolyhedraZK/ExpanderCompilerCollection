@@ -13,7 +13,6 @@ use crate::gnark::emulated::field_bls12381::e2::*;
 use crate::gnark::emulated::field_bls12381::e6::GE6;
 use expander_compiler::frontend::{Config, Error, RootAPI};
 use num_bigint::BigInt;
-use sha2::digest::KeyInit;
 
 const LOOP_COUNTER: [i8; 64] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

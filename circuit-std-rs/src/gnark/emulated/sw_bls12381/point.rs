@@ -1,10 +1,8 @@
 use crate::gnark::element::{value_of, Element};
 use crate::gnark::emparam::{CurveParams, FieldParams};
 use crate::gnark::field::GField;
-use expander_compiler::frontend::{Config, RootAPI, Variable};
+use expander_compiler::frontend::{Config, RootAPI};
 use num_bigint::BigInt;
-use std::fmt;
-use std::vec::Vec;
 
 pub struct AffinePoint<Base: FieldParams> {
     pub x: Element<Base>,
@@ -67,7 +65,7 @@ impl<Base: FieldParams, Scalars: FieldParams> Curve<Base, Scalars> {
     ) {
         let x_is_zero = self.base_api.is_zero::<C, B>(builder, &p.x);
         let y_is_zero = self.base_api.is_zero::<C, B>(builder, &p.y);
-        let selector = builder.and(&x_is_zero, &y_is_zero);
+        let selector = builder.and(x_is_zero, y_is_zero);
         let zero_const = self.base_api.zero_const.clone();
         let b = self
             .base_api
