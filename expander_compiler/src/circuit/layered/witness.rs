@@ -333,6 +333,7 @@ mod tests {
     use super::*;
     use crate::circuit::config::M31Config;
     use crate::field::M31;
+    use arith::Field;
 
     #[test]
     fn basic_simd() {

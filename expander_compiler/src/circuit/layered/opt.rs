@@ -710,11 +710,12 @@ mod tests {
         circuit::{
             config::{Config, GF2Config as C},
             ir::{self, common::rand_gen::*},
+            layered::{CrossLayerInputType, NormalInputType},
         },
         utils::error::Error,
     };
 
-    use super::{CrossLayerInputType, InputType, NormalInputType};
+    use super::InputType;
 
     type CField = <C as Config>::CircuitField;
 

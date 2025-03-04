@@ -246,6 +246,7 @@ mod tests {
     use crate::circuit::{
         config::*,
         ir::{common::rand_gen::*, dest::RootCircuit},
+        layered::{CrossLayerInputType, NormalInputType},
     };
 
     fn test_serde_for_field<C: Config, I: InputType>() {
