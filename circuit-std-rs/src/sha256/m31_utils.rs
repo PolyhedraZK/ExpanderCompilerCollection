@@ -1,6 +1,13 @@
 use expander_compiler::frontend::{
     declare_circuit, Config, Define, Error, FieldModulus, M31Config, RootAPI, Variable, M31,
 };
+
+#[cfg(test)]
+use expander_compiler::{
+    frontend::{compile, CompileOptions},
+    hints::registry::HintRegistry,
+};
+
 use num_bigint::BigInt;
 use num_traits::cast::ToPrimitive;
 
