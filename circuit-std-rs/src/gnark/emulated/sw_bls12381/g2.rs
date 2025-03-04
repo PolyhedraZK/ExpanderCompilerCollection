@@ -546,7 +546,6 @@ impl Debug for G2Affine {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         f.debug_struct("G2Affine")
             .field("P", &self.p)
-            //.field("P.y", &self.p.y)
             .field("lines", &self.lines)
             .finish()
     }

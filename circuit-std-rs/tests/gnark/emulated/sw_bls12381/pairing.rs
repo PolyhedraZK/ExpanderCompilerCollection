@@ -47,8 +47,6 @@ declare_circuit!(PairingCheckGKRCircuit {
     in2_g2: [[[Variable; 48]; 2]; 2],
 });
 
-//pub type PairingCheckGKRCircuit = _PairingCheckGKRCircuit<Variable>;
-
 impl Define<M31Config> for PairingCheckGKRCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut pairing = Pairing::new(builder);
@@ -242,7 +240,6 @@ fn random_assignment(
 }
 
 fn random_g1g2_affines(mut rng: impl rand::RngCore) -> (BlsG1Affine, BlsG2Affine) {
-    // fn random_g1g2_affines() -> (BlsG1Affine, BlsG2Affine) {
     // Generate the generators for G1 and G2
     let g1_generator = BlsG1Affine::new(
         ark_bls12_381::g1::G1_GENERATOR_X,
@@ -254,8 +251,6 @@ fn random_g1g2_affines(mut rng: impl rand::RngCore) -> (BlsG1Affine, BlsG2Affine
         ark_bls12_381::g2::G2_GENERATOR_Y,
     );
 
-    // Create a random number generator
-    ///let mut rng = ark_std::rand::thread_rng();
     let random_scalar: Fr = Fr::rand(&mut rng);
     let p: BlsG1Affine = G1Projective::from(g1_generator).mul(random_scalar).into();
     let q: BlsG2Affine = G2Projective::from(g2_generator).mul(random_scalar).into();
