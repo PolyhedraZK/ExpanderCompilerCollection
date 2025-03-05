@@ -20,12 +20,11 @@ use circuit_std_rs::{
 
 use ark_ff::{AdditiveGroup, UniformRand};
 
+use crate::common::circuit_test_helper_with_hint;
 use ark_serialize::CanonicalSerialize;
 use std::ops::{Mul, Neg};
 
-#[path = "../../../common.rs"]
-mod common;
-
+// this param is just for StdCircuit to compile, the data is not used actually. can see the test 'pairing_random_test' below
 #[derive(Clone, Debug, Default)]
 pub struct PairingParams {
     pub _in1_g1: BlsG1Affine,
@@ -419,7 +418,8 @@ fn pairing_random_test() {
         _in1_g2: BlsG2Affine::default(),
         _in2_g2: BlsG2Affine::default(),
     };
-    common::circuit_test_helper_with_hint::<M31Config, PairingCheckGKRCircuit<Variable>>(
+
+    circuit_test_helper_with_hint::<M31Config, PairingCheckGKRCircuit<Variable>>(
         &param,
         &mut hint_registry,
     );
