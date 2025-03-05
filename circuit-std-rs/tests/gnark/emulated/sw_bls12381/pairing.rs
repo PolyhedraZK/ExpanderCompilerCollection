@@ -1,7 +1,6 @@
 use ark_bls12_381::{
     Fr, G1Affine as BlsG1Affine, G1Projective, G2Affine as BlsG2Affine, G2Projective,
 };
-use circuit_std_rs::utils::register_hint;
 use expander_compiler::{
     declare_circuit,
     frontend::{extra::debug_eval, Define, HintRegistry, M31Config, RootAPI, Variable, M31},
@@ -15,14 +14,17 @@ use circuit_std_rs::{
             sw_bls12381::{g1::*, g2::*, pairing::Pairing},
         },
     },
+    utils::register_hint,
     StdCircuit,
 };
 
 use ark_ff::{AdditiveGroup, UniformRand};
-use rand::thread_rng;
 
 use ark_serialize::CanonicalSerialize;
 use std::ops::{Mul, Neg};
+
+#[path = "../../../common.rs"]
+mod common;
 
 #[derive(Clone, Debug, Default)]
 pub struct PairingParams {
@@ -404,12 +406,21 @@ fn pairing_random_test() {
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
 
-    let assignment = random_assignment(thread_rng());
-    debug_eval(
-        &PairingCheckGKRCircuit::default(),
-        &assignment,
-        hint_registry,
-    );
+    // let assignment = random_assignment(thread_rng());
+    // debug_eval(
+    //     &PairingCheckGKRCircuit::default(),
+    //     &assignment,
+    //     hint_registry,
+    // );
 
-    //common::circuit_test_helper::<M31Config, PairingCheckGKRCircuit<Variable>>(&param);
+    let param = PairingParams {
+        _in1_g1: BlsG1Affine::default(),
+        _in2_g1: BlsG1Affine::default(),
+        _in1_g2: BlsG2Affine::default(),
+        _in2_g2: BlsG2Affine::default(),
+    };
+    common::circuit_test_helper_with_hint::<M31Config, PairingCheckGKRCircuit<Variable>>(
+        &param,
+        &mut hint_registry,
+    );
 }
