@@ -382,6 +382,9 @@ pub fn to_binary<C: Config, B: RootAPI<C>>(
     n_bits: usize,
 ) -> Vec<Variable> {
     let res = api.new_hint("myhint.tobinary", &[x], n_bits);
+    for bit in res.iter() {
+        api.assert_is_bool(*bit);
+    }
     let res_x = from_binary(api, &res);
     api.assert_is_equal(x, res_x);
     res

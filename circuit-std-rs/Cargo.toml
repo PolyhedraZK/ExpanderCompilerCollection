@@ -24,3 +24,4 @@ ark-ff = "0.5.0"
 tiny-keccak = { version = "2.0.2", features = [ "sha3", "keccak" ] }
 lazy_static = "1.5.0"
 once_cell = "1.20.3"
+mpi_config.workspace = true
