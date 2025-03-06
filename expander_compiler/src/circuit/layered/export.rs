@@ -1,4 +1,4 @@
-use super::*;
+use super::{Circuit, Config, CrossLayerInputType, Input, InputUsize, NormalInputType};
 
 impl<C: Config> Circuit<C, NormalInputType> {
     pub fn export_to_expander<
