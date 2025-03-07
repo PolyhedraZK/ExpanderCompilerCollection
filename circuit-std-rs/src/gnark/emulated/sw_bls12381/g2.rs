@@ -462,8 +462,8 @@ impl G2 {
         let mut buf_x = bytes.to_vec();
         let buf0 = to_binary(native, buf_x[0], 8);
         let pad = vec![native.constant(0); 5];
-        let m_data = from_binary(native, [pad, buf0[5..].to_vec()].concat()); //buf0 & mMask
-        let buf0_and_non_mask = from_binary(native, buf0[..5].to_vec()); //buf0 & ^mMask
+        let m_data = from_binary(native, &[pad, buf0[5..].to_vec()].concat()); //buf0 & mMask
+        let buf0_and_non_mask = from_binary(native, &buf0[..5].to_vec()); //buf0 & ^mMask
         buf_x[0] = buf0_and_non_mask;
 
         //get p.x

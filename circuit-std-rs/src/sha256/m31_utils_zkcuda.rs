@@ -1,10 +1,16 @@
 use expander_compiler::frontend::*;
 use num_bigint::BigInt;
 use num_traits::cast::ToPrimitive;
-use std::fs::{self, OpenOptions};
-use std::io::{self, BufRead, BufReader, Write};
+use std::sync::Mutex;
+use once_cell::sync::Lazy;
 
-pub fn bytes_to_bits<C: Config, B: RootAPI<C>>(api: &mut B, vals: &[Variable]) -> Vec<Variable> {
+// extern "Rust" {
+//     static GLOBAL_HINT_IDX: Lazy<Mutex<usize>>;
+//     static GLOBAL_HINTS: Lazy<Mutex<Vec<Vec<u32>>>>;
+// }
+pub static GLOBAL_HINT_IDX: Lazy<Mutex<usize>> = Lazy::new(|| Mutex::new(0));
+pub static GLOBAL_HINTS: Lazy<Mutex<Vec<Vec<u32>>>> = Lazy::new(|| Mutex::new(Vec::new()));
+pub fn bytes_to_bits<C: Config, Builder: RootAPI<C>>(api: &mut Builder, vals: &[Variable]) -> Vec<Variable> {
     let mut ret = to_binary(api, vals[0], 8);
     for val in vals.iter().skip(1) {
         ret = to_binary(api, *val, 8)
@@ -14,7 +20,7 @@ pub fn bytes_to_bits<C: Config, B: RootAPI<C>>(api: &mut B, vals: &[Variable]) -
     }
     ret
 }
-pub fn bits_to_bytes<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> Vec<Variable> {
+pub fn bits_to_bytes<C: Config>(api: &mut API<C>, bits: &[Variable]) -> Vec<Variable> {
     let mut ret = vec![];
     for i in 0..bits.len() / 8 {
         let cur_bits = &bits[i * 8..(i + 1) * 8];
@@ -22,8 +28,8 @@ pub fn bits_to_bytes<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -
     }
     ret
 }
-pub fn left_shift<C: Config, B: RootAPI<C>>(
-    api: &mut B,
+pub fn left_shift<C: Config>(
+    api: &mut API<C>,
     bits: &[Variable],
     shift: usize,
 ) -> Vec<Variable> {
@@ -44,7 +50,7 @@ pub fn rotate_left(bits: &[Variable], shift: usize) -> Vec<Variable> {
     rotated_bits.extend_from_slice(&bits[..shift]);
     rotated_bits
 }
-pub fn sigma0<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> Vec<Variable> {
+pub fn sigma0<C: Config>(api: &mut API<C>, bits: &[Variable]) -> Vec<Variable> {
     if bits.len() != 32 {
         panic!("Sigma0: len(bits) != 32");
     }
@@ -61,7 +67,7 @@ pub fn sigma0<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> Vec<V
     }
     ret
 }
-pub fn sigma1<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> Vec<Variable> {
+pub fn sigma1<C: Config>(api: &mut API<C>, bits: &[Variable]) -> Vec<Variable> {
     if bits.len() != 32 {
         panic!("Sigma1: len(bits) != 32");
     }
@@ -78,7 +84,7 @@ pub fn sigma1<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> Vec<V
     }
     ret
 }
-pub fn cap_sigma0<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> Vec<Variable> {
+pub fn cap_sigma0<C: Config>(api: &mut API<C>, bits: &[Variable]) -> Vec<Variable> {
     if bits.len() != 32 {
         panic!("CapSigma0: len(bits) != 32");
     }
@@ -95,7 +101,7 @@ pub fn cap_sigma0<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> V
     }
     ret
 }
-pub fn cap_sigma1<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> Vec<Variable> {
+pub fn cap_sigma1<C: Config>(api: &mut API<C>, bits: &[Variable]) -> Vec<Variable> {
     if bits.len() != 32 {
         panic!("CapSigma1: len(bits) != 32");
     }
@@ -112,8 +118,8 @@ pub fn cap_sigma1<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> V
     }
     ret
 }
-pub fn ch<C: Config, B: RootAPI<C>>(
-    api: &mut B,
+pub fn ch<C: Config>(
+    api: &mut API<C>,
     x: &[Variable],
     y: &[Variable],
     z: &[Variable],
@@ -130,8 +136,8 @@ pub fn ch<C: Config, B: RootAPI<C>>(
     }
     ret
 }
-pub fn maj<C: Config, B: RootAPI<C>>(
-    api: &mut B,
+pub fn maj<C: Config>(
+    api: &mut API<C>,
     x: &[Variable],
     y: &[Variable],
     z: &[Variable],
@@ -149,8 +155,8 @@ pub fn maj<C: Config, B: RootAPI<C>>(
     }
     ret
 }
-pub fn big_array_add_no_reduce<C: Config, B: RootAPI<C>>(
-    api: &mut B,
+pub fn big_array_add_no_reduce<C: Config>(
+    api: &mut API<C>,
     a: &[Variable],
     b: &[Variable],
 ) -> Vec<Variable> {
@@ -163,8 +169,7 @@ pub fn big_array_add_no_reduce<C: Config, B: RootAPI<C>>(
     }
     c
 }
-pub fn big_array_add_reduce<C: Config, B: RootAPI<C>>(
-    api: &mut B,
+pub fn big_array_add_reduce<C: Config, Builder: RootAPI<C>>(api: &mut Builder,
     a: &[Variable],
     b: &[Variable],
     nb_bits: usize,
@@ -183,8 +188,8 @@ pub fn big_array_add_reduce<C: Config, B: RootAPI<C>>(
     }
     c
 }
-pub fn big_array_add<C: Config, B: RootAPI<C>>(
-    api: &mut B,
+pub fn big_array_add<C: Config>(
+    api: &mut API<C>,
     a: &[Variable],
     b: &[Variable],
     nb_bits: usize,
@@ -205,8 +210,8 @@ pub fn big_array_add<C: Config, B: RootAPI<C>>(
     c[a.len() - 1] = api.add(c[a.len() - 1], carry);
     c
 }
-pub fn sha_m31_add<C: Config, B: RootAPI<C>>(
-    api: &mut B,
+pub fn sha_m31_add<C: Config>(
+    api: &mut API<C>,
     a: &[Variable],
     b: &[Variable],
     nb_bits: usize,
@@ -228,8 +233,8 @@ pub fn sha_m31_add<C: Config, B: RootAPI<C>>(
     c[1] = api.sub(c[1], tmp);
     c
 }
-pub fn sha_m31_26_add<C: Config, B: RootAPI<C>>(
-    api: &mut B,
+pub fn sha_m31_26_add<C: Config>(
+    api: &mut API<C>,
     a: &[Variable],
     b: &[Variable],
     nb_bits: usize,
@@ -251,8 +256,8 @@ pub fn sha_m31_26_add<C: Config, B: RootAPI<C>>(
     c[1] = api.sub(c[1], tmp);
     c
 }
-pub fn sha_m31_add_to_32bits<C: Config, B: RootAPI<C>>(
-    api: &mut B,
+pub fn sha_m31_add_to_32bits<C: Config>(
+    api: &mut API<C>,
     a: &[Variable],
     b: &[Variable],
     nb_bits: usize,
@@ -287,15 +292,15 @@ pub fn sha_m31_add_to_32bits<C: Config, B: RootAPI<C>>(
     );
     res.try_into().unwrap()
 }
-pub fn bit_array_to_m31<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> [Variable; 2] {
+pub fn bit_array_to_m31<C: Config>(api: &mut API<C>, bits: &[Variable]) -> [Variable; 2] {
     if bits.len() >= 60 {
         panic!("BitArrayToM31: length of bits must be less than 60");
     }
     [from_binary(api, &bits[..30]), from_binary(api, &bits[30..])]
 }
 
-pub fn bit_array_to_m31_26<C: Config, B: RootAPI<C>>(
-    api: &mut B,
+pub fn bit_array_to_m31_26<C: Config>(
+    api: &mut API<C>,
     bits: &[Variable],
 ) -> [Variable; 2] {
     if bits.len() >= 54 {
@@ -304,8 +309,8 @@ pub fn bit_array_to_m31_26<C: Config, B: RootAPI<C>>(
     [from_binary(api, &bits[..26]), from_binary(api, &bits[26..])]
 }
 
-pub fn m31_array_put_uint32<C: Config, B: RootAPI<C>>(
-    api: &mut B,
+pub fn m31_array_put_uint32<C: Config>(
+    api: &mut API<C>,
     b: &mut [Variable],
     x: [Variable; 2],
 ) {
@@ -319,8 +324,8 @@ pub fn m31_array_put_uint32<C: Config, B: RootAPI<C>>(
     b[0] = api.add(quo, shift);
 }
 
-pub fn m31_26_array_put_uint32<C: Config, B: RootAPI<C>>(
-    api: &mut B,
+pub fn m31_26_array_put_uint32<C: Config>(
+    api: &mut API<C>,
     b: &mut [Variable],
     x: [Variable; 2],
 ) {
@@ -333,8 +338,8 @@ pub fn m31_26_array_put_uint32<C: Config, B: RootAPI<C>>(
     let shift = api.mul(x[1], 1 << 2);
     b[0] = api.add(quo, shift);
 }
-pub fn big_endian_put_uint64<C: Config, B: RootAPI<C>>(
-    api: &mut B,
+pub fn big_endian_put_uint64<C: Config>(
+    api: &mut API<C>,
     b: &mut [Variable],
     x: Variable,
 ) {
@@ -346,15 +351,15 @@ pub fn big_endian_put_uint64<C: Config, B: RootAPI<C>>(
     }
     b[0] = quo;
 }
-pub fn m31_to_bit_array<C: Config, B: RootAPI<C>>(api: &mut B, m31: &[Variable]) -> Vec<Variable> {
+pub fn m31_to_bit_array<C: Config>(api: &mut API<C>, m31: &[Variable]) -> Vec<Variable> {
     let mut bits = vec![];
     for val in m31 {
         bits.extend_from_slice(&to_binary(api, *val, 30));
     }
     bits
 }
-pub fn m31_to_bit_array_seperate<C: Config, B: RootAPI<C>>(
-    api: &mut B,
+pub fn m31_to_bit_array_seperate<C: Config>(
+    api: &mut API<C>,
     m31: &[Variable],
     overflow: usize,
 ) -> Vec<Variable> {
@@ -363,8 +368,8 @@ pub fn m31_to_bit_array_seperate<C: Config, B: RootAPI<C>>(
     bits.extend_from_slice(&to_binary(api, m31[1], 2 + overflow));
     bits
 }
-pub fn m31_26_to_bit_array_seperate<C: Config, B: RootAPI<C>>(
-    api: &mut B,
+pub fn m31_26_to_bit_array_seperate<C: Config>(
+    api: &mut API<C>,
     m31: &[Variable],
     overflow: usize,
 ) -> Vec<Variable> {
@@ -376,75 +381,32 @@ pub fn m31_26_to_bit_array_seperate<C: Config, B: RootAPI<C>>(
     bits.extend_from_slice(&to_binary(api, high, 6 + overflow + 1));
     bits
 }
-pub fn to_binary<C: Config, B: RootAPI<C>>(
-    api: &mut B,
+// pub fn to_binary<C: Config>(
+//     api: &mut API<C>,
+//     x: Variable,
+//     n_bits: usize,
+// ) -> Vec<Variable> {
+//     unsafe{
+//         let mut hint_idx = GLOBAL_HINT_IDX.lock().unwrap();
+//         let res_u32 = GLOBAL_HINTS.lock().unwrap()[*hint_idx].clone();
+//         *hint_idx += 1;
+//         let res = res_u32.iter().map(|&bit| api.constant(bit)).collect::<Vec<_>>();
+//         let res_x = from_binary(api, &res);
+//         api.assert_is_equal(x, res_x);
+//         res
+//     }
+// }
+pub fn to_binary<C: Config, Builder: RootAPI<C>>(api: &mut Builder,
     x: Variable,
     n_bits: usize,
 ) -> Vec<Variable> {
     let res = api.new_hint("myhint.tobinary", &[x], n_bits);
-    for bit in res.iter() {
-        api.assert_is_bool(*bit);
-    }
     let res_x = from_binary(api, &res);
     api.assert_is_equal(x, res_x);
     res
 }
-// pub fn extract_and_remove_tobinary_section(file_path: &str) -> io::Result<Vec<u32>> {
-//     let file = OpenOptions::new().read(true).write(true).open(file_path)?;
-//     let reader = BufReader::new(&file);
 
-//     let mut lines = reader.lines().filter_map(Result::ok).collect::<Vec<String>>();
-//     let mut extracted_numbers = Vec::new();
-//     let mut new_lines = Vec::new();
-
-//     let mut found_tobinary = false;
-//     let mut found_section = false;
-
-//     for line in lines.iter() {
-//         if line.trim() == "tobinary:" {
-//             if found_tobinary {
-//                 new_lines.push(line.clone()); 
-//                 found_section = true;
-//             } else {
-//                 found_tobinary = true; 
-//             }
-//         } else if found_tobinary && !found_section {
-//             let nums = line
-//                 .split(',')
-//                 .filter_map(|s| s.trim().parse::<u32>().ok())
-//                 .collect::<Vec<u32>>();
-
-//             extracted_numbers.extend(nums);
-//         } else {
-//             new_lines.push(line.clone()); 
-//         }
-//     }
-//     fs::write(file_path, new_lines.join("\n"))?;
-
-//     Ok(extracted_numbers)
-// }
-// pub fn to_binary<C: Config, B: RootAPI<C>>(
-//     api: &mut B,
-//     x: Variable,
-//     n_bits: usize,
-// ) -> Vec<Variable> {
-//     let mut res = vec![];
-//     match extract_and_remove_tobinary_section("./log.txt") {
-//         Ok(numbers) => {
-//             println!("Extracted numbers: {:?}", numbers);
-//             if n_bits == 30 {
-//                 println!("hit!");
-//             }
-//             for i in 0..n_bits {
-//                 let number_var = api.constant(numbers[i]);
-//                 res.push(number_var);
-//             }
-//         },
-//         Err(e) => eprintln!("Error: {}", e),
-//     }
-//     res
-// }
-pub fn from_binary<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> Variable {
+pub fn from_binary<C: Config, Builder: RootAPI<C>>(api: &mut Builder, bits: &[Variable]) -> Variable {
     let mut res = api.constant(0);
     for (i, bit) in bits.iter().enumerate() {
         let coef = 1 << i;
@@ -454,15 +416,22 @@ pub fn from_binary<C: Config, B: RootAPI<C>>(api: &mut B, bits: &[Variable]) -> 
     res
 }
 
-pub fn to_binary_hint(x: &[M31], y: &mut [M31]) -> Result<(), Error> {
+// pub fn to_binary_hint(x: &[M31], y: &mut [M31]) -> Result<(), Error> {
+//     let t = x[0].to_u256();
+//     for (i, k) in y.iter_mut().enumerate() {
+//         *k = M31::from_u256(t >> i as u32 & 1);
+//     }
+//     Ok(())
+// }
+pub fn to_binary_hint<C: Config>(x: &[C::CircuitField], y: &mut [C::CircuitField]) -> Result<(), Error> {
     let t = x[0].to_u256();
     for (i, k) in y.iter_mut().enumerate() {
-        *k = M31::from_u256(t >> i as u32 & 1);
+        *k = C::CircuitField::from_u256(t >> i as u32 & 1);
     }
     Ok(())
 }
 
-pub fn big_is_zero<C: Config, B: RootAPI<C>>(api: &mut B, k: usize, in_: &[Variable]) -> Variable {
+pub fn big_is_zero<C: Config>(api: &mut API<C>, k: usize, in_: &[Variable]) -> Variable {
     let mut total = api.constant(k as u32);
     for val in in_.iter().take(k) {
         let tmp = api.is_zero(val);
@@ -471,8 +440,8 @@ pub fn big_is_zero<C: Config, B: RootAPI<C>>(api: &mut B, k: usize, in_: &[Varia
     api.is_zero(total)
 }
 
-pub fn bigint_to_m31_array<C: Config, B: RootAPI<C>>(
-    api: &mut B,
+pub fn bigint_to_m31_array<C: Config>(
+    api: &mut API<C>,
     x: BigInt,
     n_bits: usize,
     limb_len: usize,
@@ -489,8 +458,8 @@ pub fn bigint_to_m31_array<C: Config, B: RootAPI<C>>(
     }
     res
 }
-pub fn big_less_than<C: Config, B: RootAPI<C>>(
-    api: &mut B,
+pub fn big_less_than<C: Config>(
+    api: &mut API<C>,
     n: usize,
     k: usize,
     a: &[Variable],
@@ -519,8 +488,8 @@ pub fn big_less_than<C: Config, B: RootAPI<C>>(
     }
     ors[0]
 }
-pub fn my_is_less<C: Config, B: RootAPI<C>>(
-    api: &mut B,
+pub fn my_is_less<C: Config>(
+    api: &mut API<C>,
     n: usize,
     a: Variable,
     b: Variable,
@@ -533,8 +502,8 @@ pub fn my_is_less<C: Config, B: RootAPI<C>>(
     api.sub(one, bi1[n])
 }
 
-pub fn idiv_mod_bit<C: Config, B: RootAPI<C>>(
-    builder: &mut B,
+pub fn idiv_mod_bit<C: Config>(
+    builder: &mut API<C>,
     a: Variable,
     b: u64,
 ) -> (Variable, Variable) {

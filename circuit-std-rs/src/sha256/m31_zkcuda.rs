@@ -1,10 +1,10 @@
-use super::m31_utils::{
+use super::m31_utils_zkcuda::{
     big_array_add_no_reduce, bit_array_to_m31_26, bytes_to_bits, cap_sigma0, cap_sigma1, ch,
     m31_26_array_put_uint32, m31_26_to_bit_array_seperate, maj, sha_m31_26_add, sigma0, sigma1,
 };
 use expander_compiler::frontend::*;
 
-const SHA256LEN: usize = 32;
+pub const SHA256LEN: usize = 32;
 const CHUNK: usize = 64;
 const INIT0: u32 = 0x6A09E667;
 const INIT1: u32 = 0xBB67AE85;
@@ -51,7 +51,7 @@ pub struct MyDigest {
 }
 
 impl MyDigest {
-    pub fn new<C: Config, B: RootAPI<C>>(api: &mut B) -> Self {
+    pub fn new<C: Config>(api: &mut API<C>) -> Self {
         let mut h = [[api.constant(0); 2]; 8];
         h[0][0] = api.constant(INIT00_26);
         h[0][1] = api.constant(INIT01_26);
@@ -89,7 +89,7 @@ impl MyDigest {
             first_8words_h: h,
         }
     }
-    fn reset<C: Config, B: RootAPI<C>>(&mut self, api: &mut B) {
+    fn reset<C: Config>(&mut self, api: &mut API<C>) {
         for i in 0..8 {
             self.h[i] = [api.constant(0); 2];
         }
@@ -113,7 +113,7 @@ impl MyDigest {
         self.len = 0;
     }
     //always write a chunk
-    fn chunk_write<C: Config, B: RootAPI<C>>(&mut self, api: &mut B, p: &[Variable]) {
+    pub fn chunk_write<C: Config>(&mut self, api: &mut API<C>, p: &[Variable]) {
         if p.len() != CHUNK || self.nx != 0 {
             panic!("p.len() != CHUNK || self.nx != 0");
         }
@@ -121,7 +121,7 @@ impl MyDigest {
         let tmp_h = self.h;
         self.h = self.block(api, tmp_h, p);
     }
-    fn chunk_write_compress<C: Config, B: RootAPI<C>>(&mut self, api: &mut B, p: &[Variable]) {
+    pub fn chunk_write_compress<C: Config>(&mut self, api: &mut API<C>, p: &[Variable]) {
         if p.len() != CHUNK * 8 || self.nx != 0 {
             panic!("p.len() != CHUNK || self.nx != 0");
         }
@@ -129,7 +129,7 @@ impl MyDigest {
         let tmp_h = self.h;
         self.h = self.block_37bytes_compress(api, tmp_h, p);
     }
-    fn return_sum<C: Config, B: RootAPI<C>>(&mut self, api: &mut B) -> [Variable; SHA256LEN] {
+    pub fn return_sum<C: Config>(&mut self, api: &mut API<C>) -> [Variable; SHA256LEN] {
         let mut digest = [api.constant(0); SHA256LEN];
 
         m31_26_array_put_uint32(api, &mut digest[0..], self.h[0]);
@@ -142,9 +142,9 @@ impl MyDigest {
         m31_26_array_put_uint32(api, &mut digest[28..], self.h[7]);
         digest
     }
-    fn block<C: Config, B: RootAPI<C>>(
+    pub fn block<C: Config>(
         &mut self,
-        api: &mut B,
+        api: &mut API<C>,
         h: [[Variable; 2]; 8],
         p: &[Variable],
     ) -> [[Variable; 2]; 8] {
@@ -241,9 +241,9 @@ impl MyDigest {
     }
     //consider in a 64-byte block, only 8-th word is different
     //so we can skip the 0~7-th word when doing second part
-    fn block_37bytes_compress<C: Config, B: RootAPI<C>>(
+    fn block_37bytes_compress<C: Config>(
         &mut self,
-        api: &mut B,
+        api: &mut API<C>,
         h: [[Variable; 2]; 8],
         p: &[Variable],
     ) -> [[Variable; 2]; 8] {
@@ -330,9 +330,9 @@ impl MyDigest {
         hh[7] = sha_m31_26_add(api, &hh[7], &h, 26);
         hh
     }
-    fn block_37bytes_compress_26_set_8words_states<C: Config, B: RootAPI<C>>(
+    fn block_37bytes_compress_26_set_8words_states<C: Config>(
         &mut self,
-        api: &mut B,
+        api: &mut API<C>,
         h: [[Variable; 2]; 8],
         p: &[Variable],
     ) {
@@ -407,28 +407,28 @@ impl MyDigest {
     }
 }
 
-pub fn sha256_37bytes<C: Config, B: RootAPI<C>>(
-    builder: &mut B,
-    orign_data: &[Variable],
-) -> Vec<Variable> {
-    let mut data = orign_data.to_vec();
-    let n = data.len();
-    if n != 32 + 1 + 4 {
-        panic!("len(orignData) !=  32+1+4")
-    }
-    let mut pre_pad = vec![builder.constant(0); 64 - 37];
-    pre_pad[0] = builder.constant(128); //0x80
-    pre_pad[64 - 37 - 2] = builder.constant((37) * 8 / 256); //length byte
-    pre_pad[64 - 37 - 1] = builder.constant((32 + 1 + 4) * 8 - 256); //length byte
-    data.append(&mut pre_pad); //append padding
+// pub fn sha256_37bytes<C: Config>(
+//     builder: &mut API<C>,
+//     orign_data: &[Variable],
+// ) -> Vec<Variable> {
+//     let mut data = orign_data.to_vec();
+//     let n = data.len();
+//     if n != 32 + 1 + 4 {
+//         panic!("len(orignData) !=  32+1+4")
+//     }
+//     let mut pre_pad = vec![builder.constant(0); 64 - 37];
+//     pre_pad[0] = builder.constant(128); //0x80
+//     pre_pad[64 - 37 - 2] = builder.constant((37) * 8 / 256); //length byte
+//     pre_pad[64 - 37 - 1] = builder.constant((32 + 1 + 4) * 8 - 256); //length byte
+//     data.append(&mut pre_pad); //append padding
 
-    let mut d = MyDigest::new(builder);
-    d.chunk_write(builder, &data);
-    d.return_sum(builder).to_vec()
-}
+//     let mut d = MyDigest::new(builder);
+//     d.chunk_write(builder, &data);
+//     d.return_sum(builder).to_vec()
+// }
 
-pub fn sha256_37bytes_compress<C: Config, B: RootAPI<C>>(
-    builder: &mut B,
+pub fn sha256_37bytes_compress<C: Config>(
+    builder: &mut API<C>,
     orign_data: &[Variable],
 ) -> Vec<Variable> {
     let mut data = orign_data.to_vec();
@@ -450,8 +450,8 @@ pub fn sha256_37bytes_compress<C: Config, B: RootAPI<C>>(
     d.return_sum(builder).to_vec()
 }
 
-pub fn sha256_37bytes_256batch_compress<C: Config, B: RootAPI<C>>(
-    builder: &mut B,
+pub fn sha256_37bytes_256batch_compress<C: Config>(
+    builder: &mut API<C>,
     inputs: &[Vec<Variable>],
 ) -> Vec<Vec<Variable>> {
     let mut d = MyDigest::new(builder);
@@ -480,8 +480,8 @@ pub fn sha256_37bytes_256batch_compress<C: Config, B: RootAPI<C>>(
     outputs
 }
 
-pub fn sha256_var_bytes<C: Config, B: RootAPI<C>>(
-    builder: &mut B,
+pub fn sha256_var_bytes<C: Config>(
+    builder: &mut API<C>,
     orign_data: &[Variable],
 ) -> Vec<Variable> {
     let mut data = orign_data.to_vec();
@@ -512,40 +512,40 @@ pub fn sha256_var_bytes<C: Config, B: RootAPI<C>>(
     d.return_sum(builder).to_vec()
 }
 
-pub fn check_sha256_37bytes<C: Config, B: RootAPI<C>>(
-    builder: &mut B,
-    origin_data: &[Variable],
-) -> Vec<Variable> {
-    let output = origin_data[37..].to_vec();
-    let result = sha256_37bytes(builder, &origin_data[..37]);
-    for i in 0..32 {
-        builder.assert_is_equal(result[i], output[i]);
-    }
-    result
-}
+// pub fn check_sha256_37bytes<C: Config>(
+//     builder: &mut API<C>,
+//     origin_data: &[Variable],
+// ) -> Vec<Variable> {
+//     let output = origin_data[37..].to_vec();
+//     let result = sha256_37bytes(builder, &origin_data[..37]);
+//     for i in 0..32 {
+//         builder.assert_is_equal(result[i], output[i]);
+//     }
+//     result
+// }
 
-pub fn check_sha256_37bytes_compress<C: Config, B: RootAPI<C>>(
-    builder: &mut B,
-    origin_data: &[Variable],
-) -> Vec<Variable> {
-    let output = origin_data[37 * 8..].to_vec();
-    let result = sha256_37bytes_compress(builder, &origin_data[..37 * 8]);
-    for i in 0..32 {
-        builder.assert_is_equal(result[i], output[i]);
-    }
-    result
-}
+// pub fn check_sha256_37bytes_compress<C: Config>(
+//     builder: &mut API<C>,
+//     origin_data: &[Variable],
+// ) -> Vec<Variable> {
+//     let output = origin_data[37 * 8..].to_vec();
+//     let result = sha256_37bytes_compress(builder, &origin_data[..37 * 8]);
+//     for i in 0..32 {
+//         builder.assert_is_equal(result[i], output[i]);
+//     }
+//     result
+// }
 
-pub fn check_sha256_37bytes_256batch_compress<C: Config, B: RootAPI<C>>(
-    builder: &mut B,
-    inputs: &[Vec<Variable>],
-    outputs: &[Vec<Variable>],
-) -> Vec<Vec<Variable>> {
-    let result = sha256_37bytes_256batch_compress(builder, inputs);
-    for i in 0..outputs.len() {
-        for j in 0..32 {
-            builder.assert_is_equal(result[i][j], outputs[i][j]);
-        }
-    }
-    result
-}
+// pub fn check_sha256_37bytes_256batch_compress<C: Config>(
+//     builder: &mut API<C>,
+//     inputs: &[Vec<Variable>],
+//     outputs: &[Vec<Variable>],
+// ) -> Vec<Vec<Variable>> {
+//     let result = sha256_37bytes_256batch_compress(builder, inputs);
+//     for i in 0..outputs.len() {
+//         for j in 0..32 {
+//             builder.assert_is_equal(result[i][j], outputs[i][j]);
+//         }
+//     }
+//     result
+// }
