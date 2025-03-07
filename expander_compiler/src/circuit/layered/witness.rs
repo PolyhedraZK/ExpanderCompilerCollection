@@ -3,12 +3,8 @@ use std::mem;
 
 use arith::SimdField;
 
-use super::*;
-use crate::{
-    circuit::config::Config,
-    field::{Field, FieldModulus},
-    utils::serde::Serde,
-};
+use super::{Circuit, FieldForECC, InputType};
+use crate::{circuit::config::Config, field::Field, utils::serde::Serde};
 
 #[derive(Clone, Debug)]
 pub enum WitnessValues<C: Config> {
@@ -337,6 +333,7 @@ mod tests {
     use super::*;
     use crate::circuit::config::M31Config;
     use crate::field::M31;
+    use arith::Field;
 
     #[test]
     fn basic_simd() {

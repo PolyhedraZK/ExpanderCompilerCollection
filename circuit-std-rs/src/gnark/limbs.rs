@@ -1,4 +1,4 @@
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{FieldModulus, M31};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 pub fn recompose(inputs: Vec<BigInt>, nb_bits: u32) -> BigInt {

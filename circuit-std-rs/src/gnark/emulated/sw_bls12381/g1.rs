@@ -1,7 +1,9 @@
-use crate::gnark::element::*;
+use std::str::FromStr;
+
+use crate::gnark::element::{new_internal_element, value_of, Element};
 use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::emulated::field_bls12381::e2::CurveF;
-use crate::sha256::m31_utils::*;
+use crate::sha256::m31_utils::{big_less_than, from_binary, to_binary};
 use crate::utils::simple_select;
 use expander_compiler::{
     declare_circuit,
@@ -9,7 +11,6 @@ use expander_compiler::{
 };
 use num_bigint::BigInt;
 use std::fmt::{Debug, Formatter, Result};
-use std::str::FromStr;
 
 const M_COMPRESSED_SMALLEST: u8 = 0b100 << 5;
 const M_COMPRESSED_LARGEST: u8 = 0b101 << 5;

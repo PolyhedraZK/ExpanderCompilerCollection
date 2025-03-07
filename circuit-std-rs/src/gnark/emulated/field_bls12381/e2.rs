@@ -1,5 +1,5 @@
-use crate::gnark::element::*;
-use crate::gnark::emparam::*;
+use crate::gnark::element::{value_of, Element};
+use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::field::GField;
 use expander_compiler::frontend::{Config, RootAPI, Variable};
 use num_bigint::BigInt;
