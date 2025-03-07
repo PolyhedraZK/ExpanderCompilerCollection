@@ -119,7 +119,7 @@ pub fn expand_msg_xmd_variable<C: Config, B: RootAPI<C>>(
     input.extend_from_slice(&block_v);
     input.extend_from_slice(msg);
     input.push(api.constant((len_in_bytes >> 8) as u32));
-    input.push(api.constant(len_in_bytes as u32));
+    input.push(api.constant((len_in_bytes % 256) as u32));
     input.push(api.constant(0));
     input.extend_from_slice(dst);
     input.push(api.constant(size_domain as u32));

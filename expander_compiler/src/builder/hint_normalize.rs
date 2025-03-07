@@ -1,5 +1,3 @@
-use core::panic;
-
 use crate::circuit::ir::common::RawConstraint;
 use crate::circuit::ir::expr;
 use crate::field::FieldArith;
@@ -183,7 +181,8 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                 }
             }
             Commit(_) => {
-                panic!("commit is unimplemented");
+                // TODO: warn user that this is different from gnark
+                InsnOut::ConstantLike(Coef::Random)
             }
             Hint {
                 hint_id,

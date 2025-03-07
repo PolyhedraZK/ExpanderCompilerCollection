@@ -218,7 +218,13 @@ pub fn to_binary<C: Config, B: RootAPI<C>>(
     x: Variable,
     n_bits: usize,
 ) -> Vec<Variable> {
-    api.new_hint("myhint.tobinary", &[x], n_bits)
+    let bits = api.new_hint("myhint.tobinary", &[x], n_bits);
+    for bit in bits.iter() {
+        api.assert_is_bool(*bit);
+    }
+    let sum = from_binary(api, bits.to_vec());
+    api.assert_is_equal(sum, x);
+    bits
 }
 pub fn from_binary<C: Config, B: RootAPI<C>>(api: &mut B, bits: Vec<Variable>) -> Variable {
     let mut res = api.constant(0);
