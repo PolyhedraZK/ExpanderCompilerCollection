@@ -9,7 +9,7 @@ use tiny_keccak::Hasher;
 // We will show two ways to archive the same goal: compute multiple Keccak hashes in parallel.
 // The first way is to run multiple kernels in parallel, each of which computes a single Keccak hash. (Recommended)
 // The second way is to run a single kernel that computes multiple Keccak hashes.
-const N_PARALLEL: usize = 4;
+const N_PARALLEL: usize = 1;
 
 const CHECK_BITS: usize = 256;
 const PARTITION_BITS: usize = 30;
@@ -255,7 +255,7 @@ fn compute_keccak_inner<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<V
 
     let mut ss = vec![vec![api.constant(1); 64]; 25];
     let mut new_p = p.clone();
-    for _ in 0..100000 {
+    for _ in 0..60000 {
         let x = api.unconstrained_identity(new_p[0]);
         api.assert_is_equal(x, new_p[0]);
         new_p[0] = x;

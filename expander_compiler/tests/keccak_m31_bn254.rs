@@ -363,6 +363,8 @@ fn keccak_big_field<C: Config, const N_WITNESSES: usize>(field_name: &str) {
     let mut expander_circuit = layered_circuit
         .export_to_expander::<C::DefaultGKRFieldConfig>()
         .flatten();
+    expander_circuit.identify_rnd_coefs();
+    expander_circuit.identify_structure_info();
     let config = expander_config::Config::<C::DefaultGKRConfig>::new(
         expander_config::GKRScheme::Vanilla,
         mpi_config::MPIConfig::new(),
