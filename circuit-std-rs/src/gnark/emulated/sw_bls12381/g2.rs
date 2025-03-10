@@ -187,10 +187,11 @@ impl G2 {
         let y2 = self.ext2.double(native, &p.y);
         let λ1 = self.ext2.div(native, &xx, &y2);
         // xr = λ1²-2p.x
-        let x2 = self
+        let mut x2 = self
             .ext2
             .mul_by_const_element(native, &p.x, &BigInt::from(2));
         let λ1λ1 = self.ext2.square(native, &λ1);
+        x2 = self.ext2.sub(native, &λ1λ1, &x2);
 
         let x1x2 = self.ext2.sub(native, &p.x, &x2);
         let mut λ2 = self.ext2.div(native, &y2, &x1x2);

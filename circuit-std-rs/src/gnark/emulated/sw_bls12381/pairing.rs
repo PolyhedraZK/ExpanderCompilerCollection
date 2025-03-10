@@ -1,15 +1,11 @@
-use super::g1::G1Affine;
-use super::g2::G2Affine;
-use super::g2::LineEvaluation;
-use super::g2::LineEvaluations;
-use super::g2::{G2AffP, G2};
+use super::g1::{G1Affine, G1};
+use super::g2::{G2AffP, G2Affine, LineEvaluation, LineEvaluations, G2};
 use super::point::AffinePoint;
 use super::point::Curve;
 use crate::gnark::element::value_of;
 use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::emparam::Bls12381Fr;
 use crate::gnark::emparam::CurveParams;
-use crate::gnark::emulated::field_bls12381;
 use crate::gnark::emulated::field_bls12381::e12::{Ext12, GE12};
 use crate::gnark::emulated::field_bls12381::e2::{CurveF, GE2};
 use crate::gnark::emulated::field_bls12381::e6::GE6;
@@ -24,6 +20,7 @@ pub struct Pairing {
     pub ext12: Ext12,
     pub curve_f: CurveF,
     pub curve: Curve<Bls12381Fp, Bls12381Fr>,
+    pub g1: G1,
     pub g2: G2,
     pub btwist: GE2,
 }
@@ -37,12 +34,15 @@ impl Pairing {
             a0: value_of::<C, B, Bls12381Fp>(native, Box::new("4".to_string())),
             a1: value_of::<C, B, Bls12381Fp>(native, Box::new("4".to_string())),
         };
+
+        let g1 = G1::new(native);
         let g2 = G2::new(native);
 
         Self {
             curve_f,
             ext12,
             curve,
+            g1,
             g2,
             btwist,
         }
@@ -464,19 +464,16 @@ impl Pairing {
         self.curve.assert_is_on_curve(native, &p_affine);
     }
 
-    // func (pr Pairing) AssertIsOnG1(P *G1Affine) {
-    //     // 1- Check P is on the curve
-    //     pr.AssertIsOnCurve(P)
-
-    //     // 2- Check P has the right subgroup order
-    //     // [x²]ϕ(P)
-    //     phiP := pr.g1.phi(P)
-    //     _P := pr.g1.scalarMulBySeedSquare(phiP)
-    //     _P = pr.curve.Neg(_P)
-
-    //     // [r]Q == 0 <==>  P = -[x²]ϕ(P)
-    //     pr.curve.AssertIsEqual(_P, P)
-    // }
+    pub fn assert_is_on_g1<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, p: &G1Affine) {
+        // 1- Check P is on the curve
+        self.assert_is_on_curve(native, p.clone());
+        // 2- Check P has the right subgroup order
+        // [x²]ϕ(P)
+        let phi_p = self.g1.phi(native, &p);
+        let p_squared = self.g1.scalar_mul_by_seed_square(native, &phi_p);
+        let neg_p_squared = self.curve.neg(native, &p_squared);
+        self.g1.assert_is_equal(native, &neg_p_squared, &p_squared); // Neg returns an inverse of p. It doesn't modify p.);
+    }
 
     // use p: G2Affine ?
     pub fn assert_is_on_g2<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, q: &G2AffP) {

@@ -12,15 +12,20 @@ use expander_compiler::{
 use num_bigint::BigInt;
 use std::fmt::{Debug, Formatter, Result};
 
+use super::point::AffinePoint;
+
 const M_COMPRESSED_SMALLEST: u8 = 0b100 << 5;
 const M_COMPRESSED_LARGEST: u8 = 0b101 << 5;
 
 // TODO: refactor G1Affine, G2Affine all with AffinePoint
-#[derive(Default, Clone)]
-pub struct G1Affine {
-    pub x: Element<Bls12381Fp>,
-    pub y: Element<Bls12381Fp>,
-}
+// #[derive(Default, Clone)]
+// pub struct G1Affine {
+//     pub x: Element<Bls12381Fp>,
+//     pub y: Element<Bls12381Fp>,
+// }
+
+pub type G1Affine = AffinePoint<Bls12381Fp>;
+
 impl G1Affine {
     pub fn new(x: Element<Bls12381Fp>, y: Element<Bls12381Fp>) -> Self {
         Self { x, y }
@@ -82,6 +87,12 @@ impl G1 {
 
         G1Affine { x: xr, y: yr }
     }
+
+    pub fn phi<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, q: &G1Affine) -> G1Affine {
+        let x = self.curve_f.mul(native, &q.x, &self.w);
+        G1Affine { x, y: q.y.clone() }
+    }
+
     pub fn double<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, p: &G1Affine) -> G1Affine {
         let xx3a = self.curve_f.mul(native, &p.x, &p.x);
         let two = value_of::<C, B, Bls12381Fp>(native, Box::new(2));
@@ -100,6 +111,86 @@ impl G1 {
 
         G1Affine { x: xr, y: yr }
     }
+
+    pub fn double_n<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        p: &G1Affine,
+        n: usize,
+    ) -> G1Affine {
+        let mut pn: G1Affine = p.clone();
+        for _ in 0..n {
+            pn = self.double(native, &pn);
+        }
+        pn
+    }
+
+    pub fn double_and_add<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        p: &G1Affine,
+        q: &G1Affine,
+    ) -> G1Affine {
+        // compute λ1 = (q.y-p.y)/(q.x-p.x)
+        let yqyp = self.curve_f.sub(native, &q.y, &p.y);
+        let xqxp = self.curve_f.sub(native, &q.x, &p.x);
+        let λ1 = self.curve_f.div(native, &yqyp, &xqxp);
+
+        // compute x1 = λ1²-p.x-q.x
+        let λ1λ1 = self.curve_f.mul(native, &λ1, &λ1);
+        let xqxp = self.curve_f.add(native, &p.x, &q.x);
+        let x2 = self.curve_f.sub(native, &λ1λ1, &xqxp);
+
+        // omit y1 computation
+        // compute λ1 = -λ1-1*p.y/(x1-p.x)
+        let ypyp = self.curve_f.add(native, &p.y, &p.y);
+        let x2xp = self.curve_f.sub(native, &x2, &p.x);
+        let λ2 = self.curve_f.div(native, &ypyp, &x2xp);
+        let λ2 = self.curve_f.add(native, &λ1, &λ2);
+        let λ2 = self.curve_f.neg(native, &λ2);
+
+        // compute x3 =λ2²-p.x-x3
+        let λ2λ2 = self.curve_f.mul(native, &λ2, &λ2);
+        let x3 = self.curve_f.sub(native, &λ2λ2, &p.x);
+        let x3 = self.curve_f.sub(native, &x3, &x2);
+
+        // compute y3 = λ2*(p.x - x3)-p.y
+        let y3 = self.curve_f.sub(native, &p.x, &x3);
+        let y3 = self.curve_f.mul(native, &λ2, &y3);
+        let y3 = self.curve_f.sub(native, &y3, &p.y);
+
+        G1Affine { x: x3, y: y3 }
+    }
+
+    pub fn scalar_mul_by_seed_square<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        q: &G1Affine,
+    ) -> G1Affine {
+        let mut z = self.double(native, q);
+        z = self.add(native, q, &z);
+        z = self.double(native, &z);
+        z = self.double_and_add(native, &z, q);
+        z = self.double_n(native, &z, 2);
+        z = self.double_and_add(native, &z, q);
+        z = self.double_n(native, &z, 8);
+        z = self.double_and_add(native, &z, q);
+        let mut t0 = self.double(native, &z);
+        t0 = self.add(native, &z, &t0);
+        let t0 = self.double(native, &t0);
+        let t0 = self.double_and_add(native, &t0, &z);
+        let t0 = self.double_n(native, &t0, 2);
+        let t0 = self.double_and_add(native, &t0, &z);
+        let t0 = self.double_n(native, &t0, 8);
+        let t0 = self.double_and_add(native, &t0, &z);
+        let t0 = self.double_n(native, &t0, 31);
+        let z = self.add(native, &t0, &z);
+        let z = self.double_n(native, &z, 32);
+        let z = self.double_and_add(native, &z, q);
+        let z = self.double_n(native, &z, 32);
+        z
+    }
+
     pub fn assert_is_equal<C: Config, B: RootAPI<C>>(
         &mut self,
         native: &mut B,
