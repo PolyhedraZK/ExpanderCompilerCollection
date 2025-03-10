@@ -8,8 +8,10 @@ use super::point::Curve;
 use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::emparam::Bls12381Fr;
 use crate::gnark::emparam::CurveParams;
+use crate::gnark::emulated::field_bls12381;
 use crate::gnark::emulated::field_bls12381::e12::{Ext12, GE12};
-use crate::gnark::emulated::field_bls12381::e2::CurveF;
+use crate::gnark::element::value_of;
+use crate::gnark::emulated::field_bls12381::e2::{CurveF, GE2};
 use crate::gnark::emulated::field_bls12381::e6::GE6;
 use expander_compiler::frontend::{Config, Error, RootAPI};
 use num_bigint::BigInt;
@@ -22,6 +24,7 @@ pub struct Pairing {
     pub ext12: Ext12,
     pub curve_f: CurveF,
     pub curve: Curve<Bls12381Fp, Bls12381Fr>,
+    pub btwist: GE2,
 }
 
 impl Pairing {
@@ -29,10 +32,20 @@ impl Pairing {
         let curve_f = CurveF::new(native, Bls12381Fp {});
         let ext12 = Ext12::new(native);
         let curve = Curve::new(native, &CurveParams::get_bls12381_params(), Bls12381Fp {});
+        let btwist = GE2 {
+            a0:  value_of::<C, B, Bls12381Fp>(native, Box::new("4".to_string())),
+            a1:  value_of::<C, B, Bls12381Fp>(native, Box::new("4".to_string())),
+        };
+        // bTwist := fields_bls12381.E2{
+        //     A0: emulated.ValueOf[BaseField]("4"),
+        //     A1: emulated.ValueOf[BaseField]("4"),
+        // }
+
         Self {
             curve_f,
             ext12,
             curve,
+            btwist,
         }
     }
     pub fn pairing_check<C: Config, B: RootAPI<C>>(
@@ -450,5 +463,39 @@ impl Pairing {
     pub fn assert_is_on_curve<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, p: G1Affine) {
         let p_affine = AffinePoint { x: p.x, y: p.y };
         self.curve.assert_is_on_curve(native, &p_affine);
+    }
+
+    pub fn assert_is_on_g2<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, q: G2Affine) {
+        self.assert_is_on_twist(native, &q);
+        // let xQ = self.scalar_mul_by_seed(native, &q);
+        // let psiQ = self.psi(native, &q);
+        // self.assert_is_equal(native, &xQ, &psiQ);
+    }
+
+    // func (pr Pairing) AssertIsOnG2(Q *G2Affine) {
+    // 	// 1- Check Q is on the curve
+    // 	pr.AssertIsOnTwist(Q)
+
+    // 	// 2- Check Q has the right subgroup order
+    // 	// [x₀]Q
+    // 	xQ := pr.g2.scalarMulBySeed(Q)
+    // 	// ψ(Q)
+    // 	psiQ := pr.g2.psi(Q)
+
+    // 	// [r]Q == 0 <==>  ψ(Q) == [x₀]Q
+    // 	pr.g2.AssertIsEqual(xQ, psiQ)
+    // }
+    pub fn assert_is_on_twist<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, q: G2Affine) {
+        let is_x_zero = self.ext12.ext6.ext2.is_zero(native, &q.p.x);
+        let is_y_zero = self.ext12.ext6.ext2.is_zero(native, &q.p.y);
+        let selector = native.and(is_x_zero, is_y_zero);
+        let zero = self.ext12.ext6.ext2.zero();
+        let b = self.ext12.ext6.ext2.select(native, selector, &zero, &self.btwist);
+
+        let left = self.ext12.ext6.ext2.square(native, &q.p.y);
+        let mut right = self.ext12.ext6.ext2.square(native, &q.p.x);
+        right = self.ext12.ext6.ext2.mul(native, &right, &q.p.x);
+        right = self.ext12.ext6.ext2.add(native, &right, &b);
+        self.ext12.ext6.ext2.assert_isequal(native, &left, &right);
     }
 }
