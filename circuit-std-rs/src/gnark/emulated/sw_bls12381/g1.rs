@@ -17,13 +17,6 @@ use super::point::AffinePoint;
 const M_COMPRESSED_SMALLEST: u8 = 0b100 << 5;
 const M_COMPRESSED_LARGEST: u8 = 0b101 << 5;
 
-// TODO: refactor G1Affine, G2Affine all with AffinePoint
-// #[derive(Default, Clone)]
-// pub struct G1Affine {
-//     pub x: Element<Bls12381Fp>,
-//     pub y: Element<Bls12381Fp>,
-// }
-
 pub type G1Affine = AffinePoint<Bls12381Fp>;
 
 impl G1Affine {
@@ -177,17 +170,17 @@ impl G1 {
         z = self.double_and_add(native, &z, q);
         let mut t0 = self.double(native, &z);
         t0 = self.add(native, &z, &t0);
-        let t0 = self.double(native, &t0);
-        let t0 = self.double_and_add(native, &t0, &z);
-        let t0 = self.double_n(native, &t0, 2);
-        let t0 = self.double_and_add(native, &t0, &z);
-        let t0 = self.double_n(native, &t0, 8);
-        let t0 = self.double_and_add(native, &t0, &z);
-        let t0 = self.double_n(native, &t0, 31);
-        let z = self.add(native, &t0, &z);
-        let z = self.double_n(native, &z, 32);
-        let z = self.double_and_add(native, &z, q);
-        let z = self.double_n(native, &z, 32);
+        let mut t0 = self.double(native, &t0);
+        t0 = self.double_and_add(native, &t0, &z);
+        t0 = self.double_n(native, &t0, 2);
+        t0 = self.double_and_add(native, &t0, &z);
+        t0 = self.double_n(native, &t0, 8);
+        t0 = self.double_and_add(native, &t0, &z);
+        t0 = self.double_n(native, &t0, 31);
+        z = self.add(native, &t0, &z);
+        z = self.double_n(native, &z, 32);
+        z = self.double_and_add(native, &z, q);
+        z = self.double_n(native, &z, 32);
         z
     }
 

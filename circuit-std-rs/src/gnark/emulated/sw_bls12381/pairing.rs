@@ -469,7 +469,7 @@ impl Pairing {
         self.assert_is_on_curve(native, p.clone());
         // 2- Check P has the right subgroup order
         // [x²]ϕ(P)
-        let phi_p = self.g1.phi(native, &p);
+        let phi_p = self.g1.phi(native, p);
         let p_squared = self.g1.scalar_mul_by_seed_square(native, &phi_p);
         let neg_p_squared = self.curve.neg(native, &p_squared);
         self.g1.assert_is_equal(native, &neg_p_squared, &p_squared); // Neg returns an inverse of p. It doesn't modify p.);

@@ -156,14 +156,6 @@ impl G2 {
         G2AffP::new(x3, y3)
     }
 
-    // func (g2 *G2) doubleN(p *G2Affine, n int) *G2Affine {
-    //     pn := p
-    //     for s := 0; s < n; s++ {
-    //         pn = g2.double(pn)
-    //     }
-    //     return pn
-    // }
-
     pub fn double_n<C: Config, B: RootAPI<C>>(
         &mut self,
         native: &mut B,
