@@ -2,6 +2,7 @@ use expander_compiler::field::FieldArith;
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::proving_system::ExpanderGKRProvingSystem;
 use expander_compiler::zkcuda::{context::*, kernel::*};
+use extra::Serde;
 use rand::{Rng, SeedableRng};
 use tiny_keccak::Hasher;
 
@@ -357,6 +358,10 @@ fn zkcuda_keccak_1() {
 fn zkcuda_keccak_2() {
     let kernel: Kernel<M31Config> = compile_compute_multiple_keccak().unwrap();
     println!("compile ok");
+
+    let file = std::fs::File::create("circuit.txt").unwrap();
+    let writer = std::io::BufWriter::new(file);
+    kernel.layered_circuit.serialize_into(writer).unwrap();
 
     let mut ctx: Context<M31Config> = Context::default();
     let mut p: Vec<Vec<M31>> = vec![];
