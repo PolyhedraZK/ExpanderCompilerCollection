@@ -119,6 +119,95 @@ impl G2 {
 
         G2AffP::new(xr, yr)
     }
+
+    pub fn g2_double_and_add<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        p: &G2AffP,
+        q: &G2AffP,
+    ) -> G2AffP {
+        // compute λ1 = (q.y-p.y)/(q.x-p.x)
+        let yqyp = self.ext2.sub(native, &q.y, &p.y);
+        let xqxp = self.ext2.sub(native, &q.x, &p.x);
+        let λ1 = self.ext2.div(native, &yqyp, &xqxp);
+
+        // compute x2 = λ1²-p.x-q.x
+        let λ1λ1 = self.ext2.square(native, &λ1);
+        let xqxp = self.ext2.add(native, &p.x, &q.x);
+        let x2 = self.ext2.sub(native, &λ1λ1, &xqxp);
+        // omit y2 computation
+        // compute λ2 = -λ1-2*p.y/(x2-p.x)
+        let pypy = self.ext2.add(native, &p.y, &p.y);
+        let x2xp = self.ext2.sub(native, &x2, &p.x);
+        let mut λ2 = self.ext2.div(native, &pypy, &x2xp);
+        λ2 = self.ext2.add(native, &λ1, &λ2);
+        λ2 = self.ext2.neg(native, &λ2);
+
+        // compute x3 =λ2²-p.x-x3
+        let λ2λ2 = self.ext2.square(native, &λ2);
+        let mut x3 = self.ext2.sub(native, &λ2λ2, &p.x);
+        x3 = self.ext2.sub(native, &x3, &x2);
+
+        // compute y3 = λ2*(p.x - x3)-p.ys
+        let mut y3 = self.ext2.sub(native, &p.x, &x3);
+        y3 = self.ext2.mul(native, &λ2, &y3);
+        y3 = self.ext2.sub(native, &y3, &p.y);
+
+        G2AffP::new(x3, y3)
+    }
+
+    // func (g2 *G2) doubleN(p *G2Affine, n int) *G2Affine {
+    //     pn := p
+    //     for s := 0; s < n; s++ {
+    //         pn = g2.double(pn)
+    //     }
+    //     return pn
+    // }
+
+    pub fn double_n<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        p: &G2AffP,
+        n: usize,
+    ) -> G2AffP {
+        let mut pn = self.copy_g2_aff_p(native, p);
+        for _ in 0..n {
+            pn = self.g2_double(native, &pn);
+        }
+
+        pn
+    }
+
+    pub fn triple<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, p: &G2AffP) -> G2AffP {
+        // compute λ1 = (3p.x²)/2p.y
+        let xx = self.ext2.square(native, &p.x);
+        let xx = self
+            .ext2
+            .mul_by_const_element(native, &xx, &BigInt::from(3));
+        let y2 = self.ext2.double(native, &p.y);
+        let λ1 = self.ext2.div(native, &xx, &y2);
+        // xr = λ1²-2p.x
+        let x2 = self
+            .ext2
+            .mul_by_const_element(native, &p.x, &BigInt::from(2));
+        let λ1λ1 = self.ext2.square(native, &λ1);
+
+        let x1x2 = self.ext2.sub(native, &p.x, &x2);
+        let mut λ2 = self.ext2.div(native, &y2, &x1x2);
+        λ2 = self.ext2.sub(native, &λ2, &λ1);
+
+        // xr = λ²-p.x-x2
+        let λ2λ2 = self.ext2.square(native, &λ2);
+        let qxrx = self.ext2.add(native, &x2, &p.x);
+        let xr = self.ext2.sub(native, &λ2λ2, &qxrx);
+
+        // yr = λ(p.x-xr) - p.y
+        let pxrx = self.ext2.sub(native, &p.x, &xr);
+        let λ2pxrx = self.ext2.mul(native, &λ2, &pxrx);
+        let yr = self.ext2.sub(native, &λ2pxrx, &p.y);
+        G2AffP::new(xr, yr)
+    }
+
     pub fn assert_is_equal<C: Config, B: RootAPI<C>>(
         &mut self,
         native: &mut B,
@@ -318,6 +407,7 @@ impl G2 {
             y: out_b1,
         }
     }
+
     pub fn g2_eval_polynomial<C: Config, B: RootAPI<C>>(
         &mut self,
         native: &mut B,
@@ -539,6 +629,24 @@ impl G2 {
 
         //TBD: subgroup check, do we need to do that? Since we are pretty sure that the sig bytes are correct, its unmashalling must be on the right curve?
         G2AffP { x: px, y }
+    }
+
+    pub fn scalar_mul_by_seed<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        q: &G2AffP,
+    ) -> G2AffP {
+        let mut z = self.triple(native, q);
+        z = self.g2_double(native, &z);
+        z = self.g2_double_and_add(native, &z, q);
+        z = self.double_n(native, &z, 2);
+        z = self.g2_double_and_add(native, &z, q);
+        z = self.double_n(native, &z, 8);
+        z = self.g2_double_and_add(native, &z, q);
+        z = self.double_n(native, &z, 31);
+        z = self.g2_double_and_add(native, &z, q);
+        z = self.double_n(native, &z, 16);
+        self.neg(native, &z)
     }
 }
 
