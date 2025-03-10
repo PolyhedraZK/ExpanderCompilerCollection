@@ -42,9 +42,6 @@ fn example<C: Config>() {
     }
 
     let mut expander_circuit = compile_result.layered_circuit.export_to_expander_flatten();
-    // TODO: add a unified function to prepare the circuit in Expander
-    expander_circuit.identify_rnd_coefs();
-    expander_circuit.identify_structure_info();
 
     let config = C::new_expander_config();
 

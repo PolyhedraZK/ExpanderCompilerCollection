@@ -284,9 +284,6 @@ fn keccak_gf2_full() {
 
     // alternatively, you can specify the particular config like gkr_field_config::GF2ExtConfig
     let mut expander_circuit = layered_circuit.export_to_expander_flatten();
-    // TODO: add a unified function to prepare the circuit in Expander
-    expander_circuit.identify_rnd_coefs();
-    expander_circuit.identify_structure_info();
 
     let config = GF2Config::new_expander_config();
 

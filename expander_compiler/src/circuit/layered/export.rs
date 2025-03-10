@@ -72,7 +72,7 @@ impl<C: Config> Circuit<C, NormalInputType> {
         &self,
     ) -> expander_circuit::Circuit<C::DefaultGKRFieldConfig> {
         let circuit = self.export_to_expander::<C::DefaultGKRFieldConfig>();
-        circuit.flatten()
+        circuit.flatten::<C::DefaultGKRConfig>()
     }
 }
 
