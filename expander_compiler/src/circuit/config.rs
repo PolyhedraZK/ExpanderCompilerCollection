@@ -21,6 +21,13 @@ pub trait Config: Default + Clone + Ord + Debug + Hash + Copy + 'static {
     const COST_CONST: usize = 3;
 
     const ENABLE_RANDOM_COMBINATION: bool = true;
+
+    fn new_expander_config() -> expander_config::Config<Self::DefaultGKRConfig> {
+        expander_config::Config::new(
+            expander_config::GKRScheme::Vanilla,
+            mpi_config::MPIConfig::new(),
+        )
+    }
 }
 
 #[derive(Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]

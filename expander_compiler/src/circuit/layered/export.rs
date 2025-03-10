@@ -67,6 +67,13 @@ impl<C: Config> Circuit<C, NormalInputType> {
             expected_num_output_zeros: self.expected_num_output_zeroes,
         }
     }
+
+    pub fn export_to_expander_flatten(
+        &self,
+    ) -> expander_circuit::Circuit<C::DefaultGKRFieldConfig> {
+        let circuit = self.export_to_expander::<C::DefaultGKRFieldConfig>();
+        circuit.flatten()
+    }
 }
 
 impl<C: Config> Circuit<C, CrossLayerInputType> {
