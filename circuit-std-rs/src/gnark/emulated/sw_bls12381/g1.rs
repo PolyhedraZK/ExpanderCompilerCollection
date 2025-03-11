@@ -138,19 +138,19 @@ impl G1 {
         // compute λ1 = -λ1-1*p.y/(x1-p.x)
         let ypyp = self.curve_f.add(native, &p.y, &p.y);
         let x2xp = self.curve_f.sub(native, &x2, &p.x);
-        let λ2 = self.curve_f.div(native, &ypyp, &x2xp);
-        let λ2 = self.curve_f.add(native, &λ1, &λ2);
-        let λ2 = self.curve_f.neg(native, &λ2);
+        let mut λ2 = self.curve_f.div(native, &ypyp, &x2xp);
+        λ2 = self.curve_f.add(native, &λ1, &λ2);
+        λ2 = self.curve_f.neg(native, &λ2);
 
         // compute x3 =λ2²-p.x-x3
         let λ2λ2 = self.curve_f.mul(native, &λ2, &λ2);
-        let x3 = self.curve_f.sub(native, &λ2λ2, &p.x);
-        let x3 = self.curve_f.sub(native, &x3, &x2);
+        let mut x3 = self.curve_f.sub(native, &λ2λ2, &p.x);
+        x3 = self.curve_f.sub(native, &x3, &x2);
 
         // compute y3 = λ2*(p.x - x3)-p.y
-        let y3 = self.curve_f.sub(native, &p.x, &x3);
-        let y3 = self.curve_f.mul(native, &λ2, &y3);
-        let y3 = self.curve_f.sub(native, &y3, &p.y);
+        let mut y3 = self.curve_f.sub(native, &p.x, &x3);
+        y3 = self.curve_f.mul(native, &λ2, &y3);
+        y3 = self.curve_f.sub(native, &y3, &p.y);
 
         G1Affine { x: x3, y: y3 }
     }
