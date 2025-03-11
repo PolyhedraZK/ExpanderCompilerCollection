@@ -1,0 +1,208 @@
+use crate::utils::{
+    ensure_directory_exists, get_solver, read_from_json_file, write_witness_to_file,
+};
+use ark_std::primitive::u8;
+use circuit_std_rs::sha256::m31::check_sha256_37bytes_256batch_compress;
+use circuit_std_rs::sha256::m31_utils::{big_array_add_reduce, bytes_to_bits};
+use circuit_std_rs::utils::register_hint;
+use expander_compiler::frontend::extra::*;
+use expander_compiler::frontend::*;
+use serde::Deserialize;
+use std::sync::Arc;
+use std::thread;
+
+pub const SHA256LEN: usize = 32;
+pub const HASHTABLESIZE: usize = 256;
+#[derive(Clone, Copy, Debug)]
+pub struct HashTableParams {
+    pub table_size: usize,
+    pub hash_len: usize,
+}
+#[derive(Debug, Deserialize)]
+pub struct HashTableJson {
+    #[serde(rename = "Seed")]
+    pub seed: Vec<u8>,
+    #[serde(rename = "ShuffleRound")]
+    pub shuffle_round: u8,
+    #[serde(rename = "StartIndex")]
+    pub start_index: Vec<u8>,
+    #[serde(rename = "HashOutputs")]
+    pub hash_outputs: Vec<Vec<u8>>,
+}
+#[derive(Debug, Deserialize)]
+pub struct HashTablesJson {
+    pub tables: Vec<HashTableJson>,
+}
+
+declare_circuit!(HASHTABLECircuit {
+    shuffle_round: Variable,
+    start_index: [Variable; 4],
+    seed: [PublicVariable; SHA256LEN],
+    output: [[Variable; SHA256LEN]; HASHTABLESIZE],
+});
+impl HASHTABLECircuit<M31> {
+    pub fn from_entry(&mut self, entry: &HashTableJson) {
+        for i in 0..SHA256LEN {
+            self.seed[i] = M31::from(entry.seed[i] as u32);
+        }
+        self.shuffle_round = M31::from(entry.shuffle_round as u32);
+        for i in 0..4 {
+            self.start_index[i] = M31::from(entry.start_index[i] as u32);
+        }
+        for i in 0..HASHTABLESIZE {
+            for j in 0..SHA256LEN {
+                self.output[i][j] = M31::from(entry.hash_outputs[i][j] as u32);
+            }
+        }
+    }
+    pub fn get_assignments_from_data(hashtable_data: Vec<HashTableJson>) -> Vec<Self> {
+        let mut assignments = vec![];
+        for cur_hashtable_data in &hashtable_data {
+            let mut hash_assignment = HASHTABLECircuit::default();
+            hash_assignment.from_entry(cur_hashtable_data);
+            assignments.push(hash_assignment);
+        }
+        assignments
+    }
+    pub fn get_assignments_from_json(dir: &str) -> Vec<Self> {
+        let file_path = format!("{}/hash_assignment.json", dir);
+        let hashtable_data: Vec<HashTableJson> = read_from_json_file(&file_path).unwrap();
+        HASHTABLECircuit::get_assignments_from_data(hashtable_data)
+    }
+}
+impl GenericDefine<M31Config> for HASHTABLECircuit<Variable> {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
+        let mut seed_bits: Vec<Variable> = vec![];
+        for i in 0..8 {
+            seed_bits.extend_from_slice(&bytes_to_bits(builder, &self.seed[i * 4..(i + 1) * 4]));
+        }
+        let mut indices = vec![];
+        let var0 = builder.constant(0);
+        for i in 0..HASHTABLESIZE {
+            //assume HASHTABLESIZE is less than 2^8
+            let var_i = builder.constant(i as u32);
+            let index =
+                big_array_add_reduce(builder, &self.start_index, &[var_i, var0, var0, var0], 8);
+            indices.push(bytes_to_bits(builder, &index));
+        }
+        let mut round_bits = vec![];
+        round_bits.extend_from_slice(&bytes_to_bits(builder, &[self.shuffle_round]));
+        let mut inputs = vec![];
+        let mut outputs = vec![];
+        for (i, index) in indices.iter().enumerate().take(HASHTABLESIZE) {
+            let mut cur_input = Vec::<Variable>::new();
+            cur_input.extend_from_slice(&seed_bits);
+            cur_input.extend_from_slice(&index[8..]);
+            cur_input.extend_from_slice(&round_bits);
+            cur_input.extend_from_slice(&index[..8]);
+            inputs.push(cur_input);
+            outputs.push(self.output[i].to_vec());
+        }
+        check_sha256_37bytes_256batch_compress(builder, &inputs, &outputs);
+    }
+}
+
+pub fn generate_hash_witnesses(dir: &str) {
+    let circuit_name = &format!("hashtable{}", HASHTABLESIZE);
+
+    //get solver
+    log::debug!("preparing {} solver...", circuit_name);
+    let witnesses_dir = format!("./witnesses/{}", circuit_name);
+    let w_s = get_solver(&witnesses_dir, circuit_name, HASHTABLECircuit::default());
+
+    //get assignments
+    let start_time = std::time::Instant::now();
+    let assignments = HASHTABLECircuit::get_assignments_from_json(dir);
+    let end_time = std::time::Instant::now();
+    log::debug!(
+        "assigned assignments time: {:?}",
+        end_time.duration_since(start_time)
+    );
+    let assignment_chunks: Vec<Vec<HASHTABLECircuit<M31>>> =
+        assignments.chunks(16).map(|x| x.to_vec()).collect();
+
+    //generate witnesses (multi-thread)
+    log::debug!("Start generating witnesses...");
+    let witness_solver = Arc::new(w_s);
+    let handles = assignment_chunks
+        .into_iter()
+        .enumerate()
+        .map(|(i, assignments)| {
+            let witness_solver = Arc::clone(&witness_solver);
+            let witnesses_dir_clone = witnesses_dir.clone();
+            thread::spawn(move || {
+                let mut hint_registry = HintRegistry::<M31>::new();
+                register_hint(&mut hint_registry);
+                let witness = witness_solver
+                    .solve_witnesses_with_hints(&assignments, &mut hint_registry)
+                    .unwrap();
+                write_witness_to_file(
+                    &format!("{}/witness_{}.txt", witnesses_dir_clone, i),
+                    witness,
+                )
+            })
+        })
+        .collect::<Vec<_>>();
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    let end_time = std::time::Instant::now();
+    log::debug!(
+        "Generate {} witness Time: {:?}",
+        circuit_name,
+        end_time.duration_since(start_time)
+    );
+}
+
+pub fn end2end_hashtable_witnesses(
+    w_s: WitnessSolver<M31Config>,
+    hashtable_data: Vec<HashTableJson>,
+) {
+    let circuit_name = &format!("hashtable{}", HASHTABLESIZE);
+
+    let witnesses_dir = format!("./witnesses/{}", circuit_name);
+    ensure_directory_exists(&witnesses_dir);
+
+    //get assignments
+    let start_time = std::time::Instant::now();
+    let assignments = HASHTABLECircuit::get_assignments_from_data(hashtable_data);
+    let end_time = std::time::Instant::now();
+    log::debug!(
+        "assigned assignments time: {:?}",
+        end_time.duration_since(start_time)
+    );
+    let assignment_chunks: Vec<Vec<HASHTABLECircuit<M31>>> =
+        assignments.chunks(16).map(|x| x.to_vec()).collect();
+
+    //generate witnesses (multi-thread)
+    log::debug!("Start generating witnesses...");
+    let witness_solver = Arc::new(w_s);
+    let handles = assignment_chunks
+        .into_iter()
+        .enumerate()
+        .map(|(i, assignments)| {
+            let witness_solver = Arc::clone(&witness_solver);
+            let witnesses_dir_clone = witnesses_dir.clone();
+            thread::spawn(move || {
+                let mut hint_registry = HintRegistry::<M31>::new();
+                register_hint(&mut hint_registry);
+                let witness = witness_solver
+                    .solve_witnesses_with_hints(&assignments, &mut hint_registry)
+                    .unwrap();
+                write_witness_to_file(
+                    &format!("{}/witness_{}.txt", witnesses_dir_clone, i),
+                    witness,
+                )
+            })
+        })
+        .collect::<Vec<_>>();
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    let end_time = std::time::Instant::now();
+    log::debug!(
+        "Generate {} witness Time: {:?}",
+        circuit_name,
+        end_time.duration_since(start_time)
+    );
+}
