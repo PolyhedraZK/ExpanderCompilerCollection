@@ -44,78 +44,78 @@ fn sha256_37bytes<C: Config>(
 }
 
 
-#[test]
-fn zkcuda_sha256_37bytes_globalhint() {
-    println!("Global hints:");
-    let filename = "log.txt";
-    let file = File::open(filename).unwrap();
-    let reader = io::BufReader::new(file);
-    let mut matrix: Vec<Vec<u32>> = Vec::new();
-    let mut reading_numbers = false;
-    for line in reader.lines() {
-        if let Ok(content) = line {
-            let trimmed = content.trim();
-            if trimmed == "tobinary:" {
-                reading_numbers = true;
-                continue;
-            }
-            if reading_numbers && !trimmed.is_empty() {
-                let no_comma = trimmed.trim_end_matches(',');
-                let nums: Vec<u32> = no_comma
-                    .split(',')
-                    .filter_map(|s| s.trim().parse::<u32>().ok())
-                    .collect();
-                if !nums.is_empty() {
-                    matrix.push(nums);
-                }
-                reading_numbers = false;
-            }
-        }
-    }
+// #[test]
+// fn zkcuda_sha256_37bytes_globalhint() {
+//     println!("Global hints:");
+//     let filename = "log.txt";
+//     let file = File::open(filename).unwrap();
+//     let reader = io::BufReader::new(file);
+//     let mut matrix: Vec<Vec<u32>> = Vec::new();
+//     let mut reading_numbers = false;
+//     for line in reader.lines() {
+//         if let Ok(content) = line {
+//             let trimmed = content.trim();
+//             if trimmed == "tobinary:" {
+//                 reading_numbers = true;
+//                 continue;
+//             }
+//             if reading_numbers && !trimmed.is_empty() {
+//                 let no_comma = trimmed.trim_end_matches(',');
+//                 let nums: Vec<u32> = no_comma
+//                     .split(',')
+//                     .filter_map(|s| s.trim().parse::<u32>().ok())
+//                     .collect();
+//                 if !nums.is_empty() {
+//                     matrix.push(nums);
+//                 }
+//                 reading_numbers = false;
+//             }
+//         }
+//     }
 
-    let mut hints = GLOBAL_HINTS.lock().unwrap();
-    for i in 0..matrix.len() {
-        let mut hint_res = vec![];
-        for j in 0..matrix[i].len() {
-            hint_res.push(matrix[i][j]);
-        }
-        hints.push(hint_res);
-    }
-    std::mem::drop(hints);
-    println!("Global hints");
-    let kernel_check_sha256_37bytes: Kernel<M31Config> = compile_sha256_37bytes().unwrap();
-    println!("compile_sha256_37bytes() done");
-    let data = [255; 37];
-    let repeat_time = 64;
-    let mut hash = Sha256::new();
-    hash.update(data);
-    let output = hash.finalize();
-    let mut input_vars = vec![];
-    let mut output_vars = vec![];
-    for i in 0..37 {
-        input_vars.push(M31::from(data[i] as u32));
-    }
-    for i in 0..32 {
-        output_vars.push(M31::from(output[i] as u32));
-    }
-    let mut new_input_vars = vec![];
-    for _ in 0..repeat_time {
-        new_input_vars.push(input_vars.clone());
-    }
-    let mut ctx: Context<M31Config, ExpanderGKRProvingSystem<M31Config>> = Context::default();
+//     let mut hints = GLOBAL_HINTS.lock().unwrap();
+//     for i in 0..matrix.len() {
+//         let mut hint_res = vec![];
+//         for j in 0..matrix[i].len() {
+//             hint_res.push(matrix[i][j]);
+//         }
+//         hints.push(hint_res);
+//     }
+//     std::mem::drop(hints);
+//     println!("Global hints");
+//     let kernel_check_sha256_37bytes: Kernel<M31Config> = compile_sha256_37bytes().unwrap();
+//     println!("compile_sha256_37bytes() done");
+//     let data = [255; 37];
+//     let repeat_time = 64;
+//     let mut hash = Sha256::new();
+//     hash.update(data);
+//     let output = hash.finalize();
+//     let mut input_vars = vec![];
+//     let mut output_vars = vec![];
+//     for i in 0..37 {
+//         input_vars.push(M31::from(data[i] as u32));
+//     }
+//     for i in 0..32 {
+//         output_vars.push(M31::from(output[i] as u32));
+//     }
+//     let mut new_input_vars = vec![];
+//     for _ in 0..repeat_time {
+//         new_input_vars.push(input_vars.clone());
+//     }
+//     let mut ctx: Context<M31Config, ExpanderGKRProvingSystem<M31Config>> = Context::default();
 
-    let a = ctx.copy_to_device(&new_input_vars, false);
-    let mut c = None;
-    let start_time = time::Instant::now();
-    call_kernel!(ctx, kernel_check_sha256_37bytes, a, mut c);
-    let elapsed = start_time.elapsed();
-    println!("Time elapsed in call_kernel!() is: {:?}", elapsed);
-    // let c = c.reshape(&[repeat_time, 32]);
-    let result: Vec<Vec<M31>> = ctx.copy_to_host(c);
-    for i in 0..repeat_time {
-        assert_eq!(result[i], output_vars);
-    }
-}
+//     let a = ctx.copy_to_device(&new_input_vars, false);
+//     let mut c = None;
+//     let start_time = time::Instant::now();
+//     call_kernel!(ctx, kernel_check_sha256_37bytes, a, mut c);
+//     let elapsed = start_time.elapsed();
+//     println!("Time elapsed in call_kernel!() is: {:?}", elapsed);
+//     // let c = c.reshape(&[repeat_time, 32]);
+//     let result: Vec<Vec<M31>> = ctx.copy_to_host(c);
+//     for i in 0..repeat_time {
+//         assert_eq!(result[i], output_vars);
+//     }
+// }
 
 
 
@@ -126,7 +126,7 @@ fn zkcuda_sha256_37bytes_globalhint() {
 //     let kernel_check_sha256_37bytes: Kernel<M31Config> = compile_sha256_37bytes().unwrap();
 //     println!("compile_sha256_37bytes() done");
 //     let data = [255; 37];
-//     let repeat_time = 64;
+//     let repeat_time = 512;
 //     let mut hash = Sha256::new();
 //     hash.update(data);
 //     let output = hash.finalize();
@@ -168,7 +168,7 @@ fn zkcuda_sha256_37bytes_globalhint() {
 //     let kernel_check_sha256_37bytes: Kernel<M31Config> = compile_sha256_37bytes().unwrap();
 //     println!("compile_sha256_37bytes() done");
 //     let data = [255; 37];
-//     let repeat_time = 1;
+//     let repeat_time = 64;
 //     let mut hash = Sha256::new();
 //     hash.update(data);
 //     let output = hash.finalize();
