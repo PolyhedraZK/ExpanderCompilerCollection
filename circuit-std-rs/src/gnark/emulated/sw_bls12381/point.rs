@@ -4,6 +4,7 @@ use crate::gnark::field::GField;
 use expander_compiler::frontend::{Config, RootAPI};
 use num_bigint::BigInt;
 
+#[derive(Default, Clone)]
 pub struct AffinePoint<Base: FieldParams> {
     pub x: Element<Base>,
     pub y: Element<Base>,
@@ -82,5 +83,17 @@ impl<Base: FieldParams, Scalars: FieldParams> Curve<Base, Scalars> {
         }
 
         self.base_api.assert_is_equal(builder, &left, &right);
+    }
+
+    // Neg returns an inverse of p. It doesn't modify p.
+    pub fn neg<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        p: &AffinePoint<Base>,
+    ) -> AffinePoint<Base> {
+        AffinePoint {
+            x: p.x.clone(),
+            y: self.base_api.neg(native, &p.y),
+        }
     }
 }
