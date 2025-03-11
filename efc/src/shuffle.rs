@@ -1,4 +1,4 @@
-use crate::bls::check_pubkey_key_bls;
+use crate::bls::{aggregate_attestation_public_key_flatten, check_pubkey_key_bls};
 use crate::bls_verifier::G1Json;
 use crate::utils::{get_solver, read_from_json_file, write_witness_to_file};
 use crate::validator::{ValidatorPlain, ValidatorSSZ};
@@ -240,17 +240,6 @@ impl ShuffleCircuit<M31> {
             let withdrawable_epoch = validator.withdrawable_epoch.to_le_bytes();
             for (j, withdrawable_epoch_byte) in withdrawable_epoch.iter().enumerate() {
                 self.withdrawable_epoch[i][j] = M31::from(*withdrawable_epoch_byte as u32);
-            }
-        }
-    }
-    pub fn from_pubkey_bls(&mut self, committee_indices: Vec<u32>, pubkey_bls: Vec<Vec<String>>) {
-        for i in 0..VALIDATOR_CHUNK_SIZE {
-            let pubkey = &pubkey_bls[committee_indices[i] as usize];
-            let pubkey_x = STANDARD.decode(&pubkey[0]).unwrap();
-            let pubkey_y = STANDARD.decode(&pubkey[1]).unwrap();
-            for k in 0..48 {
-                self.pubkeys_bls[i][0][k] = M31::from(pubkey_x[k] as u32);
-                self.pubkeys_bls[i][1][k] = M31::from(pubkey_y[k] as u32);
             }
         }
     }
@@ -525,93 +514,6 @@ pub fn flip_with_hash_bits<C: Config, B: RootAPI<C>>(
         ));
     }
     (res, position_diffs)
-}
-
-pub fn aggregate_attestation_public_key_flatten<C: Config, B: RootAPI<C>>(
-    builder: &mut B,
-    g1: &mut G1,
-    pub_key: &[G1Affine],
-    validator_agg_bits: &[Variable],
-    agg_pubkey: &mut G1Affine,
-) {
-    let one_var = builder.constant(1);
-    let mut has_first_flag = builder.constant(0);
-    let mut copy_aggregated_pubkey = pub_key[0].clone();
-    has_first_flag = simple_select(builder, validator_agg_bits[0], one_var, has_first_flag);
-    let mut copy_has_first_flag = builder.new_hint("myhint.copyvarshint", &[has_first_flag], 1)[0];
-    for i in 1..validator_agg_bits.len() {
-        let mut aggregated_pubkey = pub_key[0].clone();
-        let tmp_agg_pubkey = g1.add(builder, &copy_aggregated_pubkey, &pub_key[i]);
-        aggregated_pubkey.x = g1.curve_f.select(
-            builder,
-            validator_agg_bits[i],
-            &tmp_agg_pubkey.x,
-            &copy_aggregated_pubkey.x,
-        );
-        aggregated_pubkey.y = g1.curve_f.select(
-            builder,
-            validator_agg_bits[i],
-            &tmp_agg_pubkey.y,
-            &copy_aggregated_pubkey.y,
-        );
-        let no_first_flag = builder.sub(1, copy_has_first_flag);
-        let is_first = builder.and(validator_agg_bits[i], no_first_flag);
-        aggregated_pubkey.x =
-            g1.curve_f
-                .select(builder, is_first, &pub_key[i].x, &aggregated_pubkey.x);
-        aggregated_pubkey.y =
-            g1.curve_f
-                .select(builder, is_first, &pub_key[i].y, &aggregated_pubkey.y);
-        has_first_flag =
-            simple_select(builder, validator_agg_bits[i], one_var, copy_has_first_flag);
-        copy_aggregated_pubkey = g1.copy_g1(builder, &aggregated_pubkey);
-        copy_has_first_flag = builder.new_hint("myhint.copyvarshint", &[has_first_flag], 1)[0];
-    }
-    g1.curve_f
-        .assert_is_equal(builder, &copy_aggregated_pubkey.x, &agg_pubkey.x);
-    g1.curve_f
-        .assert_is_equal(builder, &copy_aggregated_pubkey.y, &agg_pubkey.y);
-}
-
-pub fn aggregate_attestation_public_key_unflatten<C: Config, B: RootAPI<C>>(
-    builder: &mut B,
-    g1: &mut G1,
-    pub_key: &[G1Affine],
-    validator_agg_bits: &[Variable],
-    agg_pubkey: &mut G1Affine,
-) {
-    let one_var = builder.constant(1);
-    let mut has_first_flag = builder.constant(0);
-    let mut aggregated_pubkey = pub_key[0].clone();
-    has_first_flag = simple_select(builder, validator_agg_bits[0], one_var, has_first_flag);
-    for i in 1..validator_agg_bits.len() {
-        let tmp_agg_pubkey = g1.add(builder, &aggregated_pubkey, &pub_key[i]);
-        aggregated_pubkey.x = g1.curve_f.select(
-            builder,
-            validator_agg_bits[i],
-            &tmp_agg_pubkey.x,
-            &aggregated_pubkey.x,
-        );
-        aggregated_pubkey.y = g1.curve_f.select(
-            builder,
-            validator_agg_bits[i],
-            &tmp_agg_pubkey.y,
-            &aggregated_pubkey.y,
-        );
-        let no_first_flag = builder.sub(1, has_first_flag);
-        let is_first = builder.and(validator_agg_bits[i], no_first_flag);
-        aggregated_pubkey.x =
-            g1.curve_f
-                .select(builder, is_first, &pub_key[i].x, &aggregated_pubkey.x);
-        aggregated_pubkey.y =
-            g1.curve_f
-                .select(builder, is_first, &pub_key[i].y, &aggregated_pubkey.y);
-        has_first_flag = simple_select(builder, validator_agg_bits[i], one_var, has_first_flag);
-    }
-    g1.curve_f
-        .assert_is_equal(builder, &aggregated_pubkey.x, &agg_pubkey.x);
-    g1.curve_f
-        .assert_is_equal(builder, &aggregated_pubkey.y, &agg_pubkey.y);
 }
 pub fn generate_shuffle_witnesses(dir: &str) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {

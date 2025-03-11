@@ -1,4 +1,4 @@
-use circuit_std_rs::gnark::emulated::sw_bls12381::g1::G1Affine;
+use circuit_std_rs::gnark::emulated::sw_bls12381::g1::{G1Affine, G1};
 use circuit_std_rs::sha256::m31_utils::{
     big_is_zero, big_less_than, bigint_to_m31_array, to_binary,
 };
@@ -195,4 +195,93 @@ pub fn decompose_vars<C: Config, B: RootAPI<C>>(
         scalar_array.extend(to_binary(api, *scalar_byte, n_bit));
     }
     scalar_array
+}
+
+
+
+pub fn aggregate_attestation_public_key_flatten<C: Config, B: RootAPI<C>>(
+    builder: &mut B,
+    g1: &mut G1,
+    pub_key: &[G1Affine],
+    validator_agg_bits: &[Variable],
+    agg_pubkey: &mut G1Affine,
+) {
+    let one_var = builder.constant(1);
+    let mut has_first_flag = builder.constant(0);
+    let mut copy_aggregated_pubkey = pub_key[0].clone();
+    has_first_flag = simple_select(builder, validator_agg_bits[0], one_var, has_first_flag);
+    let mut copy_has_first_flag = builder.new_hint("myhint.copyvarshint", &[has_first_flag], 1)[0];
+    for i in 1..validator_agg_bits.len() {
+        let mut aggregated_pubkey = pub_key[0].clone();
+        let tmp_agg_pubkey = g1.add(builder, &copy_aggregated_pubkey, &pub_key[i]);
+        aggregated_pubkey.x = g1.curve_f.select(
+            builder,
+            validator_agg_bits[i],
+            &tmp_agg_pubkey.x,
+            &copy_aggregated_pubkey.x,
+        );
+        aggregated_pubkey.y = g1.curve_f.select(
+            builder,
+            validator_agg_bits[i],
+            &tmp_agg_pubkey.y,
+            &copy_aggregated_pubkey.y,
+        );
+        let no_first_flag = builder.sub(1, copy_has_first_flag);
+        let is_first = builder.and(validator_agg_bits[i], no_first_flag);
+        aggregated_pubkey.x =
+            g1.curve_f
+                .select(builder, is_first, &pub_key[i].x, &aggregated_pubkey.x);
+        aggregated_pubkey.y =
+            g1.curve_f
+                .select(builder, is_first, &pub_key[i].y, &aggregated_pubkey.y);
+        has_first_flag =
+            simple_select(builder, validator_agg_bits[i], one_var, copy_has_first_flag);
+        copy_aggregated_pubkey = g1.copy_g1(builder, &aggregated_pubkey);
+        copy_has_first_flag = builder.new_hint("myhint.copyvarshint", &[has_first_flag], 1)[0];
+    }
+    g1.curve_f
+        .assert_is_equal(builder, &copy_aggregated_pubkey.x, &agg_pubkey.x);
+    g1.curve_f
+        .assert_is_equal(builder, &copy_aggregated_pubkey.y, &agg_pubkey.y);
+}
+
+pub fn aggregate_attestation_public_key_unflatten<C: Config, B: RootAPI<C>>(
+    builder: &mut B,
+    g1: &mut G1,
+    pub_key: &[G1Affine],
+    validator_agg_bits: &[Variable],
+    agg_pubkey: &mut G1Affine,
+) {
+    let one_var = builder.constant(1);
+    let mut has_first_flag = builder.constant(0);
+    let mut aggregated_pubkey = pub_key[0].clone();
+    has_first_flag = simple_select(builder, validator_agg_bits[0], one_var, has_first_flag);
+    for i in 1..validator_agg_bits.len() {
+        let tmp_agg_pubkey = g1.add(builder, &aggregated_pubkey, &pub_key[i]);
+        aggregated_pubkey.x = g1.curve_f.select(
+            builder,
+            validator_agg_bits[i],
+            &tmp_agg_pubkey.x,
+            &aggregated_pubkey.x,
+        );
+        aggregated_pubkey.y = g1.curve_f.select(
+            builder,
+            validator_agg_bits[i],
+            &tmp_agg_pubkey.y,
+            &aggregated_pubkey.y,
+        );
+        let no_first_flag = builder.sub(1, has_first_flag);
+        let is_first = builder.and(validator_agg_bits[i], no_first_flag);
+        aggregated_pubkey.x =
+            g1.curve_f
+                .select(builder, is_first, &pub_key[i].x, &aggregated_pubkey.x);
+        aggregated_pubkey.y =
+            g1.curve_f
+                .select(builder, is_first, &pub_key[i].y, &aggregated_pubkey.y);
+        has_first_flag = simple_select(builder, validator_agg_bits[i], one_var, has_first_flag);
+    }
+    g1.curve_f
+        .assert_is_equal(builder, &aggregated_pubkey.x, &agg_pubkey.x);
+    g1.curve_f
+        .assert_is_equal(builder, &aggregated_pubkey.y, &agg_pubkey.y);
 }
