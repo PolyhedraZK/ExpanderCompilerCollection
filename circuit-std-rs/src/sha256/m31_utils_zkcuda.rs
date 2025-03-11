@@ -421,20 +421,20 @@ pub fn from_binary<C: Config>(api: &mut API<C>, bits: &[Variable]) -> Variable {
     res
 }
 
-// pub fn to_binary_hint(x: &[M31], y: &mut [M31]) -> Result<(), Error> {
-//     let t = x[0].to_u256();
-//     for (i, k) in y.iter_mut().enumerate() {
-//         *k = M31::from_u256(t >> i as u32 & 1);
-//     }
-//     Ok(())
-// }
-pub fn to_binary_hint<C: Config>(x: &[C::CircuitField], y: &mut [C::CircuitField]) -> Result<(), Error> {
+pub fn to_binary_hint(x: &[M31], y: &mut [M31]) -> Result<(), Error> {
     let t = x[0].to_u256();
     for (i, k) in y.iter_mut().enumerate() {
-        *k = C::CircuitField::from_u256(t >> i as u32 & 1);
+        *k = M31::from_u256(t >> i as u32 & 1);
     }
     Ok(())
 }
+// pub fn to_binary_hint<C: Config>(x: &[C::CircuitField], y: &mut [C::CircuitField]) -> Result<(), Error> {
+//     let t = x[0].to_u256();
+//     for (i, k) in y.iter_mut().enumerate() {
+//         *k = C::CircuitField::from_u256(t >> i as u32 & 1);
+//     }
+//     Ok(())
+// }
 
 pub fn big_is_zero<C: Config>(api: &mut API<C>, k: usize, in_: &[Variable]) -> Variable {
     let mut total = api.constant(k as u32);

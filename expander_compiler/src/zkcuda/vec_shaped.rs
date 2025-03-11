@@ -64,6 +64,7 @@ pub fn flatten_shaped<T: FieldRaw, V: VecShaped<T>>(v: &V) -> (Vec<T>, Vec<usize
 
 pub fn unflatten_shaped<T: FieldRaw, V: VecShaped<T> + Default>(mut s: &[T], shape: &[usize]) -> V {
     let mut v = V::default();
+    println!("shape unflatten {:?}", shape);
     s = v.unflatten_shaped(s, shape);
     if !s.is_empty() {
         panic!("Shape mismatch in unflatten");

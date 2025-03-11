@@ -183,6 +183,8 @@ fn check_reshape_compat(shape: &[usize], new_shape: &[usize]) {
     let total = shape.iter().product::<usize>();
     let new_total = new_shape.iter().product::<usize>();
     if total != new_total {
+        println!("{:?} {:?}", shape, new_shape);
+        println!("{} {}", total, new_total);
         panic!("Total number of elements must be the same");
     }
     let mut i = 0;
