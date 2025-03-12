@@ -15,6 +15,8 @@ gkr.workspace = true
 arith.workspace = true
 gf2.workspace = true
 mersenne31.workspace = true
+serdes.workspace = true
+
 sha2 = "0.10.8"
 big-int = "7.0.0"
 num-bigint = "0.4.6"

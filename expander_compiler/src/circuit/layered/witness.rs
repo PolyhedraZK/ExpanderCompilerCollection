@@ -285,7 +285,7 @@ impl<C: Config> ExpSerde for Witness<C> {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "invalid modulus",
-            ));
+            ))?;
         }
         let mut values = Vec::with_capacity(
             num_witnesses * (num_inputs_per_witness + num_public_inputs_per_witness),

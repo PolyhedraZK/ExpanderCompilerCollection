@@ -1,12 +1,10 @@
-use expander_compiler::circuit::layered::NormalInputType;
 use libc::{c_ulong, malloc};
 use std::ptr;
 use std::slice;
 
-use expander_compiler::{
-    circuit::{config, ir},
-    utils::serde::Serde,
-};
+use expander_compiler::circuit::layered::NormalInputType;
+use expander_compiler::circuit::{config, ir};
+use serdes::ExpSerde;
 
 use super::*;
 

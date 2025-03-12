@@ -39,7 +39,7 @@ impl<C: Config> ExpSerde for Coef<C> {
             _ => Err(IoError::new(
                 std::io::ErrorKind::InvalidData,
                 "invalid coef type",
-            )),
+            ))?,
         }
     }
 }
@@ -238,14 +238,14 @@ impl<C: Config, I: InputType> ExpSerde for Circuit<C, I> {
             return Err(IoError::new(
                 std::io::ErrorKind::InvalidData,
                 "invalid magic number",
-            ));
+            ))?;
         }
         let modulus = ethnum::U256::deserialize_from(&mut reader)?;
         if modulus != C::CircuitField::MODULUS {
             return Err(IoError::new(
                 std::io::ErrorKind::InvalidData,
                 "invalid modulus",
-            ));
+            ))?;
         }
         let num_public_inputs = usize::deserialize_from(&mut reader)?;
         let num_actual_outputs = usize::deserialize_from(&mut reader)?;

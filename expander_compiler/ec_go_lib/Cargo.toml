@@ -15,5 +15,8 @@ expander_circuit.workspace = true
 gkr.workspace = true
 arith.workspace = true
 expander_transcript.workspace = true
+serdes.workspace = true
+
 expander_compiler = {path = "../" }
+
 libc = "0.2.155"

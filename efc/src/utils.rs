@@ -15,7 +15,7 @@ pub fn run_circuit<C: Config>(compile_result: &CompileResult<C>, witness: Witnes
     let mut expander_circuit = compile_result
         .layered_circuit
         .export_to_expander::<C::DefaultGKRFieldConfig>()
-        .flatten();
+        .flatten::<C::DefaultGKRConfig>();
     let config = expander_config::Config::<C::DefaultGKRConfig>::new(
         expander_config::GKRScheme::Vanilla,
         mpi_config::MPIConfig::new(),

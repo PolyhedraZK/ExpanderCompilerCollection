@@ -41,7 +41,6 @@ where
     Irc::Instruction: ExpSerde,
     Irc::Constraint: ExpSerde,
 {
-
     const SERIALIZED_SIZE: usize = unimplemented!();
 
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
@@ -59,7 +58,7 @@ where
             return Err(IoError::new(
                 std::io::ErrorKind::InvalidData,
                 "config id mismatch",
-            ));
+            ))?;
         }
         let num_public_inputs = usize::deserialize_from(&mut reader)?;
         let expected_num_output_zeroes = usize::deserialize_from(&mut reader)?;

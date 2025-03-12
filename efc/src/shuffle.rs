@@ -14,6 +14,7 @@ use expander_compiler::frontend::extra::*;
 use expander_compiler::frontend::*;
 use serde::de::{Deserializer, SeqAccess, Visitor};
 use serde::Deserialize;
+use serdes::ExpSerde;
 use std::fmt;
 use std::sync::Arc;
 use std::sync::Mutex;

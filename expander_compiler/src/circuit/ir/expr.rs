@@ -1,6 +1,6 @@
 use std::{
     fmt,
-    io::{Error as IoError, Read, Write},
+    io::{Read, Write},
     ops::{Deref, DerefMut},
 };
 
@@ -469,6 +469,8 @@ impl<C: Config> fmt::Display for LinComb<C> {
 }
 
 impl<C: Config> ExpSerde for LinComb<C> {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         self.terms.len().serialize_into(&mut writer)?;
         for term in self.terms.iter() {
@@ -480,6 +482,7 @@ impl<C: Config> ExpSerde for LinComb<C> {
         self.constant.serialize_into(&mut writer)?;
         Ok(())
     }
+
     fn deserialize_from<R: Read>(mut reader: R) -> SerdeResult<Self> {
         let len = usize::deserialize_from(&mut reader)?;
         let mut terms = Vec::with_capacity(len);

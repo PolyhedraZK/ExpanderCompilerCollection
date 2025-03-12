@@ -78,7 +78,7 @@ impl<C: Config> ExpSerde for Instruction<C> {
                 return Err(IoError::new(
                     std::io::ErrorKind::InvalidData,
                     "invalid InstructionType",
-                ))
+                ))?
             }
         })
     }

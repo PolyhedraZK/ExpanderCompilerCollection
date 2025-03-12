@@ -1,9 +1,10 @@
-use expander_compiler::circuit::layered;
 use libc::{c_uchar, c_ulong, malloc};
 use std::ptr;
 use std::slice;
 
-use expander_compiler::{circuit::config, utils::serde::Serde};
+use expander_compiler::circuit::config;
+use expander_compiler::circuit::layered;
+use serdes::ExpSerde;
 
 use super::*;
 

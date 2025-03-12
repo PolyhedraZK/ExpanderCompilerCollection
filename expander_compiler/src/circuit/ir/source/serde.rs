@@ -109,7 +109,7 @@ impl<C: Config> ExpSerde for Instruction<C> {
                         return Err(IoError::new(
                             std::io::ErrorKind::InvalidData,
                             "invalid BoolBinOpType",
-                        ))
+                        ))?
                     }
                 },
             },
@@ -154,7 +154,7 @@ impl<C: Config> ExpSerde for Instruction<C> {
                         return Err(IoError::new(
                             std::io::ErrorKind::InvalidData,
                             "invalid UnconstrainedBinOpType",
-                        ))
+                        ))?
                     }
                 },
             },
@@ -171,7 +171,7 @@ impl<C: Config> ExpSerde for Instruction<C> {
                 return Err(IoError::new(
                     std::io::ErrorKind::InvalidData,
                     "invalid InstructionType",
-                ))
+                ))?
             }
         })
     }
@@ -196,7 +196,7 @@ impl ExpSerde for Constraint {
                     return Err(IoError::new(
                         std::io::ErrorKind::InvalidData,
                         "invalid ConstraintType",
-                    ))
+                    ))?
                 }
             },
             var: usize::deserialize_from(&mut reader)?,
