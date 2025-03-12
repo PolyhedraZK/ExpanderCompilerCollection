@@ -19,14 +19,17 @@ tiny-keccak = { version = "2.0", features = ["keccak"] }
 halo2curves = { git = "https://github.com/PolyhedraZK/halo2curves", default-features = false, features = [
     "bits",
 ] }
-arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-expander_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "config" }
-expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "circuit" }
-gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "transcript" }
-crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "main"}
 
+
+# todo: change back to main branch
+arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/circuit_serde" }
+mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/circuit_serde" }
+gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/circuit_serde" }
+expander_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/circuit_serde", package = "config" }
+expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/circuit_serde", package = "circuit" }
+gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/circuit_serde" }
+gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/circuit_serde" }
+mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/circuit_serde" }
+expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/circuit_serde", package = "transcript" }
+crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/circuit_serde"}
+serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/circuit_serde"}

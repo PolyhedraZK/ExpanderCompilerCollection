@@ -1,11 +1,13 @@
 use std::io::{Error as IoError, Read, Write};
 
-use crate::{field::FieldModulus, utils::serde::Serde};
+use serdes::{ExpSerde, SerdeResult};
 
 use super::*;
 
-impl<C: Config> Serde for Coef<C> {
-    fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
+impl<C: Config> ExpSerde for Coef<C> {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+
+    fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         match self {
             Coef::Constant(c) => {
                 1u8.serialize_into(&mut writer)?;
@@ -21,7 +23,8 @@ impl<C: Config> Serde for Coef<C> {
         };
         Ok(())
     }
-    fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
+
+    fn deserialize_from<R: Read>(mut reader: R) -> SerdeResult<Self> {
         let typ = u8::deserialize_from(&mut reader)?;
         match typ {
             1 => {
@@ -41,54 +44,67 @@ impl<C: Config> Serde for Coef<C> {
     }
 }
 
-impl Serde for CrossLayerInput {
-    fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
+impl ExpSerde for CrossLayerInput {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+
+    fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         self.layer.serialize_into(&mut writer)?;
         self.offset.serialize_into(&mut writer)?;
         Ok(())
     }
-    fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
+
+    fn deserialize_from<R: Read>(mut reader: R) -> SerdeResult<Self> {
         let layer = usize::deserialize_from(&mut reader)?;
         let offset = usize::deserialize_from(&mut reader)?;
         Ok(CrossLayerInput { layer, offset })
     }
 }
 
-impl Serde for NormalInput {
-    fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
+impl ExpSerde for NormalInput {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+
+    fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         self.offset.serialize_into(&mut writer)?;
         Ok(())
     }
-    fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
+
+    fn deserialize_from<R: Read>(mut reader: R) -> SerdeResult<Self> {
         let offset = usize::deserialize_from(&mut reader)?;
         Ok(NormalInput { offset })
     }
 }
 
-impl Serde for CrossLayerInputUsize {
-    fn serialize_into<W: Write>(&self, writer: W) -> Result<(), IoError> {
+impl ExpSerde for CrossLayerInputUsize {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+
+    fn serialize_into<W: Write>(&self, writer: W) -> SerdeResult<()> {
         self.v.serialize_into(writer)
     }
-    fn deserialize_from<R: Read>(reader: R) -> Result<Self, IoError> {
+
+    fn deserialize_from<R: Read>(reader: R) -> SerdeResult<Self> {
         Ok(CrossLayerInputUsize {
             v: Vec::<usize>::deserialize_from(reader)?,
         })
     }
 }
 
-impl Serde for NormalInputUsize {
-    fn serialize_into<W: Write>(&self, writer: W) -> Result<(), IoError> {
+impl ExpSerde for NormalInputUsize {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+
+    fn serialize_into<W: Write>(&self, writer: W) -> SerdeResult<()> {
         self.v.serialize_into(writer)
     }
-    fn deserialize_from<R: Read>(reader: R) -> Result<Self, IoError> {
+    fn deserialize_from<R: Read>(reader: R) -> SerdeResult<Self> {
         Ok(NormalInputUsize {
             v: usize::deserialize_from(reader)?,
         })
     }
 }
 
-impl<C: Config, I: InputType, const INPUT_NUM: usize> Serde for Gate<C, I, INPUT_NUM> {
-    fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
+impl<C: Config, I: InputType, const INPUT_NUM: usize> ExpSerde for Gate<C, I, INPUT_NUM> {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+
+    fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         for input in &self.inputs {
             input.serialize_into(&mut writer)?;
         }
@@ -96,7 +112,7 @@ impl<C: Config, I: InputType, const INPUT_NUM: usize> Serde for Gate<C, I, INPUT
         self.coef.serialize_into(&mut writer)?;
         Ok(())
     }
-    fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
+    fn deserialize_from<R: Read>(mut reader: R) -> SerdeResult<Self> {
         let mut inputs = [I::Input::default(); INPUT_NUM];
         for input in inputs.iter_mut() {
             *input = I::Input::deserialize_from(&mut reader)?;
@@ -111,13 +127,15 @@ impl<C: Config, I: InputType, const INPUT_NUM: usize> Serde for Gate<C, I, INPUT
     }
 }
 
-impl<I: InputType> Serde for Allocation<I> {
-    fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
+impl<I: InputType> ExpSerde for Allocation<I> {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+
+    fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         self.input_offset.serialize_into(&mut writer)?;
         self.output_offset.serialize_into(&mut writer)?;
         Ok(())
     }
-    fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
+    fn deserialize_from<R: Read>(mut reader: R) -> SerdeResult<Self> {
         let input_offset = I::InputUsize::deserialize_from(&mut reader)?;
         let output_offset = usize::deserialize_from(&mut reader)?;
         Ok(Allocation {
@@ -127,28 +145,30 @@ impl<I: InputType> Serde for Allocation<I> {
     }
 }
 
-impl<I: InputType> Serde for ChildSpec<I> {
-    fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
-        self.0.serialize_into(&mut writer)?;
-        self.1.serialize_into(&mut writer)?;
-        Ok(())
-    }
-    fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
-        let sub_circuit_id = usize::deserialize_from(&mut reader)?;
-        let allocs = Vec::<Allocation<I>>::deserialize_from(&mut reader)?;
-        Ok((sub_circuit_id, allocs))
-    }
-}
+// impl ExpSerde for ChildSpec<CrossLayerInput> {
+//     fn serialize_into<W: Write>(&self, mut writer: W) ->  SerdeResult<()> {
+//         self.0.serialize_into(&mut writer)?;
+//         self.1.serialize_into(&mut writer)?;
+//         Ok(())
+//     }
+//     fn deserialize_from<R: Read>(mut reader: R) -> SerdeResult<Self> {
+//         let sub_circuit_id = usize::deserialize_from(&mut reader)?;
+//         let allocs = Vec::<Allocation<I>>::deserialize_from(&mut reader)?;
+//         Ok((sub_circuit_id, allocs))
+//     }
+// }
 
-impl<C: Config, I: InputType> Serde for GateCustom<C, I> {
-    fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
+impl<C: Config, I: InputType> ExpSerde for GateCustom<C, I> {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+
+    fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         self.gate_type.serialize_into(&mut writer)?;
         self.inputs.serialize_into(&mut writer)?;
         self.output.serialize_into(&mut writer)?;
         self.coef.serialize_into(&mut writer)?;
         Ok(())
     }
-    fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
+    fn deserialize_from<R: Read>(mut reader: R) -> SerdeResult<Self> {
         let gate_type = usize::deserialize_from(&mut reader)?;
         let inputs = Vec::<I::Input>::deserialize_from(&mut reader)?;
         let output = usize::deserialize_from(&mut reader)?;
@@ -162,8 +182,10 @@ impl<C: Config, I: InputType> Serde for GateCustom<C, I> {
     }
 }
 
-impl<C: Config, I: InputType> Serde for Segment<C, I> {
-    fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
+impl<C: Config, I: InputType> ExpSerde for Segment<C, I> {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+
+    fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         self.num_inputs.serialize_into(&mut writer)?;
         self.num_outputs.serialize_into(&mut writer)?;
         self.child_segs.serialize_into(&mut writer)?;
@@ -173,7 +195,8 @@ impl<C: Config, I: InputType> Serde for Segment<C, I> {
         self.gate_customs.serialize_into(&mut writer)?;
         Ok(())
     }
-    fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
+
+    fn deserialize_from<R: Read>(mut reader: R) -> SerdeResult<Self> {
         let num_inputs = I::InputUsize::deserialize_from(&mut reader)?;
         let num_outputs = usize::deserialize_from(&mut reader)?;
         let child_segs = Vec::<ChildSpec<I>>::deserialize_from(&mut reader)?;
@@ -195,8 +218,10 @@ impl<C: Config, I: InputType> Serde for Segment<C, I> {
 
 const MAGIC: usize = 3914834606642317635;
 
-impl<C: Config, I: InputType> Serde for Circuit<C, I> {
-    fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
+impl<C: Config, I: InputType> ExpSerde for Circuit<C, I> {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+
+    fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         MAGIC.serialize_into(&mut writer)?;
         C::CircuitField::MODULUS.serialize_into(&mut writer)?;
         self.num_public_inputs.serialize_into(&mut writer)?;
@@ -207,7 +232,7 @@ impl<C: Config, I: InputType> Serde for Circuit<C, I> {
         self.layer_ids.serialize_into(&mut writer)?;
         Ok(())
     }
-    fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
+    fn deserialize_from<R: Read>(mut reader: R) -> SerdeResult<Self> {
         let magic = usize::deserialize_from(&mut reader)?;
         if magic != MAGIC {
             return Err(IoError::new(

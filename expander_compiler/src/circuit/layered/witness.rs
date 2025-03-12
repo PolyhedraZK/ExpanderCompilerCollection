@@ -2,13 +2,10 @@ use std::any::{Any, TypeId};
 use std::mem;
 
 use arith::SimdField;
+use serdes::SerdeResult;
 
 use super::*;
-use crate::{
-    circuit::config::Config,
-    field::{Field, FieldModulus},
-    utils::serde::Serde,
-};
+use crate::{circuit::config::Config, field::Field};
 
 #[derive(Clone, Debug)]
 pub enum WitnessValues<C: Config> {
@@ -276,8 +273,10 @@ impl<C: Config> Witness<C> {
     }
 }
 
-impl<C: Config> Serde for Witness<C> {
-    fn deserialize_from<R: std::io::Read>(mut reader: R) -> Result<Self, std::io::Error> {
+impl<C: Config> ExpSerde for Witness<C> {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+
+    fn deserialize_from<R: std::io::Read>(mut reader: R) -> SerdeResult<Self> {
         let num_witnesses = usize::deserialize_from(&mut reader)?;
         let num_inputs_per_witness = usize::deserialize_from(&mut reader)?;
         let num_public_inputs_per_witness = usize::deserialize_from(&mut reader)?;
@@ -305,7 +304,8 @@ impl<C: Config> Serde for Witness<C> {
         }
         Ok(res)
     }
-    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> Result<(), std::io::Error> {
+
+    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> SerdeResult<()> {
         self.num_witnesses.serialize_into(&mut writer)?;
         self.num_inputs_per_witness.serialize_into(&mut writer)?;
         self.num_public_inputs_per_witness
