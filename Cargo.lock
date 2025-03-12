@@ -39,12 +39,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "allocator-api2"
-version = "0.2.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
-
-[[package]]
 name = "android-tzdata"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -118,9 +112,9 @@ dependencies = [
 [[package]]
 name = "arith"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#9e99c1cb6b72ff06a95277872833c628170eb0dc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#f0e1b00d8e8eeaf02dcd37390dda5259c3601780"
 dependencies = [
- "ark-std 0.4.0",
+ "ark-std",
  "cfg-if",
  "criterion",
  "ethnum",
@@ -139,22 +133,10 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c775f0d12169cba7aae4caeb547bb6a50781c7449a8aa53793827c9ec4abf488"
 dependencies = [
- "ark-ec 0.4.2",
- "ark-ff 0.4.2",
- "ark-serialize 0.4.2",
- "ark-std 0.4.0",
-]
-
-[[package]]
-name = "ark-bls12-381"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3df4dcc01ff89867cd86b0da835f23c3f02738353aaee7dde7495af71363b8d5"
-dependencies = [
- "ark-ec 0.5.0",
- "ark-ff 0.5.0",
- "ark-serialize 0.5.0",
- "ark-std 0.5.0",
+ "ark-ec",
+ "ark-ff",
+ "ark-serialize",
+ "ark-std",
 ]
 
 [[package]]
@@ -163,34 +145,13 @@ version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "defd9a439d56ac24968cca0571f598a61bc8c55f71d50a89cda591cb750670ba"
 dependencies = [
- "ark-ff 0.4.2",
- "ark-poly 0.4.2",
- "ark-serialize 0.4.2",
- "ark-std 0.4.0",
+ "ark-ff",
+ "ark-poly",
+ "ark-serialize",
+ "ark-std",
  "derivative",
  "hashbrown 0.13.2",
  "itertools 0.10.5",
- "num-traits",
- "zeroize",
-]
-
-[[package]]
-name = "ark-ec"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43d68f2d516162846c1238e755a7c4d131b892b70cc70c471a8e3ca3ed818fce"
-dependencies = [
- "ahash",
- "ark-ff 0.5.0",
- "ark-poly 0.5.0",
- "ark-serialize 0.5.0",
- "ark-std 0.5.0",
- "educe",
- "fnv",
- "hashbrown 0.15.2",
- "itertools 0.13.0",
- "num-bigint",
- "num-integer",
  "num-traits",
  "zeroize",
 ]
@@ -201,10 +162,10 @@ version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec847af850f44ad29048935519032c33da8aa03340876d351dfab5660d2966ba"
 dependencies = [
- "ark-ff-asm 0.4.2",
- "ark-ff-macros 0.4.2",
- "ark-serialize 0.4.2",
- "ark-std 0.4.0",
+ "ark-ff-asm",
+ "ark-ff-macros",
+ "ark-serialize",
+ "ark-std",
  "derivative",
  "digest",
  "itertools 0.10.5",
@@ -216,26 +177,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ark-ff"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a177aba0ed1e0fbb62aa9f6d0502e9b46dad8c2eab04c14258a1212d2557ea70"
-dependencies = [
- "ark-ff-asm 0.5.0",
- "ark-ff-macros 0.5.0",
- "ark-serialize 0.5.0",
- "ark-std 0.5.0",
- "arrayvec",
- "digest",
- "educe",
- "itertools 0.13.0",
- "num-bigint",
- "num-traits",
- "paste",
- "zeroize",
-]
-
-[[package]]
 name = "ark-ff-asm"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -243,16 +184,6 @@ checksum = "3ed4aa4fe255d0bc6d79373f7e31d2ea147bcf486cba1be5ba7ea85abdb92348"
 dependencies = [
  "quote",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "ark-ff-asm"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62945a2f7e6de02a31fe400aa489f0e0f5b2502e69f95f853adb82a96c7a6b60"
-dependencies = [
- "quote",
- "syn 2.0.100",
 ]
 
 [[package]]
@@ -269,44 +200,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "ark-ff-macros"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09be120733ee33f7693ceaa202ca41accd5653b779563608f1234f78ae07c4b3"
-dependencies = [
- "num-bigint",
- "num-traits",
- "proc-macro2",
- "quote",
- "syn 2.0.100",
-]
-
-[[package]]
 name = "ark-poly"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d320bfc44ee185d899ccbadfa8bc31aab923ce1558716e1997a1e74057fe86bf"
 dependencies = [
- "ark-ff 0.4.2",
- "ark-serialize 0.4.2",
- "ark-std 0.4.0",
+ "ark-ff",
+ "ark-serialize",
+ "ark-std",
  "derivative",
  "hashbrown 0.13.2",
-]
-
-[[package]]
-name = "ark-poly"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "579305839da207f02b89cd1679e50e67b4331e2f9294a57693e5051b7703fe27"
-dependencies = [
- "ahash",
- "ark-ff 0.5.0",
- "ark-serialize 0.5.0",
- "ark-std 0.5.0",
- "educe",
- "fnv",
- "hashbrown 0.15.2",
 ]
 
 [[package]]
@@ -315,21 +218,8 @@ version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "adb7b85a02b83d2f22f89bd5cac66c9c89474240cb6207cb1efc16d098e822a5"
 dependencies = [
- "ark-serialize-derive 0.4.2",
- "ark-std 0.4.0",
- "digest",
- "num-bigint",
-]
-
-[[package]]
-name = "ark-serialize"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f4d068aaf107ebcd7dfb52bc748f8030e0fc930ac8e360146ca54c1203088f7"
-dependencies = [
- "ark-serialize-derive 0.5.0",
- "ark-std 0.5.0",
- "arrayvec",
+ "ark-serialize-derive",
+ "ark-std",
  "digest",
  "num-bigint",
 ]
@@ -346,31 +236,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "ark-serialize-derive"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "213888f660fddcca0d257e88e54ac05bca01885f258ccdf695bafd77031bb69d"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.100",
-]
-
-[[package]]
 name = "ark-std"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94893f1e0c6eeab764ade8dc4c0db24caf4fe7cbbaafc0eba0a9030f447b5185"
-dependencies = [
- "num-traits",
- "rand",
-]
-
-[[package]]
-name = "ark-std"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "246a225cc6131e9ee4f24619af0f19d67761fff15d7ccc22e42b80846e69449a"
 dependencies = [
  "num-traits",
  "rand",
@@ -613,10 +482,10 @@ dependencies = [
 [[package]]
 name = "circuit"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#9e99c1cb6b72ff06a95277872833c628170eb0dc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#f0e1b00d8e8eeaf02dcd37390dda5259c3601780"
 dependencies = [
  "arith",
- "ark-std 0.4.0",
+ "ark-std",
  "config",
  "ethnum",
  "gkr_field_config",
@@ -633,9 +502,9 @@ name = "circuit-std-rs"
 version = "0.1.0"
 dependencies = [
  "arith",
- "ark-bls12-381 0.5.0",
- "ark-ff 0.5.0",
- "ark-std 0.4.0",
+ "ark-bls12-381",
+ "ark-ff",
+ "ark-std",
  "big-int",
  "circuit",
  "config",
@@ -711,10 +580,10 @@ checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 [[package]]
 name = "config"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#9e99c1cb6b72ff06a95277872833c628170eb0dc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#f0e1b00d8e8eeaf02dcd37390dda5259c3601780"
 dependencies = [
  "arith",
- "ark-std 0.4.0",
+ "ark-std",
  "gf2",
  "gf2_128",
  "gkr_field_config",
@@ -730,7 +599,7 @@ dependencies = [
 [[package]]
 name = "config_macros"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#9e99c1cb6b72ff06a95277872833c628170eb0dc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#f0e1b00d8e8eeaf02dcd37390dda5259c3601780"
 dependencies = [
  "config",
  "field_hashers",
@@ -836,7 +705,7 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 [[package]]
 name = "crosslayer_prototype"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#9e99c1cb6b72ff06a95277872833c628170eb0dc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#f0e1b00d8e8eeaf02dcd37390dda5259c3601780"
 dependencies = [
  "arith",
  "config",
@@ -931,26 +800,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "educe"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d7bc049e1bd8cdeb31b68bbd586a9464ecf9f3944af3958a7a9d0f8b9799417"
-dependencies = [
- "enum-ordinalize",
- "proc-macro2",
- "quote",
- "syn 2.0.100",
-]
-
-[[package]]
 name = "efc"
 version = "0.1.0"
 dependencies = [
  "arith",
- "ark-bls12-381 0.4.0",
- "ark-ec 0.4.2",
- "ark-ff 0.4.2",
- "ark-std 0.4.0",
+ "ark-bls12-381",
+ "ark-ec",
+ "ark-ff",
+ "ark-std",
  "base64 0.22.1",
  "circuit",
  "circuit-std-rs",
@@ -986,26 +843,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75030f3c4f45dafd7586dd6780965a8c7e8e285a5ecb86713e63a79c5b2766f3"
 dependencies = [
  "cfg-if",
-]
-
-[[package]]
-name = "enum-ordinalize"
-version = "4.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fea0dcfa4e54eeb516fe454635a95753ddd39acda650ce703031c6973e315dd5"
-dependencies = [
- "enum-ordinalize-derive",
-]
-
-[[package]]
-name = "enum-ordinalize-derive"
-version = "4.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d28318a75d4aead5c4db25382e8ef717932d0346600cacae6357eb5941bc5ff"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.100",
 ]
 
 [[package]]
@@ -1058,7 +895,7 @@ name = "expander_compiler"
 version = "0.1.0"
 dependencies = [
  "arith",
- "ark-std 0.4.0",
+ "ark-std",
  "chrono",
  "circuit",
  "clap",
@@ -1093,7 +930,7 @@ dependencies = [
 [[package]]
 name = "field_hashers"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#9e99c1cb6b72ff06a95277872833c628170eb0dc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#f0e1b00d8e8eeaf02dcd37390dda5259c3601780"
 dependencies = [
  "arith",
  "halo2curves",
@@ -1188,10 +1025,10 @@ dependencies = [
 [[package]]
 name = "gf2"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#9e99c1cb6b72ff06a95277872833c628170eb0dc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#f0e1b00d8e8eeaf02dcd37390dda5259c3601780"
 dependencies = [
  "arith",
- "ark-std 0.4.0",
+ "ark-std",
  "cfg-if",
  "ethnum",
  "halo2curves",
@@ -1206,10 +1043,10 @@ dependencies = [
 [[package]]
 name = "gf2_128"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#9e99c1cb6b72ff06a95277872833c628170eb0dc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#f0e1b00d8e8eeaf02dcd37390dda5259c3601780"
 dependencies = [
  "arith",
- "ark-std 0.4.0",
+ "ark-std",
  "ethnum",
  "gf2",
  "rand",
@@ -1225,10 +1062,10 @@ checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 [[package]]
 name = "gkr"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#9e99c1cb6b72ff06a95277872833c628170eb0dc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#f0e1b00d8e8eeaf02dcd37390dda5259c3601780"
 dependencies = [
  "arith",
- "ark-std 0.4.0",
+ "ark-std",
  "bytes",
  "chrono",
  "circuit",
@@ -1265,10 +1102,10 @@ dependencies = [
 [[package]]
 name = "gkr_field_config"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#9e99c1cb6b72ff06a95277872833c628170eb0dc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#f0e1b00d8e8eeaf02dcd37390dda5259c3601780"
 dependencies = [
  "arith",
- "ark-std 0.4.0",
+ "ark-std",
  "gf2",
  "gf2_128",
  "mersenne31",
@@ -1358,9 +1195,6 @@ name = "hashbrown"
 version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf151400ff0baff5465007dd2f3e717f3fe502074ca563069ce3a6629d07b289"
-dependencies = [
- "allocator-api2",
-]
 
 [[package]]
 name = "headers"
@@ -1825,10 +1659,10 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 [[package]]
 name = "mersenne31"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#9e99c1cb6b72ff06a95277872833c628170eb0dc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#f0e1b00d8e8eeaf02dcd37390dda5259c3601780"
 dependencies = [
  "arith",
- "ark-std 0.4.0",
+ "ark-std",
  "cfg-if",
  "ethnum",
  "field_hashers",
@@ -1912,7 +1746,7 @@ dependencies = [
 [[package]]
 name = "mpi_config"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#9e99c1cb6b72ff06a95277872833c628170eb0dc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#f0e1b00d8e8eeaf02dcd37390dda5259c3601780"
 dependencies = [
  "arith",
  "mpi",
@@ -2123,10 +1957,10 @@ dependencies = [
 [[package]]
 name = "poly_commit"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#9e99c1cb6b72ff06a95277872833c628170eb0dc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#f0e1b00d8e8eeaf02dcd37390dda5259c3601780"
 dependencies = [
  "arith",
- "ark-std 0.4.0",
+ "ark-std",
  "ethnum",
  "gf2",
  "gkr_field_config",
@@ -2144,10 +1978,10 @@ dependencies = [
 [[package]]
 name = "polynomials"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#9e99c1cb6b72ff06a95277872833c628170eb0dc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#f0e1b00d8e8eeaf02dcd37390dda5259c3601780"
 dependencies = [
  "arith",
- "ark-std 0.4.0",
+ "ark-std",
  "criterion",
  "gkr_field_config",
  "halo2curves",
@@ -2438,7 +2272,7 @@ dependencies = [
 [[package]]
 name = "serdes"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#9e99c1cb6b72ff06a95277872833c628170eb0dc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#f0e1b00d8e8eeaf02dcd37390dda5259c3601780"
 dependencies = [
  "ethnum",
  "halo2curves",
@@ -2559,7 +2393,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 [[package]]
 name = "sumcheck"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#9e99c1cb6b72ff06a95277872833c628170eb0dc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#f0e1b00d8e8eeaf02dcd37390dda5259c3601780"
 dependencies = [
  "arith",
  "circuit",
@@ -2744,7 +2578,7 @@ dependencies = [
 [[package]]
 name = "transcript"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#9e99c1cb6b72ff06a95277872833c628170eb0dc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#f0e1b00d8e8eeaf02dcd37390dda5259c3601780"
 dependencies = [
  "arith",
  "field_hashers",
@@ -2757,10 +2591,10 @@ dependencies = [
 [[package]]
 name = "tree"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#9e99c1cb6b72ff06a95277872833c628170eb0dc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#f0e1b00d8e8eeaf02dcd37390dda5259c3601780"
 dependencies = [
  "arith",
- "ark-std 0.4.0",
+ "ark-std",
  "serdes",
  "sha2",
 ]
@@ -2865,7 +2699,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 [[package]]
 name = "utils"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#9e99c1cb6b72ff06a95277872833c628170eb0dc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#f0e1b00d8e8eeaf02dcd37390dda5259c3601780"
 
 [[package]]
 name = "version_check"
