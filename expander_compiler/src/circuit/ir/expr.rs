@@ -8,7 +8,6 @@ use serdes::{ExpSerde, SerdeResult};
 
 use crate::circuit::config::Config;
 use crate::field::FieldArith;
-// use crate::utils::serde::Serde;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Term<C: Config> {
