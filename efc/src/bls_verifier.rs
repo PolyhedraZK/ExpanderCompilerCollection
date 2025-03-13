@@ -278,7 +278,6 @@ pub fn end2end_blsverifier_witness(
 
     let witnesses_dir = format!("./witnesses/{}", circuit_name);
     ensure_directory_exists(&witnesses_dir);
-
     //get assignments
     let start_time = std::time::Instant::now();
     let assignments =

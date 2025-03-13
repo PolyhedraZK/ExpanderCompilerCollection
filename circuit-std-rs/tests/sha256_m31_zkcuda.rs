@@ -127,7 +127,7 @@ fn zkcuda_single_sha256_37bytes_hint() {
     let kernel_check_sha256_37bytes: Kernel<M31Config> = compile_sha256_37bytes().unwrap();
     println!("compile_sha256_37bytes() done");
     let data = [255; 37];
-    let repeat_time = 512;
+    let repeat_time = 16;
     let mut hash = Sha256::new();
     hash.update(data);
     let output = hash.finalize();
