@@ -145,19 +145,6 @@ impl<I: InputType> ExpSerde for Allocation<I> {
     }
 }
 
-// impl ExpSerde for ChildSpec<CrossLayerInput> {
-//     fn serialize_into<W: Write>(&self, mut writer: W) ->  SerdeResult<()> {
-//         self.0.serialize_into(&mut writer)?;
-//         self.1.serialize_into(&mut writer)?;
-//         Ok(())
-//     }
-//     fn deserialize_from<R: Read>(mut reader: R) -> SerdeResult<Self> {
-//         let sub_circuit_id = usize::deserialize_from(&mut reader)?;
-//         let allocs = Vec::<Allocation<I>>::deserialize_from(&mut reader)?;
-//         Ok((sub_circuit_id, allocs))
-//     }
-// }
-
 impl<C: Config, I: InputType> ExpSerde for GateCustom<C, I> {
     const SERIALIZED_SIZE: usize = unimplemented!();
 
