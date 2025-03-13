@@ -191,13 +191,8 @@ impl<T: FieldParams> GField<T> {
                 limb_nb_bits = ((T::modulus().bits() - 1) % T::bits_per_limb() as u64) + 1;
             }
             //range check
-            if limb_nb_bits > 8 {
-                self.table
-                    .rangeproof(native, a.limbs[i], limb_nb_bits as usize);
-            } else {
-                self.table
-                    .rangeproof_onechunk(native, a.limbs[i], limb_nb_bits as usize);
-            }
+            self.table
+                .rangeproof(native, a.limbs[i], limb_nb_bits as usize);
         }
     }
     pub fn wrap_hint<C: Config, B: RootAPI<C>>(
