@@ -9,6 +9,7 @@ expander_compiler = { path = "../expander_compiler"}
 
 arith.workspace = true
 ark-bls12-381.workspace = true
+ark-ec.workspace = true
 ark-ff.workspace = true
 ark-std.workspace = true
 big-int.workspace = true

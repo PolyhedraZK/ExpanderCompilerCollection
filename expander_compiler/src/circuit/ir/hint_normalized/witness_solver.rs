@@ -3,7 +3,7 @@ use crate::circuit::layered::witness::{Witness, WitnessValues};
 use arith::SimdField;
 use serdes::{ExpSerde, SerdeResult};
 
-use super::*;
+use super::{Config, Error, FieldArith, HintCaller, RootCircuit};
 
 pub struct WitnessSolver<C: Config> {
     pub circuit: RootCircuit<C>,

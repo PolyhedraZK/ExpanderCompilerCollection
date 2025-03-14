@@ -1,9 +1,9 @@
 use std::sync::Arc;
 use std::thread;
 
-use circuit_std_rs::gnark::emulated::sw_bls12381::g1::*;
-use circuit_std_rs::gnark::emulated::sw_bls12381::g2::*;
-use circuit_std_rs::gnark::emulated::sw_bls12381::pairing::*;
+use circuit_std_rs::gnark::emulated::sw_bls12381::g1::G1Affine;
+use circuit_std_rs::gnark::emulated::sw_bls12381::g2::{G2AffP, G2Affine, LineEvaluations, G2};
+use circuit_std_rs::gnark::emulated::sw_bls12381::pairing::Pairing;
 use circuit_std_rs::utils::register_hint;
 use expander_compiler::circuit::ir::hint_normalized::witness_solver;
 use expander_compiler::compile::CompileOptions;

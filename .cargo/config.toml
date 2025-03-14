@@ -1,2 +1,7 @@
 [build]
-rustflags = ["-C", "target-cpu=native"]
+rustflags = [
+    "-C", "target-cpu=native", 
+    "-D", "clippy::wildcard_imports",
+    "-D", "clippy::manual_clone",
+    "-D", "clippy::manual_default",
+]

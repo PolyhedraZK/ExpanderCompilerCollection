@@ -1,24 +1,30 @@
+use std::fmt;
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::thread;
+
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
+use circuit_std_rs::gnark::emulated::sw_bls12381::g1::{G1Affine, G1};
+use circuit_std_rs::gnark::emulated::sw_bls12381::g2::{G2AffP, G2};
+use circuit_std_rs::sha256::m31_utils::big_array_add;
+use circuit_std_rs::utils::{register_hint, simple_select};
+use expander_compiler::circuit::ir::hint_normalized::witness_solver;
+use expander_compiler::frontend::extra::HintRegistry;
+use expander_compiler::frontend::{
+    compile, declare_circuit, CompileOptions, CompileResult, Config, Define, M31Config, RootAPI,
+    Variable, M31,
+};
+use serde::de::{Deserializer, SeqAccess, Visitor};
+use serde::Deserialize;
+use serdes::ExpSerde;
+
 use crate::attestation::{Attestation, AttestationDataSSZ};
 use crate::bls::check_pubkey_key_bls;
 use crate::bls_verifier::{convert_point, G1Json, PairingEntry};
 use crate::utils::{ensure_directory_exists, read_from_json_file};
 use crate::validator::{read_validators, ValidatorPlain, ValidatorSSZ};
-use base64::engine::general_purpose::STANDARD;
-use base64::Engine;
-use circuit_std_rs::gnark::emulated::sw_bls12381::g1::*;
-use circuit_std_rs::gnark::emulated::sw_bls12381::g2::{G2AffP, G2};
-use circuit_std_rs::sha256::m31_utils::big_array_add;
-use circuit_std_rs::utils::{register_hint, simple_select};
-use expander_compiler::circuit::ir::hint_normalized::witness_solver;
-use expander_compiler::frontend::extra::*;
-use expander_compiler::frontend::*;
-use serde::de::{Deserializer, SeqAccess, Visitor};
-use serde::Deserialize;
-use serdes::ExpSerde;
-use std::fmt;
-use std::sync::Arc;
-use std::sync::Mutex;
-use std::thread;
+
 pub const SHUFFLE_ROUND: usize = 90;
 pub const VALIDATOR_CHUNK_SIZE: usize = 128 * 4;
 pub const MAX_VALIDATOR_EXP: usize = 29;

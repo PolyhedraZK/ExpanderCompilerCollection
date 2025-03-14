@@ -37,7 +37,7 @@ pub mod extra {
     pub use crate::hints::registry::{EmptyHintCaller, HintCaller, HintRegistry};
     // pub use crate::utils::serde::Serde;
 
-    use super::*;
+    use super::{internal, Config, Define, Variable};
 
     pub fn debug_eval<
         C: Config,

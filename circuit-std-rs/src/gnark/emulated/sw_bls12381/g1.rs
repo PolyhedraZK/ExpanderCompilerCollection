@@ -1,19 +1,21 @@
 use std::str::FromStr;
 
-use crate::gnark::element::*;
+use crate::gnark::element::{new_internal_element, value_of, Element};
 use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::emulated::field_bls12381::e2::CurveF;
-use crate::sha256::m31_utils::*;
+use crate::sha256::m31_utils::{big_less_than, from_binary, to_binary};
 use crate::utils::simple_select;
 use expander_compiler::{
     declare_circuit,
     frontend::{Config, Define, M31Config, RootAPI, Variable},
 };
 use num_bigint::BigInt;
+use std::fmt::{Debug, Formatter, Result};
 
 const M_COMPRESSED_SMALLEST: u8 = 0b100 << 5;
 const M_COMPRESSED_LARGEST: u8 = 0b101 << 5;
 
+// TODO: refactor G1Affine, G2Affine all with AffinePoint
 #[derive(Default, Clone)]
 pub struct G1Affine {
     pub x: Element<Bls12381Fp>,
@@ -38,6 +40,16 @@ impl G1Affine {
         }
     }
 }
+
+impl Debug for G1Affine {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        f.debug_struct("G1Affine")
+            .field("x", &self.x)
+            .field("y", &self.y)
+            .finish()
+    }
+}
+
 pub struct G1 {
     pub curve_f: CurveF,
     pub w: Element<Bls12381Fp>,

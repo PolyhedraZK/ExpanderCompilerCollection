@@ -1,8 +1,12 @@
 use std::io::{Error as IoError, Read, Write};
 
+use arith::Field;
 use serdes::{ExpSerde, SerdeResult};
 
-use super::*;
+use super::{
+    Allocation, ChildSpec, Circuit, Coef, Config, CrossLayerInput, CrossLayerInputUsize, Gate,
+    GateAdd, GateConst, GateCustom, GateMul, InputType, NormalInput, NormalInputUsize, Segment,
+};
 
 impl<C: Config> ExpSerde for Coef<C> {
     const SERIALIZED_SIZE: usize = unimplemented!();
@@ -255,6 +259,7 @@ mod tests {
     use crate::circuit::{
         config::*,
         ir::{common::rand_gen::*, dest::RootCircuit},
+        layered::{CrossLayerInputType, NormalInputType},
     };
 
     fn test_serde_for_field<C: Config, I: InputType>() {

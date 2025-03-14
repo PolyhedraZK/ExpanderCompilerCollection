@@ -1,15 +1,24 @@
-use crate::utils::{ensure_directory_exists, read_from_json_file};
-use circuit_std_rs::logup::LogUpSingleKeyTable;
-use circuit_std_rs::poseidon_m31::*;
-use circuit_std_rs::sha256::m31_utils::*;
-use circuit_std_rs::utils::{register_hint, simple_lookup2, simple_select};
-use expander_compiler::circuit::ir::hint_normalized::witness_solver;
-use expander_compiler::frontend::extra::*;
-use expander_compiler::frontend::*;
-use serde::Deserialize;
-use serdes::ExpSerde;
 use std::sync::Arc;
 use std::thread;
+
+use circuit_std_rs::logup::LogUpSingleKeyTable;
+use circuit_std_rs::poseidon_m31::{
+    PoseidonM31Params, POSEIDON_M31X16_FULL_ROUNDS, POSEIDON_M31X16_PARTIAL_ROUNDS,
+    POSEIDON_M31X16_RATE,
+};
+use circuit_std_rs::sha256::m31_utils::from_binary;
+use circuit_std_rs::utils::{register_hint, simple_lookup2, simple_select};
+use expander_compiler::circuit::ir::hint_normalized::witness_solver;
+#[cfg(test)]
+use expander_compiler::frontend::extra::debug_eval;
+use expander_compiler::frontend::extra::HintRegistry;
+use expander_compiler::frontend::{
+    compile, declare_circuit, CompileOptions, Define, M31Config, RootAPI, Variable, M31,
+};
+use serde::Deserialize;
+use serdes::ExpSerde;
+
+use crate::utils::{ensure_directory_exists, read_from_json_file};
 
 pub const TABLE_SIZE: usize = 1024;
 declare_circuit!(PermutationHashCircuit {

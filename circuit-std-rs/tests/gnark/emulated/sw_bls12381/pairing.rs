@@ -1,3 +1,9 @@
+use ark_bls12_381::{
+    Fr, G1Affine as BlsG1Affine, G1Projective, G2Affine as BlsG2Affine, G2Projective,
+};
+use ark_ec::Group;
+use ark_ff::UniformRand;
+use ark_serialize::CanonicalSerialize;
 use circuit_std_rs::{
     gnark::{
         element::Element,
@@ -7,11 +13,24 @@ use circuit_std_rs::{
         },
     },
     utils::register_hint,
+    StdCircuit,
 };
 use expander_compiler::{
     declare_circuit,
     frontend::{extra::debug_eval, Define, HintRegistry, M31Config, RootAPI, Variable, M31},
 };
+
+use crate::common::circuit_test_helper_with_hint;
+use std::ops::{Mul, Neg};
+
+// this param is just for StdCircuit to compile, the data is not used actually. can see the test 'pairing_random_test' below
+#[derive(Clone, Debug, Default)]
+pub struct PairingParams {
+    pub _in1_g1: BlsG1Affine,
+    pub _in2_g1: BlsG1Affine,
+    pub _in1_g2: BlsG2Affine,
+    pub _in2_g2: BlsG2Affine,
+}
 
 declare_circuit!(PairingCheckGKRCircuit {
     in1_g1: [[Variable; 48]; 2],
@@ -135,6 +154,9 @@ impl Define<M31Config> for PairingCheckGKRCircuit<Variable> {
                 ),
             },
         };
+        pairing.assert_is_on_curve(builder, p1_g1.clone());
+        pairing.assert_is_on_curve(builder, p2_g1.clone());
+
         pairing
             .pairing_check(
                 builder,
@@ -156,6 +178,130 @@ impl Define<M31Config> for PairingCheckGKRCircuit<Variable> {
         pairing.ext12.ext6.ext2.curve_f.table.final_check(builder);
         pairing.ext12.ext6.ext2.curve_f.table.final_check(builder);
     }
+}
+
+impl StdCircuit<M31Config> for PairingCheckGKRCircuit<Variable> {
+    type Params = PairingParams;
+    type Assignment =PairingCheckGKRCircuit<<expander_compiler::frontend::M31Config as expander_compiler::frontend::Config>::CircuitField>;
+
+    fn new_circuit(_params: &Self::Params) -> Self {
+        let mut circuit = Self::default();
+
+        circuit.in1_g1 = [[Variable::default(); 48]; 2];
+        circuit.in2_g1 = [[Variable::default(); 48]; 2];
+        circuit.in1_g2 = [[[Variable::default(); 48]; 2]; 2];
+        circuit.in2_g2 = [[[Variable::default(); 48]; 2]; 2];
+
+        circuit
+    }
+
+    fn new_assignment(_params: &Self::Params, rng: impl rand::RngCore) -> Self::Assignment {
+        random_assignment(rng)
+    }
+}
+
+fn random_assignment(
+    rng: impl rand::RngCore,
+) -> PairingCheckGKRCircuit<expander_compiler::field::M31> {
+    let (p1, mut q1) = random_g1g2_affines(rng);
+    let p2: BlsG1Affine = G1Projective::from(p1).double().neg().into();
+    let q2 = q1;
+    q1 = G2Projective::from(q1).double().into();
+
+    let mut assignment = PairingCheckGKRCircuit::default();
+    let p1_bytes = affine_point_to_bytes_g1(&p1);
+    let p2_bytes = affine_point_to_bytes_g1(&p2);
+    let q1_bytes = affine_point_to_bytes_g2(&q1);
+    let q2_bytes = affine_point_to_bytes_g2(&q2);
+
+    assignment.in1_g1[0] = convert_to_m31(p1_bytes[0]);
+    assignment.in1_g1[1] = convert_to_m31(p1_bytes[1]);
+    assignment.in2_g1[0] = convert_to_m31(p2_bytes[0]);
+    assignment.in2_g1[1] = convert_to_m31(p2_bytes[1]);
+    assignment.in1_g2[0][0] = convert_to_m31(q1_bytes[0][0]);
+    assignment.in1_g2[0][1] = convert_to_m31(q1_bytes[0][1]);
+    assignment.in1_g2[1][0] = convert_to_m31(q1_bytes[1][0]);
+    assignment.in1_g2[1][1] = convert_to_m31(q1_bytes[1][1]);
+
+    assignment.in2_g2[0][0] = convert_to_m31(q2_bytes[0][0]);
+    assignment.in2_g2[0][1] = convert_to_m31(q2_bytes[0][1]);
+    assignment.in2_g2[1][0] = convert_to_m31(q2_bytes[1][0]);
+    assignment.in2_g2[1][1] = convert_to_m31(q2_bytes[1][1]);
+
+    assignment
+}
+
+fn random_g1g2_affines(mut rng: impl rand::RngCore) -> (BlsG1Affine, BlsG2Affine) {
+    // Generate the generators for G1 and G2
+    let g1_generator = BlsG1Affine::new(
+        ark_bls12_381::g1::G1_GENERATOR_X,
+        ark_bls12_381::g1::G1_GENERATOR_Y,
+    );
+
+    let g2_generator = BlsG2Affine::new(
+        ark_bls12_381::g2::G2_GENERATOR_X,
+        ark_bls12_381::g2::G2_GENERATOR_Y,
+    );
+
+    let random_scalar: Fr = Fr::rand(&mut rng);
+    let p: BlsG1Affine = G1Projective::from(g1_generator).mul(random_scalar).into();
+    let q: BlsG2Affine = G2Projective::from(g2_generator).mul(random_scalar).into();
+
+    (p, q)
+}
+
+fn affine_point_to_bytes_g1(point: &BlsG1Affine) -> [[u8; 48]; 2] {
+    let mut x_bytes = [0u8; 48];
+    let mut y_bytes = [0u8; 48];
+
+    // serialize x
+    point.x.serialize_compressed(&mut x_bytes.as_mut()).unwrap();
+
+    //serialize y
+    point.y.serialize_compressed(&mut y_bytes.as_mut()).unwrap();
+
+    [x_bytes, y_bytes]
+}
+
+fn affine_point_to_bytes_g2(point: &BlsG2Affine) -> [[[u8; 48]; 2]; 2] {
+    let mut x_bytes = [[0u8; 48]; 2];
+    let mut y_bytes = [[0u8; 48]; 2];
+
+    // serialize x
+    point
+        .x
+        .c0
+        .serialize_compressed(&mut x_bytes[0].as_mut())
+        .unwrap(); // x.c0
+    point
+        .x
+        .c1
+        .serialize_compressed(&mut x_bytes[1].as_mut())
+        .unwrap(); // x.c1
+
+    // serialize x
+    point
+        .y
+        .c0
+        .serialize_compressed(&mut y_bytes[0].as_mut())
+        .unwrap(); // y.c0
+    point
+        .y
+        .c1
+        .serialize_compressed(&mut y_bytes[1].as_mut())
+        .unwrap(); // y.c1
+
+    [x_bytes, y_bytes]
+}
+
+fn convert_to_m31(input: [u8; 48]) -> [M31; 48] {
+    let mut output = [M31::default(); 48];
+
+    for i in 0..48 {
+        output[i] = M31::from(input[i] as u32);
+    }
+
+    output
 }
 
 #[test]
@@ -250,5 +396,30 @@ fn test_pairing_check_gkr() {
         &PairingCheckGKRCircuit::default(),
         &assignment,
         hint_registry,
+    );
+}
+
+#[test]
+fn pairing_random_test() {
+    let mut hint_registry = HintRegistry::<M31>::new();
+    register_hint(&mut hint_registry);
+
+    // let assignment = random_assignment(thread_rng());
+    // debug_eval(
+    //     &PairingCheckGKRCircuit::default(),
+    //     &assignment,
+    //     hint_registry,
+    // );
+
+    let param = PairingParams {
+        _in1_g1: BlsG1Affine::default(),
+        _in2_g1: BlsG1Affine::default(),
+        _in1_g2: BlsG2Affine::default(),
+        _in2_g2: BlsG2Affine::default(),
+    };
+
+    circuit_test_helper_with_hint::<M31Config, PairingCheckGKRCircuit<Variable>>(
+        &param,
+        &mut hint_registry,
     );
 }

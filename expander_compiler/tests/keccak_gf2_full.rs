@@ -283,20 +283,11 @@ fn keccak_gf2_full() {
     println!("test 3 passed");
 
     // alternatively, you can specify the particular config like gkr_field_config::GF2ExtConfig
-    let mut expander_circuit = layered_circuit
-        .export_to_expander::<<GF2Config as Config>::DefaultGKRFieldConfig>()
-        .flatten::<<GF2Config as Config>::DefaultGKRConfig>();
-    // TODO: add a unified function to prepare the circuit in Expander
-    expander_circuit.identify_rnd_coefs();
-    expander_circuit.identify_structure_info();
+    let mut expander_circuit = layered_circuit.export_to_expander_flatten();
 
-    let config = expander_config::Config::<<GF2Config as Config>::DefaultGKRConfig>::new(
-        expander_config::GKRScheme::Vanilla,
-        mpi_config::MPIConfig::new(),
-    );
+    let config = GF2Config::new_expander_config();
 
-    let (simd_input, simd_public_input) =
-        witness.to_simd::<<GF2Config as Config>::DefaultSimdField>();
+    let (simd_input, simd_public_input) = witness.to_simd();
     println!("{} {}", simd_input.len(), simd_public_input.len());
     expander_circuit.layers[0].input_vals = simd_input;
     expander_circuit.public_input = simd_public_input.clone();

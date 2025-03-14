@@ -6,7 +6,7 @@ use expander_compiler::circuit::layered::NormalInputType;
 use expander_compiler::circuit::{config, ir};
 use serdes::ExpSerde;
 
-use super::*;
+use super::{match_config_id, ByteArray, Config};
 
 #[repr(C)]
 pub struct CompileResult {

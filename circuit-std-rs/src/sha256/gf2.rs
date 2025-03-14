@@ -1,6 +1,9 @@
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{GF2Config, RootAPI, Variable};
 
-use super::gf2_utils::*;
+use super::gf2_utils::{
+    add, add_const, capital_sigma0, capital_sigma1, ch, lower_case_sigma0, lower_case_sigma1, maj,
+    sum_all, u32_to_bit, u64_to_bit, Sha256Word,
+};
 
 #[derive(Clone, Debug, Default)]
 pub struct SHA256GF2 {
