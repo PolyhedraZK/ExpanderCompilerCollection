@@ -1,14 +1,24 @@
-use crate::utils::{ensure_directory_exists, read_from_json_file};
-use circuit_std_rs::logup::LogUpSingleKeyTable;
-use circuit_std_rs::poseidon_m31::*;
-use circuit_std_rs::sha256::m31_utils::*;
-use circuit_std_rs::utils::{register_hint, simple_lookup2, simple_select};
-use expander_compiler::circuit::ir::hint_normalized::witness_solver;
-use expander_compiler::frontend::extra::*;
-use expander_compiler::frontend::*;
-use serde::Deserialize;
 use std::sync::Arc;
 use std::thread;
+
+use circuit_std_rs::logup::LogUpSingleKeyTable;
+use circuit_std_rs::poseidon_m31::{
+    PoseidonM31Params, POSEIDON_M31X16_FULL_ROUNDS, POSEIDON_M31X16_PARTIAL_ROUNDS,
+    POSEIDON_M31X16_RATE,
+};
+use circuit_std_rs::sha256::m31_utils::from_binary;
+use circuit_std_rs::utils::{register_hint, simple_lookup2, simple_select};
+use expander_compiler::circuit::ir::hint_normalized::witness_solver;
+#[cfg(test)]
+use expander_compiler::frontend::extra::debug_eval;
+use expander_compiler::frontend::extra::HintRegistry;
+use expander_compiler::frontend::{
+    compile, declare_circuit, CompileOptions, Define, M31Config, RootAPI, Variable, M31,
+};
+use serde::Deserialize;
+use serdes::ExpSerde;
+
+use crate::utils::{ensure_directory_exists, read_from_json_file};
 
 pub const TABLE_SIZE: usize = 1024;
 declare_circuit!(PermutationHashCircuit {
@@ -17,7 +27,7 @@ declare_circuit!(PermutationHashCircuit {
     table: [Variable; TABLE_SIZE],
 });
 
-impl GenericDefine<M31Config> for PermutationHashCircuit<Variable> {
+impl Define<M31Config> for PermutationHashCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut table = LogUpSingleKeyTable::new(8);
         let mut table_key = vec![];
@@ -88,7 +98,7 @@ pub struct PermutationHashEntry {
     pub real_keys: Vec<u32>,
 }
 
-impl GenericDefine<M31Config> for PermutationIndicesValidatorHashesCircuit<Variable> {
+impl Define<M31Config> for PermutationIndicesValidatorHashesCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let zero_var = builder.constant(0);
         let neg_one_count = builder.sub(1, VALIDATOR_COUNT as u32);
@@ -192,7 +202,7 @@ pub fn generate_permutation_hashes_witness(dir: &str) {
             .unwrap()
         } else {
             println!("The solver does not exist.");
-            let compile_result = compile_generic(
+            let compile_result = compile(
                 &PermutationIndicesValidatorHashesCircuit::default(),
                 CompileOptions::default(),
             )

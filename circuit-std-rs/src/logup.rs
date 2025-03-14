@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use arith::Field;
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{declare_circuit, Config, Define, Error, RootAPI, Variable, M31};
 use rand::Rng;
 
 use crate::StdCircuit;
@@ -150,7 +150,7 @@ fn logup_poly_val<C: Config, B: RootAPI<C>>(
 }
 
 impl<C: Config> Define<C> for LogUpCircuit {
-    fn define(&self, builder: &mut API<C>) {
+    fn define<Builder: RootAPI<C>>(&self, builder: &mut Builder) {
         let key_len = self.table_keys[0].len();
         let value_len = self.table_values[0].len();
 

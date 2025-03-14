@@ -1,5 +1,5 @@
 use circuit_std_rs::sha256::m31::sha256_var_bytes;
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{declare_circuit, Config, Define, M31Config, RootAPI, Variable};
 use serde::Deserialize;
 
 const ZERO_HASHES: [&[u8]; 40] = [
@@ -324,7 +324,7 @@ declare_circuit!(AttHashCircuit {
     outputs: [Variable; 32],
 });
 
-impl GenericDefine<M31Config> for AttHashCircuit<Variable> {
+impl Define<M31Config> for AttHashCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let att_ssz = AttestationDataSSZ {
             slot: self.slot,

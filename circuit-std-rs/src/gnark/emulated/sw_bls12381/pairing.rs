@@ -3,9 +3,13 @@ use super::g2::G2AffP;
 use super::g2::G2Affine;
 use super::g2::LineEvaluation;
 use super::g2::LineEvaluations;
+use super::point::AffinePoint;
+use super::point::Curve;
 use crate::gnark::emparam::Bls12381Fp;
-use crate::gnark::emulated::field_bls12381::e12::*;
-use crate::gnark::emulated::field_bls12381::e2::*;
+use crate::gnark::emparam::Bls12381Fr;
+use crate::gnark::emparam::CurveParams;
+use crate::gnark::emulated::field_bls12381::e12::{Ext12, GE12};
+use crate::gnark::emulated::field_bls12381::e2::CurveF;
 use crate::gnark::emulated::field_bls12381::e6::GE6;
 use expander_compiler::frontend::{Config, Error, RootAPI};
 use num_bigint::BigInt;
@@ -17,13 +21,19 @@ const LOOP_COUNTER: [i8; 64] = [
 pub struct Pairing {
     pub ext12: Ext12,
     pub curve_f: CurveF,
+    pub curve: Curve<Bls12381Fp, Bls12381Fr>,
 }
 
 impl Pairing {
     pub fn new<C: Config, B: RootAPI<C>>(native: &mut B) -> Self {
         let curve_f = CurveF::new(native, Bls12381Fp {});
         let ext12 = Ext12::new(native);
-        Self { curve_f, ext12 }
+        let curve = Curve::new(native, &CurveParams::get_bls12381_params(), Bls12381Fp {});
+        Self {
+            curve_f,
+            ext12,
+            curve,
+        }
     }
     pub fn pairing_check<C: Config, B: RootAPI<C>>(
         &mut self,
@@ -119,14 +129,14 @@ impl Pairing {
                 .mul_014_by_014(native, &tmp0, &tmp1, &res.c0.b0, &res.c0.b1);
             res = GE12 {
                 c0: GE6 {
-                    b0: prod_lines[0].my_clone(),
-                    b1: prod_lines[1].my_clone(),
-                    b2: prod_lines[2].my_clone(),
+                    b0: prod_lines[0].clone(),
+                    b1: prod_lines[1].clone(),
+                    b2: prod_lines[2].clone(),
                 },
                 c1: GE6 {
-                    b0: res.c1.b0.my_clone(),
-                    b1: prod_lines[3].my_clone(),
-                    b2: prod_lines[4].my_clone(),
+                    b0: res.c1.b0.clone(),
+                    b1: prod_lines[3].clone(),
+                    b2: prod_lines[4].clone(),
                 },
             };
         } else {
@@ -281,7 +291,7 @@ impl Pairing {
         let tmp = self.ext12.ext6.ext2.add(native, &p1.x, &p2.x);
         let xr = self.ext12.ext6.ext2.sub(native, &xr, &tmp);
 
-        let r0 = λ1.my_clone();
+        let r0 = λ1.clone();
         let mut r1 = self.ext12.ext6.ext2.mul(native, &λ1, &p1.x);
         r1 = self.ext12.ext6.ext2.sub(native, &r1, &p1.y);
 
@@ -303,7 +313,7 @@ impl Pairing {
 
         let p = G2AffP { x: x4, y: y4 };
 
-        let r0 = λ2.my_clone();
+        let r0 = λ2.clone();
         let mut r1 = self.ext12.ext6.ext2.mul(native, &λ2, &p1.x);
         r1 = self.ext12.ext6.ext2.sub(native, &r1, &p1.y);
 
@@ -340,7 +350,7 @@ impl Pairing {
 
         let res = G2AffP { x: xr, y: yr };
 
-        let r0 = λ.my_clone();
+        let r0 = λ.clone();
         let mut r1 = self.ext12.ext6.ext2.mul(native, &λ, &p1.x);
         r1 = self.ext12.ext6.ext2.sub(native, &r1, &p1.y);
 
@@ -367,7 +377,7 @@ impl Pairing {
         let d = self.ext12.ext6.ext2.double(native, &p1.y);
         let λ1 = self.ext12.ext6.ext2.div(native, &n, &d);
 
-        let r0 = λ1.my_clone();
+        let r0 = λ1.clone();
         let mut r1 = self.ext12.ext6.ext2.mul(native, &λ1, &p1.x);
         r1 = self.ext12.ext6.ext2.sub(native, &r1, &p1.y);
 
@@ -385,7 +395,7 @@ impl Pairing {
         let λ2 = self.ext12.ext6.ext2.div(native, &d, &x1x2);
         let λ2 = self.ext12.ext6.ext2.sub(native, &λ2, &λ1);
 
-        let r0 = λ2.my_clone();
+        let r0 = λ2.clone();
         let mut r1 = self.ext12.ext6.ext2.mul(native, &λ2, &p1.x);
         r1 = self.ext12.ext6.ext2.sub(native, &r1, &p1.y);
 
@@ -418,7 +428,7 @@ impl Pairing {
         let d = self.ext12.ext6.ext2.double(native, &p1.y);
         let λ = self.ext12.ext6.ext2.div(native, &n, &d);
 
-        let r0 = λ.my_clone();
+        let r0 = λ.clone();
         let mut r1 = self.ext12.ext6.ext2.mul(native, &λ, &p1.x);
         r1 = self.ext12.ext6.ext2.sub(native, &r1, &p1.y);
 
@@ -435,5 +445,10 @@ impl Pairing {
             x: copy_q_acc_x,
             y: copy_q_acc_y,
         }
+    }
+
+    pub fn assert_is_on_curve<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, p: G1Affine) {
+        let p_affine = AffinePoint { x: p.x, y: p.y };
+        self.curve.assert_is_on_curve(native, &p_affine);
     }
 }

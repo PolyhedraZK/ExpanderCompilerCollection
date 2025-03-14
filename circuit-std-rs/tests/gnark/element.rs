@@ -42,7 +42,7 @@ mod tests {
     declare_circuit!(VALUECircuit {
         target: [[Variable; 48]; 8],
     });
-    impl GenericDefine<M31Config> for VALUECircuit<Variable> {
+    impl Define<M31Config> for VALUECircuit<Variable> {
         fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
             let v1 = -1111111i32;
             let v2 = 22222222222222u64;

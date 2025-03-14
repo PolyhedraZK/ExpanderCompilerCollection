@@ -1,18 +1,19 @@
-use crate::gnark::element::*;
+use crate::gnark::element::{value_of, Element};
 use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::emulated::field_bls12381::e2::Ext2;
 use crate::gnark::emulated::field_bls12381::e2::GE2;
-use crate::sha256::m31_utils::*;
+use crate::sha256::m31_utils::{big_less_than, from_binary, to_binary};
 use crate::utils::simple_select;
 use expander_compiler::declare_circuit;
-use expander_compiler::frontend::{Config, GenericDefine, M31Config, RootAPI, Variable};
+use expander_compiler::frontend::{Config, Define, M31Config, RootAPI, Variable};
 use num_bigint::BigInt;
+use std::fmt::{Debug, Formatter, Result};
 use std::str::FromStr;
 
 const M_COMPRESSED_SMALLEST: u8 = 0b100 << 5;
 const M_COMPRESSED_LARGEST: u8 = 0b101 << 5;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct G2AffP {
     pub x: GE2,
     pub y: GE2,
@@ -35,7 +36,7 @@ impl G2AffP {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Debug)]
 pub struct LineEvaluation {
     pub r0: GE2,
     pub r1: GE2,
@@ -43,6 +44,7 @@ pub struct LineEvaluation {
 
 type LineEvaluationArray = [[Option<Box<LineEvaluation>>; 63]; 2];
 
+#[derive(Clone, Debug)]
 pub struct LineEvaluations(pub LineEvaluationArray);
 
 impl Default for LineEvaluations {
@@ -57,6 +59,8 @@ impl LineEvaluations {
             .all(|row| row.iter().all(|cell| cell.is_none()))
     }
 }
+
+#[derive(Clone)]
 pub struct G2Affine {
     pub p: G2AffP,
     pub lines: LineEvaluations,
@@ -83,7 +87,7 @@ impl G2 {
     }
     pub fn neg<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, p: &G2AffP) -> G2AffP {
         let yr = self.ext2.neg(native, &p.y);
-        G2AffP::new(p.x.my_clone(), yr)
+        G2AffP::new(p.x.clone(), yr)
     }
     pub fn copy_g2_aff_p<C: Config, B: RootAPI<C>>(
         &mut self,
@@ -218,7 +222,7 @@ impl G2 {
 
         let third_root_one_g1 = value_of::<C, B, Bls12381Fp>(native, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436".to_string()));
 
-        let mut t_double_mul = G2AffP::new(t_double.x.my_clone(), t_double.y.my_clone());
+        let mut t_double_mul = G2AffP::new(t_double.x.clone(), t_double.y.clone());
         t_double_mul.x = self
             .ext2
             .mul_by_element(native, &t_double_mul.x, &third_root_one_g1);
@@ -278,12 +282,12 @@ impl G2 {
         let g_x1 = self.ext2.mul(native, &xi_3_t_6, &g_x0);
 
         let inputs = vec![
-            g_x0.a0.my_clone(),
-            g_x0.a1.my_clone(),
-            g_x1.a0.my_clone(),
-            g_x1.a1.my_clone(),
-            in0.a0.my_clone(),
-            in0.a1.my_clone(),
+            g_x0.a0.clone(),
+            g_x0.a1.clone(),
+            g_x1.a0.clone(),
+            g_x1.a1.clone(),
+            in0.a0.clone(),
+            in0.a1.clone(),
         ];
         let output = self
             .ext2
@@ -291,8 +295,8 @@ impl G2 {
             .new_hint(native, "myhint.getsqrtx0x1fq2newhint", 3, inputs);
         let is_square = self.ext2.curve_f.is_zero(native, &output[0]); // is_square = 0 if g_x0 has not square root, 1 otherwise
         let y = GE2 {
-            a0: output[1].my_clone(),
-            a1: output[2].my_clone(),
+            a0: output[1].clone(),
+            a1: output[2].clone(),
         };
 
         let y_sq = self.ext2.square(native, &y);
@@ -308,7 +312,7 @@ impl G2 {
         native.assert_is_equal(sgn_in, sgn_y);
 
         let out_b0 = self.ext2.select(native, is_square, &x1, &x0);
-        let out_b1 = y.my_clone();
+        let out_b1 = y.clone();
         G2AffP {
             x: out_b0,
             y: out_b1,
@@ -321,7 +325,7 @@ impl G2 {
         coefficients: Vec<GE2>,
         x: &GE2,
     ) -> GE2 {
-        let mut dst = coefficients[coefficients.len() - 1].my_clone();
+        let mut dst = coefficients[coefficients.len() - 1].clone();
         if monic {
             dst = self.ext2.add(native, &dst, x);
         }
@@ -415,8 +419,8 @@ impl G2 {
     }
     pub fn g2_isogeny<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, p: &G2AffP) -> G2AffP {
         let mut p = G2AffP {
-            x: p.x.my_clone(),
-            y: p.y.my_clone(),
+            x: p.x.clone(),
+            y: p.y.clone(),
         };
         let den1 = self.g2_isogeny_y_denominator(native, &p.x);
         let den0 = self.g2_isogeny_x_denominator(native, &p.x);
@@ -538,12 +542,21 @@ impl G2 {
     }
 }
 
+impl Debug for G2Affine {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        f.debug_struct("G2Affine")
+            .field("P", &self.p)
+            .field("lines", &self.lines)
+            .finish()
+    }
+}
+
 declare_circuit!(G2UncompressCircuit {
     x: [Variable; 96],
     y: [[[Variable; 48]; 2]; 2],
 });
 
-impl GenericDefine<M31Config> for G2UncompressCircuit<Variable> {
+impl Define<M31Config> for G2UncompressCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g2 = G2::new(builder);
         let g2_res = g2.uncompressed(builder, &self.x);
@@ -568,7 +581,7 @@ declare_circuit!(MapToG2Circuit {
     out: [[[Variable; 48]; 2]; 2],
 });
 
-impl GenericDefine<M31Config> for MapToG2Circuit<Variable> {
+impl Define<M31Config> for MapToG2Circuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g2 = G2::new(builder);
         let in0 = GE2::from_vars(self.in0[0].to_vec(), self.in0[1].to_vec());
@@ -591,7 +604,7 @@ declare_circuit!(HashToG2Circuit {
     out: [[[Variable; 48]; 2]; 2],
 });
 
-impl GenericDefine<M31Config> for HashToG2Circuit<Variable> {
+impl Define<M31Config> for HashToG2Circuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g2 = G2::new(builder);
         let (hm0, hm1) = g2.hash_to_fp(builder, &self.msg);
