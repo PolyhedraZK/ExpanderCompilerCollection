@@ -43,6 +43,7 @@ pub struct LineEvaluation {
 
 type LineEvaluationArray = [[Option<Box<LineEvaluation>>; 63]; 2];
 
+#[derive(Clone, Debug)]
 pub struct LineEvaluations(pub LineEvaluationArray);
 
 impl Default for LineEvaluations {
@@ -57,6 +58,8 @@ impl LineEvaluations {
             .all(|row| row.iter().all(|cell| cell.is_none()))
     }
 }
+
+#[derive(Clone)]
 pub struct G2Affine {
     pub p: G2AffP,
     pub lines: LineEvaluations,

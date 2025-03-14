@@ -38,6 +38,16 @@ impl G1Affine {
         }
     }
 }
+
+impl Debug for G1Affine {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        f.debug_struct("G1Affine")
+            .field("x", &self.x)
+            .field("y", &self.y)
+            .finish()
+    }
+}
+
 pub struct G1 {
     pub curve_f: CurveF,
     pub w: Element<Bls12381Fp>,

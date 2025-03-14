@@ -1,6 +1,6 @@
 use expander_compiler::frontend::*;
 use expander_compiler::utils::serde::Serde;
-use expander_compiler::zkcuda::proving_system::{DummyProvingSystem, ExpanderGKRProvingSystem};
+use expander_compiler::zkcuda::proving_system::ExpanderGKRProvingSystem;
 use expander_compiler::zkcuda::{context::*, kernel::*};
 
 fn add_2<C: Config>(api: &mut API<C>, inputs: &mut Vec<Vec<Variable>>) {
@@ -16,59 +16,6 @@ fn add_16<C: Config>(api: &mut API<C>, inputs: &mut Vec<Vec<Variable>>) {
         sum = api.add(sum, inputs[0][i]);
     }
     inputs[1][0] = sum;
-}
-
-#[test]
-fn zkcuda_1() {
-    let kernel_add_2: Kernel<M31Config> = compile_with_spec(
-        add_2,
-        &[
-            IOVecSpec {
-                len: 2,
-                is_input: true,
-                is_output: false,
-            },
-            IOVecSpec {
-                len: 1,
-                is_input: false,
-                is_output: true,
-            },
-        ],
-    )
-    .unwrap();
-    let kernel_add_16: Kernel<M31Config> = compile_with_spec(
-        add_16,
-        &[
-            IOVecSpec {
-                len: 16,
-                is_input: true,
-                is_output: false,
-            },
-            IOVecSpec {
-                len: 1,
-                is_input: false,
-                is_output: true,
-            },
-        ],
-    )
-    .unwrap();
-
-    let mut ctx: Context<M31Config, DummyProvingSystem<M31Config>> = Context::default();
-    let mut a = vec![];
-    for i in 0..32 {
-        a.push(M31::from(i + 1 as u32));
-    }
-    let a = ctx.copy_raw_to_device(&a);
-    let mut io = vec![a, None];
-    ctx.call_kernel_raw(&kernel_add_2, &mut io, 16, &vec![false, false]);
-    let b = io[1].clone();
-    let mut io = vec![b, None];
-    ctx.call_kernel_raw(&kernel_add_16, &mut io, 1, &vec![false, false]);
-    let c = io[1].clone();
-    let result = ctx.copy_raw_to_host(c);
-    assert_eq!(result, vec![M31::from(32 * 33 / 2)]);
-    let proof = ctx.to_proof();
-    assert!(proof.verify());
 }
 
 #[test]
@@ -106,7 +53,7 @@ fn zkcuda_1_expander() {
     )
     .unwrap();
 
-    let mut ctx: Context<M31Config, ExpanderGKRProvingSystem<M31Config>> = Context::default();
+    let mut ctx: Context<M31Config> = Context::default();
     let mut a = vec![];
     for i in 0..32 {
         a.push(M31::from(i + 1 as u32));
@@ -120,8 +67,10 @@ fn zkcuda_1_expander() {
     let c = io[1].clone();
     let result = ctx.copy_raw_to_host(c);
     assert_eq!(result, vec![M31::from(32 * 33 / 2)]);
+
+    let computation_graph = ctx.to_computation_graph();
     let proof = ctx.to_proof();
-    assert!(proof.verify());
+    assert!(computation_graph.verify(&proof));
 }
 
 #[kernel]
@@ -145,7 +94,7 @@ fn zkcuda_2() {
     println!("{:?}", kernel_add_2.io_shapes);
     println!("{:?}", kernel_add_16.io_shapes);
 
-    let mut ctx: Context<M31Config, DummyProvingSystem<M31Config>> = Context::default();
+    let mut ctx: Context<M31Config> = Context::default();
     let mut a: Vec<Vec<M31>> = vec![];
     for i in 0..16 {
         a.push(vec![]);
@@ -162,8 +111,10 @@ fn zkcuda_2() {
     let c = c.reshape(&[]);
     let result: M31 = ctx.copy_to_host(c);
     assert_eq!(result, M31::from(32 * 33 / 2));
+
+    let computation_graph = ctx.to_computation_graph();
     let proof = ctx.to_proof();
-    assert!(proof.verify());
+    assert!(computation_graph.verify(&proof));
 }
 
 #[test]
@@ -176,7 +127,7 @@ fn zkcuda_2_simd() {
     kernel_add_2_tmp.serialize_into(&mut buf).unwrap();
     let kernel_add_2: Kernel<M31Config> = Kernel::deserialize_from(&mut buf.as_slice()).unwrap();
 
-    let mut ctx: Context<M31Config, DummyProvingSystem<M31Config>> = Context::default();
+    let mut ctx: Context<M31Config> = Context::default();
     let mut a: Vec<Vec<mersenne31::M31x16>> = vec![];
     for i in 0..16 {
         a.push(vec![]);
@@ -200,8 +151,10 @@ fn zkcuda_2_simd() {
     for k in 0..16 {
         assert_eq!(result[k], M31::from((32 * 33 / 2 + 32 * k) as u32));
     }
+
+    let computation_graph = ctx.to_computation_graph();
     let proof = ctx.to_proof();
-    assert!(proof.verify());
+    assert!(computation_graph.verify(&proof));
 }
 
 fn to_binary<C: Config>(api: &mut API<C>, x: Variable, n_bits: usize) -> Vec<Variable> {
@@ -230,7 +183,8 @@ fn zkcuda_to_binary() {
     hint_registry.register("myhint.tobinary", to_binary_hint);
 
     let kernel: Kernel<M31Config> = compile_convert_to_binary().unwrap();
-    let mut ctx: Context<M31Config, DummyProvingSystem<M31Config>, _> = Context::new(hint_registry);
+    let mut ctx: Context<M31Config, ExpanderGKRProvingSystem<M31Config>, _> =
+        Context::new(hint_registry);
 
     let a = M31::from(0x55);
     let a = ctx.copy_to_device(&a, false);
@@ -252,6 +206,8 @@ fn zkcuda_to_binary() {
             M31::from(0)
         ]
     );
+
+    let computation_graph = ctx.to_computation_graph();
     let proof = ctx.to_proof();
-    assert!(proof.verify());
+    assert!(computation_graph.verify(&proof));
 }

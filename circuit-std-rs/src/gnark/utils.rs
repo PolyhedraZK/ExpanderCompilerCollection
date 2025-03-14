@@ -1,8 +1,10 @@
 use ark_bls12_381::Fq;
 use ark_ff::Field;
+use ark_bls12_381::Fq;
+use ark_ff::Field;
 use num_bigint::BigInt;
 
-use crate::gnark::element::*;
+use crate::gnark::element::Element;
 use crate::gnark::emparam::FieldParams;
 use crate::gnark::emulated::field_bls12381::e2::GE2;
 use crate::gnark::limbs::decompose;

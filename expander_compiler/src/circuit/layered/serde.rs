@@ -2,7 +2,10 @@ use std::io::{Error as IoError, Read, Write};
 
 use crate::{field::FieldModulus, utils::serde::Serde};
 
-use super::*;
+use super::{
+    Allocation, ChildSpec, Circuit, Coef, Config, CrossLayerInput, CrossLayerInputUsize, Gate,
+    GateAdd, GateConst, GateCustom, GateMul, InputType, NormalInput, NormalInputUsize, Segment,
+};
 
 impl<C: Config> Serde for Coef<C> {
     fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
@@ -243,6 +246,7 @@ mod tests {
     use crate::circuit::{
         config::*,
         ir::{common::rand_gen::*, dest::RootCircuit},
+        layered::{CrossLayerInputType, NormalInputType},
     };
 
     fn test_serde_for_field<C: Config, I: InputType>() {

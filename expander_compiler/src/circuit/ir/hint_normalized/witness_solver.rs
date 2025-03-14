@@ -5,7 +5,7 @@ use crate::{
 
 use arith::SimdField;
 
-use super::*;
+use super::{Config, Error, FieldArith, HintCaller, RootCircuit};
 
 pub struct WitnessSolver<C: Config> {
     pub circuit: RootCircuit<C>,

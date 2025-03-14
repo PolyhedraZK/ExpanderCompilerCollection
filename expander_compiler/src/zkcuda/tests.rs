@@ -27,6 +27,7 @@ fn add_16<C: Config>(api: &mut API<C>, inputs: &mut Vec<Vec<Variable>>) {
 }
 
 #[test]
+#[allow(deprecated)]
 fn zkcuda_1() {
     let kernel_add_2: Kernel<M31Config> = compile_with_spec(
         add_2,
@@ -96,8 +97,10 @@ fn zkcuda_1() {
     let c = io[1].clone();
     let result = ctx.copy_raw_to_host(c);
     assert_eq!(result, vec![M31::from(32 * 33 / 2)]);
+
+    let computation_graph = ctx.to_computation_graph();
     let proof = ctx.to_proof();
-    assert!(proof.verify());
+    assert!(computation_graph.verify(&proof));
 
     let mut ctx: Context<M31Config, DummyProvingSystem<M31Config>> = Context::default();
     let mut a = vec![];
@@ -118,8 +121,10 @@ fn zkcuda_1() {
     let c = io[1].clone();
     let result = ctx.copy_raw_to_host(c);
     assert_eq!(result, vec![M31::from(16 * 17 / 2)]);
+
+    let computation_graph = ctx.to_computation_graph();
     let proof = ctx.to_proof();
-    assert!(proof.verify());
+    assert!(computation_graph.verify(&proof));
 }
 
 fn div_2x5<C: Config>(api: &mut API<C>, inputs: &mut Vec<Vec<Variable>>) {
@@ -141,6 +146,7 @@ fn add_5<C: Config>(api: &mut API<C>, inputs: &mut Vec<Vec<Variable>>) {
 }
 
 #[test]
+#[allow(deprecated)]
 fn zkcuda_2() {
     let kernel_add_5: Kernel<M31Config> = compile_with_spec(
         add_5,
@@ -213,8 +219,10 @@ fn zkcuda_2() {
     let c = io[1].clone();
     let result = ctx.copy_raw_to_host(c);
     assert_eq!(result, vec![M31::from(25 * 26 / 2)]);
+
+    let computation_graph = ctx.to_computation_graph();
     let proof = ctx.to_proof();
-    assert!(proof.verify());
+    assert!(computation_graph.verify(&proof));
 }
 
 #[kernel]

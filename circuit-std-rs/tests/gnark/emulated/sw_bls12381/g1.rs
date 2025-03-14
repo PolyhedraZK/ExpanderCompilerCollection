@@ -6,8 +6,7 @@ use expander_compiler::{
     compile::CompileOptions,
     declare_circuit,
     frontend::{
-        compile_generic, extra::debug_eval, GenericDefine, HintRegistry, M31Config, RootAPI,
-        Variable, M31,
+        compile, extra::debug_eval, Define, HintRegistry, M31Config, RootAPI, Variable, M31,
     },
 };
 
@@ -17,7 +16,7 @@ declare_circuit!(G1AddCircuit {
     r: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for G1AddCircuit<Variable> {
+impl Define<M31Config> for G1AddCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g1 = G1::new(builder);
         let p1_g1 = G1Affine::from_vars(self.p[0].to_vec(), self.p[1].to_vec());
@@ -38,7 +37,7 @@ impl GenericDefine<M31Config> for G1AddCircuit<Variable> {
 
 #[test]
 fn test_g1_add() {
-    compile_generic(&G1AddCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&G1AddCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = G1AddCircuit::<M31> {

@@ -3,14 +3,12 @@ use arith::SimdField;
 use crate::field::FieldArith;
 use crate::hints::registry::{EmptyHintCaller, HintCaller};
 use crate::utils::misc::next_power_of_two;
-use crate::zkcuda::vec_shaped::unflatten_shaped;
 use crate::{circuit::config::Config, utils::pool::Pool};
 
-use super::kernel::shape_prepend;
-use super::vec_shaped::{flatten_shaped, VecShaped};
 use super::{
-    kernel::{Kernel, Shape},
-    proving_system::ProvingSystem,
+    kernel::{shape_prepend, Kernel, Shape},
+    proving_system::{Commitment, ExpanderGKRProvingSystem, ProvingSystem},
+    vec_shaped::{flatten_shaped, unflatten_shaped, VecShaped},
 };
 
 pub use macros::call_kernel;
@@ -37,36 +35,40 @@ pub enum BroadcastType {
     Both,
 }
 
-pub struct WrappedProof<C: Config, P: ProvingSystem<C>> {
-    pub proof: P::Proof,
+#[derive(Clone)]
+pub struct ProofTemplate {
     pub kernel_id: usize,
     pub commitment_indices: Vec<usize>,
     pub parallel_count: usize,
     pub is_broadcast: Vec<bool>,
 }
 
-pub struct Context<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField> = EmptyHintCaller>
-{
+pub struct Context<
+    C: Config,
+    P: ProvingSystem<C> = ExpanderGKRProvingSystem<C>,
+    H: HintCaller<C::CircuitField> = EmptyHintCaller,
+> {
     pub kernels: Pool<Kernel<C>>,
     pub device_memories: Vec<DeviceMemory<C, P>>,
-    pub proofs: Vec<WrappedProof<C, P>>,
+    pub proofs: Vec<P::Proof>,
+    pub proof_templates: Vec<ProofTemplate>,
     pub hint_caller: H,
 }
 
-pub struct CombinedProof<C: Config, P: ProvingSystem<C>> {
-    pub kernels: Vec<Kernel<C>>,
+pub struct CombinedProof<C: Config, P: ProvingSystem<C> = ExpanderGKRProvingSystem<C>> {
     pub commitments: Vec<P::Commitment>,
-    pub proofs: Vec<WrappedProof<C, P>>,
+    pub proofs: Vec<P::Proof>,
+}
+
+pub struct ComputationGraph<C: Config> {
+    pub kernels: Vec<Kernel<C>>,
+    pub commitments_lens: Vec<usize>,
+    pub proof_templates: Vec<ProofTemplate>,
 }
 
 impl<C: Config, P: ProvingSystem<C>> Default for Context<C, P> {
     fn default() -> Self {
-        Context {
-            kernels: Pool::new(),
-            device_memories: vec![],
-            proofs: vec![],
-            hint_caller: EmptyHintCaller::new(),
-        }
+        Self::new(EmptyHintCaller)
     }
 }
 
@@ -228,6 +230,7 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
             kernels: Pool::new(),
             device_memories: vec![],
             proofs: vec![],
+            proof_templates: vec![],
             hint_caller,
         }
     }
@@ -565,8 +568,8 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
             next_power_of_two(parallel_count),
             &lc_is_broadcast,
         );
-        self.proofs.push(WrappedProof {
-            proof,
+        self.proofs.push(proof);
+        self.proof_templates.push(ProofTemplate {
             kernel_id,
             commitment_indices: handles.iter().map(|x| x.id).collect(),
             parallel_count,
@@ -574,9 +577,20 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
         });
     }
 
+    pub fn to_computation_graph(&self) -> ComputationGraph<C> {
+        ComputationGraph {
+            kernels: self.kernels.vec().clone(),
+            commitments_lens: self
+                .device_memories
+                .iter()
+                .map(|x| x.commitment.vals_len())
+                .collect(),
+            proof_templates: self.proof_templates.clone(),
+        }
+    }
+
     pub fn to_proof(self) -> CombinedProof<C, P> {
         CombinedProof {
-            kernels: self.kernels.vec().clone(),
             commitments: self
                 .device_memories
                 .into_iter()
@@ -587,19 +601,32 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
     }
 }
 
-impl<C: Config, P: ProvingSystem<C>> CombinedProof<C, P> {
-    pub fn verify(&self) -> bool {
-        for proof in self.proofs.iter() {
+impl<C: Config> ComputationGraph<C> {
+    pub fn verify<P: ProvingSystem<C>>(&self, combined_proof: &CombinedProof<C, P>) -> bool {
+        for (commitment, len) in combined_proof
+            .commitments
+            .iter()
+            .zip(self.commitments_lens.iter())
+        {
+            if commitment.vals_len() != *len {
+                return false;
+            }
+        }
+        for (proof, template) in combined_proof
+            .proofs
+            .iter()
+            .zip(self.proof_templates.iter())
+        {
             if !P::verify(
-                &self.kernels[proof.kernel_id],
-                &proof.proof,
-                &proof
+                &self.kernels[template.kernel_id],
+                proof,
+                &template
                     .commitment_indices
                     .iter()
-                    .map(|&x| &self.commitments[x])
+                    .map(|&x| &combined_proof.commitments[x])
                     .collect::<Vec<_>>(),
-                next_power_of_two(proof.parallel_count),
-                &proof.is_broadcast,
+                next_power_of_two(template.parallel_count),
+                &template.is_broadcast,
             ) {
                 return false;
             }

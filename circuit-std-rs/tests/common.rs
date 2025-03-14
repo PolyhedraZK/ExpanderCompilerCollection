@@ -8,12 +8,23 @@ where
     Cfg: Config,
     Cir: StdCircuit<Cfg>,
 {
+    circuit_test_helper_with_hint::<Cfg, Cir>(params, &mut EmptyHintCaller::default());
+}
+
+pub fn circuit_test_helper_with_hint<Cfg, Cir>(
+    params: &Cir::Params,
+    hint: &mut impl HintCaller<Cfg::CircuitField>,
+) where
+    Cfg: Config,
+    Cir: StdCircuit<Cfg>,
+{
     let mut rng = thread_rng();
-    let compile_result: CompileResult<Cfg> = compile(&Cir::new_circuit(params)).unwrap();
+    let compile_result: CompileResult<Cfg> =
+        compile(&Cir::new_circuit(params), CompileOptions::default()).unwrap();
     let assignment = Cir::new_assignment(params, &mut rng);
     let witness = compile_result
         .witness_solver
-        .solve_witness(&assignment)
+        .solve_witness_with_hints(&assignment, hint)
         .unwrap();
     let output = compile_result.layered_circuit.run(&witness);
     assert_eq!(output, vec![true]);
