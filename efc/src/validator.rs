@@ -1,5 +1,8 @@
-use circuit_std_rs::poseidon_m31::*;
-use expander_compiler::frontend::*;
+use circuit_std_rs::poseidon_m31::{
+    PoseidonM31Params, POSEIDON_M31X16_FULL_ROUNDS, POSEIDON_M31X16_PARTIAL_ROUNDS,
+    POSEIDON_M31X16_RATE,
+};
+use expander_compiler::frontend::{Config, RootAPI, Variable};
 use serde::Deserialize;
 
 use crate::utils::read_from_json_file;

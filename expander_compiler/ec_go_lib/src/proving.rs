@@ -5,7 +5,7 @@ use std::slice;
 
 use expander_compiler::{circuit::config, utils::serde::Serde};
 
-use super::*;
+use super::{match_config_id, ByteArray, Config};
 
 fn prove_circuit_file_inner<C: config::Config>(
     circuit_filename: &str,
