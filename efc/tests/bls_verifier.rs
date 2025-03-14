@@ -229,9 +229,9 @@ fn g1_add_zkcuda<C: Config>(
     let p2_g1 = G1Affine::from_vars(input[48*2..48*3].to_vec(), input[48*3..48*4].to_vec());
     let r_g1 = G1Affine::from_vars(input[48*4..48*5].to_vec(), input[48*5..48*6].to_vec());
     let mut r = g1.add(builder, &p1_g1, &p2_g1);
-    // for _ in 0..16 {
-    //     r = g1.add(builder, &r, &p2_g1);
-    // }
+    for _ in 0..16 {
+        r = g1.add(builder, &r, &p2_g1);
+    }
     g1.curve_f.assert_is_equal(builder, &r.x, &r_g1.x);
     g1.curve_f.assert_is_equal(builder, &r.y, &r_g1.y);
     g1.curve_f.check_mul(builder);
@@ -250,7 +250,7 @@ fn test_g1_add_zkcuda() {
     register_hint(&mut hint_registry);
     let file_name = "kernel_g1_add_zkcuda.txt";
     let kernel_g1_add = 
-    if std::fs::metadata(file_name).is_ok() {
+    if std::fs::metadata("file_name").is_ok() {
         let file = std::fs::File::open(file_name).unwrap();
         let reader = std::io::BufReader::new(file);
         Kernel::<M31Config>::deserialize_from(reader).unwrap()
@@ -262,6 +262,15 @@ fn test_g1_add_zkcuda() {
         kernel_pairing_check
     };
 
+    let witness_solver = kernel_g1_add.clone().witness_solver;
+    let lc_stats =  witness_solver.get_stats();
+
+    print_info("built layered circuit");
+    print_stat("num_terms", lc_stats.num_terms, false);
+    print_stat("num_insns", lc_stats.num_insns, false);
+    print_stat("numUsedInputs", lc_stats.num_inputs, false);
+    print_stat("num_constraints", lc_stats.num_constraints, false);
+    print_stat("num_variables", lc_stats.num_variables, false);
     let p1_x_bytes = [
         169, 204, 143, 202, 195, 182, 32, 187, 150, 46, 27, 88, 137, 82, 209, 11, 255, 228, 147,
         72, 218, 149, 56, 139, 243, 28, 49, 146, 210, 5, 238, 232, 111, 204, 78, 170, 83, 191, 222,
