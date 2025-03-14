@@ -1,12 +1,13 @@
 use std::{
     fmt,
-    io::{Error as IoError, Read, Write},
+    io::{Read, Write},
     ops::{Deref, DerefMut},
 };
 
+use serdes::{ExpSerde, SerdeResult};
+
 use crate::circuit::config::Config;
-use crate::field::{FieldArith, FieldModulus};
-use crate::utils::serde::Serde;
+use crate::field::FieldArith;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Term<C: Config> {
@@ -466,8 +467,10 @@ impl<C: Config> fmt::Display for LinComb<C> {
     }
 }
 
-impl<C: Config> Serde for LinComb<C> {
-    fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
+impl<C: Config> ExpSerde for LinComb<C> {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+
+    fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         self.terms.len().serialize_into(&mut writer)?;
         for term in self.terms.iter() {
             term.var.serialize_into(&mut writer)?;
@@ -478,7 +481,8 @@ impl<C: Config> Serde for LinComb<C> {
         self.constant.serialize_into(&mut writer)?;
         Ok(())
     }
-    fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
+
+    fn deserialize_from<R: Read>(mut reader: R) -> SerdeResult<Self> {
         let len = usize::deserialize_from(&mut reader)?;
         let mut terms = Vec::with_capacity(len);
         for _ in 0..len {

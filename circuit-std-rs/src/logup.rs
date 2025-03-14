@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 
 use arith::Field;
-use expander_compiler::frontend::{
-    declare_circuit, Config, Define, Error, FieldModulus, RootAPI, Variable, M31,
-};
+use expander_compiler::frontend::{declare_circuit, Config, Define, Error, RootAPI, Variable, M31};
 use rand::Rng;
 
 use crate::StdCircuit;

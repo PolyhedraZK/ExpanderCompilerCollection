@@ -9,13 +9,13 @@ use expander_compiler::circuit::ir::hint_normalized::witness_solver;
 use expander_compiler::compile::CompileOptions;
 use expander_compiler::declare_circuit;
 use expander_compiler::frontend::compile;
-use expander_compiler::frontend::internal::Serde;
 use expander_compiler::frontend::Define;
 use expander_compiler::frontend::HintRegistry;
 use expander_compiler::frontend::M31Config;
 use expander_compiler::frontend::{RootAPI, Variable, M31};
 
 use serde::Deserialize;
+use serdes::ExpSerde;
 
 use crate::utils::ensure_directory_exists;
 use crate::utils::read_from_json_file;

@@ -1,12 +1,8 @@
 use std::{fmt, hash::Hash};
 
-use arith::FieldForECC;
+use serdes::ExpSerde;
 
-use crate::{
-    field::FieldArith,
-    hints,
-    utils::{error::Error, serde::Serde},
-};
+use crate::{field::FieldArith, hints, utils::error::Error};
 
 use super::config::Config;
 
@@ -152,7 +148,7 @@ pub trait Input:
     + Eq
     + PartialOrd
     + Ord
-    + Serde
+    + ExpSerde
 {
     fn layer(&self) -> usize;
     fn offset(&self) -> usize;
@@ -204,7 +200,7 @@ pub struct NormalInputUsize {
 }
 
 pub trait InputUsize:
-    std::fmt::Debug + Default + Clone + Hash + PartialEq + Eq + PartialOrd + Ord + Serde
+    std::fmt::Debug + Default + Clone + Hash + PartialEq + Eq + PartialOrd + Ord + ExpSerde
 {
     type Iter<'a>: Iterator<Item = usize>
     where
