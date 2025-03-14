@@ -24,3 +24,6 @@ rand.workspace = true
 serdes.workspace = true
 sha2.workspace = true
 tiny-keccak.workspace = true
+
+[dev-dependencies]
+ark-serialize.workspace = true

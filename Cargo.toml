@@ -13,6 +13,7 @@ opt-level = 3
 ark-bls12-381 = "0.4.0"
 ark-ec = "0.4.0"
 ark-ff = "0.4.0"
+ark-serialize = "0.4.0"
 ark-std = "0.4.0"
 base64 = "0.22.1"
 big-int = "7.0.0"

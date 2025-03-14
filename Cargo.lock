@@ -505,6 +505,7 @@ dependencies = [
  "ark-bls12-381",
  "ark-ec",
  "ark-ff",
+ "ark-serialize",
  "ark-std",
  "big-int",
  "circuit",
