@@ -646,7 +646,10 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "rand",
+ "serde",
+ "serde_json",
  "sha2",
+ "stacker",
  "tiny-keccak",
 ]
 
