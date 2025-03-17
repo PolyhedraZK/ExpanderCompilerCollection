@@ -1,4 +1,4 @@
-use crate::bls_verifier::{PairingCircuit, PairingEntry};
+use crate::bls_verifier::{convert_limbs, convert_point, PairingCircuit, PairingEntry};
 use crate::utils::read_from_json_file;
 use circuit_std_rs::gnark::emulated::sw_bls12381::g1::*;
 use circuit_std_rs::gnark::emulated::sw_bls12381::g2::*;
@@ -12,6 +12,7 @@ use expander_compiler::zkcuda::kernel::Kernel;
 use expander_compiler::zkcuda::kernel::*;
 use expander_compiler::zkcuda::proving_system::ExpanderGKRProvingSystem;
 use mersenne31::M31;
+use crate::zkcuda_hashtable::{HASHTABLESIZE, SHA256LEN};
 
 fn bls_verify_inner<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variable> {
     let pubkey = &p[..48 * 2];
@@ -67,15 +68,67 @@ fn bls_verify<C: Config>(
 }
 
 #[test]
-fn test_zkcuda_hashtable() {
+fn test_zkcuda_bls_verify() {
     let kernel: Kernel<M31Config> = compile_bls_verify().unwrap();
     println!("compile ok");
     let dir = ".";
     let file_path = format!("{}/pairing_assignment.json", dir);
 
-    let pairing_data: Vec<PairingEntry> = read_from_json_file(&file_path).unwrap();
-    let assignment = PairingCircuit::from_entry(pairing_data[0].clone());
+    let pairing_datas: Vec<PairingEntry> = read_from_json_file(&file_path).unwrap();
+    let entry = &pairing_datas[0];
+    let  pubkey =  [
+        convert_limbs(entry.pub_key.x.limbs.clone()),
+        convert_limbs(entry.pub_key.y.limbs.clone()),
+    ];
+    let hm =  [
+        convert_point(entry.hm.p.x.clone()),
+        convert_point(entry.hm.p.y.clone()),
+    ];
+    let sig = [
+            convert_point(entry.signature.p.x.clone()),
+            convert_point(entry.signature.p.y.clone()),
+        ];
 
+    let mut p: Vec<M31> = vec![];
+    for i in 0..2 {
+        for j in 0..48{
+            p.push(pubkey[i][j]);
+        }
+    }
+    for i in 0..2 {
+        for j in 0..2{
+            for k  in 0..48 {
+                p.push(hm[i][j][k]);
+            }
+        }
+    }
+    for i in 0..2 {
+        for j in 0..2{
+            for k  in 0..48 {
+                p.push(sig[i][j][k]);
+            }
+        }
+    }
+
+    println!("prepare data ok");
+    let mut ctx: Context<M31Config> = Context::default();
+
+    let p = ctx.copy_to_device(&vec![p], false);
+    println!("copy to device ok");
+
+    // println!("p: {:?}", p.clone().unwrap().shape.unwrap());
+
+    println!("compile ok");
+
+    let mut out = None;
+    call_kernel!(ctx, kernel, p, mut out);
+    println!("call kernel ok");
+
+    println!("out shape: {:?}", out.clone().unwrap().shape.unwrap());
+
+    let out = out.reshape(&[SHA256LEN*HASHTABLESIZE]);
+
+    println!("out shape: {:?}", out.clone().unwrap().shape.unwrap());
 
 }
 
