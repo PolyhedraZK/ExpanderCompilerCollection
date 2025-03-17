@@ -442,19 +442,25 @@ impl LogUpRangeProofTable {
     }
 }
 
-pub fn query_count_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+pub fn query_count_hint<F: Field + FieldModulus>(
+    inputs: &[F],
+    outputs: &mut [F],
+) -> Result<(), Error> {
     let mut count = vec![0; outputs.len()];
     for input in inputs {
         let query_id = input.to_u256().as_usize();
         count[query_id] += 1;
     }
     for i in 0..outputs.len() {
-        outputs[i] = M31::from(count[i] as u32);
+        outputs[i] = F::from(count[i] as u32);
     }
     Ok(())
 }
 
-pub fn query_count_by_key_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+pub fn query_count_by_key_hint<F: Field + FieldModulus>(
+    inputs: &[F],
+    outputs: &mut [F],
+) -> Result<(), Error> {
     let mut outputs_u32 = vec![0; outputs.len()];
 
     let table_size = inputs[0].to_u256().as_usize();
@@ -473,20 +479,24 @@ pub fn query_count_by_key_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<()
         outputs_u32[i] = count as u32;
     }
     for i in 0..outputs.len() {
-        outputs[i] = M31::from(outputs_u32[i]);
+        outputs[i] = F::from(outputs_u32[i]);
     }
 
     Ok(())
 }
 
-pub fn rangeproof_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+pub fn rangeproof_hint<F: Field + FieldModulus>(
+    inputs: &[F],
+    outputs: &mut [F],
+) -> Result<(), Error> {
     let n = inputs[0].to_u256().as_i64();
     let m = inputs[1].to_u256().as_i64();
     let mut a = inputs[2].to_u256().as_i64();
+
     for i in 0..n / m {
         let r = a % (1 << m);
         a /= 1 << m;
-        outputs[i as usize] = M31::from(r as u32);
+        outputs[i as usize] = F::from(r as u32);
     }
     Ok(())
 }
