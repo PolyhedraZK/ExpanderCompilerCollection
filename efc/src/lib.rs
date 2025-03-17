@@ -10,3 +10,4 @@ pub mod shuffle;
 pub mod utils;
 pub mod validator;
 pub mod zkcuda_hashtable;
+pub mod zkcuda_bls_verifier;
