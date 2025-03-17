@@ -1,4 +1,4 @@
-use crate::bls_verifier::{convert_limbs, convert_point, PairingCircuit, PairingEntry};
+use crate::bls_verifier::{convert_limbs, convert_point, PairingEntry};
 use crate::utils::read_from_json_file;
 use circuit_std_rs::gnark::emulated::sw_bls12381::g1::*;
 use circuit_std_rs::gnark::emulated::sw_bls12381::g2::*;
