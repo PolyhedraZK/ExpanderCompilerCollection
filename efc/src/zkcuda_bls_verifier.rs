@@ -3,7 +3,6 @@ use crate::utils::read_from_json_file;
 use circuit_std_rs::gnark::emulated::sw_bls12381::g1::*;
 use circuit_std_rs::gnark::emulated::sw_bls12381::g2::*;
 use circuit_std_rs::gnark::emulated::sw_bls12381::pairing::*;
-use circuit_std_rs::sha256::m31_utils::to_binary_hint;
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::context::{call_kernel, Context, Reshape};
 use expander_compiler::zkcuda::kernel::Kernel;
