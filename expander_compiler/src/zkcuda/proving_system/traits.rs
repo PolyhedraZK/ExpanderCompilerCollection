@@ -1,29 +1,38 @@
-use super::super::kernel::Kernel;
+use super::super::{kernel::Kernel, proof::ComputationGraph};
+
 use crate::circuit::config::Config;
+
+pub trait Commitment<C: Config>: Clone {
+    fn vals_len(&self) -> usize;
+}
 
 pub trait ProvingSystem<C: Config> {
     type ProverSetup: Clone;
     type VerifierSetup: Clone;
     type Proof: Clone;
-    type Commitment: Clone;
+    type Commitment: Commitment<C>;
     type CommitmentExtraInfo: Clone;
 
-    // TODO: the setup function should take the problem description as an input, 
-    // probably the context or all the kernels?
-    fn setup() -> (Self::ProverSetup, Self::VerifierSetup); 
-    
-    fn commit(vals: &[C::DefaultSimdField], prover_setup: &Self::ProverSetup) -> (Self::Commitment, Self::CommitmentExtraInfo);
+    fn prover_setup(computation_graph: &ComputationGraph<C>) -> Self::ProverSetup;
+    fn verifier_setup(computation_graph: &ComputationGraph<C>) -> Self::VerifierSetup;
+
+    fn commit(
+        prover_setup: &Self::ProverSetup,
+        vals: &[C::DefaultSimdField],
+    ) -> (Self::Commitment, Self::CommitmentExtraInfo);
+
     fn prove(
         prover_setup: &Self::ProverSetup,
         kernel: &Kernel<C>,
-        vals: &[C::DefaultSimdField],
         commitments: &[&Self::Commitment],
-        commitments_extra_info: &[Self::CommitmentExtraInfo],
+        commitments_extra_info: &[&Self::CommitmentExtraInfo],
+        commitments_values: &[&[C::DefaultSimdField]],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> Self::Proof;
 
     fn verify(
+        verifier_setup: &Self::VerifierSetup,
         kernel: &Kernel<C>,
         proof: &Self::Proof,
         commitments: &[&Self::Commitment],

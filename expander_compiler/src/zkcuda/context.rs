@@ -7,6 +7,7 @@ use crate::{circuit::config::Config, utils::pool::Pool};
 
 use super::{
     kernel::{shape_prepend, Kernel, Shape},
+    proof::{ComputationGraph, ProofTemplate},
     proving_system::{Commitment, ExpanderGKRProvingSystem, ProvingSystem},
     vec_shaped::{flatten_shaped, unflatten_shaped, VecShaped},
 };
@@ -16,7 +17,7 @@ pub use macros::call_kernel;
 pub struct DeviceMemory<C: Config, P: ProvingSystem<C>> {
     pub raw_values: Vec<C::DefaultSimdField>,
     pub values: Vec<C::DefaultSimdField>,
-    pub commitment: P::Commitment,
+    pub _proving_system: std::marker::PhantomData<P>,
 }
 
 #[derive(Clone)]
@@ -35,14 +36,6 @@ pub enum BroadcastType {
     Both,
 }
 
-#[derive(Clone)]
-pub struct ProofTemplate {
-    pub kernel_id: usize,
-    pub commitment_indices: Vec<usize>,
-    pub parallel_count: usize,
-    pub is_broadcast: Vec<bool>,
-}
-
 pub struct Context<
     C: Config,
     P: ProvingSystem<C> = ExpanderGKRProvingSystem<C>,
@@ -50,20 +43,14 @@ pub struct Context<
 > {
     pub kernels: Pool<Kernel<C>>,
     pub device_memories: Vec<DeviceMemory<C, P>>,
-    pub proofs: Vec<P::Proof>,
     pub proof_templates: Vec<ProofTemplate>,
     pub hint_caller: H,
+    pub _proving_system: std::marker::PhantomData<P>,
 }
 
 pub struct CombinedProof<C: Config, P: ProvingSystem<C> = ExpanderGKRProvingSystem<C>> {
     pub commitments: Vec<P::Commitment>,
     pub proofs: Vec<P::Proof>,
-}
-
-pub struct ComputationGraph<C: Config> {
-    pub kernels: Vec<Kernel<C>>,
-    pub commitments_lens: Vec<usize>,
-    pub proof_templates: Vec<ProofTemplate>,
 }
 
 impl<C: Config, P: ProvingSystem<C>> Default for Context<C, P> {
@@ -227,9 +214,9 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
         Context {
             kernels: Pool::new(),
             device_memories: vec![],
-            proofs: vec![],
             proof_templates: vec![],
             hint_caller,
+            _proving_system: std::marker::PhantomData,
         }
     }
 
@@ -240,11 +227,10 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
         broadcast_type: BroadcastType,
         shape: Shape,
     ) -> DeviceMemoryHandle {
-        let commitment = P::commit(&padded_values);
         self.device_memories.push(DeviceMemory {
             raw_values: values,
             values: padded_values,
-            commitment,
+            _proving_system: std::marker::PhantomData,
         });
         Some(DeviceMemoryHandleRaw {
             id: self.device_memories.len() - 1,
@@ -520,20 +506,14 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
                 continue;
             }
             ov.resize(next_power_of_two(ov.len()), C::DefaultSimdField::zero());
-            let commitment = P::commit(&ov);
-            let device_memory = DeviceMemory {
-                raw_values: ov_raw,
-                values: ov,
-                commitment,
-            };
-            self.device_memories.push(device_memory);
-            let handle = DeviceMemoryHandleRaw {
-                id: self.device_memories.len() - 1,
-                broadcast_type: broadcast_type(shape, false),
-                shape: shape_prepend(shape, parallel_count),
-            };
-            handles.push(handle.clone());
-            *output = Some(handle);
+            let handle = self.make_device_mem(
+                ov_raw,
+                ov,
+                broadcast_type(shape, false),
+                shape_prepend(shape, parallel_count),
+            );
+            *output = handle.clone();
+            handles.push(handle.unwrap());
             lc_is_broadcast.push(false);
         }
         if kernel.witness_solver_hint_input.is_some() {
@@ -541,32 +521,15 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
                 next_power_of_two(hint_output_vec.len()),
                 C::DefaultSimdField::zero(),
             );
-            let commitment = P::commit(&hint_output_vec);
-            let device_memory = DeviceMemory {
-                raw_values: hint_output_vec.clone(),
-                values: hint_output_vec,
-                commitment,
-            };
-            self.device_memories.push(device_memory);
-            let handle = DeviceMemoryHandleRaw {
-                id: self.device_memories.len() - 1,
-                broadcast_type: BroadcastType::Both,
-                shape: None,
-            };
-            handles.push(handle);
+            let handle = self.make_device_mem(
+                hint_output_vec.clone(),
+                hint_output_vec,
+                BroadcastType::Both,
+                None,
+            );
+            handles.push(handle.unwrap());
             lc_is_broadcast.push(false);
         }
-        let commitment_refs: Vec<_> = handles
-            .iter()
-            .map(|x| &self.device_memories[x.id].commitment)
-            .collect();
-        let proof = P::prove(
-            kernel,
-            &commitment_refs,
-            next_power_of_two(parallel_count),
-            &lc_is_broadcast,
-        );
-        self.proofs.push(proof);
         self.proof_templates.push(ProofTemplate {
             kernel_id,
             commitment_indices: handles.iter().map(|x| x.id).collect(),
@@ -581,26 +544,57 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
             commitments_lens: self
                 .device_memories
                 .iter()
-                .map(|x| x.commitment.vals_len())
+                .map(|x| x.values.len())
                 .collect(),
             proof_templates: self.proof_templates.clone(),
         }
     }
 
     pub fn to_proof(self) -> CombinedProof<C, P> {
+        let computation_graph = self.to_computation_graph();
+        let prover_setup = P::prover_setup(&computation_graph);
+        let commitments = self
+            .device_memories
+            .iter()
+            .map(|x| P::commit(&prover_setup, &x.values))
+            .collect::<Vec<_>>();
+        let proofs = self
+            .proof_templates
+            .iter()
+            .map(|template| {
+                P::prove(
+                    &prover_setup,
+                    &self.kernels.get(template.kernel_id),
+                    &template
+                        .commitment_indices
+                        .iter()
+                        .map(|x| &commitments[*x].0)
+                        .collect::<Vec<_>>(),
+                    &template
+                        .commitment_indices
+                        .iter()
+                        .map(|x| &commitments[*x].1)
+                        .collect::<Vec<_>>(),
+                    &template
+                        .commitment_indices
+                        .iter()
+                        .map(|x| &self.device_memories[*x].values[..])
+                        .collect::<Vec<_>>(),
+                    next_power_of_two(template.parallel_count),
+                    &template.is_broadcast,
+                )
+            })
+            .collect::<Vec<_>>();
         CombinedProof {
-            commitments: self
-                .device_memories
-                .into_iter()
-                .map(|x| x.commitment)
-                .collect(),
-            proofs: self.proofs,
+            commitments: commitments.into_iter().map(|x| x.0).collect(),
+            proofs,
         }
     }
 }
 
 impl<C: Config> ComputationGraph<C> {
     pub fn verify<P: ProvingSystem<C>>(&self, combined_proof: &CombinedProof<C, P>) -> bool {
+        let verifier_setup = P::verifier_setup(self);
         for (commitment, len) in combined_proof
             .commitments
             .iter()
@@ -616,6 +610,7 @@ impl<C: Config> ComputationGraph<C> {
             .zip(self.proof_templates.iter())
         {
             if !P::verify(
+                &verifier_setup,
                 &self.kernels[template.kernel_id],
                 proof,
                 &template
