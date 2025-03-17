@@ -100,6 +100,19 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
             expander_circuit.layers[0].input_vals =
                 prepare_inputs(kernel, commitments, is_broadcast, i);
             expander_circuit.evaluate();
+            println!(
+                "{:?}",
+                expander_circuit.layers.last_mut().unwrap().output_vals
+            );
+            for x in expander_circuit
+                .layers
+                .last_mut()
+                .unwrap()
+                .output_vals
+                .iter()
+            {
+                assert_eq!(*x, C::DefaultSimdField::zero());
+            }
             let (claimed_v, rx, ry, rsimd, _rmpi) = gkr_prove(
                 &expander_circuit,
                 &mut prover_scratch,
