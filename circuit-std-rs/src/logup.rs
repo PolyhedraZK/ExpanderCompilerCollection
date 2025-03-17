@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use arith::Field;
 use expander_compiler::frontend::{
-    declare_circuit, Config, Define, Error, FieldModulus, RootAPI, Variable, M31,
+    declare_circuit, Config, Define, Error, FieldModulus, RootAPI, Variable,
 };
 use rand::Rng;
 
