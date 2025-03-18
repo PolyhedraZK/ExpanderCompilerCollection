@@ -12,3 +12,4 @@ pub mod validator;
 pub mod zkcuda_hashtable;
 pub mod zkcuda_bls_verifier;
 pub mod zkcuda_shuffle;
+pub mod zkcuda_permutation;
