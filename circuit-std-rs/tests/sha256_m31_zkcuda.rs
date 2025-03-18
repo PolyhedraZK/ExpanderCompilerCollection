@@ -17,14 +17,7 @@ fn sha256_37bytes<C: Config>(
     output_data: &mut [OutputVariable; SHA256LEN],
 ) -> Vec<Variable> {
     for _ in 0..64{
-        println!("sha256_37bytes");
-        let mut hint_idx = GLOBAL_HINT_IDX.lock().unwrap();
-        *hint_idx = 0;
-        std::mem::drop(hint_idx);
         let mut data = orign_data.to_vec();
-        // for _ in 32..37 {
-        //     data.push(builder.constant(255));
-        // }
         let n = data.len();
         if n != 32 + 1 + 4 {
             panic!("len(orignData) !=  32+1+4")
@@ -35,9 +28,7 @@ fn sha256_37bytes<C: Config>(
         pre_pad[64 - 37 - 1] = builder.constant((32 + 1 + 4) * 8 - 256); //length byte
         data.append(&mut pre_pad); //append padding
         let mut d = MyDigest::new(builder);
-        println!("pass");
         d.chunk_write(builder, &data);
-        println!("write");
         let res = d.return_sum(builder).to_vec();
         for (i, val) in res.iter().enumerate() {
             output_data[i] = *val;
@@ -159,7 +150,6 @@ fn zkcuda_sha256_37bytes_hint() {
         assert_eq!(result[i], output_vars);
     }
 }
-
 
 
 // #[test]

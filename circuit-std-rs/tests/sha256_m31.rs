@@ -1,7 +1,43 @@
-use circuit_std_rs::{sha256::m31::sha256_37bytes, sha256::m31_utils::to_binary_hint};
+use circuit_std_rs::sha256::{m31::*, m31_utils::to_binary_hint};
 use expander_compiler::frontend::*;
 use extra::*;
 use sha2::{Digest, Sha256};
+
+declare_circuit!(SHA256COMPARECircuit {
+    input: [Variable; 37],
+    output: [Variable; 32],
+});
+
+
+impl Define<M31Config> for SHA256COMPARECircuit<Variable> {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
+        for _ in 0..64{ 
+            let mut data = self.input.to_vec();
+            let n = data.len();
+            if n != 32 + 1 + 4 {
+                panic!("len(orignData) !=  32+1+4")
+            }
+            let mut pre_pad = vec![builder.constant(0); 64 - 37];
+            pre_pad[0] = builder.constant(128); //0x80
+            pre_pad[64 - 37 - 2] = builder.constant((37) * 8 / 256); //length byte
+            pre_pad[64 - 37 - 1] = builder.constant((32 + 1 + 4) * 8 - 256); //length byte
+            data.append(&mut pre_pad); //append padding
+            let mut d = MyDigest::new(builder);
+            d.chunk_write(builder, &data);
+            let res = d.return_sum(builder).to_vec();
+            for (i, val) in res.iter().enumerate() {
+                builder.assert_is_equal(*val, self.output[i]);
+            }
+        }
+    }
+}
+
+#[test]
+fn test_sha256_sha256_comparecircuit() {
+    let mut hint_registry = HintRegistry::<M31>::new();
+    hint_registry.register("myhint.tobinary", to_binary_hint);
+    compile(&SHA256COMPARECircuit::default(), CompileOptions::default()).unwrap();
+}
 
 declare_circuit!(SHA25637BYTESCircuit {
     input: [Variable; 37],

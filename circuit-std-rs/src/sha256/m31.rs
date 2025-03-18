@@ -113,7 +113,7 @@ impl MyDigest {
         self.len = 0;
     }
     //always write a chunk
-    fn chunk_write<C: Config, B: RootAPI<C>>(&mut self, api: &mut B, p: &[Variable]) {
+    pub fn chunk_write<C: Config, B: RootAPI<C>>(&mut self, api: &mut B, p: &[Variable]) {
         if p.len() != CHUNK || self.nx != 0 {
             panic!("p.len() != CHUNK || self.nx != 0");
         }
@@ -129,7 +129,7 @@ impl MyDigest {
         let tmp_h = self.h;
         self.h = self.block_37bytes_compress(api, tmp_h, p);
     }
-    fn return_sum<C: Config, B: RootAPI<C>>(&mut self, api: &mut B) -> [Variable; SHA256LEN] {
+    pub fn return_sum<C: Config, B: RootAPI<C>>(&mut self, api: &mut B) -> [Variable; SHA256LEN] {
         let mut digest = [api.constant(0); SHA256LEN];
 
         m31_26_array_put_uint32(api, &mut digest[0..], self.h[0]);
