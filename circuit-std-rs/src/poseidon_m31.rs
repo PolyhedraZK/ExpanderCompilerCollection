@@ -206,4 +206,4 @@ pub const POSEIDON_M31X16_FULL_ROUNDS: usize = 8;
 
 pub const POSEIDON_M31X16_PARTIAL_ROUNDS: usize = 14;
 
-pub const POSEIDON_M31X16_RATE: usize = 8;
+pub const  POSEIDON_M31X16_RATE: usize = 8;

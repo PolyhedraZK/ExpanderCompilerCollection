@@ -61,3 +61,16 @@ pub fn ensure_directory_exists(dir: &str) {
         println!("Directory already exists: {}", dir);
     }
 }
+
+pub fn sub_vector<T>(vec: &Vec<T>, start: usize, length: usize) -> (Vec<T>, usize)
+where
+    T: Clone,
+{
+    if start >= vec.len() {
+        return (Vec::new(), start);
+    }
+    let end = std::cmp::min(start + length, vec.len());
+    let sub_vec = vec[start..end].to_vec();
+    let next_pos = end;
+    (sub_vec, next_pos)
+}

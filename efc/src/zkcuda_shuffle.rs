@@ -11,19 +11,7 @@ use circuit_std_rs::gnark::emulated::sw_bls12381::g2::*;
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::kernel::*;
 use circuit_std_rs::utils::simple_select;
-
-fn sub_vector<T>(vec: &Vec<T>, start: usize, length: usize) -> (Vec<T>, usize)
-where
-    T: Clone,
-{
-    if start >= vec.len() {
-        return (Vec::new(), start);
-    }
-    let end = std::cmp::min(start + length, vec.len());
-    let sub_vec = vec[start..end].to_vec();
-    let next_pos = end;
-    (sub_vec, next_pos)
-}
+use crate::utils::sub_vector;
 
 fn shuffle_inner<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variable> {
     println!("len p: {}", p.len());
