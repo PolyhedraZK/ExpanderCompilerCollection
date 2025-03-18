@@ -346,9 +346,10 @@ fn zkcuda_keccak_1() {
     assert_eq!(out, expected_res);
     assert_eq!(out[0][0], expected_res[0][0]);
 
+    let computation_graph = ctx.to_computation_graph();
     let proof = ctx.to_proof();
     println!("proof generation ok");
-    assert!(proof.verify());
+    assert!(computation_graph.verify(&proof));
     println!("verify ok");
 }
 
@@ -357,7 +358,7 @@ fn zkcuda_keccak_2() {
     let kernel: Kernel<M31Config> = compile_compute_multiple_keccak().unwrap();
     println!("compile ok");
 
-    let mut ctx: Context<M31Config, ExpanderGKRProvingSystem<M31Config>> = Context::default();
+    let mut ctx: Context<M31Config> = Context::default();
     let mut p: Vec<Vec<M31>> = vec![];
     let mut data: Vec<Vec<u8>> = vec![];
     let mut expected_res: Vec<Vec<M31>> = vec![];
@@ -402,8 +403,9 @@ fn zkcuda_keccak_2() {
     assert_eq!(out[0], expected_res);
     assert_eq!(out[0][0][0], expected_res[0][0]);
 
+    let computation_graph = ctx.to_computation_graph();
     let proof = ctx.to_proof();
     println!("proof generation ok");
-    assert!(proof.verify());
+    assert!(computation_graph.verify(&proof));
     println!("verify ok");
 }

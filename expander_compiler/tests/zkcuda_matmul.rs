@@ -1,5 +1,4 @@
 use expander_compiler::frontend::*;
-use expander_compiler::zkcuda::proving_system::DummyProvingSystem;
 use expander_compiler::zkcuda::{context::*, kernel::*};
 
 #[kernel]
@@ -34,7 +33,7 @@ fn zkcuda_matmul_sum() {
     let kernel_mul_line: Kernel<M31Config> = compile_mul_line().unwrap();
     let kernel_sum_8_elements: Kernel<M31Config> = compile_sum_8_elements().unwrap();
 
-    let mut ctx: Context<M31Config, DummyProvingSystem<M31Config>> = Context::default();
+    let mut ctx: Context<M31Config> = Context::default();
 
     let mut mat_a: Vec<Vec<M31>> = vec![];
     for i in 0..64 {
@@ -84,6 +83,7 @@ fn zkcuda_matmul_sum() {
     let result: M31 = ctx.copy_to_host(g);
     assert_eq!(result, expected_result);
 
+    let computation_graph = ctx.to_computation_graph();
     let proof = ctx.to_proof();
-    assert!(proof.verify());
+    assert!(computation_graph.verify(&proof));
 }

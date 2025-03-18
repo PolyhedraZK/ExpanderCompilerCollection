@@ -1,18 +1,19 @@
-use circuit_std_rs::gnark::{
-    element::new_internal_element,
-    emulated::field_bls12381::{
-        e12::{Ext12, GE12},
-        e2::GE2,
-        e6::GE6,
+use circuit_std_rs::{
+    gnark::{
+        element::new_internal_element,
+        emulated::field_bls12381::{
+            e12::{Ext12, GE12},
+            e2::GE2,
+            e6::GE6,
+        },
     },
-    hints::register_hint,
+    utils::register_hint,
 };
 use expander_compiler::{
     compile::CompileOptions,
     declare_circuit,
     frontend::{
-        compile_generic, extra::debug_eval, GenericDefine, HintRegistry, M31Config, RootAPI,
-        Variable, M31,
+        compile, extra::debug_eval, Define, HintRegistry, M31Config, RootAPI, Variable, M31,
     },
 };
 
@@ -22,7 +23,7 @@ declare_circuit!(E12AddCircuit {
     z: [[[[Variable; 48]; 2]; 3]; 2],
 });
 
-impl GenericDefine<M31Config> for E12AddCircuit<Variable> {
+impl Define<M31Config> for E12AddCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext12 = Ext12::new(builder);
         let x_e12 = GE12 {
@@ -125,7 +126,7 @@ impl GenericDefine<M31Config> for E12AddCircuit<Variable> {
 }
 #[test]
 fn test_e12_add() {
-    compile_generic(&E12AddCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E12AddCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E12AddCircuit::<M31> {
@@ -362,7 +363,7 @@ declare_circuit!(E12SubCircuit {
     c: [[[[Variable; 48]; 2]; 3]; 2],
 });
 
-impl GenericDefine<M31Config> for E12SubCircuit<Variable> {
+impl Define<M31Config> for E12SubCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext12 = Ext12::new(builder);
 
@@ -470,7 +471,7 @@ impl GenericDefine<M31Config> for E12SubCircuit<Variable> {
 
 #[test]
 fn test_e12_sub() {
-    compile_generic(&E12SubCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E12SubCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
 
@@ -709,7 +710,7 @@ declare_circuit!(E12MulCircuit {
     c: [[[[Variable; 48]; 2]; 3]; 2],
 });
 
-impl GenericDefine<M31Config> for E12MulCircuit<Variable> {
+impl Define<M31Config> for E12MulCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext12 = Ext12::new(builder);
 
@@ -817,7 +818,7 @@ impl GenericDefine<M31Config> for E12MulCircuit<Variable> {
 
 #[test]
 fn test_e12_mul() {
-    compile_generic(&E12MulCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E12MulCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
 
@@ -1055,7 +1056,7 @@ declare_circuit!(E12DivCircuit {
     c: [[[[Variable; 48]; 2]; 3]; 2],
 });
 
-impl GenericDefine<M31Config> for E12DivCircuit<Variable> {
+impl Define<M31Config> for E12DivCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext12 = Ext12::new(builder);
 
@@ -1163,7 +1164,7 @@ impl GenericDefine<M31Config> for E12DivCircuit<Variable> {
 
 #[test]
 fn test_e12_div() {
-    compile_generic(&E12DivCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E12DivCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
 
@@ -1400,7 +1401,7 @@ declare_circuit!(E12SquareCircuit {
     c: [[[[Variable; 48]; 2]; 3]; 2],
 });
 
-impl GenericDefine<M31Config> for E12SquareCircuit<Variable> {
+impl Define<M31Config> for E12SquareCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext12 = Ext12::new(builder);
 
@@ -1477,7 +1478,7 @@ impl GenericDefine<M31Config> for E12SquareCircuit<Variable> {
 
 #[test]
 fn test_e12_square() {
-    compile_generic(&E12SquareCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E12SquareCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
 
@@ -1641,7 +1642,7 @@ declare_circuit!(E12ConjugateCircuit {
     c: [[[[Variable; 48]; 2]; 3]; 2],
 });
 
-impl GenericDefine<M31Config> for E12ConjugateCircuit<Variable> {
+impl Define<M31Config> for E12ConjugateCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext12 = Ext12::new(builder);
 
@@ -1718,7 +1719,7 @@ impl GenericDefine<M31Config> for E12ConjugateCircuit<Variable> {
 
 #[test]
 fn test_e12_conjugate() {
-    compile_generic(&E12ConjugateCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E12ConjugateCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
 
@@ -1882,7 +1883,7 @@ declare_circuit!(E12InverseCircuit {
     c: [[[[Variable; 48]; 2]; 3]; 2],
 });
 
-impl GenericDefine<M31Config> for E12InverseCircuit<Variable> {
+impl Define<M31Config> for E12InverseCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext12 = Ext12::new(builder);
 
@@ -1959,7 +1960,7 @@ impl GenericDefine<M31Config> for E12InverseCircuit<Variable> {
 
 #[test]
 fn test_e12_inverse() {
-    compile_generic(&E12InverseCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E12InverseCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
 
@@ -2124,7 +2125,7 @@ declare_circuit!(E12MulBy014Circuit {
     c: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E12MulBy014Circuit<Variable> {
+impl Define<M31Config> for E12MulBy014Circuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext12 = Ext12::new(builder);
 
