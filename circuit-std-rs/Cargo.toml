@@ -11,6 +11,10 @@ ark-std.workspace = true
 rand.workspace = true
 expander_config.workspace = true
 expander_circuit.workspace = true
+
+mpi_config.workspace = true
+gkr_field_config.workspace = true
+
 gkr.workspace = true
 arith.workspace = true
 gf2.workspace = true
