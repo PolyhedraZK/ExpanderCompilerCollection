@@ -95,7 +95,7 @@ pub fn xor_variable<C: Config, B: RootAPI<C>>(
     for i in 0..nbits {
         bits_res[i] = api.xor(bits_a[i], bits_b[i]);
     }
-    from_binary(api, bits_res)
+    from_binary(api, &bits_res)
 }
 pub fn expand_msg_xmd_variable<C: Config, B: RootAPI<C>>(
     api: &mut B,

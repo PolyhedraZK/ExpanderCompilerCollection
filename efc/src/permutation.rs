@@ -100,7 +100,7 @@ impl Define<M31Config> for PermutationIndicesValidatorHashesCircuit<Variable> {
         for i in 0..VALIDATOR_COUNT / 16 {
             active_validator_16_bits.push(from_binary(
                 builder,
-                self.active_validator_bits[i * 16..(i + 1) * 16].to_vec(),
+                &self.active_validator_bits[i * 16..(i + 1) * 16].to_vec(),
             ));
         }
         let params = PoseidonM31Params::new(

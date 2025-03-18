@@ -16,30 +16,32 @@ fn sha256_37bytes<C: Config>(
     orign_data: &[InputVariable; 37],
     output_data: &mut [OutputVariable; SHA256LEN],
 ) -> Vec<Variable> {
-    println!("sha256_37bytes");
-    let mut hint_idx = GLOBAL_HINT_IDX.lock().unwrap();
-    *hint_idx = 0;
-    std::mem::drop(hint_idx);
-    let mut data = orign_data.to_vec();
-    // for _ in 32..37 {
-    //     data.push(builder.constant(255));
-    // }
-    let n = data.len();
-    if n != 32 + 1 + 4 {
-        panic!("len(orignData) !=  32+1+4")
-    }
-    let mut pre_pad = vec![builder.constant(0); 64 - 37];
-    pre_pad[0] = builder.constant(128); //0x80
-    pre_pad[64 - 37 - 2] = builder.constant((37) * 8 / 256); //length byte
-    pre_pad[64 - 37 - 1] = builder.constant((32 + 1 + 4) * 8 - 256); //length byte
-    data.append(&mut pre_pad); //append padding
-    let mut d = MyDigest::new(builder);
-    println!("pass");
-    d.chunk_write(builder, &data);
-    println!("write");
-    let res = d.return_sum(builder).to_vec();
-    for (i, val) in res.iter().enumerate() {
-        output_data[i] = *val;
+    for _ in 0..64{
+        println!("sha256_37bytes");
+        let mut hint_idx = GLOBAL_HINT_IDX.lock().unwrap();
+        *hint_idx = 0;
+        std::mem::drop(hint_idx);
+        let mut data = orign_data.to_vec();
+        // for _ in 32..37 {
+        //     data.push(builder.constant(255));
+        // }
+        let n = data.len();
+        if n != 32 + 1 + 4 {
+            panic!("len(orignData) !=  32+1+4")
+        }
+        let mut pre_pad = vec![builder.constant(0); 64 - 37];
+        pre_pad[0] = builder.constant(128); //0x80
+        pre_pad[64 - 37 - 2] = builder.constant((37) * 8 / 256); //length byte
+        pre_pad[64 - 37 - 1] = builder.constant((32 + 1 + 4) * 8 - 256); //length byte
+        data.append(&mut pre_pad); //append padding
+        let mut d = MyDigest::new(builder);
+        println!("pass");
+        d.chunk_write(builder, &data);
+        println!("write");
+        let res = d.return_sum(builder).to_vec();
+        for (i, val) in res.iter().enumerate() {
+            output_data[i] = *val;
+        }
     }
 }
 
@@ -119,44 +121,44 @@ fn sha256_37bytes<C: Config>(
 
 
 
-// #[test]
-// fn zkcuda_sha256_37bytes_hint() {
-//     let mut hint_registry = HintRegistry::<M31>::new();
-//     hint_registry.register("myhint.tobinary", to_binary_hint);
-//     let kernel_check_sha256_37bytes: Kernel<M31Config> = compile_sha256_37bytes().unwrap();
-//     println!("compile_sha256_37bytes() done");
-//     let data = [255; 37];
-//     let repeat_time = 512;
-//     let mut hash = Sha256::new();
-//     hash.update(data);
-//     let output = hash.finalize();
-//     println!("output: {:?}", output);
-//     let mut input_vars = vec![];
-//     let mut output_vars = vec![];
-//     for i in 0..37 {
-//         input_vars.push(M31::from(data[i] as u32));
-//     }
-//     for i in 0..32 {
-//         output_vars.push(M31::from(output[i] as u32));
-//     }
-//     let mut new_input_vars = vec![];
-//     for _ in 0..repeat_time {
-//         new_input_vars.push(input_vars.clone());
-//     }
-//     let mut ctx: Context<M31Config, ExpanderGKRProvingSystem<M31Config>, _> = Context::new(hint_registry);
+#[test]
+fn zkcuda_sha256_37bytes_hint() {
+    let mut hint_registry = HintRegistry::<M31>::new();
+    hint_registry.register("myhint.tobinary", to_binary_hint);
+    let kernel_check_sha256_37bytes: Kernel<M31Config> = compile_sha256_37bytes().unwrap();
+    println!("compile_sha256_37bytes() done");
+    let data = [255; 37];
+    let repeat_time = 8;
+    let mut hash = Sha256::new();
+    hash.update(data);
+    let output = hash.finalize();
+    println!("output: {:?}", output);
+    let mut input_vars = vec![];
+    let mut output_vars = vec![];
+    for i in 0..37 {
+        input_vars.push(M31::from(data[i] as u32));
+    }
+    for i in 0..32 {
+        output_vars.push(M31::from(output[i] as u32));
+    }
+    let mut new_input_vars = vec![];
+    for _ in 0..repeat_time {
+        new_input_vars.push(input_vars.clone());
+    }
+    let mut ctx: Context<M31Config, ExpanderGKRProvingSystem<M31Config>, _> = Context::new(hint_registry);
 
-//     let a = ctx.copy_to_device(&new_input_vars, false);
-//     let mut c = None;
-//     let start_time = time::Instant::now();
-//     call_kernel!(ctx, kernel_check_sha256_37bytes, a, mut c);
-//     let elapsed = start_time.elapsed();
-//     println!("Time elapsed in call_kernel!() is: {:?}", elapsed);
-//     // let c = c.reshape(&[repeat_time, 32]);
-//     let result: Vec<Vec<M31>> = ctx.copy_to_host(c);
-//     for i in 0..repeat_time {
-//         assert_eq!(result[i], output_vars);
-//     }
-// }
+    let a = ctx.copy_to_device(&new_input_vars, false);
+    let mut c = None;
+    let start_time = time::Instant::now();
+    call_kernel!(ctx, kernel_check_sha256_37bytes, a, mut c);
+    let elapsed = start_time.elapsed();
+    println!("Time elapsed in call_kernel!() is: {:?}", elapsed);
+    // let c = c.reshape(&[repeat_time, 32]);
+    let result: Vec<Vec<M31>> = ctx.copy_to_host(c);
+    for i in 0..repeat_time {
+        assert_eq!(result[i], output_vars);
+    }
+}
 
 
 
@@ -297,168 +299,168 @@ fn sha256_37bytes<C: Config>(
 //     let result: Vec<M31> = ctx.copy_to_host(c);
 //     assert_eq!(result, output_vars);
 // }
-const HASHTABLESIZE: usize = 64;
-declare_circuit!(HASHTABLECircuit {
-    shuffle_round: Variable,
-    start_index: [Variable; 4],
-    seed: [PublicVariable; SHA256LEN],
-    output: [[Variable; SHA256LEN]; HASHTABLESIZE],
-});
-impl<C: Config> Define<C> for HASHTABLECircuit<Variable> {
-    fn define(&self, builder: &mut API<C>) {
-        let mut seed_bits: Vec<Variable> = vec![];
-        for i in 0..8 {
-            seed_bits.extend_from_slice(&bytes_to_bits(builder, &self.seed[i * 4..(i + 1) * 4]));
-        }
-        let mut indices = vec![];
-        let var0 = builder.constant(0);
-        for i in 0..HASHTABLESIZE {
-            //assume HASHTABLESIZE is less than 2^8
-            let var_i = builder.constant(i as u32);
-            let index =
-                big_array_add_reduce(builder, &self.start_index, &[var_i, var0, var0, var0], 8);
-            indices.push(bytes_to_bits(builder, &index));
-        }
-        let mut round_bits = vec![];
-        round_bits.extend_from_slice(&bytes_to_bits(builder, &[self.shuffle_round]));
-        let mut inputs = vec![];
-        let mut outputs = vec![];
-        for (i, index) in indices.iter().enumerate().take(HASHTABLESIZE) {
-            let mut cur_input = Vec::<Variable>::new();
-            cur_input.extend_from_slice(&seed_bits);
-            cur_input.extend_from_slice(&index[8..]);
-            cur_input.extend_from_slice(&round_bits);
-            cur_input.extend_from_slice(&index[..8]);
-            inputs.push(cur_input);
-            outputs.push(self.output[i].to_vec());
-        }
-        check_sha256_37bytes_256batch_compress(builder, &inputs, &outputs);
-    }
-}
-//Where C: Config = M31Config
-fn hashtable_big_field<C: Config, const N_WITNESSES: usize>(){
-    let compile_result: CompileResult<C> = compile(&HASHTABLECircuit::default()).unwrap();
-    let CompileResult {
-        witness_solver,
-        layered_circuit,
-    } = compile_result;
-    let circuit_name = format!("circuit_{}.txt", "hashtablem31");
-    let file = std::fs::File::create(&circuit_name).unwrap();
-    let writer = std::io::BufWriter::new(file);
-    layered_circuit.serialize_into(writer).unwrap();
+// const HASHTABLESIZE: usize = 64;
+// declare_circuit!(HASHTABLECircuit {
+//     shuffle_round: Variable,
+//     start_index: [Variable; 4],
+//     seed: [PublicVariable; SHA256LEN],
+//     output: [[Variable; SHA256LEN]; HASHTABLESIZE],
+// });
+// impl<C: Config> Define<C> for HASHTABLECircuit<Variable> {
+//     fn define(&self, builder: &mut API<C>) {
+//         let mut seed_bits: Vec<Variable> = vec![];
+//         for i in 0..8 {
+//             seed_bits.extend_from_slice(&bytes_to_bits(builder, &self.seed[i * 4..(i + 1) * 4]));
+//         }
+//         let mut indices = vec![];
+//         let var0 = builder.constant(0);
+//         for i in 0..HASHTABLESIZE {
+//             //assume HASHTABLESIZE is less than 2^8
+//             let var_i = builder.constant(i as u32);
+//             let index =
+//                 big_array_add_reduce(builder, &self.start_index, &[var_i, var0, var0, var0], 8);
+//             indices.push(bytes_to_bits(builder, &index));
+//         }
+//         let mut round_bits = vec![];
+//         round_bits.extend_from_slice(&bytes_to_bits(builder, &[self.shuffle_round]));
+//         let mut inputs = vec![];
+//         let mut outputs = vec![];
+//         for (i, index) in indices.iter().enumerate().take(HASHTABLESIZE) {
+//             let mut cur_input = Vec::<Variable>::new();
+//             cur_input.extend_from_slice(&seed_bits);
+//             cur_input.extend_from_slice(&index[8..]);
+//             cur_input.extend_from_slice(&round_bits);
+//             cur_input.extend_from_slice(&index[..8]);
+//             inputs.push(cur_input);
+//             outputs.push(self.output[i].to_vec());
+//         }
+//         check_sha256_37bytes_256batch_compress(builder, &inputs, &outputs);
+//     }
+// }
+// //Where C: Config = M31Config
+// fn hashtable_big_field<C: Config, const N_WITNESSES: usize>(){
+//     let compile_result: CompileResult<C> = compile(&HASHTABLECircuit::default()).unwrap();
+//     let CompileResult {
+//         witness_solver,
+//         layered_circuit,
+//     } = compile_result;
+//     let circuit_name = format!("circuit_{}.txt", "hashtablem31");
+//     let file = std::fs::File::create(&circuit_name).unwrap();
+//     let writer = std::io::BufWriter::new(file);
+//     layered_circuit.serialize_into(writer).unwrap();
 
-    let seed = [255; 32];
-    let start_index = [0, 0, 0, 0];
-    let mut output = vec![];
-    let repeat_time = 64;
-    for i in 0..repeat_time {
-        let mut hash = Sha256::new();
-        let mut new_data = vec![];
-        new_data.extend_from_slice(&seed);
-        new_data.push(0);
-        new_data.push(i);
-        new_data.extend_from_slice(&vec![0,0,0]);
-        hash.update(new_data);
-        let output_data = hash.finalize();
-        output.push(output_data);
-    }
-    let mut assignment = HASHTABLECircuit::default();
-    for i in 0..32 {
-        assignment.seed[i] = C::CircuitField::from(seed[i] as u32);
-    }
-    for i in 0..4 {
-        assignment.start_index[i] = C::CircuitField::from(start_index[i] as u32);
-    }
-    for i in 0..repeat_time {
-        for j in 0..32 {
-            assignment.output[i as usize][j] = C::CircuitField::from(output[i as usize][j] as u32);
-        }
-    }
+//     let seed = [255; 32];
+//     let start_index = [0, 0, 0, 0];
+//     let mut output = vec![];
+//     let repeat_time = 64;
+//     for i in 0..repeat_time {
+//         let mut hash = Sha256::new();
+//         let mut new_data = vec![];
+//         new_data.extend_from_slice(&seed);
+//         new_data.push(0);
+//         new_data.push(i);
+//         new_data.extend_from_slice(&vec![0,0,0]);
+//         hash.update(new_data);
+//         let output_data = hash.finalize();
+//         output.push(output_data);
+//     }
+//     let mut assignment = HASHTABLECircuit::default();
+//     for i in 0..32 {
+//         assignment.seed[i] = C::CircuitField::from(seed[i] as u32);
+//     }
+//     for i in 0..4 {
+//         assignment.start_index[i] = C::CircuitField::from(start_index[i] as u32);
+//     }
+//     for i in 0..repeat_time {
+//         for j in 0..32 {
+//             assignment.output[i as usize][j] = C::CircuitField::from(output[i as usize][j] as u32);
+//         }
+//     }
 
-    // let mut hint_registry = HintRegistry::<C::CircuitField>::new();
-    // hint_registry.register("myhint.tobinary", to_binary_hint::<C>);
-    // let witness = witness_solver.solve_witness_with_hints(&HASHTABLECircuit::default(), &mut hint_registry).unwrap();
-    // let res = layered_circuit.run(&witness);
-    // assert_eq!(res, vec![true]);
-    // println!("test 1 passed");
-    let mut assignments = vec![];
-    for _ in 0..N_WITNESSES {
-        assignments.push(assignment.clone());
-    }
+//     // let mut hint_registry = HintRegistry::<C::CircuitField>::new();
+//     // hint_registry.register("myhint.tobinary", to_binary_hint::<C>);
+//     // let witness = witness_solver.solve_witness_with_hints(&HASHTABLECircuit::default(), &mut hint_registry).unwrap();
+//     // let res = layered_circuit.run(&witness);
+//     // assert_eq!(res, vec![true]);
+//     // println!("test 1 passed");
+//     let mut assignments = vec![];
+//     for _ in 0..N_WITNESSES {
+//         assignments.push(assignment.clone());
+//     }
 
-    let mut expander_circuit = layered_circuit
-        .export_to_expander::<C::DefaultGKRFieldConfig>()
-        .flatten();
-    let config = expander_config::Config::<C::DefaultGKRConfig>::new(
-        expander_config::GKRScheme::Vanilla,
-        mpi_config::MPIConfig::new(),
-    );
-    let mut hint_registry = HintRegistry::<C::CircuitField>::new();
-    hint_registry.register("myhint.tobinary", to_binary_hint::<C>);
-    let start = std::time::Instant::now();
-    let witness = witness_solver.solve_witnesses_with_hints(&assignments, &mut hint_registry).unwrap();
-    let file_name = format!("witness_{}.txt", "hashtablem31");
-    let file = std::fs::File::create(file_name).unwrap();
-    let writer = std::io::BufWriter::new(file);
-    witness.serialize_into(writer).unwrap();
-    println!("time: {} ms", start.elapsed().as_millis());
-    let (simd_input, simd_public_input) = witness.to_simd::<C::DefaultSimdField>();
-    println!("{} {}", simd_input.len(), simd_public_input.len());
-    expander_circuit.layers[0].input_vals = simd_input;
-    expander_circuit.public_input = simd_public_input.clone();
+//     let mut expander_circuit = layered_circuit
+//         .export_to_expander::<C::DefaultGKRFieldConfig>()
+//         .flatten();
+//     let config = expander_config::Config::<C::DefaultGKRConfig>::new(
+//         expander_config::GKRScheme::Vanilla,
+//         mpi_config::MPIConfig::new(),
+//     );
+//     let mut hint_registry = HintRegistry::<C::CircuitField>::new();
+//     hint_registry.register("myhint.tobinary", to_binary_hint::<C>);
+//     let start = std::time::Instant::now();
+//     let witness = witness_solver.solve_witnesses_with_hints(&assignments, &mut hint_registry).unwrap();
+//     let file_name = format!("witness_{}.txt", "hashtablem31");
+//     let file = std::fs::File::create(file_name).unwrap();
+//     let writer = std::io::BufWriter::new(file);
+//     witness.serialize_into(writer).unwrap();
+//     println!("time: {} ms", start.elapsed().as_millis());
+//     let (simd_input, simd_public_input) = witness.to_simd::<C::DefaultSimdField>();
+//     println!("{} {}", simd_input.len(), simd_public_input.len());
+//     expander_circuit.layers[0].input_vals = simd_input;
+//     expander_circuit.public_input = simd_public_input.clone();
 
-    expander_circuit.evaluate();
-    let start = std::time::Instant::now();
-    let (claimed_v, proof) = gkr::executor::prove(&mut expander_circuit, &config);
-    println!("time: {} ms", start.elapsed().as_millis());
+//     expander_circuit.evaluate();
+//     let start = std::time::Instant::now();
+//     let (claimed_v, proof) = gkr::executor::prove(&mut expander_circuit, &config);
+//     println!("time: {} ms", start.elapsed().as_millis());
 
-    let start = std::time::Instant::now();
-    assert!(gkr::executor::verify(
-        &mut expander_circuit,
-        &config,
-        &proof,
-        &claimed_v
-    ));
-    println!("time: {} ms", start.elapsed().as_millis());
+//     let start = std::time::Instant::now();
+//     assert!(gkr::executor::verify(
+//         &mut expander_circuit,
+//         &config,
+//         &proof,
+//         &claimed_v
+//     ));
+//     println!("time: {} ms", start.elapsed().as_millis());
 
-    /*let assignments_correct: Vec<Keccak256Circuit<C::CircuitField>> = (0..N_WITNESSES)
-        .map(|i| assignments[i * 2].clone())
-        .collect();
-    let witness = witness_solver
-        .solve_witnesses(&assignments_correct)
-        .unwrap();
+//     /*let assignments_correct: Vec<Keccak256Circuit<C::CircuitField>> = (0..N_WITNESSES)
+//         .map(|i| assignments[i * 2].clone())
+//         .collect();
+//     let witness = witness_solver
+//         .solve_witnesses(&assignments_correct)
+//         .unwrap();
 
-    let file = match field_name {
-        "m31" => std::fs::File::create("circuit_m31.txt").unwrap(),
-        "bn254" => std::fs::File::create("circuit_bn254.txt").unwrap(),
-        _ => panic!("unknown field"),
-    };
-    let writer = std::io::BufWriter::new(file);
-    layered_circuit.serialize_into(writer).unwrap();
+//     let file = match field_name {
+//         "m31" => std::fs::File::create("circuit_m31.txt").unwrap(),
+//         "bn254" => std::fs::File::create("circuit_bn254.txt").unwrap(),
+//         _ => panic!("unknown field"),
+//     };
+//     let writer = std::io::BufWriter::new(file);
+//     layered_circuit.serialize_into(writer).unwrap();
 
-    let file = match field_name {
-        "m31" => std::fs::File::create("witness_m31.txt").unwrap(),
-        "bn254" => std::fs::File::create("witness_bn254.txt").unwrap(),
-        _ => panic!("unknown field"),
-    };
+//     let file = match field_name {
+//         "m31" => std::fs::File::create("witness_m31.txt").unwrap(),
+//         "bn254" => std::fs::File::create("witness_bn254.txt").unwrap(),
+//         _ => panic!("unknown field"),
+//     };
 
-    let writer = std::io::BufWriter::new(file);
-    witness.serialize_into(writer).unwrap();
+//     let writer = std::io::BufWriter::new(file);
+//     witness.serialize_into(writer).unwrap();
 
-    let file = match field_name {
-        "m31" => std::fs::File::create("witness_m31_solver.txt").unwrap(),
-        "bn254" => std::fs::File::create("witness_bn254_solver.txt").unwrap(),
-        _ => panic!("unknown field"),
-    };
-    let writer = std::io::BufWriter::new(file);
-    witness_solver.serialize_into(writer).unwrap();*/
+//     let file = match field_name {
+//         "m31" => std::fs::File::create("witness_m31_solver.txt").unwrap(),
+//         "bn254" => std::fs::File::create("witness_bn254_solver.txt").unwrap(),
+//         _ => panic!("unknown field"),
+//     };
+//     let writer = std::io::BufWriter::new(file);
+//     witness_solver.serialize_into(writer).unwrap();*/
 
-    println!("dumped to files");
-}
-#[test]
-fn test_hashtable(){
-    hashtable_big_field::<M31Config, 16>();
-}
+//     println!("dumped to files");
+// }
+// #[test]
+// fn test_hashtable(){
+//     hashtable_big_field::<M31Config, 16>();
+// }
 // #[test]
 // fn test_hashtable(){
 //     let seed = [255; 32];
