@@ -65,6 +65,8 @@ pub trait BasicAPI<C: Config> {
         &mut self,
         x: impl ToVariableOrValue<C::CircuitField>,
     ) -> Option<C::CircuitField>;
+
+    fn set_outputs(&mut self, outputs: Vec<impl ToVariableOrValue<C::CircuitField>>);
 }
 
 pub trait UnconstrainedAPI<C: Config> {
