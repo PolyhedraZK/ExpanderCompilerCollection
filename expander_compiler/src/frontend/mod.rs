@@ -20,6 +20,7 @@ pub use crate::utils::error::Error;
 pub use api::{BasicAPI, RootAPI};
 pub use builder::Variable;
 pub use circuit::Define;
+pub use macros::memorized;
 pub use witness::WitnessSolver;
 
 pub mod internal {

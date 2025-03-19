@@ -1,6 +1,12 @@
 [workspace]
 resolver = "2"
-members = [ "circuit-std-rs","expander_compiler", "expander_compiler/ec_go_lib", "efc"]
+members = [
+    "circuit-std-rs",
+    "expander_compiler",
+    "expander_compiler/ec_go_lib",
+    "expander_compiler/macros",
+    "efc"
+]
 
 [profile.test]
 opt-level = 3
