@@ -642,11 +642,16 @@ dependencies = [
  "expander_compiler",
  "gf2",
  "gkr",
+ "gkr_field_config",
  "mersenne31",
+ "mpi_config",
  "num-bigint",
  "num-traits",
  "rand",
+ "serde",
+ "serde_json",
  "sha2",
+ "stacker",
  "tiny-keccak",
 ]
 

@@ -15,6 +15,7 @@ rand = "0.8.5"
 chrono = "0.4.39"
 clap = { version = "4.5.30", features = ["derive"] }
 ethnum = "1.5.0"
+stacker = "0.1.15"
 tiny-keccak = { version = "2.0", features = ["keccak"] }
 halo2curves = { git = "https://github.com/PolyhedraZK/halo2curves", default-features = false, features = [
     "bits",
