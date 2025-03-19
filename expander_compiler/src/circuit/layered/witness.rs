@@ -221,6 +221,24 @@ impl<C: Config, I: InputType> Circuit<C, I> {
             res
         }
     }
+
+    pub fn run_with_output(&self, witness: &Witness<C>) -> (Vec<C::CircuitField>, Vec<bool>) {
+        if witness.num_witnesses == 0 {
+            panic!("expected at least 1 witness")
+        }
+        if use_simd::<C>(witness.num_witnesses) {
+            panic!("cannot run with output for simd");
+        }
+
+        let mut outputs = Vec::new();
+        let mut res = Vec::new();
+        for (inputs, public_inputs) in witness.iter_scalar() {
+            let (out, constraint_result) = self.eval_with_public_inputs(inputs, &public_inputs);
+            outputs.extend(out);
+            res.push(constraint_result);
+        }
+        (outputs, res)
+    }
 }
 
 impl<C: Config> Witness<C> {

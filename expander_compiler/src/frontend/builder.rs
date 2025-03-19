@@ -26,7 +26,7 @@ pub struct Builder<C: Config> {
     var_const_id: Vec<usize>,
     const_values: Vec<C::CircuitField>,
     num_inputs: usize,
-    outputs: Vec<Variable>
+    outputs: Vec<Variable>,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -113,7 +113,7 @@ impl<C: Config> Builder<C> {
                 num_inputs,
                 var_const_id: vec![0; num_inputs + 1],
                 const_values: vec![C::CircuitField::zero()],
-                outputs: Vec::new()
+                outputs: Vec::new(),
             },
             (1..=num_inputs).map(|id| Variable { id }).collect(),
         )
@@ -133,7 +133,7 @@ impl<C: Config> Builder<C> {
             instructions: self.instructions,
             constraints: self.constraints,
             num_inputs: self.num_inputs,
-            outputs: self.outputs.iter().map(|v| v.id).collect()
+            outputs: self.outputs.iter().map(|v| v.id).collect(),
         }
     }
 

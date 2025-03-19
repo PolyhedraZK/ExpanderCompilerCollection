@@ -93,7 +93,10 @@ fn build<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + 
     root_builder.build()
 }
 
-fn build_with_output<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone>(
+fn build_with_output<
+    C: Config,
+    Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone,
+>(
     circuit: &Cir,
 ) -> ir::source::RootCircuit<C> {
     let (num_inputs, num_public_inputs) = circuit.num_vars();
@@ -119,9 +122,12 @@ pub fn compile<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define
     })
 }
 
-pub fn compile_with_output<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone>(
+pub fn compile_with_output<
+    C: Config,
+    Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone,
+>(
     circuit: &Cir,
-    options: CompileOptions
+    options: CompileOptions,
 ) -> Result<CompileResult<C>, Error> {
     let root = build_with_output(circuit);
     let (irw, lc) = crate::compile::compile_with_options::<C, _>(&root, options)?;
