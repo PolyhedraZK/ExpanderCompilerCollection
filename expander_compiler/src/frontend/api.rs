@@ -66,7 +66,12 @@ pub trait BasicAPI<C: Config> {
         x: impl ToVariableOrValue<C::CircuitField>,
     ) -> Option<C::CircuitField>;
 
-    fn set_outputs(&mut self, outputs: Vec<impl ToVariableOrValue<C::CircuitField>>);
+    fn set_outputs(&mut self, _outputs: Vec<Variable>) {
+        // default no-op
+        // TODO: consider an actual panic to prevent wrong use
+        //  or moving to a different trait
+        eprintln!("calling set-outputs on anything other than builder is a no-op");
+    }
 }
 
 pub trait UnconstrainedAPI<C: Config> {

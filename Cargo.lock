@@ -1054,6 +1054,7 @@ dependencies = [
  "gkr",
  "gkr_field_config",
  "halo2curves",
+ "log",
  "mersenne31",
  "mpi_config",
  "rand",

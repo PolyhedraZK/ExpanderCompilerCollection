@@ -26,6 +26,7 @@ pub struct Builder<C: Config> {
     var_const_id: Vec<usize>,
     const_values: Vec<C::CircuitField>,
     num_inputs: usize,
+    outputs: Vec<Variable>
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -112,6 +113,7 @@ impl<C: Config> Builder<C> {
                 num_inputs,
                 var_const_id: vec![0; num_inputs + 1],
                 const_values: vec![C::CircuitField::zero()],
+                outputs: Vec::new()
             },
             (1..=num_inputs).map(|id| Variable { id }).collect(),
         )
@@ -444,6 +446,12 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
             }
             VariableOrValue::Value(v) => Some(v),
         }
+    }
+
+    fn set_outputs(&mut self, outputs: Vec<Variable>) {
+        // TODO: should do some validation on the outputs
+        // TODO: fix use of this, right now repeated calls just overrides
+        self.outputs = outputs;
     }
 }
 
