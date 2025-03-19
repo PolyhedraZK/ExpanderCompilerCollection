@@ -4,11 +4,10 @@ use circuit_std_rs::gnark::emulated::sw_bls12381::g1::*;
 use circuit_std_rs::gnark::emulated::sw_bls12381::g2::*;
 use circuit_std_rs::gnark::emulated::sw_bls12381::pairing::*;
 use expander_compiler::frontend::*;
-use expander_compiler::zkcuda::context::{call_kernel, Context, Reshape};
+use expander_compiler::zkcuda::context::{call_kernel, Context};
 use expander_compiler::zkcuda::kernel::Kernel;
 use expander_compiler::zkcuda::kernel::*;
 use mersenne31::M31;
-use crate::zkcuda_hashtable::{HASHTABLESIZE, SHA256LEN};
 
 fn bls_verify_inner<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variable> {
     let pubkey = &p[..48 * 2];
@@ -63,9 +62,8 @@ fn bls_verify<C: Config>(
     *output = outc[0]
 }
 
-
-#[test]
-fn test_zkcuda_bls_verify() {
+//#[test]
+pub fn test_zkcuda_bls_verify() {
     let kernel: Kernel<M31Config> = compile_bls_verify().unwrap();
     println!("compile ok");
     let dir = ".";

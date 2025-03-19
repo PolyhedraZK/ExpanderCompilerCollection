@@ -1,12 +1,8 @@
 use circuit_std_rs::sha256::m31::sha256_37bytes;
-use circuit_std_rs::sha256::m31_utils::{big_array_add, to_binary_hint};
-use expander_compiler::frontend::M31Config;
+use circuit_std_rs::sha256::m31_utils::{big_array_add};
 use expander_compiler::frontend::*;
-use expander_compiler::zkcuda::context::{call_kernel, Context, Reshape};
 use expander_compiler::zkcuda::kernel::Kernel;
-use expander_compiler::zkcuda::proving_system::ExpanderGKRProvingSystem;
 use expander_compiler::zkcuda::kernel::*;
-use mersenne31::M31;
 
 pub const SHA256LEN: usize = 32;
 pub const HASHTABLESIZE: usize = 32;
