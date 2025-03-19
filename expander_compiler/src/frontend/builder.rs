@@ -681,6 +681,19 @@ impl<C: Config> RootBuilder<C> {
         }
     }
 
+    pub fn build_with_output(self) -> source::RootCircuit<C> {
+        let mut circuits = self.sub_circuits;
+        assert_eq!(self.current_builders.len(), 1);
+        for (circuit_id, builder) in self.current_builders {
+            circuits.insert(circuit_id, builder.build_with_internal_outputs());
+        }
+        source::RootCircuit {
+            circuits,
+            num_public_inputs: self.num_public_inputs,
+            expected_num_output_zeroes: 0,
+        }
+    }
+
     pub fn last_builder(&mut self) -> &mut Builder<C> {
         &mut self.current_builders.last_mut().unwrap().1
     }

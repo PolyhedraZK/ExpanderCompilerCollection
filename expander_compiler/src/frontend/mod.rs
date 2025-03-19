@@ -93,11 +93,37 @@ fn build<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + 
     root_builder.build()
 }
 
+fn build_with_output<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone>(
+    circuit: &Cir,
+) -> ir::source::RootCircuit<C> {
+    let (num_inputs, num_public_inputs) = circuit.num_vars();
+    let (mut root_builder, input_variables, public_input_variables) =
+        RootBuilder::<C>::new(num_inputs, num_public_inputs);
+    let mut circuit = circuit.clone();
+    let mut vars_ptr = input_variables.as_slice();
+    let mut public_vars_ptr = public_input_variables.as_slice();
+    circuit.load_from(&mut vars_ptr, &mut public_vars_ptr);
+    circuit.define(&mut root_builder);
+    root_builder.build_with_output()
+}
+
 pub fn compile<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone>(
     circuit: &Cir,
     options: CompileOptions,
 ) -> Result<CompileResult<C>, Error> {
     let root = build(circuit);
+    let (irw, lc) = crate::compile::compile_with_options::<C, _>(&root, options)?;
+    Ok(CompileResult {
+        witness_solver: WitnessSolver { circuit: irw },
+        layered_circuit: lc,
+    })
+}
+
+pub fn compile_with_output<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone>(
+    circuit: &Cir,
+    options: CompileOptions
+) -> Result<CompileResult<C>, Error> {
+    let root = build_with_output(circuit);
     let (irw, lc) = crate::compile::compile_with_options::<C, _>(&root, options)?;
     Ok(CompileResult {
         witness_solver: WitnessSolver { circuit: irw },
