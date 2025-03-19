@@ -9,7 +9,9 @@ const SUBCIRCUIT_TREE_CACHE_DIR: &str = "./data/subcircuitTreeCache/";
 const CACHE_DIR: &str = "./data/cache/";
 const LOCAL_TREE_DIR: &str = "./data/localTree/";
 const RANDAO_DIR: &str = "./data/beacon/randao/";
+const VALIDATOR_DIR: &str = "./data/beacon/validator/";
 const DOMAIN_BEACON_ATTESTER: &str = "01000000";
+
 const SLOTSPEREPOCH: u64 = 32;
 
 
@@ -18,6 +20,7 @@ pub fn init_directories() -> std::io::Result<()> {
     fs::create_dir_all(Path::new(CACHE_DIR))?;
     fs::create_dir_all(Path::new(LOCAL_TREE_DIR))?;
     fs::create_dir_all(Path::new(RANDAO_DIR))?;
+    fs::create_dir_all(Path::new(VALIDATOR_DIR))?;
     Ok(())
 }
 
@@ -75,10 +78,23 @@ pub fn generate_hash_table(seed: &[u8], count: usize, shuffle_round: usize) -> V
         })
         .collect()
 }
+
+pub fn get_activated_validator_indices(slot: u64) -> Result<Vec<u64>, Box<dyn Error>> {
+    let path = format!("{}ActivatedValidatorIndices{}.json", VALIDATOR_DIR, slot); 
+    let json_content = fs::read_to_string(path)?;
+    let activated_validator_indices: Vec<u64> = serde_json::from_str(&json_content)?;
+    Ok(activated_validator_indices)
+}
 #[test]
 fn test_get_beacon_seed() {
     init_directories().unwrap();
     let seed = get_beacon_seed(290000).unwrap();
     assert_eq!(seed.len(), 32);
     println!("{:?}", seed);
+}
+
+#[test]
+fn test_get_activated_validator_indices() {
+    let indices = get_activated_validator_indices(3988672).unwrap();
+    println!("{:?}", indices.len());
 }
