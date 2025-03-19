@@ -84,6 +84,8 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
         check_inputs(kernel, commitments, parallel_count, is_broadcast);
 
         let mut expander_circuit = kernel.layered_circuit.export_to_expander().flatten();
+        expander_circuit.identify_rnd_coefs();
+        expander_circuit.identify_structure_info();
         let (max_num_input_var, max_num_output_var) = max_n_vars(&expander_circuit);
         let mut prover_scratch = ProverScratchPad::<C::DefaultGKRFieldConfig>::new(
             max_num_input_var,
@@ -99,11 +101,8 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
             transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
             expander_circuit.layers[0].input_vals =
                 prepare_inputs(kernel, commitments, is_broadcast, i);
+            expander_circuit.fill_rnd_coefs(&mut transcript);
             expander_circuit.evaluate();
-            println!(
-                "{:?}",
-                expander_circuit.layers.last_mut().unwrap().output_vals
-            );
             for x in expander_circuit
                 .layers
                 .last_mut()
@@ -160,12 +159,14 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
     ) -> bool {
         check_inputs(kernel, commitments, parallel_count, is_broadcast);
 
-        let expander_circuit: Circuit<C::DefaultGKRFieldConfig> =
+        let mut expander_circuit: Circuit<C::DefaultGKRFieldConfig> =
             kernel.layered_circuit.export_to_expander().flatten();
-
+        expander_circuit.identify_rnd_coefs();
+        expander_circuit.identify_structure_info();
         for i in 0..parallel_count {
             let mut transcript = <C::DefaultGKRConfig as GKRConfig>::Transcript::new();
             transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
+            expander_circuit.fill_rnd_coefs(&mut transcript);
             let mut cursor = Cursor::new(&proof.data[i].bytes);
             cursor.set_position(32);
             let (mut verified, rz0, rz1, r_simd, _r_mpi, claimed_v0, claimed_v1) = gkr_verify(
@@ -275,7 +276,7 @@ fn prove_input_claim<C: Config>(
         >::eval(vals, challenge_vars, x_simd, &[]);
         transcript.append_field_element(&v);
 
-        let mut scratch_pad = <RawExpanderGKR<
+        let scratch_pad = <RawExpanderGKR<
             C::DefaultGKRFieldConfig,
             <C::DefaultGKRConfig as GKRConfig>::Transcript,
         > as PCSForExpanderGKR<_, _>>::ScratchPad::default();
@@ -291,7 +292,7 @@ fn prove_input_claim<C: Config>(
                 x_mpi: vec![],
             },
             transcript,
-            &mut scratch_pad,
+            &scratch_pad,
         );
         transcript.unlock_proof();
 
