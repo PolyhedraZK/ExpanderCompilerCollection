@@ -9,6 +9,7 @@ use expander_compiler::zkcuda::kernel::Kernel;
 use expander_compiler::zkcuda::kernel::*;
 use mersenne31::M31;
 
+#[allow(dead_code)]
 fn bls_verify_inner<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variable> {
     let pubkey = &p[..48 * 2];
     let hm = &p[48 * 2..48 * 2 + 48 * 2 * 2];

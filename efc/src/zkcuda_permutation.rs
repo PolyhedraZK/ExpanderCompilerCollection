@@ -1,4 +1,3 @@
-use expander_compiler::frontend::M31Config;
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::kernel::Kernel;
 use expander_compiler::zkcuda::kernel::*;
@@ -9,6 +8,7 @@ use circuit_std_rs::utils::{simple_lookup2, simple_select};
 use crate::permutation::{QUERY_SIZE, TABLE_SIZE, VALIDATOR_COUNT};
 use crate::utils::sub_vector;
 
+#[allow(dead_code)]
 fn verify_permutation_hash_inner<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variable> {
     let index = &p[..TABLE_SIZE];
     let value = &p[TABLE_SIZE..TABLE_SIZE*2];
@@ -37,6 +37,7 @@ fn verify_permutation_hash_inner<C: Config>(api: &mut API<C>, p: &Vec<Variable>)
 }
 
 
+#[allow(dead_code)]
 fn verify_permutation_indices_validator_hashes_inner<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variable> {
    
     let (query_indices, pos) = sub_vector(p, 0, QUERY_SIZE);
@@ -44,7 +45,7 @@ fn verify_permutation_indices_validator_hashes_inner<C: Config>(api: &mut API<C>
     let (active_validator_bits_hash, pos) = sub_vector(p, pos, QUERY_SIZE);
     let (active_validator_bits, pos) = sub_vector(p, pos, VALIDATOR_COUNT);
     let (table_validator_hashes, pos) = sub_vector(p, pos, POSEIDON_M31X16_RATE*VALIDATOR_COUNT);
-    let (real_keys, pos) = sub_vector(p, pos, VALIDATOR_COUNT);
+    let (real_keys, _) = sub_vector(p, pos, VALIDATOR_COUNT);
 
     let zero_var = api.constant(0);
     let neg_one_count = api.sub(1, VALIDATOR_COUNT as u32);

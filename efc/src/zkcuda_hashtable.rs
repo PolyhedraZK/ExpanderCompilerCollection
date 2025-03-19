@@ -1,12 +1,11 @@
 use circuit_std_rs::sha256::m31::sha256_37bytes;
 use circuit_std_rs::sha256::m31_utils::{big_array_add};
 use expander_compiler::frontend::*;
-use expander_compiler::zkcuda::kernel::Kernel;
 use expander_compiler::zkcuda::kernel::*;
 
 pub const SHA256LEN: usize = 32;
 pub const HASHTABLESIZE: usize = 32;
-
+#[allow(dead_code)]
 fn compute_hashtable_inner<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variable> {
     let shuffle_round = p[0];
     let start_index = &p[1..5];

@@ -13,6 +13,7 @@ use expander_compiler::zkcuda::kernel::*;
 use circuit_std_rs::utils::simple_select;
 use crate::utils::sub_vector;
 
+#[allow(dead_code)]
 fn shuffle_inner<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variable> {
     println!("len p: {}", p.len());
 
