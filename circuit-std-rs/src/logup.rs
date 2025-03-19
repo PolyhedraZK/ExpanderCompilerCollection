@@ -360,6 +360,10 @@ impl LogUpRangeProofTable {
     }
 
     pub fn rangeproof<C: Config, B: RootAPI<C>>(&mut self, builder: &mut B, a: Variable, n: usize) {
+        if n <= self.rangeproof_bits {
+            self.rangeproof_onechunk(builder, a, n);
+            return;
+        }
         //add a shift value
         let mut n = n;
         let mut new_a = a;

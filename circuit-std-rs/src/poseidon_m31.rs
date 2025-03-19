@@ -188,7 +188,7 @@ impl PoseidonM31Params {
         elts.resize(elts.len().next_multiple_of(self.rate), api.constant(0));
 
         let mut res = vec![api.constant(0); self.width];
-        let mut copy_res = api.new_hint("myhint.copyvarshint", &res, res.len());
+        let mut copy_res = vec![api.constant(0); self.width];
         elts.chunks(self.rate).for_each(|chunk| {
             let mut state_elts = vec![api.constant(0); self.width - self.rate];
             state_elts.extend_from_slice(chunk);
@@ -196,12 +196,17 @@ impl PoseidonM31Params {
             (0..self.width).for_each(|i| res[i] = api.add(copy_res[i], state_elts[i]));
             self.permute(api, &mut res);
             copy_res = api.new_hint("myhint.copyvarshint", &res, res.len());
+            assert_vars_is_equal(api, &copy_res, &res);
         });
 
         res
     }
 }
-
+pub fn assert_vars_is_equal<C: Config, B: RootAPI<C>>(api: &mut B, a: &[Variable], b: &[Variable]) {
+    a.iter()
+        .zip(b.iter())
+        .for_each(|(a, b)| api.assert_is_equal(*a, *b))
+}
 pub const POSEIDON_M31X16_FULL_ROUNDS: usize = 8;
 
 pub const POSEIDON_M31X16_PARTIAL_ROUNDS: usize = 14;
