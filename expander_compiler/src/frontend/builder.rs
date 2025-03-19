@@ -615,6 +615,10 @@ impl<C: Config> BasicAPI<C> for RootBuilder<C> {
     ) -> Option<<C as Config>::CircuitField> {
         self.last_builder().constant_value(x)
     }
+
+    fn set_outputs(&mut self, outputs: Vec<Variable>) {
+        self.last_builder().set_outputs(outputs)
+    }
 }
 
 impl<C: Config> RootAPI<C> for RootBuilder<C> {
