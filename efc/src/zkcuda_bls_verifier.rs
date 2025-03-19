@@ -63,6 +63,7 @@ fn bls_verify<C: Config>(
     *output = outc[0]
 }
 
+
 #[test]
 fn test_zkcuda_bls_verify() {
     let kernel: Kernel<M31Config> = compile_bls_verify().unwrap();
@@ -114,17 +115,26 @@ fn test_zkcuda_bls_verify() {
 
     // println!("p: {:?}", p.clone().unwrap().shape.unwrap());
 
-    println!("compile ok");
-
     let mut out = None;
     call_kernel!(ctx, kernel, p, mut out);
     println!("call kernel ok");
 
     println!("out shape: {:?}", out.clone().unwrap().shape.unwrap());
 
-    let out = out.reshape(&[SHA256LEN*HASHTABLESIZE]);
+    let result: Vec<M31> = ctx.copy_to_host(out);
+    assert_eq!(
+        result,
+        vec![
+            M31::from(1),
+        ]
+    );
 
-    println!("out shape: {:?}", out.clone().unwrap().shape.unwrap());
+    let computation_graph = ctx.to_computation_graph();
+    println!("call to_computation_graph ok");
+    let proof = ctx.to_proof();
 
+    assert!(computation_graph.verify(&proof));
+
+    println!("call verify ok");
 }
 
