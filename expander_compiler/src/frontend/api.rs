@@ -66,7 +66,7 @@ pub trait BasicAPI<C: Config> {
         x: impl ToVariableOrValue<C::CircuitField>,
     ) -> Option<C::CircuitField>;
 
-    fn set_outputs(&mut self, _outputs: Vec<Variable>) {
+    fn set_outputs(&mut self, _outputs: Vec<usize>) {
         // default no-op
         // TODO: consider an actual panic to prevent wrong use
         //  or moving to a different trait
