@@ -64,8 +64,8 @@ fn bls_verify<C: Config>(
 
 //#[test]
 pub fn test_zkcuda_bls_verify() {
-    let kernel: Kernel<M31Config> = compile_bls_verify().unwrap();
-    println!("compile ok");
+
+    let start_time = std::time::Instant::now();
     let dir = ".";
     let file_path = format!("{}/pairing_assignment.json", dir);
 
@@ -105,7 +105,8 @@ pub fn test_zkcuda_bls_verify() {
         }
     }
 
-    println!("prepare data ok");
+
+    println!("prepare data ok, time {:?}", std::time::Instant::now().duration_since(start_time));
     let mut ctx: Context<M31Config> = Context::default();
 
     let p = ctx.copy_to_device(&vec![p], false);
@@ -113,9 +114,13 @@ pub fn test_zkcuda_bls_verify() {
 
     // println!("p: {:?}", p.clone().unwrap().shape.unwrap());
 
+    let kernel: Kernel<M31Config> = compile_bls_verify().unwrap();
+    println!("compile ok, time {:?}", std::time::Instant::now().duration_since(start_time));
+
     let mut out = None;
     call_kernel!(ctx, kernel, p, mut out);
-    println!("call kernel ok");
+
+    println!("call kernel ok, time {:?}", std::time::Instant::now().duration_since(start_time));
 
     println!("out shape: {:?}", out.clone().unwrap().shape.unwrap());
 
@@ -128,11 +133,13 @@ pub fn test_zkcuda_bls_verify() {
     );
 
     let computation_graph = ctx.to_computation_graph();
-    println!("call to_computation_graph ok");
+
+    println!("to_computation_graph ok, time {:?}", std::time::Instant::now().duration_since(start_time));
+
     let proof = ctx.to_proof();
 
     assert!(computation_graph.verify(&proof));
 
-    println!("call verify ok");
+    println!("verify ok, time {:?}", std::time::Instant::now().duration_since(start_time));
 }
 
