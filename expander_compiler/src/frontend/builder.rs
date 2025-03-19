@@ -458,9 +458,7 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
     }
 
     fn set_outputs(&mut self, outputs: Vec<Variable>) {
-        // TODO: should do some validation on the outputs
-        // TODO: fix use of this, right now repeated calls just overrides
-        self.outputs = outputs.into_iter().map(|v| v.id).collect();
+        self.outputs.extend(outputs.into_iter().map(|v| v.id));
     }
 }
 

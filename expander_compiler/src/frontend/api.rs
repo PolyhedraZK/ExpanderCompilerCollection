@@ -68,8 +68,6 @@ pub trait BasicAPI<C: Config> {
 
     fn set_outputs(&mut self, _outputs: Vec<Variable>) {
         // default no-op
-        // TODO: consider an actual panic to prevent wrong use
-        //  or moving to a different trait
         eprintln!("calling set-outputs on anything other than builder is a no-op");
     }
 }
