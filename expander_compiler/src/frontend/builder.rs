@@ -128,6 +128,15 @@ impl<C: Config> Builder<C> {
         }
     }
 
+    pub fn build_with_internal_outputs(self) -> source::Circuit<C> {
+        source::Circuit {
+            instructions: self.instructions,
+            constraints: self.constraints,
+            num_inputs: self.num_inputs,
+            outputs: self.outputs.iter().map(|v| v.id).collect()
+        }
+    }
+
     fn convert_to_variable<T: ToVariableOrValue<C::CircuitField>>(&mut self, value: T) -> Variable {
         match value.convert_to_variable_or_value() {
             VariableOrValue::Variable(v) => v,
