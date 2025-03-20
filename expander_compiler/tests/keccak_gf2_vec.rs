@@ -188,7 +188,8 @@ declare_circuit!(Keccak256Circuit {
     out: [[PublicVariable]],
 });
 
-fn compute_keccak<C: Config>(api: &mut impl RootAPI<C>, p: &Vec<Variable>) -> Vec<Variable> {
+#[memorized]
+fn compute_keccak<C: Config, B: RootAPI<C>>(api: &mut B, p: &Vec<Variable>) -> Vec<Variable> {
     let mut ss = vec![vec![api.constant(0); 64]; 25];
     let mut new_p = p.clone();
     let mut append_data = vec![0; 136 - 64];
@@ -213,7 +214,8 @@ fn compute_keccak<C: Config>(api: &mut impl RootAPI<C>, p: &Vec<Variable>) -> Ve
 impl Define<GF2Config> for Keccak256Circuit<Variable> {
     fn define<Builder: RootAPI<GF2Config>>(&self, api: &mut Builder) {
         for i in 0..N_HASHES {
-            let out = api.memorized_simple_call(compute_keccak, &self.p[i].to_vec());
+            //let out = api.memorized_simple_call(compute_keccak, &self.p[i].to_vec());
+            let out = memorized_compute_keccak(api, &self.p[i].to_vec());
             for j in 0..256 {
                 api.assert_is_equal(out[j].clone(), self.out[i][j].clone());
             }

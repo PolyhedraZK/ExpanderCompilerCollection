@@ -7,6 +7,7 @@ mod api;
 mod builder;
 mod circuit;
 mod debug;
+mod sub_circuit;
 mod variables;
 mod witness;
 
@@ -35,6 +36,9 @@ pub mod internal {
 pub mod extra {
     pub use super::api::UnconstrainedAPI;
     pub use super::debug::DebugBuilder;
+    pub use super::sub_circuit::{
+        HashStructureAndPrimitive, JoinVecVariables, RebuildVecVariables,
+    };
     pub use crate::hints::registry::{EmptyHintCaller, HintCaller, HintRegistry};
     pub use crate::utils::serde::Serde;
 

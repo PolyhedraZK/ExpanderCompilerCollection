@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{
     circuit::{
         config::Config,
@@ -20,6 +22,8 @@ use super::{
 
 pub struct DebugBuilder<C: Config, H: HintCaller<C::CircuitField>> {
     values: Vec<C::CircuitField>,
+    sub_circuit_output_structure: HashMap<usize, Vec<usize>>,
+    full_hash_id: HashMap<usize, [u8; 32]>,
     hint_caller: H,
 }
 
@@ -412,6 +416,45 @@ impl<C: Config, H: HintCaller<C::CircuitField>> RootAPI<C> for DebugBuilder<C, H
         let inputs = inputs.to_vec();
         f(self, &inputs)
     }
+
+    fn hash_to_sub_circuit_id(&mut self, hash: &[u8; 32]) -> usize {
+        let circuit_id = usize::from_le_bytes(hash[0..8].try_into().unwrap());
+        if let Some(prev_hash) = self.full_hash_id.get(&circuit_id) {
+            if *prev_hash != *hash {
+                panic!("subcircuit id collision");
+            }
+        } else {
+            self.full_hash_id.insert(circuit_id, *hash);
+        }
+        circuit_id
+    }
+
+    fn call_sub_circuit<F: FnOnce(&mut Self, &Vec<Variable>) -> Vec<Variable>>(
+        &mut self,
+        _: usize,
+        inputs: &[Variable],
+        f: F,
+    ) -> Vec<Variable> {
+        let inputs = inputs.to_vec();
+        f(self, &inputs)
+    }
+
+    fn register_sub_circuit_output_structure(&mut self, circuit_id: usize, structure: Vec<usize>) {
+        if self
+            .sub_circuit_output_structure
+            .insert(circuit_id, structure)
+            .is_some()
+        {
+            panic!("subcircuit output structure already registered");
+        }
+    }
+
+    fn get_sub_circuit_output_structure(&self, circuit_id: usize) -> Vec<usize> {
+        self.sub_circuit_output_structure
+            .get(&circuit_id)
+            .unwrap()
+            .clone()
+    }
 }
 
 impl<C: Config, H: HintCaller<C::CircuitField>> DebugBuilder<C, H> {
@@ -423,6 +466,8 @@ impl<C: Config, H: HintCaller<C::CircuitField>> DebugBuilder<C, H> {
         let mut builder = DebugBuilder {
             values: vec![C::CircuitField::zero()],
             hint_caller,
+            sub_circuit_output_structure: HashMap::new(),
+            full_hash_id: HashMap::new(),
         };
         let vars = (1..=inputs.len()).map(new_variable).collect();
         let public_vars = (inputs.len() + 1..=inputs.len() + public_inputs.len())
