@@ -31,7 +31,3 @@ sha2 = "0.10.8"
 [[bin]]
 name = "trivial_circuit"
 path = "bin/trivial_circuit.rs"
-
-[[bin]]
-name = "aaa"
-path = "bin/aaa.rs"

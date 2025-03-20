@@ -241,13 +241,14 @@ pub fn memorized(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
 
         fn #memorized_fn_name #generics (#api_arg, #(#user_fn_inputs),*) #return_type {
+            use tiny_keccak::Hasher;
             let mut inputs: Vec<Variable> = Vec::new();
             let mut input_structure: Vec<usize> = Vec::new();
             
             #(#join_variable_calls)*
             
             let mut hasher = tiny_keccak::Keccak::v256();
-            hasher.update(b"proc_macro");
+            hasher.update(b"memorized");
             
             #(#hash_primitive_calls)*
             
