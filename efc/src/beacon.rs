@@ -3,17 +3,75 @@ use std::{error::Error, fs};
 use std::path::Path;
 use byteorder::{ByteOrder, LittleEndian};
 
+use serde::Deserialize;
 use sha2::{Digest, Sha256};
+
+use crate::attestation::Attestation;
 
 const SUBCIRCUIT_TREE_CACHE_DIR: &str = "./data/subcircuitTreeCache/";
 const CACHE_DIR: &str = "./data/cache/";
 const LOCAL_TREE_DIR: &str = "./data/localTree/";
 const RANDAO_DIR: &str = "./data/beacon/randao/";
 const VALIDATOR_DIR: &str = "./data/beacon/validator/";
+const COMMITTEE_DIR: &str = "./data/beacon/committee/";
+const ATTESTATION_DIR: &str = "./data/beacon/attestations/";
 const DOMAIN_BEACON_ATTESTER: &str = "01000000";
 
 const SLOTSPEREPOCH: u64 = 32;
 
+#[derive(Debug, Deserialize)]
+pub struct BeaconCommitteeJson {
+    // Adjust these fields based on your actual Go struct
+    pub slot: String,
+    pub index: String,
+    pub validators: Vec<String>,
+}
+#[derive(Debug, Deserialize, Clone)]
+pub struct ValidatorPlain {
+    #[serde(default)]
+    pub public_key: String,
+    #[serde(default)]
+    pub withdrawal_credentials: String,
+    #[serde(default)]
+    pub effective_balance: u64,
+    #[serde(default)]
+    pub slashed: bool,
+    #[serde(default)]
+    pub activation_eligibility_epoch: u64,
+    #[serde(default)]
+    pub activation_epoch: u64,
+    #[serde(default)]
+    pub exit_epoch: u64,
+    #[serde(default)]
+    pub withdrawable_epoch: u64,
+}
+#[derive(Deserialize, Debug)]
+pub struct AttestationsWithBytes {
+    pub attestations: Vec<Attestation>,
+    #[serde(with = "base64_standard")]
+    pub data: Vec<u8>,
+}
+
+// Helper module for base64 encoding/decoding
+mod base64_standard {
+    use base64::{engine::general_purpose, Engine};
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&general_purpose::STANDARD.encode(bytes))
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        general_purpose::STANDARD.decode(s.as_bytes()).map_err(serde::de::Error::custom)
+    }
+}
 
 pub fn init_directories() -> std::io::Result<()> {
     fs::create_dir_all(Path::new(SUBCIRCUIT_TREE_CACHE_DIR))?;
@@ -21,6 +79,7 @@ pub fn init_directories() -> std::io::Result<()> {
     fs::create_dir_all(Path::new(LOCAL_TREE_DIR))?;
     fs::create_dir_all(Path::new(RANDAO_DIR))?;
     fs::create_dir_all(Path::new(VALIDATOR_DIR))?;
+    fs::create_dir_all(Path::new(COMMITTEE_DIR))?;
     Ok(())
 }
 
@@ -149,6 +208,28 @@ pub fn shuffle_indices(indices: &[u64], seed: &[u8], bits: &[u8], shuffle_round:
     (shuffle_indices, flips, positions, shuffle_round_indices, pivots, flip_bits)
 }
 
+
+pub fn load_committees(slot: u64) -> Result<Vec<BeaconCommitteeJson>, Box<dyn Error>> {
+    let filepath = format!("{}{}.json", COMMITTEE_DIR, slot);
+    let file_content = fs::read_to_string(filepath)?;
+    let committees: Vec<BeaconCommitteeJson> = serde_json::from_str(&file_content)?;
+    Ok(committees)
+}
+
+
+pub fn load_validators_from_file(slot: u64) -> Result<Vec<ValidatorPlain>, Box<dyn Error>> {
+    let filepath = format!("{}validators{}.json", VALIDATOR_DIR, slot);
+    let file_data = fs::read_to_string(filepath)?;
+    let validators: Vec<ValidatorPlain> = serde_json::from_str(&file_data)?;
+    Ok(validators)
+}
+
+pub fn load_attestations_and_bytes(slot: u64) -> Result<AttestationsWithBytes, Box<dyn Error>> {
+    let path = format!("{}AttestationsAndParentRoot{}.json", ATTESTATION_DIR, slot);
+    let json_data = fs::read_to_string(path)?;
+    let wrapper: AttestationsWithBytes = serde_json::from_str(&json_data)?;
+    Ok(wrapper)
+}
 #[test]
 fn test_get_beacon_seed() {
     init_directories().unwrap();
@@ -184,4 +265,25 @@ fn test_shuffle_indices(){
     // println!("{:?}", shuffle_round_indices);
     // println!("{:?}", pivots);
     // println!("{:?}", flip_bits);
+}
+
+#[test]
+fn test_load_committees() {
+    let committees = load_committees(3988672).unwrap();
+    println!("{:?}", committees.len());
+    println!("{:?}", committees[0].validators);
+}
+
+#[test]
+fn test_load_validators_from_file() {
+    let validators = load_validators_from_file(3988672).unwrap();
+    println!("{:?}", validators.len());
+    println!("{:?}", validators[0].public_key);
+}
+
+#[test]
+fn test_load_attestations_and_bytes() {
+    let wrapper = load_attestations_and_bytes(3988672).unwrap();
+    println!("{:?}", wrapper.attestations);
+    println!("{:?}", wrapper.data);
 }
