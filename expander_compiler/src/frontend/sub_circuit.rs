@@ -80,7 +80,7 @@ impl<T: Primitive> HashStructureAndPrimitive for T {
     fn hash_structure_and_primitive(&self, hasher: &mut impl Hasher) {
         let s = self.to_string();
         hasher.update(s.len().to_string().as_bytes());
-        hasher.update(&[b',']);
+        hasher.update(b",");
         hasher.update(s.as_bytes());
     }
 }
@@ -88,7 +88,7 @@ impl<T: Primitive> HashStructureAndPrimitive for T {
 impl<T: HashStructureAndPrimitive> HashStructureAndPrimitive for Vec<T> {
     fn hash_structure_and_primitive(&self, hasher: &mut impl Hasher) {
         hasher.update(self.len().to_string().as_bytes());
-        hasher.update(&[b';']);
+        hasher.update(b";");
         for item in self {
             item.hash_structure_and_primitive(hasher);
         }

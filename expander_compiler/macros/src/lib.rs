@@ -1,9 +1,6 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{
-    parse_macro_input, FnArg, GenericParam, Ident, ItemFn, PatType, Path, PathSegment, ReturnType,
-    Type, TypeParam,
-};
+use syn::{parse_macro_input, FnArg, Ident, ItemFn, PatType, ReturnType, Type};
 
 #[derive(Debug)]
 enum ParamKind {
@@ -91,7 +88,7 @@ pub fn memorized(_attr: TokenStream, item: TokenStream) -> TokenStream {
         .inputs
         .first()
         .expect("Expected at least one argument (API)");
-    
+
     let api_arg_name = if let FnArg::Typed(PatType { pat, .. }) = api_arg {
         quote!(#pat).to_string().replace(" ", "")
     } else {
@@ -107,7 +104,7 @@ pub fn memorized(_attr: TokenStream, item: TokenStream) -> TokenStream {
         if let FnArg::Typed(PatType { pat, ty, .. }) = arg {
             let param_name = quote!(#pat).to_string().replace(" ", "");
 
-            if let Some((kind, vec_depth, is_ref)) = analyze_type_structure(&ty, true) {
+            if let Some((kind, vec_depth, is_ref)) = analyze_type_structure(ty, true) {
                 param_infos.push(ParamInfo {
                     name: param_name,
                     kind,
@@ -161,7 +158,7 @@ pub fn memorized(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let rebuild_vars = param_infos.iter().map(|param_info| {
         let param_name = format_ident!("{}", param_info.name);
-        
+
         match param_info.kind {
             ParamKind::Variable => {
                 if param_info.vec_depth > 0 {
@@ -198,8 +195,8 @@ pub fn memorized(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let call_user_fn = quote! {
         #user_fn_name(#api_arg_ident, #(#user_fn_args),*)
     };
-    
-    let join_output = if let Some(return_info) = &return_info {
+
+    let join_output = if return_info.is_some() {
         quote! {
             let result = #call_user_fn;
             let mut outputs: Vec<Variable> = Vec::new();
@@ -220,7 +217,7 @@ pub fn memorized(_attr: TokenStream, item: TokenStream) -> TokenStream {
         for _ in 0..return_info.vec_depth {
             return_type_tokens = quote! { Vec<#return_type_tokens> };
         }
-        
+
         quote! {
             let mut s = outputs.as_slice();
             let structure = #api_arg_ident.get_sub_circuit_output_structure(circuit_id);
@@ -244,28 +241,28 @@ pub fn memorized(_attr: TokenStream, item: TokenStream) -> TokenStream {
             use tiny_keccak::Hasher;
             let mut inputs: Vec<Variable> = Vec::new();
             let mut input_structure: Vec<usize> = Vec::new();
-            
+
             #(#join_variable_calls)*
-            
+
             let mut hasher = tiny_keccak::Keccak::v256();
             hasher.update(b"memorized");
-            
+
             #(#hash_primitive_calls)*
-            
+
             let mut hash = [0u8; 32];
             hasher.finalize(&mut hash);
-            
+
             let circuit_id = #api_arg_ident.hash_to_sub_circuit_id(&hash);
-            
+
             let f = |#api_arg, inputs: &Vec<Variable>| -> Vec<Variable> {
                 let mut s = inputs.as_slice();
                 let mut structure = input_structure.as_slice();
-                
+
                 #(#rebuild_vars)*
-                
+
                 #join_output
             };
-            
+
             let outputs = #api_arg_ident.call_sub_circuit(circuit_id, &inputs, f);
             #rebuild_return
         }
