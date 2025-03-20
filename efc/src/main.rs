@@ -1,11 +1,12 @@
 use std::env;
 
 use efc::end2end::end2end_witness;
+use efc::hashtable::test_hashtable;
 use efc::zkcuda_hashtable::test_zkcuda_hashtable;
 
 fn main() {
-    //test_zkcuda_bls_verify();
-    test_zkcuda_hashtable();
+    test_hashtable();
+    //test_zkcuda_hashtable();
     return;
 
     let args: Vec<String> = env::args().collect();
@@ -24,3 +25,4 @@ fn main() {
         end2end_witness(".");
     }
 }
+
