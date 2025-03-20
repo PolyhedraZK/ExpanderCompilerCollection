@@ -65,11 +65,6 @@ pub trait BasicAPI<C: Config> {
         &mut self,
         x: impl ToVariableOrValue<C::CircuitField>,
     ) -> Option<C::CircuitField>;
-
-    fn set_outputs(&mut self, _outputs: Vec<Variable>) {
-        // default no-op
-        eprintln!("calling set-outputs on anything other than builder is a no-op");
-    }
 }
 
 pub trait UnconstrainedAPI<C: Config> {
@@ -101,4 +96,5 @@ pub trait RootAPI<C: Config>: Sized + BasicAPI<C> + UnconstrainedAPI<C> + 'stati
         f: F,
         inputs: &[Variable],
     ) -> Vec<Variable>;
+    fn set_outputs(&mut self, outputs: Vec<Variable>);
 }

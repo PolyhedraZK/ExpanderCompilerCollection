@@ -26,7 +26,6 @@ pub struct Builder<C: Config> {
     var_const_id: Vec<usize>,
     const_values: Vec<C::CircuitField>,
     num_inputs: usize,
-    outputs: Vec<usize>,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -113,7 +112,6 @@ impl<C: Config> Builder<C> {
                 num_inputs,
                 var_const_id: vec![0; num_inputs + 1],
                 const_values: vec![C::CircuitField::zero()],
-                outputs: Vec::new(),
             },
             (1..=num_inputs).map(|id| Variable { id }).collect(),
         )
@@ -125,15 +123,6 @@ impl<C: Config> Builder<C> {
             constraints: self.constraints,
             num_inputs: self.num_inputs,
             outputs: outputs.iter().map(|v| v.id).collect(),
-        }
-    }
-
-    pub fn build_with_internal_outputs(self) -> source::Circuit<C> {
-        source::Circuit {
-            instructions: self.instructions,
-            constraints: self.constraints,
-            num_inputs: self.num_inputs,
-            outputs: self.outputs,
         }
     }
 
@@ -456,10 +445,6 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
             VariableOrValue::Value(v) => Some(v),
         }
     }
-
-    fn set_outputs(&mut self, outputs: Vec<Variable>) {
-        self.outputs.extend(outputs.into_iter().map(|v| v.id));
-    }
 }
 
 // write macro rules for unconstrained binary op definition
@@ -540,6 +525,7 @@ pub struct RootBuilder<C: Config> {
     current_builders: Vec<(usize, Builder<C>)>,
     sub_circuits: HashMap<usize, source::Circuit<C>>,
     full_hash_id: HashMap<usize, [u8; 32]>,
+    outputs: Vec<Variable>,
 }
 
 macro_rules! root_binary_op {
@@ -613,10 +599,6 @@ impl<C: Config> BasicAPI<C> for RootBuilder<C> {
     ) -> Option<<C as Config>::CircuitField> {
         self.last_builder().constant_value(x)
     }
-
-    fn set_outputs(&mut self, outputs: Vec<Variable>) {
-        self.last_builder().set_outputs(outputs)
-    }
 }
 
 impl<C: Config> RootAPI<C> for RootBuilder<C> {
@@ -644,6 +626,11 @@ impl<C: Config> RootAPI<C> for RootBuilder<C> {
 
         self.call_sub_circuit(circuit_id, inputs, f)
     }
+
+    fn set_outputs(&mut self, outputs: Vec<Variable>) {
+        ensure_variables_valid(&outputs);
+        self.outputs = outputs;
+    }
 }
 
 impl<C: Config> RootBuilder<C> {
@@ -664,6 +651,7 @@ impl<C: Config> RootBuilder<C> {
                 current_builders: vec![(0, builder0)],
                 sub_circuits: HashMap::new(),
                 full_hash_id: HashMap::new(),
+                outputs: Vec::new(),
             },
             inputs,
             public_inputs,
@@ -674,20 +662,7 @@ impl<C: Config> RootBuilder<C> {
         let mut circuits = self.sub_circuits;
         assert_eq!(self.current_builders.len(), 1);
         for (circuit_id, builder) in self.current_builders {
-            circuits.insert(circuit_id, builder.build(&[]));
-        }
-        source::RootCircuit {
-            circuits,
-            num_public_inputs: self.num_public_inputs,
-            expected_num_output_zeroes: 0,
-        }
-    }
-
-    pub fn build_with_output(self) -> source::RootCircuit<C> {
-        let mut circuits = self.sub_circuits;
-        assert_eq!(self.current_builders.len(), 1);
-        for (circuit_id, builder) in self.current_builders {
-            circuits.insert(circuit_id, builder.build_with_internal_outputs());
+            circuits.insert(circuit_id, builder.build(&self.outputs));
         }
         source::RootCircuit {
             circuits,
