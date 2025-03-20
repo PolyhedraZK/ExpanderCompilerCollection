@@ -112,7 +112,7 @@ dependencies = [
 [[package]]
 name = "arith"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#6e66702286aaa3d63c2fec1131cbb1bb5999a74b"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
 dependencies = [
  "ark-std",
  "cfg-if",
@@ -482,7 +482,7 @@ dependencies = [
 [[package]]
 name = "circuit"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#6e66702286aaa3d63c2fec1131cbb1bb5999a74b"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
 dependencies = [
  "arith",
  "ark-std",
@@ -582,7 +582,7 @@ checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 [[package]]
 name = "config"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#6e66702286aaa3d63c2fec1131cbb1bb5999a74b"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
 dependencies = [
  "arith",
  "ark-std",
@@ -601,7 +601,7 @@ dependencies = [
 [[package]]
 name = "config_macros"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#6e66702286aaa3d63c2fec1131cbb1bb5999a74b"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
 dependencies = [
  "config",
  "field_hashers",
@@ -707,7 +707,7 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 [[package]]
 name = "crosslayer_prototype"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#6e66702286aaa3d63c2fec1131cbb1bb5999a74b"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
 dependencies = [
  "arith",
  "config",
@@ -932,7 +932,7 @@ dependencies = [
 [[package]]
 name = "field_hashers"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#6e66702286aaa3d63c2fec1131cbb1bb5999a74b"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
 dependencies = [
  "arith",
  "halo2curves",
@@ -1027,7 +1027,7 @@ dependencies = [
 [[package]]
 name = "gf2"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#6e66702286aaa3d63c2fec1131cbb1bb5999a74b"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
 dependencies = [
  "arith",
  "ark-std",
@@ -1045,7 +1045,7 @@ dependencies = [
 [[package]]
 name = "gf2_128"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#6e66702286aaa3d63c2fec1131cbb1bb5999a74b"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
 dependencies = [
  "arith",
  "ark-std",
@@ -1064,7 +1064,7 @@ checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 [[package]]
 name = "gkr"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#6e66702286aaa3d63c2fec1131cbb1bb5999a74b"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
 dependencies = [
  "arith",
  "ark-std",
@@ -1104,7 +1104,7 @@ dependencies = [
 [[package]]
 name = "gkr_field_config"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#6e66702286aaa3d63c2fec1131cbb1bb5999a74b"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
 dependencies = [
  "arith",
  "ark-std",
@@ -1151,9 +1151,9 @@ dependencies = [
 
 [[package]]
 name = "half"
-version = "2.4.1"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6dd08c532ae367adf81c312a4580bc67f1d0fe8bc9c460520283f4c0ff277888"
+checksum = "7db2ff139bba50379da6aa0766b52fdcb62cb5b263009b09ed58ba604e14bbd1"
 dependencies = [
  "cfg-if",
  "crunchy",
@@ -1661,7 +1661,7 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 [[package]]
 name = "mersenne31"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#6e66702286aaa3d63c2fec1131cbb1bb5999a74b"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
 dependencies = [
  "arith",
  "ark-std",
@@ -1748,7 +1748,7 @@ dependencies = [
 [[package]]
 name = "mpi_config"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#6e66702286aaa3d63c2fec1131cbb1bb5999a74b"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
 dependencies = [
  "arith",
  "mpi",
@@ -1959,7 +1959,7 @@ dependencies = [
 [[package]]
 name = "poly_commit"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#6e66702286aaa3d63c2fec1131cbb1bb5999a74b"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
 dependencies = [
  "arith",
  "ark-std",
@@ -1980,7 +1980,7 @@ dependencies = [
 [[package]]
 name = "polynomials"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#6e66702286aaa3d63c2fec1131cbb1bb5999a74b"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
 dependencies = [
  "arith",
  "ark-std",
@@ -2274,7 +2274,7 @@ dependencies = [
 [[package]]
 name = "serdes"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#6e66702286aaa3d63c2fec1131cbb1bb5999a74b"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
 dependencies = [
  "ethnum",
  "halo2curves",
@@ -2363,9 +2363,9 @@ checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
 name = "stacker"
-version = "0.1.19"
+version = "0.1.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9156ebd5870ef293bfb43f91c7a74528d363ec0d424afe24160ed5a4343d08a"
+checksum = "601f9201feb9b09c00266478bf459952b9ef9a6b94edb2f21eba14ab681a60a9"
 dependencies = [
  "cc",
  "cfg-if",
@@ -2395,7 +2395,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 [[package]]
 name = "sumcheck"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#6e66702286aaa3d63c2fec1131cbb1bb5999a74b"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
 dependencies = [
  "arith",
  "circuit",
@@ -2580,7 +2580,7 @@ dependencies = [
 [[package]]
 name = "transcript"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#6e66702286aaa3d63c2fec1131cbb1bb5999a74b"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
 dependencies = [
  "arith",
  "field_hashers",
@@ -2593,7 +2593,7 @@ dependencies = [
 [[package]]
 name = "tree"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#6e66702286aaa3d63c2fec1131cbb1bb5999a74b"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
 dependencies = [
  "arith",
  "ark-std",
@@ -2701,7 +2701,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 [[package]]
 name = "utils"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/circuit_serde#6e66702286aaa3d63c2fec1131cbb1bb5999a74b"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
 
 [[package]]
 name = "version_check"
@@ -2863,9 +2863,9 @@ dependencies = [
 
 [[package]]
 name = "windows-link"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6dccfd733ce2b1753b03b6d3c65edf020262ea35e20ccdf3e288043e6dd620e3"
+checksum = "76840935b766e1b0a05c0066835fb9ec80071d4c09a16f6bd5f7e655e3c14c38"
 
 [[package]]
 name = "windows-sys"
