@@ -1,12 +1,12 @@
 use circuit_std_rs::sha256::m31::sha256_37bytes;
 use circuit_std_rs::sha256::m31_utils::{big_array_add, to_binary_hint};
 use expander_compiler::frontend::*;
-use expander_compiler::zkcuda::context::{call_kernel, Context, Reshape};
+use expander_compiler::zkcuda::context::{call_kernel, Context};
 use expander_compiler::zkcuda::kernel::*;
 use expander_compiler::zkcuda::proving_system::ExpanderGKRProvingSystem;
 
 pub const SHA256LEN: usize = 32;
-pub const HASHTABLESIZE: usize = 32;
+pub const HASHTABLESIZE: usize = 2;
 #[allow(dead_code)]
 fn compute_hashtable_inner<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variable> {
     let shuffle_round = p[0];
@@ -60,7 +60,6 @@ fn compute_hashtable<C: Config>(
 
 //#[test]
 pub fn test_zkcuda_hashtable() {
-    let start_time = std::time::Instant::now();
 
     let mut hint_registry = HintRegistry::<M31>::new();
     hint_registry.register("myhint.tobinary", to_binary_hint);
@@ -90,12 +89,16 @@ pub fn test_zkcuda_hashtable() {
     println!("copy to device ok");
    // println!("p: {:?}", p.clone().unwrap().shape.unwrap());
 
+    let start_time = std::time::Instant::now();
     let kernel: Kernel<M31Config> = compile_compute_hashtable().unwrap();
-    println!("compile ok, time {:?}", std::time::Instant::now().duration_since(start_time));
+
+    let t2 = std::time::Instant::now();
+    println!("compile ok, time {:?}", t2.duration_since(start_time));
 
     let mut out = None;
     call_kernel!(ctx, kernel, p, mut out);
-    println!("call kernel ok, time {:?}", std::time::Instant::now().duration_since(start_time));
+    let t3 = std::time::Instant::now();
+    println!("call kernel ok, time {:?}", t3.duration_since(t2));
 
    // println!("out shape: {:?}", out.clone().unwrap().shape.unwrap());
    // let out = out.reshape(&[SHA256LEN*HASHTABLESIZE]);
@@ -107,11 +110,11 @@ pub fn test_zkcuda_hashtable() {
 
     let computation_graph = ctx.to_computation_graph();
 
-    println!("to_computation_graph ok, time {:?}", std::time::Instant::now().duration_since(start_time));
-
     let proof = ctx.to_proof();
 
     assert!(computation_graph.verify(&proof));
 
-    println!("verify ok, time {:?}", std::time::Instant::now().duration_since(start_time));
+    let t4 = std::time::Instant::now();
+
+    println!("verify ok, time {:?}", t4.duration_since(t3));
 }
