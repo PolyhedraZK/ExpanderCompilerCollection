@@ -14,7 +14,7 @@ pub use circuit::declare_circuit;
 pub type API<C> = builder::RootBuilder<C>;
 pub use crate::circuit::config::*;
 pub use crate::compile::CompileOptions;
-pub use crate::field::{Field, FieldArith, BN254, GF2, M31};
+pub use crate::field::{Field, FieldArith, BN254Fr, GF2, M31};
 pub use crate::hints::registry::{EmptyHintCaller, HintCaller, HintRegistry};
 pub use crate::utils::error::Error;
 pub use api::{BasicAPI, RootAPI};

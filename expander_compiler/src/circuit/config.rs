@@ -47,9 +47,9 @@ impl Config for M31Config {
 pub struct BN254Config {}
 
 impl Config for BN254Config {
-    type CircuitField = crate::field::BN254;
+    type CircuitField = crate::field::BN254Fr;
 
-    type DefaultSimdField = crate::field::BN254;
+    type DefaultSimdField = crate::field::BN254Fr;
     type DefaultGKRFieldConfig = gkr_field_config::BN254Config;
     type DefaultGKRConfig = gkr::gkr_configs::BN254ConfigMIMC5Raw; // TODO: compare with BN254ConfigSha2Raw
 
