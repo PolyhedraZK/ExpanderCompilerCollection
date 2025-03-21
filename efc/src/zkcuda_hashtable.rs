@@ -1,6 +1,7 @@
 use crate::hashtable::{HASHTABLESIZE, SHA256LEN};
 use circuit_std_rs::sha256::m31::sha256_37bytes;
 use circuit_std_rs::sha256::m31_utils::{big_array_add, to_binary_hint};
+use circuit_std_rs::utils::register_hint;
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::context::{call_kernel, Context};
 use expander_compiler::zkcuda::kernel::*;
@@ -55,11 +56,11 @@ fn compute_hashtable<C: Config>(
 
 //#[test]
 pub fn test_zkcuda_hashtable() {
-    let mut hint_registry = HintRegistry::<M31>::new();
-    hint_registry.register("myhint.tobinary", to_binary_hint);
+    let mut hint_registry1 = HintRegistry::<M31>::new();
+    register_hint(&mut hint_registry1);
 
     let mut ctx: Context<M31Config, ExpanderGKRProvingSystem<M31Config>, _> =
-        Context::new(hint_registry);
+        Context::new(hint_registry1);
 
     let shuffle_round = 100;
     let start_index = vec![1, 0, 0, 0];
@@ -93,14 +94,6 @@ pub fn test_zkcuda_hashtable() {
     call_kernel!(ctx, kernel, p, mut out);
     let t3 = std::time::Instant::now();
     println!("call kernel ok, time {:?}", t3.duration_since(t2));
-
-    // println!("out shape: {:?}", out.clone().unwrap().shape.unwrap());
-    // let out = out.reshape(&[SHA256LEN*HASHTABLESIZE]);
-    // println!("out shape: {:?}", out.clone().unwrap().shape.unwrap());
-
-    //let out: Vec<M31> = ctx.copy_to_host(out);
-    //println!("copy to host ok");
-    //println!("out: {:?}", out);
 
     let computation_graph = ctx.to_computation_graph();
 
