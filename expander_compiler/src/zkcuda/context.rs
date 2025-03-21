@@ -550,9 +550,11 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
         }
     }
 
-    pub fn to_proof(self) -> CombinedProof<C, P> {
-        let computation_graph = self.to_computation_graph();
-        let prover_setup = P::prover_setup(&computation_graph);
+    pub fn proving_system_setup(&self, computation_graph: &ComputationGraph<C>) -> (P::ProverSetup, P::VerifierSetup) {
+        P::setup(computation_graph)
+    }
+
+    pub fn to_proof(self, prover_setup: &P::ProverSetup) -> CombinedProof<C, P> {
         let commitments = self
             .device_memories
             .iter()
@@ -593,8 +595,7 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
 }
 
 impl<C: Config> ComputationGraph<C> {
-    pub fn verify<P: ProvingSystem<C>>(&self, combined_proof: &CombinedProof<C, P>) -> bool {
-        let verifier_setup = P::verifier_setup(self);
+    pub fn verify<P: ProvingSystem<C>>(&self, combined_proof: &CombinedProof<C, P>, verifier_setup: &P::VerifierSetup) -> bool {
         for (commitment, len) in combined_proof
             .commitments
             .iter()

@@ -13,8 +13,7 @@ pub trait ProvingSystem<C: Config> {
     type Commitment: Commitment<C>;
     type CommitmentExtraInfo: Clone;
 
-    fn prover_setup(computation_graph: &ComputationGraph<C>) -> Self::ProverSetup;
-    fn verifier_setup(computation_graph: &ComputationGraph<C>) -> Self::VerifierSetup;
+    fn setup(computation_graph: &ComputationGraph<C>) -> (Self::ProverSetup, Self::VerifierSetup);
 
     fn commit(
         prover_setup: &Self::ProverSetup,
