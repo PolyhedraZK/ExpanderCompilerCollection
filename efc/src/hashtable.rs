@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::thread;
 
 pub const SHA256LEN: usize = 32;
-pub const HASHTABLESIZE: usize = 1;
+pub const HASHTABLESIZE: usize = 16;
 #[derive(Clone, Copy, Debug)]
 pub struct HashTableParams {
     pub table_size: usize,
@@ -156,22 +156,20 @@ pub fn generate_hash_witnesses(dir: &str) {
 
 //#[test]
 pub fn test_hashtable() {
-    let dir = ".";
-    let file_path = format!("{}/hashtable.json", dir);
-
-    let cur_hashtable_data: HashTableJson = read_from_json_file(&file_path).unwrap();
+    let json_str = include_str!("hashtable.json");
+    let hashtable_data: HashTableJson= serde_json::from_str(json_str).expect("Failed to deserialize JSON");
 
     let mut assignment = HASHTABLECircuit::default();
     for j in 0..32 {
-        assignment.seed[j] = M31::from(cur_hashtable_data.seed[j] as u32);
+        assignment.seed[j] = M31::from(hashtable_data.seed[j] as u32);
     }
-    assignment.shuffle_round = M31::from(cur_hashtable_data.shuffle_round as u32);
+    assignment.shuffle_round = M31::from(hashtable_data.shuffle_round as u32);
     for j in 0..4 {
-        assignment.start_index[j] = M31::from(cur_hashtable_data.start_index[j] as u32);
+        assignment.start_index[j] = M31::from(hashtable_data.start_index[j] as u32);
     }
     for j in 0..HASHTABLESIZE {
         for k in 0..32 {
-            assignment.output[j][k] = M31::from(cur_hashtable_data.hash_outputs[j][k] as u32);
+            assignment.output[j][k] = M31::from(hashtable_data.hash_outputs[j][k] as u32);
         }
     }
 
