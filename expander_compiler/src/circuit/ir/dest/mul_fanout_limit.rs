@@ -246,6 +246,7 @@ mod tests {
     use crate::circuit::layered::{InputUsize, NormalInputType};
     use crate::field::FieldArith;
     use rand::{RngCore, SeedableRng};
+    use serdes::ExpSerde;
 
     type CField = <C as Config>::CircuitField;
 
@@ -441,7 +442,6 @@ mod tests {
     #[test]
     fn full_fanout_test_and_dump() {
         use crate::circuit::ir::common::rand_gen::{RandomCircuitConfig, RandomRange};
-        use crate::utils::serde::Serde;
 
         let config = RandomCircuitConfig {
             seed: 2,

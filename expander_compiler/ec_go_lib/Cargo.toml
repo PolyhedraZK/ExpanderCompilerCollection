@@ -7,13 +7,16 @@ edition = "2021"
 crate-type = ["dylib"]
 
 [dependencies]
-rand.workspace = true
+arith.workspace = true
+expander_circuit.workspace = true
+expander_config.workspace = true
+expander_transcript.workspace = true
+gkr.workspace = true
 gkr_field_config.workspace = true
 mpi_config.workspace = true
-expander_config.workspace = true
-expander_circuit.workspace = true
-gkr.workspace = true
-arith.workspace = true
-expander_transcript.workspace = true
+rand.workspace = true
+serdes.workspace = true
+
 expander_compiler = {path = "../" }
+
 libc = "0.2.155"

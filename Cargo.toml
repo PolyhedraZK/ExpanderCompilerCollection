@@ -10,15 +10,30 @@ opt-level = 3
 
 
 [workspace.dependencies]
+ark-bls12-381 = "0.4.0"
+ark-ec = "0.4.0"
+ark-ff = "0.4.0"
+ark-serialize = "0.4.0"
 ark-std = "0.4.0"
-rand = "0.8.5"
+base64 = "0.22.1"
+big-int = "7.0.0"
 chrono = "0.4.39"
 clap = { version = "4.5.30", features = ["derive"] }
 ethnum = "1.5.0"
-tiny-keccak = { version = "2.0", features = ["keccak"] }
 halo2curves = { git = "https://github.com/PolyhedraZK/halo2curves", default-features = false, features = [
     "bits",
 ] }
+hex = "0.4"
+num-bigint = "0.4.6"
+num-traits = "0.2.19"
+rand = "0.8.5"
+rayon = "1.10.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10.8"
+stacker = "0.1.17"
+tiny-keccak = { version = "2.0", features = ["keccak"] }
+
 arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
@@ -29,4 +44,4 @@ gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "transcript" }
 crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "main"}
-
+serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "main"}

@@ -14,7 +14,7 @@ pub use circuit::declare_circuit;
 pub type API<C> = builder::RootBuilder<C>;
 pub use crate::circuit::config::*;
 pub use crate::compile::CompileOptions;
-pub use crate::field::{Field, FieldArith, FieldModulus, BN254, GF2, M31};
+pub use crate::field::{BN254Fr, Field, FieldArith, GF2, M31};
 pub use crate::hints::registry::{EmptyHintCaller, HintCaller, HintRegistry};
 pub use crate::utils::error::Error;
 pub use api::{BasicAPI, RootAPI};
@@ -28,14 +28,14 @@ pub mod internal {
         declare_circuit_load_from, declare_circuit_num_vars,
     };
     pub use super::variables::{DumpLoadTwoVariables, DumpLoadVariables};
-    pub use crate::utils::serde::Serde;
+    // pub use crate::utils::serde::Serde;
 }
 
 pub mod extra {
     pub use super::api::UnconstrainedAPI;
     pub use super::debug::DebugBuilder;
     pub use crate::hints::registry::{EmptyHintCaller, HintCaller, HintRegistry};
-    pub use crate::utils::serde::Serde;
+    // pub use crate::utils::serde::Serde;
 
     use super::{internal, Config, Define, Variable};
 
