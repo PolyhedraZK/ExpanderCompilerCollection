@@ -96,4 +96,5 @@ pub trait RootAPI<C: Config>: Sized + BasicAPI<C> + UnconstrainedAPI<C> + 'stati
         f: F,
         inputs: &[Variable],
     ) -> Vec<Variable>;
+    fn set_outputs(&mut self, outputs: Vec<Variable>);
 }

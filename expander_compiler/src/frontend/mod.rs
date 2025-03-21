@@ -48,7 +48,7 @@ pub mod extra {
         circuit: &Cir,
         assignment: &CA,
         hint_caller: H,
-    ) {
+    ) -> Vec<C::CircuitField> {
         let (num_inputs, num_public_inputs) = circuit.num_vars();
         let (a_num_inputs, a_num_public_inputs) = assignment.num_vars();
         assert_eq!(num_inputs, a_num_inputs);
@@ -63,6 +63,7 @@ pub mod extra {
         let mut public_vars_ptr = public_input_variables.as_slice();
         circuit.load_from(&mut vars_ptr, &mut public_vars_ptr);
         circuit.define(&mut root_builder);
+        root_builder.get_outputs()
     }
 }
 
