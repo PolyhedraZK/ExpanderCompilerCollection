@@ -213,13 +213,13 @@ fn zkcuda_to_binary() {
 }
 
 #[kernel]
-fn tmp<C: Config>(api: &mut API<C>, a: &InputVariable, b: &InputVariable) {
+fn assertion<C: Config>(api: &mut API<C>, a: &InputVariable, b: &InputVariable) {
     api.assert_is_equal(*a, *b);
 }
 
 #[test]
-fn zkcuda_tmp() {
-    let kernel_tmp: Kernel<M31Config> = compile_tmp().unwrap();
+fn zkcuda_assertion() {
+    let kernel_tmp: Kernel<M31Config> = compile_assertion().unwrap();
 
     let mut ctx: Context<M31Config> = Context::default();
     let a = ctx.copy_to_device(&M31::from(10u32), false).reshape(&[1]);
@@ -233,8 +233,8 @@ fn zkcuda_tmp() {
 
 #[test]
 #[should_panic]
-fn zkcuda_tmp_fail() {
-    let kernel_tmp: Kernel<M31Config> = compile_tmp().unwrap();
+fn zkcuda_assertion_fail() {
+    let kernel_tmp: Kernel<M31Config> = compile_assertion().unwrap();
 
     let mut ctx: Context<M31Config> = Context::default();
     let a = ctx.copy_to_device(&M31::from(10u32), false).reshape(&[1]);
