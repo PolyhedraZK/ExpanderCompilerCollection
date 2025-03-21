@@ -154,8 +154,10 @@ impl Define<M31Config> for PairingCheckGKRCircuit<Variable> {
                 ),
             },
         };
-        pairing.assert_is_on_curve(builder, p1_g1.clone());
-        pairing.assert_is_on_curve(builder, p2_g1.clone());
+        pairing.assert_is_on_g1(builder, &p1_g1);
+        pairing.assert_is_on_g1(builder, &p2_g1);
+        pairing.assert_is_on_g2(builder, &q1_g2);
+        pairing.assert_is_on_g2(builder, &q2_g2);
 
         pairing
             .pairing_check(
