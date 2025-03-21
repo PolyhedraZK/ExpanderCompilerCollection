@@ -9,7 +9,9 @@ use crate::circuit::{
 };
 use crate::utils::pool::Pool;
 
+use super::layer_layout::merge_layouts;
 use super::layer_layout::{LayerLayout, LayerLayoutContext, LayerReq};
+use super::CompileOptions;
 
 pub struct CompileContext<'a, C: Config, I: InputType> {
     // the root circuit
@@ -38,6 +40,8 @@ pub struct CompileContext<'a, C: Config, I: InputType> {
     pub input_order: Vec<usize>,
 
     pub root_has_constraints: bool,
+
+    pub opts: CompileOptions,
 }
 
 pub struct IrContext<'a, C: Config> {
@@ -118,6 +122,19 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
             }));
         }
         self.layout_ids = layout_ids;
+        if !self.opts.allow_input_reorder {
+            let layout_vec =
+                merge_layouts(vec![], (0..self.circuits[&0].lcs[0].vars.len()).collect());
+            let id = self.layer_layout_pool.add(&LayerLayout {
+                circuit_id: 0,
+                layer: 0,
+                size: layout_vec.len(),
+                inner: super::layer_layout::LayerLayoutInner::Dense {
+                    placement: layout_vec,
+                },
+            });
+            self.layout_ids[0] = id;
+        }
 
         // 5. generate wires
         let layers = self.connect_wires(&self.layout_ids.clone());

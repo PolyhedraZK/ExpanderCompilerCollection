@@ -63,6 +63,27 @@ impl<T: Serde> Serde for Vec<T> {
     }
 }
 
+impl<T: Serde> Serde for Option<T> {
+    fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
+        match self {
+            Some(v) => {
+                true.serialize_into(&mut writer)?;
+                v.serialize_into(&mut writer)
+            }
+            None => false.serialize_into(&mut writer),
+        }
+    }
+
+    fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
+        let has_value = bool::deserialize_from(&mut reader)?;
+        if has_value {
+            Ok(Some(T::deserialize_from(&mut reader)?))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
 impl<K: Serde + Eq + Hash, V: Serde> Serde for HashMap<K, V> {
     fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
         self.len().serialize_into(&mut writer)?;
