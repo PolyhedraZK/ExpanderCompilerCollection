@@ -156,8 +156,3 @@ pub fn assert_vars_is_equal<C: Config, B: RootAPI<C>>(api: &mut B, a: &[Variable
         .zip(b.iter())
         .for_each(|(a, b)| api.assert_is_equal(*a, *b))
 }
-pub const POSEIDON_M31X16_FULL_ROUNDS: usize = 8;
-
-pub const POSEIDON_M31X16_PARTIAL_ROUNDS: usize = 14;
-
-pub const POSEIDON_M31X16_RATE: usize = 8;

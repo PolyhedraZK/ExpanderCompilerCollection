@@ -37,6 +37,12 @@ const MATRIX_CIRC_MDS_12_SML_ROW: [u32; 12] = [1, 1, 2, 1, 8, 9, 10, 7, 5, 9, 4,
 const MATRIX_CIRC_MDS_16_SML_ROW: [u32; 16] =
     [1, 1, 51, 1, 11, 17, 2, 1, 101, 63, 15, 2, 67, 22, 13, 3];
 
+pub const POSEIDON_M31X16_FULL_ROUNDS: usize = 8;
+
+pub const POSEIDON_M31X16_PARTIAL_ROUNDS: usize = 14;
+
+pub const POSEIDON_M31X16_RATE: usize = 8;
+
 pub fn get_mds_matrix(width: usize) -> Vec<Vec<u32>> {
     let mds_first_row: &[u32] = match width {
         8 => &MATRIX_CIRC_MDS_8_SML_ROW,

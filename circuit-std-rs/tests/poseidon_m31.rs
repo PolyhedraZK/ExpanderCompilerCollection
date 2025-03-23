@@ -1,5 +1,5 @@
-use circuit_std_rs::{poseidon_m31::*, utils::register_hint};
-use expander_compiler::frontend::*;
+use circuit_std_rs::{poseidon::poseidon_m31::*, poseidon::utils::*, utils::register_hint};
+use expander_compiler::frontend::{extra::debug_eval, *};
 
 declare_circuit!(PoseidonSpongeLen8Circuit {
     inputs: [Variable; 8],
@@ -108,4 +108,53 @@ fn test_poseidon_m31x16_hash_to_state_input_len16() {
         .unwrap();
     let output = compile_result.layered_circuit.run(&witness);
     assert_eq!(output, vec![true]);
+}
+
+
+
+declare_circuit!(PoseidonSpongeLen8DebugCircuit {
+    inputs: [Variable; 8],
+    outputs: [Variable; 16]
+});
+
+impl GenericDefine<M31Config> for PoseidonSpongeLen8DebugCircuit<Variable> {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
+        let params = PoseidonM31Params::new(
+            builder,
+            POSEIDON_M31X16_RATE,
+            16,
+            POSEIDON_M31X16_FULL_ROUNDS,
+            POSEIDON_M31X16_PARTIAL_ROUNDS,
+        );
+        let res = params.hash_to_state(builder, &self.inputs);
+        (0..params.width).for_each(|i| builder.assert_is_equal(res[i], self.outputs[i]));
+    }
+}
+
+#[test]
+// NOTE(HS) Poseidon Mersenne-31 Width-16 Sponge tested over input length 8
+fn test_poseidon_m31x16_hash_to_state_input_len8_debug() {
+    let assignment = PoseidonSpongeLen8DebugCircuit::<M31> {
+        inputs: [M31::from(114514); 8],
+        outputs: [
+            M31 { v: 1021105124 },
+            M31 { v: 1342990709 },
+            M31 { v: 1593716396 },
+            M31 { v: 2100280498 },
+            M31 { v: 330652568 },
+            M31 { v: 1371365483 },
+            M31 { v: 586650367 },
+            M31 { v: 345482939 },
+            M31 { v: 849034538 },
+            M31 { v: 175601510 },
+            M31 { v: 1454280121 },
+            M31 { v: 1362077584 },
+            M31 { v: 528171622 },
+            M31 { v: 187534772 },
+            M31 { v: 436020341 },
+            M31 { v: 1441052621 },
+        ],
+    };
+
+    debug_eval(&PoseidonSpongeLen8DebugCircuit::default(), &assignment, HintRegistry::<M31>::new());
 }

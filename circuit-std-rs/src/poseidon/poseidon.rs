@@ -1,21 +1,14 @@
 use super::utils::*;
 
-
-const POSEIDON_SEED_PREFIX: &str = "poseidon_seed";
-const FIELD_NAME: &str = "Mersenne 31";
 const M31_MODULUS: u32 = 2147483647; // Example modulus for Mersenne 31
 
 fn m31_add(a: u32, b: u32) -> u32 {
-    let sum = a.wrapping_add(b);
-    if sum >= M31_MODULUS {
-        sum - M31_MODULUS
-    } else {
-        sum
-    }
+    let sum = a + b;
+    sum % M31_MODULUS
 }
 
 fn m31_mul(a: u32, b: u32) -> u32 {
-    let product = (a as u64 * b as u64) % M31_MODULUS as u64;
+    let product = (a as u128 * b as u128) % M31_MODULUS as u128;
     product as u32
 }
 fn power_5(base: u32) -> u32 {
@@ -36,9 +29,20 @@ pub struct PoseidonParams {
 
 impl PoseidonParams {
     pub fn new(rate: usize, width: usize, full_rounds: usize, partial_rounds: usize) -> Self {
-        let round_constants = get_constants(width, partial_rounds + full_rounds);
-        let mds_matrix = get_mds_matrix(width);
-
+        let mut round_constants = get_constants(width, partial_rounds + full_rounds);
+        let mut mds_matrix = get_mds_matrix(width);
+        //mod all constants by M31_MODULUS
+        (0..round_constants.len()).for_each(|i| {
+            (0..round_constants[i].len()).for_each(|j| {
+                round_constants[i][j] = round_constants[i][j] % M31_MODULUS;
+            });
+        });
+        //mod all mds_matrix by M31_MODULUS
+        (0..mds_matrix.len()).for_each(|i| {
+            (0..mds_matrix[i].len()).for_each(|j| {
+                mds_matrix[i][j] = mds_matrix[i][j] % M31_MODULUS;
+            });
+        });
         Self {
             mds_matrix,
             round_constants,
@@ -50,7 +54,9 @@ impl PoseidonParams {
     }
 
     fn add_round_constants(&self, state: &mut [u32], constants: &[u32]) {
-        (0..self.width).for_each(|i| state[i] = m31_add(state[i], constants[i]))
+        for i in 0..self.width {
+            state[i] = m31_add(state[i], constants[i]);
+        }
     }
 
     fn apply_mds_matrix(&self, state: &mut [u32]) {
@@ -79,11 +85,10 @@ impl PoseidonParams {
         let partial_ends = half_full_rounds + self.partial_rounds;
 
         assert_eq!(self.width, state.len());
-
         (0..half_full_rounds).for_each(|i| {
             self.add_round_constants(state, &self.round_constants[i]);
             self.apply_mds_matrix(state);
-            self.apply_full_sbox(state)
+            self.apply_full_sbox(state);
         });
         (half_full_rounds..partial_ends).for_each(|i| {
             self.add_round_constants(state, &self.round_constants[i]);
