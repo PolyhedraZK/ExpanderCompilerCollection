@@ -5,6 +5,6 @@ pub mod logup;
 pub use logup::{LogUpCircuit, LogUpParams};
 
 pub mod gnark;
-pub mod poseidon_m31;
+pub mod poseidon;
 pub mod sha256;
 pub mod utils;
