@@ -118,4 +118,8 @@ impl PoseidonParams {
 
         res
     }
+
+    pub fn hash(&self, inputs: &[u32]) -> Vec<u32> {
+        self.hash_to_state(inputs)[..self.rate].to_vec()
+    }
 }

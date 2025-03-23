@@ -2,7 +2,7 @@ use circuit_std_rs::sha256::m31::sha256_var_bytes;
 use expander_compiler::frontend::*;
 use serde::Deserialize;
 
-const ZERO_HASHES: [&[u8]; 40] = [
+const ZERO_HASHES_SHA256: [&[u8]; 40] = [
     &[0; 32],
     &[
         245, 165, 253, 66, 209, 106, 32, 48, 39, 152, 239, 110, 211, 9, 151, 155, 67, 0, 61, 35,
@@ -162,12 +162,12 @@ const ZERO_HASHES: [&[u8]; 40] = [
     ],
 ];
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Default, Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct CheckpointPlain {
     pub epoch: u64,
     pub root: String,
 }
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Default, Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct AttestationData {
     #[serde(default)]
     pub slot: u64,
@@ -177,7 +177,7 @@ pub struct AttestationData {
     pub source: CheckpointPlain,
     pub target: CheckpointPlain,
 }
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Default, Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct Attestation {
     #[serde(default)]
     pub aggregation_bits: String,
@@ -264,7 +264,7 @@ pub fn beacon_merklize<C: Config, B: RootAPI<C>>(
     let mut length = inputs.len();
     let depth = (length as f64).log2().ceil() as usize;
     let mut inputs = inputs;
-    for padding_hash in ZERO_HASHES.iter().take(depth) {
+    for padding_hash in ZERO_HASHES_SHA256.iter().take(depth) {
         if inputs.len() % 2 == 1 {
             let pad_hash = *padding_hash;
             let padding: Vec<_> = pad_hash

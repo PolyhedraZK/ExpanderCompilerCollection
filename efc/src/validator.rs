@@ -1,4 +1,8 @@
-use circuit_std_rs::poseidon_m31::*;
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
+use circuit_std_rs::poseidon::poseidon::PoseidonParams;
+use circuit_std_rs::poseidon::poseidon_m31::*;
+use circuit_std_rs::poseidon::utils::*;
 use circuit_std_rs::utils::register_hint;
 use expander_compiler::frontend::*;
 use serde::Deserialize;
@@ -29,7 +33,54 @@ pub struct ValidatorPlain {
     #[serde(default)]
     pub withdrawable_epoch: u64,
 }
+impl ValidatorPlain {
+    pub fn hash(&self) -> Vec<u32> {
+        let mut inputs = Vec::new();
+        let pubkey = STANDARD.decode(self.public_key.clone()).unwrap();
+        let withdrawal_credentials = STANDARD
+            .decode(self.withdrawal_credentials.clone())
+            .unwrap();
+        let effective_balance = self.effective_balance.to_le_bytes();
+        let slashed = if self.slashed { 1u64 } else { 0u64 }.to_le_bytes();
+        let activation_eligibility_epoch = self.activation_eligibility_epoch.to_le_bytes();
+        let activation_epoch = self.activation_epoch.to_le_bytes();
+        let exit_epoch = self.exit_epoch.to_le_bytes();
+        let withdrawable_epoch = self.withdrawable_epoch.to_le_bytes();
 
+        for i in 0..48 {
+            inputs.push(pubkey[i]);
+        }
+        for i in 0..32 {
+            inputs.push(withdrawal_credentials[i]);
+        }
+        for i in 0..8 {
+            inputs.push(effective_balance[i]);
+        }
+        for i in 0..1 {
+            inputs.push(slashed[i]);
+        }
+        for i in 0..8 {
+            inputs.push(activation_eligibility_epoch[i]);
+        }
+        for i in 0..8 {
+            inputs.push(activation_epoch[i]);
+        }
+        for i in 0..8 {
+            inputs.push(exit_epoch[i]);
+        }
+        for i in 0..8 {
+            inputs.push(withdrawable_epoch[i]);
+        }
+        let params = PoseidonParams::new(
+            POSEIDON_M31X16_RATE,
+            16,
+            POSEIDON_M31X16_FULL_ROUNDS,
+            POSEIDON_M31X16_PARTIAL_ROUNDS,
+        );
+        let inputs_u32 = inputs.iter().map(|x| *x as u32).collect::<Vec<u32>>();
+        params.hash_to_state(&inputs_u32)
+    }
+}
 #[derive(Clone, Copy)]
 pub struct ValidatorSSZ {
     pub public_key: [Variable; 48],

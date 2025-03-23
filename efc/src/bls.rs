@@ -197,8 +197,6 @@ pub fn decompose_vars<C: Config, B: RootAPI<C>>(
     scalar_array
 }
 
-
-
 pub fn aggregate_attestation_public_key_flatten<C: Config, B: RootAPI<C>>(
     builder: &mut B,
     g1: &mut G1,
