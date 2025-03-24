@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 
 use arith::Field;
-use expander_compiler::frontend::{
-    declare_circuit, Config, Define, Error, FieldModulus, RootAPI, Variable,
-};
+use expander_compiler::frontend::{declare_circuit, Config, Define, Error, RootAPI, Variable};
 use rand::Rng;
 
 use crate::StdCircuit;
@@ -446,10 +444,7 @@ impl LogUpRangeProofTable {
     }
 }
 
-pub fn query_count_hint<F: Field + FieldModulus>(
-    inputs: &[F],
-    outputs: &mut [F],
-) -> Result<(), Error> {
+pub fn query_count_hint<F: Field>(inputs: &[F], outputs: &mut [F]) -> Result<(), Error> {
     let mut count = vec![0; outputs.len()];
     for input in inputs {
         let query_id = input.to_u256().as_usize();
@@ -461,10 +456,7 @@ pub fn query_count_hint<F: Field + FieldModulus>(
     Ok(())
 }
 
-pub fn query_count_by_key_hint<F: Field + FieldModulus>(
-    inputs: &[F],
-    outputs: &mut [F],
-) -> Result<(), Error> {
+pub fn query_count_by_key_hint<F: Field>(inputs: &[F], outputs: &mut [F]) -> Result<(), Error> {
     let mut outputs_u32 = vec![0; outputs.len()];
 
     let table_size = inputs[0].to_u256().as_usize();
@@ -489,10 +481,7 @@ pub fn query_count_by_key_hint<F: Field + FieldModulus>(
     Ok(())
 }
 
-pub fn rangeproof_hint<F: Field + FieldModulus>(
-    inputs: &[F],
-    outputs: &mut [F],
-) -> Result<(), Error> {
+pub fn rangeproof_hint<F: Field>(inputs: &[F], outputs: &mut [F]) -> Result<(), Error> {
     let n = inputs[0].to_u256().as_i64();
     let m = inputs[1].to_u256().as_i64();
     let mut a = inputs[2].to_u256().as_i64();
