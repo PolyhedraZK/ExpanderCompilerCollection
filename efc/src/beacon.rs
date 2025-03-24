@@ -34,9 +34,9 @@ const COMMITTEE_DIR: &str = "./data/beacon/committee/";
 const ATTESTATION_DIR: &str = "./data/beacon/attestations/";
 const DOMAIN_BEACON_ATTESTER: &str = "01000000";
 
-const SLOTSPEREPOCH: u64 = 32;
-const SHUFFLEROUND: usize = 90;
-const MAXCOMMITTEESPERSLOT: usize = 64;
+pub const SLOTSPEREPOCH: u64 = 32;
+pub const SHUFFLEROUND: usize = 90;
+pub const MAXCOMMITTEESPERSLOT: usize = 64;
 const MAXBEACONVALIDATORDEPTH: usize = 40;
 const MAXBEACONVALIDATORSIZE: usize = 1 << MAXBEACONVALIDATORDEPTH;
 
@@ -723,6 +723,8 @@ fn test_load_attestations_and_bytes() {
 
 #[test]
 fn test_prepare_assignment_data() {
-    let (seed, shuffle_indices, committee_indices, pivots, activated_indices, shuffle_round_indices, flips, positions, flip_bits, round_hash_bits, attestations, aggregated_pubkeys, balance_list, real_committee_size, validator_tree) = prepare_assignment_data(3988672, 3988672 + 32);
-
+    let epoch = 290000;
+    let slot = epoch * SLOTSPEREPOCH;
+    let (seed, shuffle_indices, committee_indices, pivots, activated_indices, shuffle_round_indices, flips, positions, flip_bits, round_hash_bits, attestations, aggregated_pubkeys, balance_list, real_committee_size, validator_tree) = prepare_assignment_data(slot, slot + 32);
+    println!("aggregated_pubkeys: {:?}", aggregated_pubkeys);
 }

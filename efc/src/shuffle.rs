@@ -1,3 +1,7 @@
+use crate::attestation::Attestation;
+use ark_bls12_381::G1Affine as BlsG1Affine;
+use num_traits::real;
+use crate::{beacon, bls};
 use crate::bls::{aggregate_attestation_public_key_flatten, check_pubkey_key_bls};
 use crate::bls_verifier::G1Json;
 use crate::utils::{get_solver, read_from_json_file, write_witness_to_file};
@@ -11,6 +15,7 @@ use expander_compiler::frontend::extra::*;
 use expander_compiler::frontend::*;
 use serde::de::{Deserializer, SeqAccess, Visitor};
 use serde::Deserialize;
+use core::panic;
 use std::fmt;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -242,6 +247,166 @@ impl ShuffleCircuit<M31> {
                 self.withdrawable_epoch[i][j] = M31::from(*withdrawable_epoch_byte as u32);
             }
         }
+    }pub fn from_beacon(
+        &mut self,
+        circuit_id: u32,
+        real_committee_size: Vec<u64>, 
+        shuffle_indices: Vec<u64>,
+        committee_indices: Vec<u64>,
+        slot_attestations: Vec<Vec<Attestation>>,
+        aggregated_pubkeys: Vec<BlsG1Affine>,
+        pivots: Vec<u64>,
+        flips: Vec<Vec<u64>>,
+        positions: Vec<Vec<u64>>,
+        flip_bits: Vec<Vec<u8>>,
+        validator_hashes: Vec<Vec<u32>>,
+        balance_list: Vec<u64>,
+        plain_validators: &[ValidatorPlain],
+        pubkey_bls: &[Vec<String>],
+    ) {
+        let start: usize = real_committee_size.iter().take(circuit_id as usize).copied().sum::<u64>() as usize;
+        let real_validator_count = shuffle_indices.len();
+        //assign shuffle_json
+        self.start_index = M31::from(start as u32);
+        self.chunk_length = M31::from(VALIDATOR_CHUNK_SIZE as u32);
+        let lower = start.min(real_validator_count as usize);
+        let upper = (start + VALIDATOR_CHUNK_SIZE).min(real_validator_count as usize);
+        let sub_shuffle_indices = &shuffle_indices[lower..upper];
+        let sub_committee_indices = &committee_indices[lower..upper];
+        let slot_idx = circuit_id as usize / beacon::MAXCOMMITTEESPERSLOT;
+        let committee_idx = circuit_id as usize % beacon::MAXCOMMITTEESPERSLOT;
+        let mut att = &slot_attestations[0][0];
+        let mut pubkey: [[u8; 48]; 2] = [[0; 48]; 2];
+        if slot_attestations.len() == 0 {
+            panic!("slot_attestations is empty");
+        }
+        if slot_attestations[slot_idx].len() != 0 && slot_attestations[slot_idx].len() > committee_idx{
+            pubkey = bls::affine_point_to_bytes_g1(&aggregated_pubkeys[circuit_id as usize]);
+            att = &slot_attestations[slot_idx][committee_idx];
+        }
+        let aggregated_bits = beacon::attestation_get_aggregation_bits_from_bytes(&att.aggregation_bits);
+        for i in 0..VALIDATOR_CHUNK_SIZE {
+            self.shuffle_indices[i] = M31::from(0);
+            self.committee_indices[i] = M31::from(0);
+            self.aggregation_bits[i] = M31::from(0);
+            if i < sub_shuffle_indices.len() {
+                self.shuffle_indices[i] = M31::from(sub_shuffle_indices[i] as u32);
+            }
+            if i < sub_committee_indices.len() {
+                self.committee_indices[i] = M31::from(sub_committee_indices[i] as u32);
+            }
+            if i < aggregated_bits.len() - 1 {
+                self.aggregation_bits[i] = M31::from(aggregated_bits[i] as u32);
+            }
+        }
+        for i in 0..SHUFFLE_ROUND {
+            self.pivots[i] = M31::from(pivots[i] as u32);
+        }
+        self.index_count = M31::from(real_validator_count as u32);
+        let neg_one = M31::from((1 << 31) - 2);
+        let sub_flips = &flips[lower..upper];
+        let sub_positions = &positions[lower..upper];
+        let sub_flip_bits = &flip_bits[lower..upper];
+        for i in 0..SHUFFLE_ROUND {
+            for j in 0.. VALIDATOR_CHUNK_SIZE {
+                self.position_results[i * VALIDATOR_CHUNK_SIZE + j] = neg_one;
+                self.position_bit_results[i * VALIDATOR_CHUNK_SIZE + j] = M31::from(0);
+                self.flip_results[i * VALIDATOR_CHUNK_SIZE + j] = neg_one;
+                if j < sub_flips.len() {
+                    self.flip_results[i * VALIDATOR_CHUNK_SIZE + j] = M31::from(sub_flips[j][i] as u32);
+                }
+                if j < sub_positions.len() {
+                    self.position_results[i * VALIDATOR_CHUNK_SIZE + j] = M31::from(sub_positions[j][i] as u32);
+                }
+                if j < sub_flip_bits.len() {
+                    self.position_bit_results[i * VALIDATOR_CHUNK_SIZE + j] = M31::from(sub_flip_bits[j][i] as u32);
+                }
+            }
+        }
+
+        //assign validator_hashes
+        for i in 0..VALIDATOR_CHUNK_SIZE {
+            for j in 0..POSEIDON_HASH_LENGTH {
+                self.validator_hashes[i][j] = M31::from(validator_hashes[0][j]);
+                if i < sub_committee_indices.len() {
+                    self.validator_hashes[i][j] = M31::from(validator_hashes[sub_committee_indices[i] as usize][j]);
+                }
+            }
+        }
+
+        //assign aggregated_pubkey
+        for i in 0..48 {
+            self.aggregated_pubkey[0][i] = M31::from(pubkey[0][i] as u32);
+            self.aggregated_pubkey[1][i] = M31::from(pubkey[1][i] as u32);
+        }
+
+        //assign attestation_balance
+        let balance = balance_list[circuit_id as usize];
+        let balance_bytes = balance.to_le_bytes(); // [u8; 8]
+
+        for i in 0..8 {
+            self.attestation_balance[i] = M31::from(balance_bytes[i] as u32);
+        }
+
+        for i in 0..VALIDATOR_CHUNK_SIZE {
+            //assign pubkey_bls
+            let raw_pubkey_bls = &pubkey_bls[sub_committee_indices[i] as usize];
+            let pubkey_bls_x = STANDARD.decode(&raw_pubkey_bls[0]).unwrap();
+            let pubkey_bls_y = STANDARD.decode(&raw_pubkey_bls[1]).unwrap();
+            for k in 0..48 {
+                self.pubkeys_bls[i][0][k] = M31::from(pubkey_bls_x[47 - k] as u32);
+                self.pubkeys_bls[i][1][k] = M31::from(pubkey_bls_y[47 - k] as u32);
+            }
+
+            //assign validator
+            let validator = plain_validators[sub_committee_indices[i] as usize].clone();
+
+            //assign pubkey
+            let raw_pubkey = validator.public_key.clone();
+            let pubkey = STANDARD.decode(raw_pubkey).unwrap();
+            for (j, pubkey_byte) in pubkey.iter().enumerate().take(48) {
+                self.pubkey[i][j] = M31::from(*pubkey_byte as u32);
+            }
+            //assign withdrawal_credentials
+            let raw_withdrawal_credentials = validator.withdrawal_credentials.clone();
+            let withdrawal_credentials = STANDARD.decode(raw_withdrawal_credentials).unwrap();
+            for (j, withdrawal_credentials_byte) in
+                withdrawal_credentials.iter().enumerate().take(32)
+            {
+                self.withdrawal_credentials[i][j] = M31::from(*withdrawal_credentials_byte as u32);
+            }
+            //assign effective_balance
+            let effective_balance = validator.effective_balance.to_le_bytes();
+            for (j, effective_balance_byte) in effective_balance.iter().enumerate() {
+                self.effective_balance[i][j] = M31::from(*effective_balance_byte as u32);
+            }
+            //assign slashed
+            let slashed = if validator.slashed { 1 } else { 0 };
+            self.slashed[i][0] = M31::from(slashed);
+            //assign activation_eligibility_epoch
+            let activation_eligibility_epoch = validator.activation_eligibility_epoch.to_le_bytes();
+            for (j, activation_eligibility_epoch_byte) in
+                activation_eligibility_epoch.iter().enumerate()
+            {
+                self.activation_eligibility_epoch[i][j] =
+                    M31::from(*activation_eligibility_epoch_byte as u32);
+            }
+            //assign activation_epoch
+            let activation_epoch = validator.activation_epoch.to_le_bytes();
+            for (j, activation_epoch_byte) in activation_epoch.iter().enumerate() {
+                self.activation_epoch[i][j] = M31::from(*activation_epoch_byte as u32);
+            }
+            //assign exit_epoch
+            let exit_epoch = validator.exit_epoch.to_le_bytes();
+            for (j, exit_epoch_byte) in exit_epoch.iter().enumerate() {
+                self.exit_epoch[i][j] = M31::from(*exit_epoch_byte as u32);
+            }
+            //assign withdrawable_epoch
+            let withdrawable_epoch = validator.withdrawable_epoch.to_le_bytes();
+            for (j, withdrawable_epoch_byte) in withdrawable_epoch.iter().enumerate() {
+                self.withdrawable_epoch[i][j] = M31::from(*withdrawable_epoch_byte as u32);
+            }
+        }
     }
     pub fn get_assignments_from_data(
         shuffle_data: Vec<ShuffleJson>,
@@ -288,7 +453,7 @@ impl ShuffleCircuit<M31> {
             read_from_json_file(&format!("{}/validator.json", dir))
                 .expect("Failed to read validator.json");
         let public_key_bls_list: Vec<Vec<String>> =
-            read_from_json_file(&format!("{}/pubkey_bls.json", dir))
+            read_from_json_file(&format!("{}/pubkeyBLSList.json", dir))
                 .expect("Failed to read pubkey_bls.json");
         Self::get_assignments_from_data(shuffle_data, plain_validators, public_key_bls_list)
     }

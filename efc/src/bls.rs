@@ -6,6 +6,8 @@ use circuit_std_rs::utils::{simple_lookup2, simple_select};
 use expander_compiler::frontend::*;
 use num_bigint::BigInt;
 use std::str::FromStr;
+use ark_bls12_381::G1Affine as BlsG1Affine;
+use ark_serialize::CanonicalSerialize;
 
 const K: usize = 48;
 const N: usize = 8;
@@ -282,4 +284,17 @@ pub fn aggregate_attestation_public_key_unflatten<C: Config, B: RootAPI<C>>(
         .assert_is_equal(builder, &aggregated_pubkey.x, &agg_pubkey.x);
     g1.curve_f
         .assert_is_equal(builder, &aggregated_pubkey.y, &agg_pubkey.y);
+}
+
+pub fn affine_point_to_bytes_g1(point: &BlsG1Affine) -> [[u8; 48]; 2] {
+    let mut x_bytes = [0u8; 48];
+    let mut y_bytes = [0u8; 48];
+
+    // serialize x
+    point.x.serialize_compressed(&mut x_bytes.as_mut()).unwrap();
+
+    //serialize y
+    point.y.serialize_compressed(&mut y_bytes.as_mut()).unwrap();
+
+    [x_bytes, y_bytes]
 }
