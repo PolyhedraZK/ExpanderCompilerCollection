@@ -201,26 +201,52 @@ impl<C: Config> Witness<C> {
 }
 
 impl<C: Config, I: InputType> Circuit<C, I> {
-    pub fn run(&self, witness: &Witness<C>) -> Vec<bool> {
+    fn run_inner(
+        &self,
+        witness: &Witness<C>,
+        need_output: bool,
+    ) -> (Vec<bool>, Vec<Vec<C::CircuitField>>) {
         if witness.num_witnesses == 0 {
             panic!("expected at least 1 witness")
         }
+        let mut outputs = Vec::new();
+        let mut constraints = Vec::new();
         if use_simd::<C>(witness.num_witnesses) {
-            let mut res = Vec::new();
             for (inputs, public_inputs) in witness.iter_simd() {
-                let (_, out) = self.eval_with_public_inputs_simd(inputs, &public_inputs);
-                res.extend(out);
+                let (out, constraint_result) =
+                    self.eval_with_public_inputs_simd(inputs, &public_inputs);
+                if need_output {
+                    let n = outputs.len();
+                    for _ in 0..C::DefaultSimdField::PACK_SIZE {
+                        outputs.push(Vec::new());
+                    }
+                    for o in out {
+                        for (i, x) in o.unpack().iter().enumerate() {
+                            outputs[n + i].push(*x);
+                        }
+                    }
+                }
+                constraints.extend(constraint_result);
             }
-            res.truncate(witness.num_witnesses);
-            res
+            outputs.truncate(witness.num_witnesses);
+            constraints.truncate(witness.num_witnesses);
         } else {
-            let mut res = Vec::new();
             for (inputs, public_inputs) in witness.iter_scalar() {
-                let (_, out) = self.eval_with_public_inputs(inputs, &public_inputs);
-                res.push(out);
+                let (out, constraint_result) = self.eval_with_public_inputs(inputs, &public_inputs);
+                outputs.push(out);
+                constraints.push(constraint_result);
             }
-            res
         }
+        (constraints, outputs)
+    }
+
+    pub fn run(&self, witness: &Witness<C>) -> Vec<bool> {
+        let (constraints, _) = self.run_inner(witness, false);
+        constraints
+    }
+
+    pub fn run_with_output(&self, witness: &Witness<C>) -> (Vec<bool>, Vec<Vec<C::CircuitField>>) {
+        self.run_inner(witness, true)
     }
 }
 
