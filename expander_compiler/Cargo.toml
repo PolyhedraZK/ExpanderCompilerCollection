@@ -5,8 +5,8 @@ edition = "2021"
 
 
 [dependencies]
+arith.workspace = true
 ark-std.workspace = true
-rand.workspace = true
 chrono.workspace = true
 clap.workspace = true
 ethnum.workspace = true
@@ -26,6 +26,8 @@ crosslayer_prototype.workspace = true
 poly_commit.workspace = true
 polynomials.workspace = true
 sumcheck.workspace = true
+rand.workspace = true
+serdes.workspace = true
 
 [dev-dependencies]
 rayon = "1.9"

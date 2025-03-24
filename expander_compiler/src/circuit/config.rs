@@ -21,6 +21,13 @@ pub trait Config: Default + Clone + Ord + Debug + Hash + Copy + 'static {
     const COST_CONST: usize = 3;
 
     const ENABLE_RANDOM_COMBINATION: bool = true;
+
+    fn new_expander_config() -> expander_config::Config<Self::DefaultGKRConfig> {
+        expander_config::Config::new(
+            expander_config::GKRScheme::Vanilla,
+            mpi_config::MPIConfig::new(),
+        )
+    }
 }
 
 #[derive(Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -40,9 +47,9 @@ impl Config for M31Config {
 pub struct BN254Config {}
 
 impl Config for BN254Config {
-    type CircuitField = crate::field::BN254;
+    type CircuitField = crate::field::BN254Fr;
 
-    type DefaultSimdField = crate::field::BN254;
+    type DefaultSimdField = crate::field::BN254Fr;
     type DefaultGKRFieldConfig = gkr_field_config::BN254Config;
     type DefaultGKRConfig = gkr::gkr_configs::BN254ConfigMIMC5Raw; // TODO: compare with BN254ConfigSha2Raw
 

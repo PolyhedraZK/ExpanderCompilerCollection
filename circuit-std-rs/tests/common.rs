@@ -1,10 +1,20 @@
 use circuit_std_rs::StdCircuit;
 use expander_compiler::frontend::*;
-use extra::Serde;
 use rand::thread_rng;
+use serdes::ExpSerde;
 
 pub fn circuit_test_helper<Cfg, Cir>(params: &Cir::Params)
 where
+    Cfg: Config,
+    Cir: StdCircuit<Cfg>,
+{
+    circuit_test_helper_with_hint::<Cfg, Cir>(params, &mut EmptyHintCaller::default());
+}
+
+pub fn circuit_test_helper_with_hint<Cfg, Cir>(
+    params: &Cir::Params,
+    hint: &mut impl HintCaller<Cfg::CircuitField>,
+) where
     Cfg: Config,
     Cir: StdCircuit<Cfg>,
 {
@@ -14,7 +24,7 @@ where
     let assignment = Cir::new_assignment(params, &mut rng);
     let witness = compile_result
         .witness_solver
-        .solve_witness(&assignment)
+        .solve_witness_with_hints(&assignment, hint)
         .unwrap();
     let output = compile_result.layered_circuit.run(&witness);
     assert_eq!(output, vec![true]);

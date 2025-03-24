@@ -1,4 +1,7 @@
-use expander_compiler::{circuit::layered::witness::Witness, frontend::*};
+use expander_compiler::{
+    circuit::layered::witness::Witness,
+    frontend::{CompileResult, Config},
+};
 use serde::de::DeserializeOwned;
 use std::{fs, path::Path};
 
@@ -12,16 +15,10 @@ pub fn run_circuit<C: Config>(compile_result: &CompileResult<C>, witness: Witnes
     // ########## EXPANDER ##########
 
     //compile
-    let mut expander_circuit = compile_result
-        .layered_circuit
-        .export_to_expander::<C::DefaultGKRFieldConfig>()
-        .flatten();
-    let config = expander_config::Config::<C::DefaultGKRConfig>::new(
-        expander_config::GKRScheme::Vanilla,
-        mpi_config::MPIConfig::new(),
-    );
+    let mut expander_circuit = compile_result.layered_circuit.export_to_expander_flatten();
+    let config = C::new_expander_config();
 
-    let (simd_input, simd_public_input) = witness.to_simd::<C::DefaultSimdField>();
+    let (simd_input, simd_public_input) = witness.to_simd();
     println!("{} {}", simd_input.len(), simd_public_input.len());
     expander_circuit.layers[0].input_vals = simd_input;
     expander_circuit.public_input = simd_public_input.clone();
