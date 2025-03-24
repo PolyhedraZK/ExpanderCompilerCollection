@@ -1,4 +1,14 @@
-use expander_compiler::frontend::*;
+use arith::Field;
+use expander_compiler::frontend::{
+    declare_circuit, Config, Define, Error, M31Config, RootAPI, Variable, M31,
+};
+
+#[cfg(test)]
+use expander_compiler::{
+    frontend::{compile, CompileOptions},
+    hints::registry::HintRegistry,
+};
+
 use num_bigint::BigInt;
 use num_traits::cast::ToPrimitive;
 
@@ -209,7 +219,13 @@ pub fn to_binary<C: Config, B: RootAPI<C>>(
     x: Variable,
     n_bits: usize,
 ) -> Vec<Variable> {
-    api.new_hint("myhint.tobinary", &[x], n_bits)
+    let bits = api.new_hint("myhint.tobinary", &[x], n_bits);
+    for bit in bits.iter() {
+        api.assert_is_bool(*bit);
+    }
+    let sum = from_binary(api, bits.to_vec());
+    api.assert_is_equal(sum, x);
+    bits
 }
 pub fn from_binary<C: Config, B: RootAPI<C>>(api: &mut B, bits: Vec<Variable>) -> Variable {
     let mut res = api.constant(0);
@@ -331,7 +347,7 @@ declare_circuit!(IDIVMODBITCircuit {
 });
 
 impl Define<M31Config> for IDIVMODBITCircuit<Variable> {
-    fn define(&self, builder: &mut API<M31Config>) {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let (quotient, remainder) = idiv_mod_bit(builder, self.value, 8);
         builder.assert_is_equal(quotient, self.quotient);
         builder.assert_is_equal(remainder, self.remainder);
@@ -343,7 +359,7 @@ fn test_idiv_mod_bit() {
     let mut hint_registry = HintRegistry::<M31>::new();
     hint_registry.register("myhint.tobinary", to_binary_hint);
     //compile and test
-    let compile_result = compile(&IDIVMODBITCircuit::default()).unwrap();
+    let compile_result = compile(&IDIVMODBITCircuit::default(), CompileOptions::default()).unwrap();
     let assignment = IDIVMODBITCircuit::<M31> {
         value: M31::from(3845),
         quotient: M31::from(15),
@@ -365,7 +381,7 @@ declare_circuit!(BITCONVERTCircuit {
 });
 
 impl Define<M31Config> for BITCONVERTCircuit<Variable> {
-    fn define(&self, builder: &mut API<M31Config>) {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut big_int_bytes = [builder.constant(0); 8];
         big_endian_put_uint64(builder, &mut big_int_bytes, self.big_int);
         for (i, big_int_byte) in big_int_bytes.iter().enumerate() {
@@ -384,7 +400,7 @@ fn test_bit_convert() {
     let mut hint_registry = HintRegistry::<M31>::new();
     hint_registry.register("myhint.tobinary", to_binary_hint);
     //compile and test
-    let compile_result = compile(&BITCONVERTCircuit::default()).unwrap();
+    let compile_result = compile(&BITCONVERTCircuit::default(), CompileOptions::default()).unwrap();
     let assignment = BITCONVERTCircuit::<M31> {
         big_int: M31::from(3845),
         big_int_bytes: [

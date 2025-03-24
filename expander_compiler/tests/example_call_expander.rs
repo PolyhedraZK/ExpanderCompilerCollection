@@ -8,19 +8,20 @@ declare_circuit!(Circuit {
 });
 
 impl<C: Config> Define<C> for Circuit<Variable> {
-    fn define(&self, builder: &mut API<C>) {
-        let mut sum = builder.constant(0);
+    fn define<Builder: RootAPI<C>>(&self, api: &mut Builder) {
+        let mut sum = api.constant(0);
         for x in self.s.iter() {
-            sum = builder.add(sum, x);
+            sum = api.add(sum, x);
         }
-        builder.assert_is_equal(sum, self.sum);
+        api.assert_is_equal(sum, self.sum);
     }
 }
 
 fn example<C: Config>() {
     let n_witnesses = <C::DefaultSimdField as arith::SimdField>::PACK_SIZE;
     println!("n_witnesses: {}", n_witnesses);
-    let compile_result: CompileResult<C> = compile(&Circuit::default()).unwrap();
+    let compile_result: CompileResult<C> =
+        compile(&Circuit::default(), CompileOptions::default()).unwrap();
     let mut s = [C::CircuitField::zero(); 100];
     let mut rng = rand::rngs::StdRng::seed_from_u64(1235);
     for i in 0..s.len() {
@@ -40,16 +41,11 @@ fn example<C: Config>() {
         assert!(*x);
     }
 
-    let mut expander_circuit = compile_result
-        .layered_circuit
-        .export_to_expander::<C::DefaultGKRFieldConfig>()
-        .flatten();
-    let config = expander_config::Config::<C::DefaultGKRConfig>::new(
-        expander_config::GKRScheme::Vanilla,
-        mpi_config::MPIConfig::new(),
-    );
+    let mut expander_circuit = compile_result.layered_circuit.export_to_expander_flatten();
 
-    let (simd_input, simd_public_input) = witness.to_simd::<C::DefaultSimdField>();
+    let config = C::new_expander_config();
+
+    let (simd_input, simd_public_input) = witness.to_simd();
     println!("{} {}", simd_input.len(), simd_public_input.len());
     expander_circuit.layers[0].input_vals = simd_input;
     expander_circuit.public_input = simd_public_input.clone();

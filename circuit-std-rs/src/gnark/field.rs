@@ -1,9 +1,10 @@
-use crate::gnark::element::*;
+use crate::gnark::element::{new_internal_element, value_of, Element};
 use crate::gnark::emparam::FieldParams;
-use crate::gnark::utils::*;
+use crate::gnark::utils::{hash_to_fp_variable, nb_multiplication_res_limbs, sub_padding};
 use crate::logup::LogUpRangeProofTable;
+use crate::sha256::m31_utils::to_binary;
 use crate::utils::simple_select;
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{Config, RootAPI, Variable};
 use num_bigint::BigInt;
 use num_traits::Signed;
 use num_traits::ToPrimitive;
@@ -20,16 +21,16 @@ pub struct MulCheck<T: FieldParams> {
 }
 impl<T: FieldParams> MulCheck<T> {
     pub fn eval_round1<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, at: Vec<Variable>) {
-        self.c = eval_with_challenge(native, self.c.my_clone(), at.clone());
-        self.r = eval_with_challenge(native, self.r.my_clone(), at.clone());
-        self.k = eval_with_challenge(native, self.k.my_clone(), at.clone());
+        self.c = eval_with_challenge(native, self.c.clone(), at.clone());
+        self.r = eval_with_challenge(native, self.r.clone(), at.clone());
+        self.k = eval_with_challenge(native, self.k.clone(), at.clone());
         if !self.p.is_empty() {
-            self.p = eval_with_challenge(native, self.p.my_clone(), at.clone());
+            self.p = eval_with_challenge(native, self.p.clone(), at.clone());
         }
     }
     pub fn eval_round2<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, at: Vec<Variable>) {
-        self.a = eval_with_challenge(native, self.a.my_clone(), at.clone());
-        self.b = eval_with_challenge(native, self.b.my_clone(), at.clone());
+        self.a = eval_with_challenge(native, self.a.clone(), at.clone());
+        self.b = eval_with_challenge(native, self.b.clone(), at.clone());
     }
     pub fn check<C: Config, B: RootAPI<C>>(&self, native: &mut B, pval: Variable, ccoef: Variable) {
         let mut new_peval = pval;
@@ -77,11 +78,11 @@ impl<T: FieldParams> GField<T> {
         let mut field = GField {
             _f_params: f_params,
             max_of: 30 - 2 - T::bits_per_limb(),
-            n_const: Element::<T>::my_default(),
-            nprev_const: Element::<T>::my_default(),
-            zero_const: Element::<T>::my_default(),
-            one_const: Element::<T>::my_default(),
-            short_one_const: Element::<T>::my_default(),
+            n_const: Element::<T>::default(),
+            nprev_const: Element::<T>::default(),
+            zero_const: Element::<T>::default(),
+            one_const: Element::<T>::default(),
+            short_one_const: Element::<T>::default(),
             constrained_limbs: HashMap::new(),
             table: LogUpRangeProofTable::new(8),
             mul_checks: Vec::new(),
@@ -120,6 +121,13 @@ impl<T: FieldParams> GField<T> {
         }
         res0
     }
+    pub fn get_element_sign<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        x: &Element<T>,
+    ) -> Variable {
+        to_binary(native, x.limbs[0], 30)[0]
+    }
     pub fn select<C: Config, B: RootAPI<C>>(
         &mut self,
         native: &mut B,
@@ -127,8 +135,8 @@ impl<T: FieldParams> GField<T> {
         a: &Element<T>,
         b: &Element<T>,
     ) -> Element<T> {
-        self.enforce_width_conditional(native, &a.my_clone());
-        self.enforce_width_conditional(native, &b.my_clone());
+        self.enforce_width_conditional(native, &a.clone());
+        self.enforce_width_conditional(native, &b.clone());
         let overflow = std::cmp::max(a.overflow, b.overflow);
         let nb_limbs = std::cmp::max(a.limbs.len(), b.limbs.len());
         let mut limbs = vec![native.constant(0); nb_limbs];
@@ -183,13 +191,8 @@ impl<T: FieldParams> GField<T> {
                 limb_nb_bits = ((T::modulus().bits() - 1) % T::bits_per_limb() as u64) + 1;
             }
             //range check
-            if limb_nb_bits > 8 {
-                self.table
-                    .rangeproof(native, a.limbs[i], limb_nb_bits as usize);
-            } else {
-                self.table
-                    .rangeproof_onechunk(native, a.limbs[i], limb_nb_bits as usize);
-            }
+            self.table
+                .rangeproof(native, a.limbs[i], limb_nb_bits as usize);
         }
     }
     pub fn wrap_hint<C: Config, B: RootAPI<C>>(
@@ -249,14 +252,14 @@ impl<T: FieldParams> GField<T> {
     ) -> Element<T> {
         self.enforce_width_conditional(native, a);
         if a.mod_reduced {
-            return a.my_clone();
+            return a.clone();
         }
         if !strict && a.overflow == 0 {
-            return a.my_clone();
+            return a.clone();
         }
-        let p = Element::<T>::my_default();
-        let one = self.one_const.my_clone();
-        self.mul_mod(native, a, &one, 0, &p).my_clone()
+        let p = Element::<T>::default();
+        let one = self.one_const.clone();
+        self.mul_mod(native, a, &one, 0, &p).clone()
     }
     pub fn mul_mod<C: Config, B: RootAPI<C>>(
         &mut self,
@@ -270,12 +273,12 @@ impl<T: FieldParams> GField<T> {
         self.enforce_width_conditional(native, b);
         let (k, r, c) = self.call_mul_hint(native, a, b, true);
         let mc = MulCheck {
-            a: a.my_clone(),
-            b: b.my_clone(),
+            a: a.clone(),
+            b: b.clone(),
             c,
             k,
-            r: r.my_clone(),
-            p: p.my_clone(),
+            r: r.clone(),
+            p: p.clone(),
         };
         self.mul_checks.push(mc);
         r
@@ -342,7 +345,7 @@ impl<T: FieldParams> GField<T> {
                 true,
             )
         } else {
-            Element::my_default()
+            Element::default()
         };
         let carries = new_internal_element::<T>(ret[nb_quo_limbs + nb_rem_limbs..].to_vec(), 0);
         (quo, rem, carries)
@@ -353,20 +356,27 @@ impl<T: FieldParams> GField<T> {
         a: Element<T>,
         p: Option<Element<T>>,
     ) {
-        self.enforce_width_conditional(native, &a.my_clone());
-        let b = self.short_one_const.my_clone();
+        self.enforce_width_conditional(native, &a.clone());
+        let b = self.short_one_const.clone();
         let (k, r, c) = self.call_mul_hint(native, &a, &b, false);
         let mc = MulCheck {
             a,
             b,
             c,
             k,
-            r: r.my_clone(),
-            p: p.unwrap_or(Element::<T>::my_default()),
+            r: r.clone(),
+            p: p.unwrap_or_default(),
         };
         self.mul_checks.push(mc);
     }
-    pub fn assert_isequal<C: Config, B: RootAPI<C>>(
+    pub fn copy<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &Element<T>) -> Element<T> {
+        let inputs = vec![x.clone()];
+        let output = self.new_hint(native, "myhint.copyelementhint", 1, inputs);
+        let res = output[0].clone();
+        self.assert_is_equal(native, x, &res);
+        res
+    }
+    pub fn assert_is_equal<C: Config, B: RootAPI<C>>(
         &mut self,
         native: &mut B,
         a: &Element<T>,
@@ -383,10 +393,10 @@ impl<T: FieldParams> GField<T> {
         a: &Element<T>,
         b: &Element<T>,
     ) -> Element<T> {
-        self.enforce_width_conditional(native, &a.my_clone());
-        self.enforce_width_conditional(native, &b.my_clone());
-        let mut new_a = a.my_clone();
-        let mut new_b = b.my_clone();
+        self.enforce_width_conditional(native, &a.clone());
+        self.enforce_width_conditional(native, &b.clone());
+        let mut new_a = a.clone();
+        let mut new_b = b.clone();
         if a.overflow + 1 > self.max_of {
             new_a = self.reduce(native, a, false);
         }
@@ -412,10 +422,10 @@ impl<T: FieldParams> GField<T> {
         a: &Element<T>,
         b: &Element<T>,
     ) -> Element<T> {
-        self.enforce_width_conditional(native, &a.my_clone());
-        self.enforce_width_conditional(native, &b.my_clone());
-        let mut new_a = a.my_clone();
-        let mut new_b = b.my_clone();
+        self.enforce_width_conditional(native, &a.clone());
+        self.enforce_width_conditional(native, &b.clone());
+        let mut new_a = a.clone();
+        let mut new_b = b.clone();
         if a.overflow + 1 > self.max_of {
             new_a = self.reduce(native, a, false);
         }
@@ -443,7 +453,7 @@ impl<T: FieldParams> GField<T> {
         new_internal_element::<T>(limbs, next_overflow)
     }
     pub fn neg<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, a: &Element<T>) -> Element<T> {
-        let zero = self.zero_const.my_clone();
+        let zero = self.zero_const.clone();
         self.sub(native, &zero, a)
     }
     pub fn mul<C: Config, B: RootAPI<C>>(
@@ -457,8 +467,8 @@ impl<T: FieldParams> GField<T> {
 
         //calculate a*b's overflow and reduce if necessary
         let mut next_overflow = self.mul_pre_cond(a, b);
-        let mut new_a = a.my_clone();
-        let mut new_b = b.my_clone();
+        let mut new_a = a.clone();
+        let mut new_b = b.clone();
         if next_overflow > self.max_of {
             if a.overflow < b.overflow {
                 new_b = self.reduce(native, b, false);
@@ -476,7 +486,7 @@ impl<T: FieldParams> GField<T> {
         }
 
         //calculate a*b
-        self.mul_mod(native, &new_a, &new_b, 0, &Element::<T>::my_default())
+        self.mul_mod(native, &new_a, &new_b, 0, &Element::<T>::default())
     }
     pub fn div<C: Config, B: RootAPI<C>>(
         &mut self,
@@ -487,10 +497,10 @@ impl<T: FieldParams> GField<T> {
         self.enforce_width_conditional(native, a);
         self.enforce_width_conditional(native, b);
         //calculate a/b's overflow and reduce if necessary
-        let zero_element = self.zero_const.my_clone();
+        let zero_element = self.zero_const.clone();
         let mut mul_of = self.mul_pre_cond(&zero_element, b);
-        let mut new_a = a.my_clone();
-        let mut new_b = b.my_clone();
+        let mut new_a = a.clone();
+        let mut new_b = b.clone();
         if mul_of > self.max_of {
             new_b = self.reduce(native, &new_b, false);
             mul_of = 0;
@@ -506,16 +516,9 @@ impl<T: FieldParams> GField<T> {
         let div = self.compute_division_hint(native, a.limbs.clone(), b.limbs.clone());
         let e = self.pack_limbs(native, div, true);
         let res = self.mul(native, &e, &new_b);
-        self.assert_isequal(native, &res, &new_a);
+        self.assert_is_equal(native, &res, &new_a);
         e
     }
-    /*
-    mulOf, err := f.mulPreCond(a, &Element[T]{Limbs: make([]frontend.Variable, f.fParams.NbLimbs()), overflow: 0}) // order is important, we want that reduce left side
-    if err != nil {
-        return mulOf, err
-    }
-    return f.subPreCond(&Element[T]{overflow: 0}, &Element[T]{overflow: mulOf})
-     */
     pub fn inverse<C: Config, B: RootAPI<C>>(
         &mut self,
         native: &mut B,
@@ -523,9 +526,9 @@ impl<T: FieldParams> GField<T> {
     ) -> Element<T> {
         self.enforce_width_conditional(native, b);
         //calculate 1/b's overflow and reduce if necessary
-        let zero_element = self.zero_const.my_clone();
+        let zero_element = self.zero_const.clone();
         let mut mul_of = self.mul_pre_cond(&zero_element, b);
-        let mut new_b = b.my_clone();
+        let mut new_b = b.clone();
         if mul_of > self.max_of {
             new_b = self.reduce(native, &new_b, false);
             mul_of = 0;
@@ -539,8 +542,8 @@ impl<T: FieldParams> GField<T> {
         let inv = self.compute_inverse_hint(native, b.limbs.clone());
         let e = self.pack_limbs(native, inv, true);
         let res = self.mul(native, &e, &new_b);
-        let one = self.one_const.my_clone();
-        self.assert_isequal(native, &res, &one);
+        let one = self.one_const.clone();
+        self.assert_is_equal(native, &res, &one);
         e
     }
     pub fn compute_inverse_hint<C: Config, B: RootAPI<C>>(
@@ -585,7 +588,7 @@ impl<T: FieldParams> GField<T> {
             let neg_a = self.neg(native, a);
             return self.mul_const(native, &neg_a, -c);
         } else if c.is_zero() {
-            return self.zero_const.my_clone();
+            return self.zero_const.clone();
         }
         let cbl = c.bits();
         if cbl > self.max_overflow() {
@@ -596,7 +599,7 @@ impl<T: FieldParams> GField<T> {
             );
         }
         let next_overflow = a.overflow + cbl as u32;
-        let mut new_a = a.my_clone();
+        let mut new_a = a.clone();
         if next_overflow > self.max_of {
             new_a = self.reduce(native, a, false);
         }
@@ -626,7 +629,7 @@ impl<T: FieldParams> GField<T> {
         for i in 0..self.mul_checks.len() {
             self.mul_checks[i].eval_round2(native, at.clone());
         }
-        let pval = eval_with_challenge(native, self.n_const.my_clone(), at.clone());
+        let pval = eval_with_challenge(native, self.n_const.clone(), at.clone());
         let coef = BigInt::from(1) << T::bits_per_limb();
         let ccoef = native.sub(coef.to_u64().unwrap() as u32, commitment);
         for i in 0..self.mul_checks.len() {
@@ -635,6 +638,54 @@ impl<T: FieldParams> GField<T> {
         for i in 0..self.mul_checks.len() {
             self.mul_checks[i].clean_evaluations();
         }
+    }
+    pub fn hash_to_fp<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        msg: &[Variable],
+        len: usize,
+    ) -> Vec<Element<T>> {
+        let signature_dst: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_";
+        let mut dst = vec![];
+        for c in signature_dst {
+            dst.push(native.constant(*c as u32));
+        }
+        let hm = hash_to_fp_variable(native, msg, &dst, len);
+        let mut xs_limbs = vec![];
+        let n = T::bits_per_limb();
+        if n != 8 {
+            panic!("only support 8 bits per limb for now");
+        }
+        let k = T::nb_limbs() as usize;
+        if k > 64 {
+            panic!("only support <= 64 limbs for now");
+        }
+        for element in &hm {
+            let mut x = vec![];
+            for j in 0..k {
+                x.push(element[k - 1 - j]);
+            }
+            xs_limbs.push(x);
+        }
+        let shift = value_of(
+            native,
+            Box::new("340282366920938463463374607431768211456".to_string()),
+        );
+        let mut x_elements = vec![];
+        for i in 0..xs_limbs.len() {
+            let mut x_element = new_internal_element(xs_limbs[i].clone(), 0);
+            x_element = self.mul(native, &x_element, &shift);
+            let mut x_rem = vec![native.constant(0); k];
+            for (j, rem) in x_rem.iter_mut().enumerate().take(k) {
+                if j < (64 - k) {
+                    *rem = hm[i][63 - j];
+                }
+            }
+            x_element = self.add(native, &x_element, &new_internal_element(x_rem, 0));
+            x_element = self.reduce(native, &x_element, true);
+            x_elements.push(x_element);
+        }
+        x_elements
     }
 }
 pub fn eval_with_challenge<C: Config, B: RootAPI<C>, T: FieldParams>(
@@ -656,7 +707,7 @@ pub fn eval_with_challenge<C: Config, B: RootAPI<C>, T: FieldParams>(
         let tmp = native.mul(a.limbs[i], at[i - 1]);
         sum = native.add(sum, tmp);
     }
-    let mut ret = a.my_clone();
+    let mut ret = a.clone();
     ret.is_evaluated = true;
     ret.evaluation = sum;
     ret

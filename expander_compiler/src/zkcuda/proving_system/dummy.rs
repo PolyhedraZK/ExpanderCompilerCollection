@@ -80,6 +80,11 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
             let (_, cond) = kernel
                 .layered_circuit
                 .eval_with_public_inputs_simd(lc_input, &[]);
+            for x in cond.iter() {
+                if !*x {
+                    panic!("constraints not satisfied");
+                }
+            }
             res.push(cond);
         }
         DummyProof { cond: res }

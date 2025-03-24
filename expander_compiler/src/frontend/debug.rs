@@ -12,12 +12,15 @@ use crate::{
 
 use super::{
     api::{BasicAPI, RootAPI, UnconstrainedAPI},
-    builder::{get_variable_id, new_variable, ToVariableOrValue, VariableOrValue},
+    builder::{
+        ensure_variables_valid, get_variable_id, new_variable, ToVariableOrValue, VariableOrValue,
+    },
     Variable,
 };
 
 pub struct DebugBuilder<C: Config, H: HintCaller<C::CircuitField>> {
     values: Vec<C::CircuitField>,
+    outputs: Vec<Variable>,
     hint_caller: H,
 }
 
@@ -133,6 +136,7 @@ impl<C: Config, H: HintCaller<C::CircuitField>> BasicAPI<C> for DebugBuilder<C, 
         inputs: &[Variable],
         num_outputs: usize,
     ) -> Vec<Variable> {
+        ensure_variables_valid(inputs);
         let inputs: Vec<C::CircuitField> =
             inputs.iter().map(|v| self.convert_to_value(v)).collect();
         match self
@@ -405,8 +409,13 @@ impl<C: Config, H: HintCaller<C::CircuitField>> RootAPI<C> for DebugBuilder<C, H
         f: F,
         inputs: &[Variable],
     ) -> Vec<Variable> {
+        ensure_variables_valid(inputs);
         let inputs = inputs.to_vec();
         f(self, &inputs)
+    }
+    fn set_outputs(&mut self, outputs: Vec<Variable>) {
+        ensure_variables_valid(&outputs);
+        self.outputs = outputs;
     }
 }
 
@@ -419,6 +428,7 @@ impl<C: Config, H: HintCaller<C::CircuitField>> DebugBuilder<C, H> {
         let mut builder = DebugBuilder {
             values: vec![C::CircuitField::zero()],
             hint_caller,
+            outputs: vec![],
         };
         let vars = (1..=inputs.len()).map(new_variable).collect();
         let public_vars = (inputs.len() + 1..=inputs.len() + public_inputs.len())
@@ -460,5 +470,12 @@ impl<C: Config, H: HintCaller<C::CircuitField>> DebugBuilder<C, H> {
             EvalResult::Value(v) => self.return_as_variable(v),
             EvalResult::Values(_) => unreachable!(),
         }
+    }
+
+    pub fn get_outputs(&self) -> Vec<C::CircuitField> {
+        self.outputs
+            .iter()
+            .map(|v| self.values[get_variable_id(*v)])
+            .collect()
     }
 }

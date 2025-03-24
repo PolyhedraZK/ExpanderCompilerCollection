@@ -189,7 +189,7 @@ fn zkcuda_2() {
     let mut ctx: Context<M31Config, DummyProvingSystem<M31Config>> = Context::default();
     let mut a = vec![];
     let mut b = vec![];
-    for j in 0..5 {
+    for j in 0..8 {
         for i in j * 5..j * 5 + 5 {
             a.push(M31::from((i + 1) * (i % 5 + 1) as u32));
         }
@@ -197,22 +197,22 @@ fn zkcuda_2() {
             a.push(M31::from(0));
         }
     }
-    for _ in 0..24 {
+    /*for _ in 0..24 {
         a.push(M31::from(0));
-    }
-    for i in 0..5 {
+    }*/
+    for i in 0..8 {
         b.push(M31::from(i + 1 as u32));
     }
-    for _ in 0..3 {
+    /*for _ in 0..3 {
         b.push(M31::from(0));
-    }
+    }*/
     let a = ctx.copy_raw_to_device(&a);
     let b = ctx.copy_raw_to_device(&b);
     let mut io = vec![a, b, None];
-    ctx.call_kernel_raw(&kernel_div_2x5, &mut io, 5, &vec![false, true, false]);
+    ctx.call_kernel_raw(&kernel_div_2x5, &mut io, 8, &vec![false, true, false]);
     let c = io[2].clone();
     let mut io = vec![c, None];
-    ctx.call_kernel_raw(&kernel_add_5, &mut io, 5, &vec![false, false]);
+    ctx.call_kernel_raw(&kernel_add_5, &mut io, 8, &vec![false, false]);
     let c = io[1].clone();
     let mut io = vec![c, None];
     ctx.call_kernel_raw(&kernel_add_5, &mut io, 1, &vec![false, false]);

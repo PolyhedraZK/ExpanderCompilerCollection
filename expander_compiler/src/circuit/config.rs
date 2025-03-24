@@ -3,7 +3,7 @@ use std::{fmt::Debug, hash::Hash};
 use crate::field::{Field, FieldRaw};
 
 pub trait Config: Default + Clone + Ord + Debug + Hash + Copy + 'static {
-    type CircuitField: Field;
+    type CircuitField: Field + FieldRaw;
 
     type DefaultSimdField: FieldRaw + arith::SimdField<Scalar = Self::CircuitField>;
     type DefaultGKRFieldConfig: gkr_field_config::GKRFieldConfig<
@@ -21,6 +21,13 @@ pub trait Config: Default + Clone + Ord + Debug + Hash + Copy + 'static {
     const COST_CONST: usize = 3;
 
     const ENABLE_RANDOM_COMBINATION: bool = true;
+
+    fn new_expander_config() -> expander_config::Config<Self::DefaultGKRConfig> {
+        expander_config::Config::new(
+            expander_config::GKRScheme::Vanilla,
+            mpi_config::MPIConfig::new(),
+        )
+    }
 }
 
 #[derive(Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -31,7 +38,7 @@ impl Config for M31Config {
 
     type DefaultSimdField = mersenne31::M31x16;
     type DefaultGKRFieldConfig = gkr_field_config::M31ExtConfig;
-    type DefaultGKRConfig = gkr::executor::M31ExtConfigSha2;
+    type DefaultGKRConfig = gkr::gkr_configs::M31ExtConfigSha2Raw; //TODO: compare with M31ExtConfigSha2Orion
 
     const CONFIG_ID: usize = 1;
 }
@@ -40,11 +47,11 @@ impl Config for M31Config {
 pub struct BN254Config {}
 
 impl Config for BN254Config {
-    type CircuitField = crate::field::BN254;
+    type CircuitField = crate::field::BN254Fr;
 
-    type DefaultSimdField = crate::field::BN254;
+    type DefaultSimdField = crate::field::BN254Fr;
     type DefaultGKRFieldConfig = gkr_field_config::BN254Config;
-    type DefaultGKRConfig = gkr::executor::BN254ConfigMIMC5;
+    type DefaultGKRConfig = gkr::gkr_configs::BN254ConfigMIMC5Raw; // TODO: compare with BN254ConfigSha2Raw
 
     const CONFIG_ID: usize = 2;
 }
@@ -57,7 +64,7 @@ impl Config for GF2Config {
 
     type DefaultSimdField = gf2::GF2x8;
     type DefaultGKRFieldConfig = gkr_field_config::GF2ExtConfig;
-    type DefaultGKRConfig = gkr::executor::GF2ExtConfigSha2;
+    type DefaultGKRConfig = gkr::gkr_configs::GF2ExtConfigSha2Raw; // TODO: compare with GF2ExtConfigSha2Orion
 
     const CONFIG_ID: usize = 3;
 
