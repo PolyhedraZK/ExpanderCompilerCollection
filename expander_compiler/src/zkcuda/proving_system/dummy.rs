@@ -38,15 +38,17 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
     type CommitmentExtraInfo = ();
 
     fn setup(computation_graph: &crate::zkcuda::proof::ComputationGraph<C>) -> (Self::ProverSetup, Self::VerifierSetup) {
-        let _ = computation_graph;
+        // let _ = computation_graph;
+        computation_graph.commitments_lens.iter().for_each(|&x| println!("Setup length {}", x));
+        
         ((), ())
     }
 
     fn commit(
         _prover_setup: &Self::ProverSetup,
-        vals: &[<C as Config>::DefaultSimdField],
+        vals: &Vec<<C as Config>::DefaultSimdField>,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo) {
-        println!("Commiting to {} values", vals.len());
+        println!("Real Commit to {} values", vals.len());
         assert!(vals.len() & (vals.len() - 1) == 0);
         (
             DummyCommitment {

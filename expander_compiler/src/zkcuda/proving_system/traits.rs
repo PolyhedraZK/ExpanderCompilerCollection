@@ -17,7 +17,7 @@ pub trait ProvingSystem<C: Config> {
 
     fn commit(
         prover_setup: &Self::ProverSetup,
-        vals: &[C::DefaultSimdField],
+        vals: &Vec<C::DefaultSimdField>,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo);
 
     fn prove(

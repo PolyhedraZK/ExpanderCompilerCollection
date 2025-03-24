@@ -1,6 +1,8 @@
 use std::io::{Cursor, Read};
+use std::collections::HashMap;
 
 use crate::circuit::config::Config;
+use crate::field;
 
 use super::super::kernel::Kernel;
 use super::{check_inputs, prepare_inputs, Commitment, ProvingSystem};
@@ -29,7 +31,6 @@ where
 {
     vals_len: usize,
     commitment: PCS::Commitment,
-    scratch: PCS::ScratchPad,
 }
 
 impl<Cfg, C, T, PCS> Commitment<Cfg> for ExpanderGKRCommitment<C, T, PCS> 
@@ -55,6 +56,27 @@ where
         Self {
             vals_len: self.vals_len,
             commitment: self.commitment.clone(),
+        }
+    }
+}
+
+pub struct ExpanderGKRCommitmentExtraInfo<C, T, PCS>
+where 
+    C: GKRFieldConfig,
+    T: Transcript<C::ChallengeField>,
+    PCS: PCSForExpanderGKR<C, T>,
+{
+    scratch: PCS::ScratchPad,
+}
+
+impl<C, T, PCS> Clone for ExpanderGKRCommitmentExtraInfo<C, T, PCS>
+where
+    C: GKRFieldConfig,
+    T: Transcript<C::ChallengeField>,
+    PCS: PCSForExpanderGKR<C, T>,
+{
+    fn clone(&self) -> Self {
+        Self {
             scratch: self.scratch.clone(),
         }
     }
@@ -66,7 +88,7 @@ where
     T: Transcript<C::ChallengeField>,
     PCS: PCSForExpanderGKR<C, T>,
 {
-    p_key: <PCS::SRS as StructuredReferenceString>::PKey,
+    p_keys: HashMap<usize, <PCS::SRS as StructuredReferenceString>::PKey>,
 }
 
 impl<C, T, PCS> Clone for ExpanderGKRProverSetup<C, T, PCS> 
@@ -77,7 +99,7 @@ where
 {
     fn clone(&self) -> Self {
         Self {
-            p_key: self.p_key.clone(),
+            p_keys: self.p_keys.clone(),
         }
     }
 }
@@ -88,7 +110,7 @@ where
     T: Transcript<C::ChallengeField>,
     PCS: PCSForExpanderGKR<C, T>,
 {
-    v_key: <PCS::SRS as StructuredReferenceString>::VKey,
+    v_keys: HashMap<usize, <PCS::SRS as StructuredReferenceString>::VKey>,
 }
 
 impl<C, T, PCS> Clone for ExpanderGKRVerifierSetup<C, T, PCS> 
@@ -99,7 +121,7 @@ where
 {
     fn clone(&self) -> Self {
         Self {
-            v_key: self.v_key.clone(),
+            v_keys: self.v_keys.clone(),
         }
     }
     
@@ -137,32 +159,116 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
     type VerifierSetup = ExpanderGKRVerifierSetup<field!(C), transcript!(C), pcs!(C)>;
     type Proof = ExpanderGKRProof;
     type Commitment = ExpanderGKRCommitment<field!(C), transcript!(C), pcs!(C)>;
-    type CommitmentExtraInfo = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::ScratchPad;
+    type CommitmentExtraInfo = ExpanderGKRCommitmentExtraInfo<field!(C), transcript!(C), pcs!(C)>;
 
-    fn prover_setup(computation_graph: &crate::zkcuda::proof::ComputationGraph<C>) -> Self::ProverSetup {
-    }
+    fn setup(computation_graph: &crate::zkcuda::proof::ComputationGraph<C>) -> (Self::ProverSetup, Self::VerifierSetup) {
+        let mut p_keys = HashMap::new();
+        let mut v_keys = HashMap::new();
+        for commitment_len in computation_graph.commitments_lens.iter() {
+            if p_keys.contains_key(commitment_len) {
+                continue;
+            }
 
-    fn verifier_setup(computation_graph: &crate::zkcuda::proof::ComputationGraph<C>) -> Self::VerifierSetup {
-        unimplemented!()
+            let (_params, p_key, v_key, _scratch) = 
+                pcs_testing_setup_fixed_seed::<field!(C), transcript!(C), pcs!(C)>(*commitment_len);
+            p_keys.insert(*commitment_len, p_key);
+            v_keys.insert(*commitment_len, v_key);
+        }
+        (ExpanderGKRProverSetup { p_keys }, ExpanderGKRVerifierSetup { v_keys })
     }
 
     fn commit(
             prover_setup: &Self::ProverSetup,
-            vals: &[<C as Config>::DefaultSimdField],
+            vals: &Vec<<C as Config>::DefaultSimdField>,
         ) -> (Self::Commitment, Self::CommitmentExtraInfo) {
-        unimplemented!()
+        let n_vars = vals.len().ilog2() as usize;
+        let params = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::gen_params(n_vars);
+        let p_key = prover_setup.p_keys.get(&vals.len()).unwrap();
+        let mut scratch = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::init_scratch_pad(&params, &MPIConfig::default());
+        
+        let commitment = 
+            <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::commit(
+            &params,
+            &MPIConfig::default(),
+            p_key,
+            &RefMultiLinearPoly::from_ref(vals), 
+            &mut scratch,
+        );
+        (Self::Commitment { vals_len: vals.len(), commitment }, Self::CommitmentExtraInfo { scratch })
     }
 
     fn prove(
             prover_setup: &Self::ProverSetup,
             kernel: &Kernel<C>,
-            commitments: &[&Self::Commitment],
+            _commitments: &[&Self::Commitment],
             commitments_extra_info: &[&Self::CommitmentExtraInfo],
             commitments_values: &[&[<C as Config>::DefaultSimdField]],
             parallel_count: usize,
             is_broadcast: &[bool],
         ) -> Self::Proof {
-        unimplemented!()
+            check_inputs(kernel, commitments_values, parallel_count, is_broadcast);
+
+            let mut expander_circuit = kernel.layered_circuit.export_to_expander().flatten();
+            expander_circuit.identify_rnd_coefs();
+            expander_circuit.identify_structure_info();
+            let (max_num_input_var, max_num_output_var) = max_n_vars(&expander_circuit);
+            let mut prover_scratch = ProverScratchPad::<C::DefaultGKRFieldConfig>::new(
+                        max_num_input_var,
+                        max_num_output_var,
+                        1,
+                    );
+
+            let mut proof = ExpanderGKRProof { data: vec![] };
+
+            // For each parallel index, prove the GKR proof
+            for i in 0..parallel_count {
+                let mut transcript = <C::DefaultGKRConfig as GKRConfig>::Transcript::new();
+                transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
+                expander_circuit.layers[0].input_vals =
+                    prepare_inputs(kernel, commitments_values, is_broadcast, i);
+                expander_circuit.fill_rnd_coefs(&mut transcript);
+                expander_circuit.evaluate();
+                let (claimed_v, rx, ry, rsimd, _rmpi) = gkr_prove(
+                    &expander_circuit,
+                    &mut prover_scratch,
+                    &mut transcript,
+                    &MPIConfig::new(),
+                );
+                assert_eq!(
+                    claimed_v,
+                    <C::DefaultGKRFieldConfig as GKRFieldConfig>::ChallengeField::from(0)
+                );
+
+                prove_input_claim(
+                    kernel,
+                    commitments_values,
+                    prover_setup,
+                    commitments_extra_info,
+                    &rx,
+                    &rsimd,
+                    is_broadcast,
+                    i,
+                    &mut transcript,
+                );
+                if let Some(ry) = ry {
+                    prove_input_claim(
+                        kernel,
+                        commitments_values,
+                        prover_setup,
+                        commitments_extra_info,
+                        &ry,
+                        &rsimd,
+                        is_broadcast,
+                        i,
+                        &mut transcript,
+                    );
+                }
+
+                proof.data.push(transcript.finalize_and_get_proof());
+            }
+
+            proof
+
     }
 
     fn verify(
@@ -173,96 +279,56 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
             parallel_count: usize,
             is_broadcast: &[bool],
         ) -> bool {
-        unimplemented!()
+            let mut expander_circuit: Circuit<C::DefaultGKRFieldConfig> =
+                kernel.layered_circuit.export_to_expander().flatten();
+            expander_circuit.identify_rnd_coefs();
+            expander_circuit.identify_structure_info();
+
+            for i in 0..parallel_count {
+                let mut transcript = <C::DefaultGKRConfig as GKRConfig>::Transcript::new();
+                transcript.append_u8_slice(&[0u8; 32]); 
+                let mut cursor = Cursor::new(&proof.data[i].bytes);
+                cursor.set_position(32);
+                let (mut verified, rz0, rz1, r_simd, _r_mpi, claimed_v0, claimed_v1) = gkr_verify(
+                    &MPIConfig::default(),
+                    &expander_circuit,
+                    &[],
+                    &<C::DefaultGKRFieldConfig as GKRFieldConfig>::ChallengeField::ZERO,
+                    &mut transcript,
+                    &mut cursor,
+                );
+    
+                verified &= verify_input_claim(
+                    &mut cursor,
+                    &rz0,
+                    &r_simd,
+                    &claimed_v0,
+                    kernel,
+                    commitments,
+                    is_broadcast,
+                    i,
+                    &mut transcript,
+                );
+                if let Some(rz1) = rz1 {
+                    verified &= verify_input_claim(
+                        &mut cursor,
+                        &rz1,
+                        &r_simd,
+                        &claimed_v1.unwrap(),
+                        kernel,
+                        commitments,
+                        is_broadcast,
+                        i,
+                        &mut transcript,
+                    );
+                }
+    
+                if !verified {
+                    return false;
+                }
+            }
+            true
     }
-
-    // fn commit(vals: &[C::DefaultSimdField]) -> Self::Commitment {
-    //     assert!(vals.len() & (vals.len() - 1) == 0);
-
-    //     let (params, p_key, _v_key, mut scratch) = pcs_testing_setup_fixed_seed::<C>(vals);
-
-    //     let vals = vals.to_vec();
-    //     let poly_ref = RefMultiLinearPoly::from_ref(&vals);
-    //     let raw_commitment = RawExpanderGKR::<
-    //         C::DefaultGKRFieldConfig,
-    //         <C::DefaultGKRConfig as GKRConfig>::Transcript,
-    //     >::commit(
-    //         &params,
-    //         &MPIConfig::default(),
-    //         &p_key,
-    //         &poly_ref,
-    //         &mut scratch,
-    //     );
-
-    //     ExpanderGKRCommitment {
-    //         vals,
-    //         commitment: raw_commitment,
-    //         scratch,
-    //     }
-    // }
-
-    // fn prove(
-    //     kernel: &Kernel<C>,
-    //     commitments: &[&Self::Commitment],
-    //     parallel_count: usize,
-    //     is_broadcast: &[bool],
-    // ) -> ExpanderGKRProof {
-    //     check_inputs(kernel, commitments, parallel_count, is_broadcast);
-
-    //     let mut expander_circuit = kernel.layered_circuit.export_to_expander().flatten();
-    //     let (max_num_input_var, max_num_output_var) = max_n_vars(&expander_circuit);
-    //     let mut prover_scratch = ProverScratchPad::<C::DefaultGKRFieldConfig>::new(
-    //         max_num_input_var,
-    //         max_num_output_var,
-    //         1,
-    //     );
-
-    //     let mut proof = ExpanderGKRProof { data: vec![] };
-
-    //     // For each parallel index, prove the GKR proof
-    //     for i in 0..parallel_count {
-    //         let mut transcript = <C::DefaultGKRConfig as GKRConfig>::Transcript::new();
-    //         transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
-    //         expander_circuit.layers[0].input_vals =
-    //             prepare_inputs(kernel, commitments, is_broadcast, i);
-    //         expander_circuit.evaluate();
-    //         let (claimed_v, rx, ry, rsimd, _rmpi) = gkr_prove(
-    //             &expander_circuit,
-    //             &mut prover_scratch,
-    //             &mut transcript,
-    //             &MPIConfig::new(),
-    //         );
-    //         assert_eq!(
-    //             claimed_v,
-    //             <C::DefaultGKRFieldConfig as GKRFieldConfig>::ChallengeField::from(0)
-    //         );
-
-    //         prove_input_claim(
-    //             &rx,
-    //             &rsimd,
-    //             kernel,
-    //             commitments,
-    //             is_broadcast,
-    //             i,
-    //             &mut transcript,
-    //         );
-    //         if let Some(ry) = ry {
-    //             prove_input_claim(
-    //                 &ry,
-    //                 &rsimd,
-    //                 kernel,
-    //                 commitments,
-    //                 is_broadcast,
-    //                 i,
-    //                 &mut transcript,
-    //             );
-    //         }
-
-    //         proof.data.push(transcript.finalize_and_get_proof());
-    //     }
-
-    //     proof
-    // }
 
     // fn verify(
     //     kernel: &Kernel<C>,
@@ -271,75 +337,29 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
     //     parallel_count: usize,
     //     is_broadcast: &[bool],
     // ) -> bool {
-    //     check_inputs(kernel, commitments, parallel_count, is_broadcast);
-
-    //     let expander_circuit: Circuit<C::DefaultGKRFieldConfig> =
-    //         kernel.layered_circuit.export_to_expander().flatten();
-
-    //     for i in 0..parallel_count {
-    //         let mut transcript = <C::DefaultGKRConfig as GKRConfig>::Transcript::new();
-    //         transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
-    //         let mut cursor = Cursor::new(&proof.data[i].bytes);
-    //         cursor.set_position(32);
-    //         let (mut verified, rz0, rz1, r_simd, _r_mpi, claimed_v0, claimed_v1) = gkr_verify(
-    //             &MPIConfig::new(),
-    //             &expander_circuit,
-    //             &[],
-    //             &<C::DefaultGKRFieldConfig as GKRFieldConfig>::ChallengeField::ZERO,
-    //             &mut transcript,
-    //             &mut cursor,
-    //         );
-
-    //         verified &= verify_input_claim(
-    //             &mut cursor,
-    //             &rz0,
-    //             &r_simd,
-    //             &claimed_v0,
-    //             kernel,
-    //             commitments,
-    //             is_broadcast,
-    //             i,
-    //             &mut transcript,
-    //         );
-    //         if let Some(rz1) = rz1 {
-    //             verified &= verify_input_claim(
-    //                 &mut cursor,
-    //                 &rz1,
-    //                 &r_simd,
-    //                 &claimed_v1.unwrap(),
-    //                 kernel,
-    //                 commitments,
-    //                 is_broadcast,
-    //                 i,
-    //                 &mut transcript,
-    //             );
-    //         }
-
-    //         if !verified {
-    //             return false;
-    //         }
-    //     }
-    //     true
+    //     
     // }
 }
 
-fn pcs_testing_setup_fixed_seed<C: Config>(
-    vals: &[C::DefaultSimdField],
+fn pcs_testing_setup_fixed_seed<
+    FConfig: GKRFieldConfig, 
+    T: Transcript<FConfig::ChallengeField>, 
+    PCS: PCSForExpanderGKR<FConfig, T>
+>(
+    vals_len: usize,
 ) -> (
-    RawExpanderGKRParams,
-    PCSEmptyType,
-    PCSEmptyType,
-    RawExpanderGKRScratchPad,
+    PCS::Params,
+    <PCS::SRS as StructuredReferenceString>::PKey,
+    <PCS::SRS as StructuredReferenceString>::VKey,
+    PCS::ScratchPad,
 ) {
-    // We don't have an interface for the potential pcs setup
-    // So we're just going to use the testing setup with fixed seed
-    let mut rng = StdRng::from_seed([0; 32]);
+    let mut rng = StdRng::from_seed([123; 32]);
     expander_pcs_init_testing_only::<
-        C::DefaultGKRFieldConfig,
-        <C::DefaultGKRConfig as GKRConfig>::Transcript,
-        RawExpanderGKR<_, _>,
+        FConfig,
+        T,
+        PCS,
     >(
-        vals.len().trailing_zeros() as usize,
+        vals_len.ilog2() as usize,
         &MPIConfig::default(),
         &mut rng,
     )
@@ -356,44 +376,55 @@ fn max_n_vars<C: GKRFieldConfig>(circuit: &Circuit<C>) -> (usize, usize) {
 }
 
 fn prove_input_claim<C: Config>(
-    x: &[<C::DefaultGKRFieldConfig as GKRFieldConfig>::ChallengeField],
-    x_simd: &[<C::DefaultGKRFieldConfig as GKRFieldConfig>::ChallengeField],
     kernel: &Kernel<C>,
-    commitments: &[&ExpanderGKRCommitment<C>],
+    commitments_values: &[&[C::DefaultSimdField]],
+    p_keys: &ExpanderGKRProverSetup<field!(C), transcript!(C), pcs!(C)>,
+    commitments_extra_info: &[&ExpanderGKRCommitmentExtraInfo<field!(C), transcript!(C), pcs!(C)>],
+    x: &[<field!(C) as GKRFieldConfig>::ChallengeField],
+    x_simd: &[<field!(C) as GKRFieldConfig>::ChallengeField],
     is_broadcast: &[bool],
     parallel_index: usize,
-    transcript: &mut <C::DefaultGKRConfig as GKRConfig>::Transcript,
+    transcript: &mut transcript!(C),
 ) {
-    for ((input, commitment), ib) in kernel
+    for (((input, commitment_val), extra_info), ib) in kernel
         .layered_circuit_input
         .iter()
-        .zip(commitments.iter())
+        .zip(commitments_values)
+        .zip(commitments_extra_info)
         .zip(is_broadcast)
     {
         let nb_challenge_vars = input.len.trailing_zeros() as usize;
         let challenge_vars = &x[..nb_challenge_vars];
 
         let vals = if *ib {
-            commitment.vals_ref()
+            commitment_val
         } else {
-            &commitment.vals_ref()[parallel_index * input.len..(parallel_index + 1) * input.len]
+            &commitment_val[parallel_index * input.len..(parallel_index + 1) * input.len]
         };
 
-        let (params, p_key, _v_key, _) = pcs_testing_setup_fixed_seed::<C>(vals);
+        let params = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::gen_params(
+            vals.len().ilog2() as usize,
+        );
+        let p_key = p_keys.p_keys.get(&vals.len()).unwrap();
+        
+        // TODO: Remove unsafe after switching to the main branch
+        let mut mutable_scratch = unsafe {
+            let ptr = &extra_info.scratch as *const <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::ScratchPad as *mut <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::ScratchPad;
+            &mut *ptr
+        };
 
+        // TODO: Remove unnecessary clone
         let poly = MultiLinearPoly::new(vals.to_vec());
+        // Meant to use raw to evaluate the polynomial
+        // TODO: Switch to `MultilinearPolyExpander` after switch to the main branch
         let v = RawExpanderGKR::<
-            C::DefaultGKRFieldConfig,
-            <C::DefaultGKRConfig as GKRConfig>::Transcript,
+            field!(C),
+            transcript!(C),
         >::eval(vals, challenge_vars, x_simd, &[]);
         transcript.append_field_element(&v);
 
-        let mut scratch_pad = <RawExpanderGKR<
-            C::DefaultGKRFieldConfig,
-            <C::DefaultGKRConfig as GKRConfig>::Transcript,
-        > as PCSForExpanderGKR<_, _>>::ScratchPad::default();
         transcript.lock_proof();
-        let opening = RawExpanderGKR::open(
+        let opening = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::open(
             &params,
             &MPIConfig::default(),
             &p_key,
@@ -404,7 +435,7 @@ fn prove_input_claim<C: Config>(
                 x_mpi: vec![],
             },
             transcript,
-            &mut scratch_pad,
+            &mut mutable_scratch,
         );
         transcript.unlock_proof();
 
@@ -419,14 +450,14 @@ fn prove_input_claim<C: Config>(
 #[allow(clippy::too_many_arguments)]
 fn verify_input_claim<C: Config>(
     mut proof_reader: impl Read,
+    kernel: &Kernel<C>,
     x: &[<C::DefaultGKRFieldConfig as GKRFieldConfig>::ChallengeField],
     x_simd: &[<C::DefaultGKRFieldConfig as GKRFieldConfig>::ChallengeField],
     y: &<C::DefaultGKRFieldConfig as GKRFieldConfig>::ChallengeField,
-    kernel: &Kernel<C>,
-    commitments: &[&ExpanderGKRCommitment<C>],
+    commitments: &[&ExpanderGKRCommitment<field!(C), transcript!(C), pcs!(C)>],
     is_broadcast: &[bool],
     parallel_index: usize,
-    transcript: &mut <C::DefaultGKRConfig as GKRConfig>::Transcript,
+    transcript: &mut transcript!(C),
 ) -> bool {
     let mut target_y = <C::DefaultGKRFieldConfig as GKRFieldConfig>::ChallengeField::ZERO;
     for ((input, &commitment), ib) in kernel
