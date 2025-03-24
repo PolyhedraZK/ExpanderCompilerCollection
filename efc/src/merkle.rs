@@ -162,13 +162,13 @@ pub fn merkle_tree_element_with_limit(
     }
 
     if length == 1 {
-        return Ok(vec![leaves]);
+        return Ok(vec![leaves.to_vec()]);
     }
 
     let depth = (length as f64).log2().ceil() as usize + 1;
     let mut tree: Vec<Vec<Vec<u32>>> = vec![vec![]; depth];
 
-    let mut cur_level = leaves;
+    let mut cur_level = leaves.to_vec();
     for i in 0..depth - 1 {
         if cur_level.len() % 2 == 1 {
             cur_level.push(ZERO_HASHES_POSEIDON[i].to_vec()); // Assume this function is defined
