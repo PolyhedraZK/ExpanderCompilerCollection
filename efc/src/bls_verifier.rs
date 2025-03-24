@@ -1,8 +1,10 @@
 use crate::attestation::{Attestation, AttestationDataSSZ};
+use crate::bls;
 use crate::utils::convert_limbs;
 use crate::utils::ensure_directory_exists;
 use crate::utils::read_from_json_file;
 use crate::utils::{get_solver, write_witness_to_file};
+use ark_bls12_381::G1Affine as BlsG1Affine;
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use circuit_std_rs::gnark::emulated::sw_bls12381::g1::*;
@@ -108,6 +110,71 @@ impl BLSVERIFIERCircuit<M31> {
         self.pubkey = [
             convert_limbs(entry.pub_key.x.limbs.clone()),
             convert_limbs(entry.pub_key.y.limbs.clone()),
+        ];
+        //assign slot
+        let slot = attestation.data.slot.to_le_bytes();
+        for (j, slot_byte) in slot.iter().enumerate() {
+            self.slot[j] = M31::from(*slot_byte as u32);
+        }
+        //assign committee_index
+        let committee_index = attestation.data.committee_index.to_le_bytes();
+        for (j, committee_index_byte) in committee_index.iter().enumerate() {
+            self.committee_index[j] = M31::from(*committee_index_byte as u32);
+        }
+        //assign beacon_beacon_block_root
+        let beacon_beacon_block_root = attestation.data.beacon_block_root.clone();
+        let beacon_beacon_block_root = STANDARD.decode(beacon_beacon_block_root).unwrap();
+        for (j, beacon_beacon_block_root_byte) in beacon_beacon_block_root.iter().enumerate() {
+            self.beacon_beacon_block_root[j] = M31::from(*beacon_beacon_block_root_byte as u32);
+        }
+        //assign source_epoch
+        let source_epoch = attestation.data.source.epoch.to_le_bytes();
+        for (j, source_epoch_byte) in source_epoch.iter().enumerate() {
+            self.source_epoch[j] = M31::from(*source_epoch_byte as u32);
+        }
+        //assign target_epoch
+        let target_epoch = attestation.data.target.epoch.to_le_bytes();
+        for (j, target_epoch_byte) in target_epoch.iter().enumerate() {
+            self.target_epoch[j] = M31::from(*target_epoch_byte as u32);
+        }
+        //assign source_root
+        let source_root = attestation.data.source.root.clone();
+        let source_root = STANDARD.decode(source_root).unwrap();
+        for (j, source_root_byte) in source_root.iter().enumerate() {
+            self.source_root[j] = M31::from(*source_root_byte as u32);
+        }
+        //assign target_root
+        let target_root = attestation.data.target.root.clone();
+        let target_root = STANDARD.decode(target_root).unwrap();
+        for (j, target_root_byte) in target_root.iter().enumerate() {
+            self.target_root[j] = M31::from(*target_root_byte as u32);
+        }
+
+        //assign attestation_sig_bytes
+        let attestation_sig_bytes = attestation.signature.clone();
+        let attestation_sig_bytes = STANDARD.decode(attestation_sig_bytes).unwrap();
+        for (j, attestation_sig_byte) in attestation_sig_bytes.iter().enumerate() {
+            self.attestation_sig_bytes[j] = M31::from(*attestation_sig_byte as u32);
+        }
+    }
+    pub fn get_assignments_from_beacon_data(
+        pubkeys: Vec<BlsG1Affine>,
+        attestations: Vec<Attestation>,
+    ) -> Vec<Self> {
+        let mut assignments = vec![];
+        for (cur_pubkey, cur_attestation_data) in pubkeys.iter().zip(attestations.iter())
+        {
+            let mut pairing_assignment = BLSVERIFIERCircuit::default();
+            pairing_assignment.from_beacon(cur_pubkey, cur_attestation_data);
+            assignments.push(pairing_assignment);
+        }
+        assignments
+    }
+    pub fn from_beacon(&mut self, pubkey: &BlsG1Affine, attestation: &Attestation) {
+        let pubkey_bytes = bls::affine_point_to_bytes_g1(pubkey);
+        self.pubkey = [
+            convert_limbs(pubkey_bytes[0].to_vec()),
+            convert_limbs(pubkey_bytes[1].to_vec()),
         ];
         //assign slot
         let slot = attestation.data.slot.to_le_bytes();
@@ -283,6 +350,63 @@ pub fn end2end_blsverifier_witness(
     let start_time = std::time::Instant::now();
     let assignments =
         BLSVERIFIERCircuit::<M31>::get_assignments_from_data(pairing_data, attestations);
+    let end_time = std::time::Instant::now();
+    log::debug!(
+        "assigned assignments time: {:?}",
+        end_time.duration_since(start_time)
+    );
+    let assignment_chunks: Vec<Vec<BLSVERIFIERCircuit<M31>>> =
+        assignments.chunks(16).map(|x| x.to_vec()).collect();
+
+    //generate witnesses (multi-thread)
+    log::debug!("Start generating  {} witnesses...", circuit_name);
+    let witness_solver = Arc::new(w_s);
+    let handles = assignment_chunks
+        .into_iter()
+        .enumerate()
+        .map(|(i, assignments)| {
+            let witness_solver = Arc::clone(&witness_solver);
+            let witnesses_dir_clone = witnesses_dir.clone();
+            thread::spawn(move || {
+                //TODO: hint_registry cannot be shared/cloned
+                let mut hint_registry = HintRegistry::<M31>::new();
+                register_hint(&mut hint_registry);
+                let witness = witness_solver
+                    .solve_witnesses_with_hints(&assignments, &mut hint_registry)
+                    .unwrap();
+                write_witness_to_file(
+                    &format!("{}/witness_{}.txt", witnesses_dir_clone, i),
+                    witness,
+                )
+            })
+        })
+        .collect::<Vec<_>>();
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    let end_time = std::time::Instant::now();
+    log::debug!(
+        "Generate {} witness Time: {:?}",
+        circuit_name,
+        end_time.duration_since(start_time)
+    );
+}
+
+
+pub fn end2end_blsverifier_witness_with_beacon_data(
+    w_s: WitnessSolver<M31Config>,
+    aggregated_pubkeys: Vec<BlsG1Affine>,
+    attestations: Vec<Attestation>,
+) {
+    let circuit_name = "pairing_3checks";
+
+    let witnesses_dir = format!("./witnesses/{}", circuit_name);
+    ensure_directory_exists(&witnesses_dir);
+
+    //get assignments
+    let start_time = std::time::Instant::now();
+    let assignments =
+        BLSVERIFIERCircuit::<M31>::get_assignments_from_beacon_data(aggregated_pubkeys, attestations);
     let end_time = std::time::Instant::now();
     log::debug!(
         "assigned assignments time: {:?}",

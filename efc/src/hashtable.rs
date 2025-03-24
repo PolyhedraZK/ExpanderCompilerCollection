@@ -1,3 +1,4 @@
+use crate::beacon::{self, SHUFFLEROUND};
 use crate::utils::{
     ensure_directory_exists, get_solver, read_from_json_file, write_witness_to_file,
 };
@@ -60,6 +61,33 @@ impl HASHTABLECircuit<M31> {
         for cur_hashtable_data in &hashtable_data {
             let mut hash_assignment = HASHTABLECircuit::default();
             hash_assignment.from_entry(cur_hashtable_data);
+            assignments.push(hash_assignment);
+        }
+        assignments
+    }
+    pub fn from_beacon(&mut self, seed: &[u8], shuffle_round: usize, start_index: usize, output: &[[u8; 32]]) {
+        for i in 0..SHA256LEN {
+            self.seed[i] = M31::from(seed[i] as u32);
+        }
+        self.shuffle_round = M31::from(shuffle_round as u32);
+        let start_index_bytes_le = (start_index as u32).to_le_bytes();
+        for i in 0..4 {
+            self.start_index[i] = M31::from(start_index_bytes_le[i] as u32);
+        }
+        for i in 0..HASHTABLESIZE {
+            for j in 0..SHA256LEN {
+                self.output[i][j] = M31::from(output[i][j] as u32);
+            }
+        }
+    }
+    pub fn get_assignments_from_beacon_data(seed: &[u8], output: &[[u8; 32]], subcircuit_count: usize) -> Vec<Self> {
+        let mut assignments = vec![];
+        let size_per_round = output.len() / beacon::SHUFFLEROUND;
+        for i in 0..subcircuit_count {
+            let current_round = i * HASHTABLESIZE / size_per_round;
+            let start_index = (i * HASHTABLESIZE) % size_per_round;
+            let mut hash_assignment = HASHTABLECircuit::default();
+            hash_assignment.from_beacon(seed, current_round, start_index, &output[i*HASHTABLESIZE..(i+1)*HASHTABLESIZE]);
             assignments.push(hash_assignment);
         }
         assignments
@@ -166,6 +194,61 @@ pub fn end2end_hashtable_witnesses(
     //get assignments
     let start_time = std::time::Instant::now();
     let assignments = HASHTABLECircuit::get_assignments_from_data(hashtable_data);
+    let end_time = std::time::Instant::now();
+    log::debug!(
+        "assigned assignments time: {:?}",
+        end_time.duration_since(start_time)
+    );
+    let assignment_chunks: Vec<Vec<HASHTABLECircuit<M31>>> =
+        assignments.chunks(16).map(|x| x.to_vec()).collect();
+
+    //generate witnesses (multi-thread)
+    log::debug!("Start generating witnesses...");
+    let witness_solver = Arc::new(w_s);
+    let handles = assignment_chunks
+        .into_iter()
+        .enumerate()
+        .map(|(i, assignments)| {
+            let witness_solver = Arc::clone(&witness_solver);
+            let witnesses_dir_clone = witnesses_dir.clone();
+            thread::spawn(move || {
+                let mut hint_registry = HintRegistry::<M31>::new();
+                register_hint(&mut hint_registry);
+                let witness = witness_solver
+                    .solve_witnesses_with_hints(&assignments, &mut hint_registry)
+                    .unwrap();
+                write_witness_to_file(
+                    &format!("{}/witness_{}.txt", witnesses_dir_clone, i),
+                    witness,
+                )
+            })
+        })
+        .collect::<Vec<_>>();
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    let end_time = std::time::Instant::now();
+    log::debug!(
+        "Generate {} witness Time: {:?}",
+        circuit_name,
+        end_time.duration_since(start_time)
+    );
+}
+
+pub fn end2end_hashtable_witnesses_with_beacon_data(
+    w_s: WitnessSolver<M31Config>,
+    seed: &[u8],
+    hash_bytes: Vec<[u8; 32]>,
+) {
+    let circuit_name = &format!("hashtable{}", HASHTABLESIZE);
+
+    let witnesses_dir = format!("./witnesses/{}", circuit_name);
+    ensure_directory_exists(&witnesses_dir);
+
+    let subcircuit_count = hash_bytes.len() / HASHTABLESIZE;
+    //get assignments
+    let start_time = std::time::Instant::now();
+    let assignments = HASHTABLECircuit::get_assignments_from_beacon_data(seed, &hash_bytes, subcircuit_count);
     let end_time = std::time::Instant::now();
     log::debug!(
         "assigned assignments time: {:?}",

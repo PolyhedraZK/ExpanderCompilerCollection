@@ -518,6 +518,7 @@ pub fn prepare_assignment_data(
     Vec<u64>,
     Vec<u64>,
     Vec<Vec<Vec<u32>>>,
+    Vec<[u8; 32]>,
 ) {
     let epoch = start / SLOTSPEREPOCH;
     let seed = get_beacon_seed(epoch).unwrap();
@@ -628,6 +629,7 @@ pub fn prepare_assignment_data(
         balance_list,
         real_committee_size,
         validator_tree,
+        hash_bytes,
     )
 }
 pub fn calculate_and_save_validator_tree(
@@ -725,6 +727,6 @@ fn test_load_attestations_and_bytes() {
 fn test_prepare_assignment_data() {
     let epoch = 290000;
     let slot = epoch * SLOTSPEREPOCH;
-    let (seed, shuffle_indices, committee_indices, pivots, activated_indices, shuffle_round_indices, flips, positions, flip_bits, round_hash_bits, attestations, aggregated_pubkeys, balance_list, real_committee_size, validator_tree) = prepare_assignment_data(slot, slot + 32);
+    let (seed, shuffle_indices, committee_indices, pivots, activated_indices, shuffle_round_indices, flips, positions, flip_bits, round_hash_bits, attestations, aggregated_pubkeys, balance_list, real_committee_size, validator_tree, hash_bytes) = prepare_assignment_data(slot, slot + 32);
     println!("aggregated_pubkeys: {:?}", aggregated_pubkeys);
 }
