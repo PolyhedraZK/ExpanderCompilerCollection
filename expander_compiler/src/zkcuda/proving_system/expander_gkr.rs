@@ -1,4 +1,4 @@
-/*use std::io::{Cursor, Read};
+use std::io::{Cursor, Read};
 
 use crate::circuit::config::Config;
 
@@ -384,4 +384,3 @@ fn verify_input_claim<C: Config>(
 
     *y == target_y
 }
-*/
