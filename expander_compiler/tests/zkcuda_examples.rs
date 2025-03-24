@@ -1,7 +1,7 @@
 use expander_compiler::frontend::*;
-use expander_compiler::utils::serde::Serde;
 use expander_compiler::zkcuda::proving_system::ExpanderGKRProvingSystem;
 use expander_compiler::zkcuda::{context::*, kernel::*};
+use serdes::ExpSerde;
 
 fn add_2<C: Config>(api: &mut API<C>, inputs: &mut Vec<Vec<Variable>>) {
     let a = inputs[0][0];

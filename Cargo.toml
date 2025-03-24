@@ -40,17 +40,17 @@ sha2 = "0.10.8"
 stacker = "0.1.17"
 tiny-keccak = { version = "2.0", features = ["keccak"] }
 
-arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-expander_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "config" }
-expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "circuit" }
-expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "transcript" }
-gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "main"}
-poly_commit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "poly_commit" }
-polynomials = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-sumcheck = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "main"}
+arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "sq/serdes_option" }
+mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "sq/serdes_option" }
+gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "sq/serdes_option" }
+expander_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "sq/serdes_option", package = "config" }
+expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "sq/serdes_option", package = "circuit" }
+expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "sq/serdes_option", package = "transcript" }
+gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "sq/serdes_option" }
+gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "sq/serdes_option" }
+mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "sq/serdes_option" }
+crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "sq/serdes_option"}
+poly_commit = { git = "https://github.com/PolyhedraZK/Expander", branch = "sq/serdes_option", package = "poly_commit" }
+polynomials = { git = "https://github.com/PolyhedraZK/Expander", branch = "sq/serdes_option" }
+sumcheck = { git = "https://github.com/PolyhedraZK/Expander", branch = "sq/serdes_option" }
+serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "sq/serdes_option"}

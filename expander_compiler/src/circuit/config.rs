@@ -3,7 +3,7 @@ use std::{fmt::Debug, hash::Hash};
 use crate::field::{Field, FieldRaw};
 
 pub trait Config: Default + Clone + Ord + Debug + Hash + Copy + 'static {
-    type CircuitField: Field;
+    type CircuitField: Field + FieldRaw;
 
     type DefaultSimdField: FieldRaw + arith::SimdField<Scalar = Self::CircuitField>;
     type DefaultGKRFieldConfig: gkr_field_config::GKRFieldConfig<

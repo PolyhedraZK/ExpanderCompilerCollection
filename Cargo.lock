@@ -112,13 +112,14 @@ dependencies = [
 [[package]]
 name = "arith"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=sq/serdes_option#6302b63a1a6148c8b5fde6091c0e657e8ce86f16"
 dependencies = [
  "ark-std",
  "cfg-if",
  "criterion",
  "ethnum",
  "halo2curves",
+ "itertools 0.13.0",
  "log",
  "rand",
  "raw-cpuid",
@@ -482,7 +483,7 @@ dependencies = [
 [[package]]
 name = "circuit"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=sq/serdes_option#6302b63a1a6148c8b5fde6091c0e657e8ce86f16"
 dependencies = [
  "arith",
  "ark-std",
@@ -582,7 +583,7 @@ checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 [[package]]
 name = "config"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=sq/serdes_option#6302b63a1a6148c8b5fde6091c0e657e8ce86f16"
 dependencies = [
  "arith",
  "ark-std",
@@ -601,7 +602,7 @@ dependencies = [
 [[package]]
 name = "config_macros"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=sq/serdes_option#6302b63a1a6148c8b5fde6091c0e657e8ce86f16"
 dependencies = [
  "config",
  "field_hashers",
@@ -707,7 +708,7 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 [[package]]
 name = "crosslayer_prototype"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=sq/serdes_option#6302b63a1a6148c8b5fde6091c0e657e8ce86f16"
 dependencies = [
  "arith",
  "config",
@@ -936,7 +937,7 @@ dependencies = [
 [[package]]
 name = "field_hashers"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=sq/serdes_option#6302b63a1a6148c8b5fde6091c0e657e8ce86f16"
 dependencies = [
  "arith",
  "halo2curves",
@@ -1031,7 +1032,7 @@ dependencies = [
 [[package]]
 name = "gf2"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=sq/serdes_option#6302b63a1a6148c8b5fde6091c0e657e8ce86f16"
 dependencies = [
  "arith",
  "ark-std",
@@ -1049,7 +1050,7 @@ dependencies = [
 [[package]]
 name = "gf2_128"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=sq/serdes_option#6302b63a1a6148c8b5fde6091c0e657e8ce86f16"
 dependencies = [
  "arith",
  "ark-std",
@@ -1068,7 +1069,7 @@ checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 [[package]]
 name = "gkr"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=sq/serdes_option#6302b63a1a6148c8b5fde6091c0e657e8ce86f16"
 dependencies = [
  "arith",
  "ark-std",
@@ -1108,7 +1109,7 @@ dependencies = [
 [[package]]
 name = "gkr_field_config"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=sq/serdes_option#6302b63a1a6148c8b5fde6091c0e657e8ce86f16"
 dependencies = [
  "arith",
  "ark-std",
@@ -1662,7 +1663,7 @@ version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.79",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -1674,7 +1675,7 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 [[package]]
 name = "mersenne31"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=sq/serdes_option#6302b63a1a6148c8b5fde6091c0e657e8ce86f16"
 dependencies = [
  "arith",
  "ark-std",
@@ -1761,7 +1762,7 @@ dependencies = [
 [[package]]
 name = "mpi_config"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=sq/serdes_option#6302b63a1a6148c8b5fde6091c0e657e8ce86f16"
 dependencies = [
  "arith",
  "mpi",
@@ -1972,10 +1973,11 @@ dependencies = [
 [[package]]
 name = "poly_commit"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=sq/serdes_option#6302b63a1a6148c8b5fde6091c0e657e8ce86f16"
 dependencies = [
  "arith",
  "ark-std",
+ "derivative",
  "ethnum",
  "gf2",
  "gkr_field_config",
@@ -1993,14 +1995,16 @@ dependencies = [
 [[package]]
 name = "polynomials"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=sq/serdes_option#6302b63a1a6148c8b5fde6091c0e657e8ce86f16"
 dependencies = [
  "arith",
  "ark-std",
  "criterion",
  "gkr_field_config",
  "halo2curves",
+ "itertools 0.13.0",
  "mpi_config",
+ "rand",
 ]
 
 [[package]]
@@ -2287,7 +2291,7 @@ dependencies = [
 [[package]]
 name = "serdes"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=sq/serdes_option#6302b63a1a6148c8b5fde6091c0e657e8ce86f16"
 dependencies = [
  "ethnum",
  "halo2curves",
@@ -2408,7 +2412,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 [[package]]
 name = "sumcheck"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=sq/serdes_option#6302b63a1a6148c8b5fde6091c0e657e8ce86f16"
 dependencies = [
  "arith",
  "circuit",
@@ -2593,7 +2597,7 @@ dependencies = [
 [[package]]
 name = "transcript"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=sq/serdes_option#6302b63a1a6148c8b5fde6091c0e657e8ce86f16"
 dependencies = [
  "arith",
  "field_hashers",
@@ -2606,7 +2610,7 @@ dependencies = [
 [[package]]
 name = "tree"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=sq/serdes_option#6302b63a1a6148c8b5fde6091c0e657e8ce86f16"
 dependencies = [
  "arith",
  "ark-std",
@@ -2714,7 +2718,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 [[package]]
 name = "utils"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8425e4cb01f09947af78fe97bd5e8e2790d38202"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=sq/serdes_option#6302b63a1a6148c8b5fde6091c0e657e8ce86f16"
 
 [[package]]
 name = "version_check"
