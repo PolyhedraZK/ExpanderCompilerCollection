@@ -21,10 +21,9 @@ pub struct DummyProof {
     cond: Vec<Vec<bool>>,
 }
 
-/*#[deprecated(
+#[deprecated(
     note = "DummyProvingSystem is a dummy implementation for testing purposes. Please use ExpanderGKRProvingSystem."
-)]*/
-// FIXME: after Zhiyong finishes the implementation, change back
+)]
 pub struct DummyProvingSystem<C: Config> {
     _config: std::marker::PhantomData<C>,
 }
@@ -74,6 +73,11 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
             let (_, cond) = kernel
                 .layered_circuit
                 .eval_with_public_inputs_simd(lc_input, &[]);
+            for x in cond.iter() {
+                if !*x {
+                    panic!("constraints not satisfied");
+                }
+            }
             res.push(cond);
         }
         DummyProof { cond: res }

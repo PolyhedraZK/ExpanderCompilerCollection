@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use arith::Field;
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{declare_circuit, Config, Define, Error, RootAPI, Variable};
 use rand::Rng;
 
 use crate::StdCircuit;
@@ -150,7 +150,7 @@ fn logup_poly_val<C: Config, B: RootAPI<C>>(
 }
 
 impl<C: Config> Define<C> for LogUpCircuit {
-    fn define(&self, builder: &mut API<C>) {
+    fn define<Builder: RootAPI<C>>(&self, builder: &mut Builder) {
         let key_len = self.table_keys[0].len();
         let value_len = self.table_values[0].len();
 
@@ -358,6 +358,10 @@ impl LogUpRangeProofTable {
     }
 
     pub fn rangeproof<C: Config, B: RootAPI<C>>(&mut self, builder: &mut B, a: Variable, n: usize) {
+        if n <= self.rangeproof_bits {
+            self.rangeproof_onechunk(builder, a, n);
+            return;
+        }
         //add a shift value
         let mut n = n;
         let mut new_a = a;
@@ -440,19 +444,19 @@ impl LogUpRangeProofTable {
     }
 }
 
-pub fn query_count_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+pub fn query_count_hint<F: Field>(inputs: &[F], outputs: &mut [F]) -> Result<(), Error> {
     let mut count = vec![0; outputs.len()];
     for input in inputs {
         let query_id = input.to_u256().as_usize();
         count[query_id] += 1;
     }
     for i in 0..outputs.len() {
-        outputs[i] = M31::from(count[i] as u32);
+        outputs[i] = F::from(count[i] as u32);
     }
     Ok(())
 }
 
-pub fn query_count_by_key_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+pub fn query_count_by_key_hint<F: Field>(inputs: &[F], outputs: &mut [F]) -> Result<(), Error> {
     let mut outputs_u32 = vec![0; outputs.len()];
 
     let table_size = inputs[0].to_u256().as_usize();
@@ -471,20 +475,21 @@ pub fn query_count_by_key_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<()
         outputs_u32[i] = count as u32;
     }
     for i in 0..outputs.len() {
-        outputs[i] = M31::from(outputs_u32[i]);
+        outputs[i] = F::from(outputs_u32[i]);
     }
 
     Ok(())
 }
 
-pub fn rangeproof_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+pub fn rangeproof_hint<F: Field>(inputs: &[F], outputs: &mut [F]) -> Result<(), Error> {
     let n = inputs[0].to_u256().as_i64();
     let m = inputs[1].to_u256().as_i64();
     let mut a = inputs[2].to_u256().as_i64();
+
     for i in 0..n / m {
         let r = a % (1 << m);
         a /= 1 << m;
-        outputs[i as usize] = M31::from(r as u32);
+        outputs[i as usize] = F::from(r as u32);
     }
     Ok(())
 }

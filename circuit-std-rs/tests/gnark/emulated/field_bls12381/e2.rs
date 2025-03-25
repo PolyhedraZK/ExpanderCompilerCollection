@@ -1,13 +1,15 @@
-use circuit_std_rs::gnark::{
-    element::new_internal_element,
-    emulated::field_bls12381::e2::{Ext2, GE2},
-    hints::register_hint,
+use circuit_std_rs::{
+    gnark::{
+        element::new_internal_element,
+        emulated::field_bls12381::e2::{Ext2, GE2},
+    },
+    utils::register_hint,
 };
-use expander_compiler::frontend::compile_generic;
+use expander_compiler::frontend::compile;
 use expander_compiler::{
     compile::CompileOptions,
     declare_circuit,
-    frontend::{extra::debug_eval, GenericDefine, HintRegistry, M31Config, RootAPI, Variable, M31},
+    frontend::{extra::debug_eval, Define, HintRegistry, M31Config, RootAPI, Variable, M31},
 };
 declare_circuit!(E2AddCircuit {
     x: [[Variable; 48]; 2],
@@ -15,7 +17,7 @@ declare_circuit!(E2AddCircuit {
     z: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E2AddCircuit<Variable> {
+impl Define<M31Config> for E2AddCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext2 = Ext2::new(builder);
         let x_e2 = GE2 {
@@ -41,7 +43,7 @@ impl GenericDefine<M31Config> for E2AddCircuit<Variable> {
 
 #[test]
 fn test_e2_add() {
-    compile_generic(&E2AddCircuit::default(), CompileOptions::default()).unwrap();
+    // compile(&E2AddCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2AddCircuit::<M31> {
@@ -71,14 +73,14 @@ fn test_e2_add() {
         202, 31, 217, 66, 238, 3, 35, 127, 14,
     ];
     let z0_bytes = [
-        218, 253, 64, 116, 175, 52, 24, 151, 151, 215, 179, 170, 76, 250, 69, 90, 88, 37, 34, 244,
-        208, 51, 26, 6, 74, 174, 1, 199, 44, 146, 237, 75, 240, 250, 248, 226, 161, 68, 67, 49,
-        204, 164, 203, 228, 12, 79, 238, 5,
+        19, 252, 77, 22, 167, 224, 86, 207, 170, 126, 100, 101, 179, 5, 123, 204, 244, 241, 1, 219,
+        167, 75, 49, 47, 215, 220, 138, 172, 4, 140, 84, 156, 139, 98, 129, 126, 131, 227, 83, 128,
+        231, 209, 102, 103, 142, 234, 215, 9,
     ];
     let z1_bytes = [
-        162, 191, 112, 190, 81, 47, 128, 118, 149, 112, 222, 152, 142, 11, 49, 60, 180, 34, 229,
-        197, 248, 214, 150, 237, 125, 100, 177, 224, 222, 18, 165, 199, 250, 85, 240, 222, 198, 4,
-        78, 217, 202, 6, 85, 164, 7, 27, 109, 21,
+        52, 239, 235, 194, 147, 251, 219, 52, 190, 151, 43, 230, 243, 162, 249, 150, 35, 33, 35,
+        209, 61, 156, 61, 109, 217, 198, 182, 43, 127, 125, 25, 134, 243, 14, 209, 120, 248, 217,
+        158, 177, 221, 195, 12, 158, 46, 213, 27, 7,
     ];
     for i in 0..48 {
         assignment.x[0][i] = M31::from(x0_bytes[i] as u32);
@@ -89,11 +91,7 @@ fn test_e2_add() {
         assignment.z[1][i] = M31::from(z1_bytes[i] as u32);
     }
 
-    // debug_eval(
-    //     &E2AddCircuit::default(),
-    //     &assignment,
-    //     hint_registry,
-    // );
+    debug_eval(&E2AddCircuit::default(), &assignment, hint_registry);
 }
 
 declare_circuit!(E2SubCircuit {
@@ -102,7 +100,7 @@ declare_circuit!(E2SubCircuit {
     z: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E2SubCircuit<Variable> {
+impl Define<M31Config> for E2SubCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext2 = Ext2::new(builder);
         let x_e2 = GE2 {
@@ -135,7 +133,7 @@ impl GenericDefine<M31Config> for E2SubCircuit<Variable> {
 #[test]
 fn test_e2_sub() {
     // let compile_result = compile(&E2SubCircuit::default()).unwrap();
-    compile_generic(&E2SubCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E2SubCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2SubCircuit::<M31> {
@@ -191,7 +189,7 @@ declare_circuit!(E2DoubleCircuit {
     z: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E2DoubleCircuit<Variable> {
+impl Define<M31Config> for E2DoubleCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext2 = Ext2::new(builder);
         let x_e2 = GE2 {
@@ -216,7 +214,7 @@ impl GenericDefine<M31Config> for E2DoubleCircuit<Variable> {
 #[test]
 fn test_e2_double() {
     // let compile_result = compile(&E2DoubleCircuit::default()).unwrap();
-    compile_generic(&E2DoubleCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E2DoubleCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2DoubleCircuit::<M31> {
@@ -260,7 +258,7 @@ declare_circuit!(E2MulCircuit {
     z: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E2MulCircuit<Variable> {
+impl Define<M31Config> for E2MulCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext2 = Ext2::new(builder);
         let x_e2 = GE2 {
@@ -289,7 +287,7 @@ impl GenericDefine<M31Config> for E2MulCircuit<Variable> {
 #[test]
 fn test_e2_mul() {
     // let compile_result = compile(&E2MulCircuit::default()).unwrap();
-    compile_generic(&E2MulCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E2MulCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2MulCircuit::<M31> {
@@ -346,7 +344,7 @@ declare_circuit!(E2SquareCircuit {
     z: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E2SquareCircuit<Variable> {
+impl Define<M31Config> for E2SquareCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext2 = Ext2::new(builder);
         let x_e2 = GE2 {
@@ -371,7 +369,7 @@ impl GenericDefine<M31Config> for E2SquareCircuit<Variable> {
 #[test]
 fn test_e2_square() {
     // let compile_result = compile(&E2SquareCircuit::default()).unwrap();
-    compile_generic(&E2SquareCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E2SquareCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2SquareCircuit::<M31> {
@@ -415,7 +413,7 @@ declare_circuit!(E2DivCircuit {
     z: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E2DivCircuit<Variable> {
+impl Define<M31Config> for E2DivCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext2 = Ext2::new(builder);
         let x_e2 = GE2 {
@@ -443,7 +441,7 @@ impl GenericDefine<M31Config> for E2DivCircuit<Variable> {
 
 #[test]
 fn test_e2_div() {
-    compile_generic(&E2DivCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E2DivCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2DivCircuit::<M31> {
@@ -500,7 +498,7 @@ declare_circuit!(E2MulByElementCircuit {
     c: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E2MulByElementCircuit<Variable> {
+impl Define<M31Config> for E2MulByElementCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext2 = Ext2::new(builder);
         let a_e2 = GE2 {
@@ -526,7 +524,7 @@ impl GenericDefine<M31Config> for E2MulByElementCircuit<Variable> {
 #[test]
 fn test_e2_mul_by_element() {
     // let compile_result = compile(&E2MulByElementCircuit::default()).unwrap();
-    compile_generic(&E2MulByElementCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E2MulByElementCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2MulByElementCircuit::<M31> {
@@ -581,7 +579,7 @@ declare_circuit!(E2MulByNonResidueCircuit {
     c: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E2MulByNonResidueCircuit<Variable> {
+impl Define<M31Config> for E2MulByNonResidueCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext2 = Ext2::new(builder);
         let a_e2 = GE2 {
@@ -605,7 +603,7 @@ impl GenericDefine<M31Config> for E2MulByNonResidueCircuit<Variable> {
 
 #[test]
 fn test_e2_mul_by_non_residue() {
-    compile_generic(
+    compile(
         &E2MulByNonResidueCircuit::default(),
         CompileOptions::default(),
     )
@@ -657,7 +655,7 @@ declare_circuit!(E2NegCircuit {
     c: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E2NegCircuit<Variable> {
+impl Define<M31Config> for E2NegCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext2 = Ext2::new(builder);
         let a_e2 = GE2 {
@@ -682,7 +680,7 @@ impl GenericDefine<M31Config> for E2NegCircuit<Variable> {
 #[test]
 fn test_e2_neg() {
     // let compile_result = compile(&E2NegCircuit::default()).unwrap();
-    compile_generic(&E2NegCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E2NegCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2NegCircuit::<M31> {
@@ -726,7 +724,7 @@ declare_circuit!(E2ConjugateCircuit {
     c: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E2ConjugateCircuit<Variable> {
+impl Define<M31Config> for E2ConjugateCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext2 = Ext2::new(builder);
         let a_e2 = GE2 {
@@ -751,7 +749,7 @@ impl GenericDefine<M31Config> for E2ConjugateCircuit<Variable> {
 #[test]
 fn test_e2_conjugate() {
     // let compile_result = compile(&E2ConjugateCircuit::default()).unwrap();
-    compile_generic(&E2ConjugateCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E2ConjugateCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2ConjugateCircuit::<M31> {
@@ -795,7 +793,7 @@ declare_circuit!(E2InverseCircuit {
     c: [[Variable; 48]; 2],
 });
 
-impl GenericDefine<M31Config> for E2InverseCircuit<Variable> {
+impl Define<M31Config> for E2InverseCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut ext2 = Ext2::new(builder);
         let a_e2 = GE2 {
@@ -819,7 +817,7 @@ impl GenericDefine<M31Config> for E2InverseCircuit<Variable> {
 
 #[test]
 fn test_e2_inverse() {
-    compile_generic(&E2InverseCircuit::default(), CompileOptions::default()).unwrap();
+    compile(&E2InverseCircuit::default(), CompileOptions::default()).unwrap();
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2InverseCircuit::<M31> {

@@ -16,7 +16,7 @@ declare_circuit!(SHA256CircuitCompressionOnly {
     output: [Variable; 256],
 });
 
-impl GenericDefine<GF2Config> for SHA256CircuitCompressionOnly<Variable> {
+impl Define<GF2Config> for SHA256CircuitCompressionOnly<Variable> {
     fn define<Builder: RootAPI<GF2Config>>(&self, api: &mut Builder) {
         let hasher = SHA256GF2::new();
         let mut state = SHA256_INIT_STATE
@@ -41,7 +41,7 @@ fn test_sha256_compression_gf2() {
     // )
     // .unwrap();
 
-    let compile_result = compile_generic_cross_layer(
+    let compile_result = compile_cross_layer(
         &SHA256CircuitCompressionOnly::default(),
         CompileOptions::default(),
     )
@@ -91,7 +91,7 @@ declare_circuit!(SHA256Circuit {
     output: [Variable; OUTPUT_LEN],
 });
 
-impl GenericDefine<GF2Config> for SHA256Circuit<Variable> {
+impl Define<GF2Config> for SHA256Circuit<Variable> {
     fn define<Builder: RootAPI<GF2Config>>(&self, api: &mut Builder) {
         let mut hasher = SHA256GF2::new();
         hasher.update(&self.input);
@@ -107,7 +107,7 @@ fn test_sha256_gf2() {
     //     compile_generic(&SHA256Circuit::default(), CompileOptions::default()).unwrap();
 
     let compile_result =
-        compile_generic_cross_layer(&SHA256Circuit::default(), CompileOptions::default()).unwrap();
+        compile_cross_layer(&SHA256Circuit::default(), CompileOptions::default()).unwrap();
 
     let n_tests = 5;
     let mut rng = rand::thread_rng();

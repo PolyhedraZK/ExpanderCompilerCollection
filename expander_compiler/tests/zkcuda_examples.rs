@@ -1,7 +1,7 @@
 use expander_compiler::frontend::*;
-use expander_compiler::utils::serde::Serde;
 use expander_compiler::zkcuda::proving_system::ExpanderGKRProvingSystem;
 use expander_compiler::zkcuda::{context::*, kernel::*};
+use serdes::ExpSerde;
 
 fn add_2<C: Config>(api: &mut API<C>, inputs: &mut Vec<Vec<Variable>>) {
     let a = inputs[0][0];
@@ -214,4 +214,38 @@ fn zkcuda_to_binary() {
     let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
     let proof = ctx.to_proof(&prover_setup);
     assert!(computation_graph.verify(&proof, &verifier_setup));
+}
+
+#[kernel]
+fn assertion<C: Config>(api: &mut API<C>, a: &InputVariable, b: &InputVariable) {
+    api.assert_is_equal(*a, *b);
+}
+
+#[test]
+fn zkcuda_assertion() {
+    let kernel_tmp: Kernel<M31Config> = compile_assertion().unwrap();
+
+    let mut ctx: Context<M31Config> = Context::default();
+    let a = ctx.copy_to_device(&M31::from(10u32), false).reshape(&[1]);
+    let b = ctx.copy_to_device(&M31::from(10u32), false).reshape(&[1]);
+    call_kernel!(ctx, kernel_tmp, a, b);
+
+    let computation_graph = ctx.to_computation_graph();
+    let proof = ctx.to_proof();
+    assert!(computation_graph.verify(&proof));
+}
+
+#[test]
+#[should_panic]
+fn zkcuda_assertion_fail() {
+    let kernel_tmp: Kernel<M31Config> = compile_assertion().unwrap();
+
+    let mut ctx: Context<M31Config> = Context::default();
+    let a = ctx.copy_to_device(&M31::from(10u32), false).reshape(&[1]);
+    let b = ctx.copy_to_device(&M31::from(9u32), false).reshape(&[1]);
+    call_kernel!(ctx, kernel_tmp, a, b);
+
+    let computation_graph = ctx.to_computation_graph();
+    let proof = ctx.to_proof();
+    assert!(computation_graph.verify(&proof));
 }

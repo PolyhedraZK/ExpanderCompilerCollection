@@ -353,7 +353,6 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
             }
             check_results.push(chk);
         }
-        println!("{:?}", check_results);
         let mut parallel_count = None;
         for (_, _, pc) in check_results.iter() {
             if let Some(pc) = pc {

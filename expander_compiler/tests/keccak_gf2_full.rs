@@ -34,7 +34,7 @@ fn rc() -> Vec<u64> {
 }
 
 fn xor_in<C: Config>(
-    api: &mut API<C>,
+    api: &mut impl RootAPI<C>,
     mut s: Vec<Vec<Variable>>,
     buf: Vec<Vec<Variable>>,
 ) -> Vec<Vec<Variable>> {
@@ -48,7 +48,7 @@ fn xor_in<C: Config>(
     s
 }
 
-fn keccak_f<C: Config>(api: &mut API<C>, mut a: Vec<Vec<Variable>>) -> Vec<Vec<Variable>> {
+fn keccak_f<C: Config>(api: &mut impl RootAPI<C>, mut a: Vec<Vec<Variable>>) -> Vec<Vec<Variable>> {
     let mut b = vec![vec![api.constant(0); 64]; 25];
     let mut c = vec![vec![api.constant(0); 64]; 5];
     let mut d = vec![vec![api.constant(0); 64]; 5];
@@ -132,7 +132,7 @@ fn keccak_f<C: Config>(api: &mut API<C>, mut a: Vec<Vec<Variable>>) -> Vec<Vec<V
     a
 }
 
-fn xor<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
+fn xor<C: Config>(api: &mut impl RootAPI<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
     let nbits = a.len();
     let mut bits_res = vec![api.constant(0); nbits];
     for i in 0..nbits {
@@ -141,7 +141,7 @@ fn xor<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<V
     bits_res
 }
 
-fn and<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
+fn and<C: Config>(api: &mut impl RootAPI<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<Variable> {
     let nbits = a.len();
     let mut bits_res = vec![api.constant(0); nbits];
     for i in 0..nbits {
@@ -150,7 +150,7 @@ fn and<C: Config>(api: &mut API<C>, a: Vec<Variable>, b: Vec<Variable>) -> Vec<V
     bits_res
 }
 
-fn not<C: Config>(api: &mut API<C>, a: Vec<Variable>) -> Vec<Variable> {
+fn not<C: Config>(api: &mut impl RootAPI<C>, a: Vec<Variable>) -> Vec<Variable> {
     let mut bits_res = vec![api.constant(0); a.len()];
     for i in 0..a.len() {
         bits_res[i] = api.sub(1, a[i].clone());
@@ -188,7 +188,7 @@ declare_circuit!(Keccak256Circuit {
     out: [[PublicVariable; 256]; N_HASHES],
 });
 
-fn compute_keccak<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variable> {
+fn compute_keccak<C: Config>(api: &mut impl RootAPI<C>, p: &Vec<Variable>) -> Vec<Variable> {
     let mut ss = vec![vec![api.constant(0); 64]; 25];
     let mut new_p = p.clone();
     let mut append_data = vec![0; 136 - 64];
@@ -211,7 +211,7 @@ fn compute_keccak<C: Config>(api: &mut API<C>, p: &Vec<Variable>) -> Vec<Variabl
 }
 
 impl Define<GF2Config> for Keccak256Circuit<Variable> {
-    fn define(&self, api: &mut API<GF2Config>) {
+    fn define<Builder: RootAPI<GF2Config>>(&self, api: &mut Builder) {
         for i in 0..N_HASHES {
             // You can use api.memorized_simple_call for sub-circuits
             // let out = api.memorized_simple_call(compute_keccak, &self.p[i].to_vec());
@@ -225,7 +225,7 @@ impl Define<GF2Config> for Keccak256Circuit<Variable> {
 
 #[test]
 fn keccak_gf2_full() {
-    let compile_result = compile(&Keccak256Circuit::default()).unwrap();
+    let compile_result = compile(&Keccak256Circuit::default(), CompileOptions::default()).unwrap();
     let CompileResult {
         witness_solver,
         layered_circuit,
@@ -283,16 +283,11 @@ fn keccak_gf2_full() {
     println!("test 3 passed");
 
     // alternatively, you can specify the particular config like gkr_field_config::GF2ExtConfig
-    let mut expander_circuit = layered_circuit
-        .export_to_expander::<<GF2Config as Config>::DefaultGKRFieldConfig>()
-        .flatten();
-    let config = expander_config::Config::<<GF2Config as Config>::DefaultGKRConfig>::new(
-        expander_config::GKRScheme::Vanilla,
-        mpi_config::MPIConfig::new(),
-    );
+    let mut expander_circuit = layered_circuit.export_to_expander_flatten();
 
-    let (simd_input, simd_public_input) =
-        witness.to_simd::<<GF2Config as Config>::DefaultSimdField>();
+    let config = GF2Config::new_expander_config();
+
+    let (simd_input, simd_public_input) = witness.to_simd();
     println!("{} {}", simd_input.len(), simd_public_input.len());
     expander_circuit.layers[0].input_vals = simd_input;
     expander_circuit.public_input = simd_public_input.clone();
