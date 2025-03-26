@@ -2,20 +2,18 @@ use expander_compiler::frontend::{M31Config, WitnessSolver};
 
 use expander_compiler::frontend::*;
 use crate::attestation::Attestation;
-use crate::{beacon, bls_verifier};
+use crate::{beacon, bls_verifier, merkle};
 use crate::bls_verifier::{
-    end2end_blsverifier_witness, generate_blsverifier_witnesses, BLSVERIFIERCircuit, PairingEntry,
+    end2end_blsverifier_witness, end2end_blsverifier_witnesses_with_assignments, generate_blsverifier_witnesses, BLSVERIFIERCircuit, PairingEntry
 };
 use crate::hashtable::{
-    self, end2end_hashtable_witnesses, generate_hash_witnesses, HASHTABLECircuit, HashTableJson,
+    self, end2end_hashtable_witnesses, end2end_hashtable_witnesses_with_assignments, generate_hash_witnesses, HASHTABLECircuit, HashTableJson
 };
 use crate::permutation::{
-    self, end2end_permutation_hashbit_witness, end2end_permutation_query_witness,
-    generate_permutation_hashbit_witnesses, PermutationHashEntry,
-    PermutationIndicesValidatorHashBitCircuit, PermutationQueryCircuit, PermutationQueryEntry,
+    self, end2end_permutation_hashbit_witness, end2end_permutation_hashbit_witnesses_with_assignments, end2end_permutation_query_witness, end2end_permutation_query_witnesses_with_assignments, generate_permutation_hashbit_witnesses, PermutationHashEntry, PermutationIndicesValidatorHashBitCircuit, PermutationQueryCircuit, PermutationQueryEntry
 };
 use crate::shuffle::{
-    self, end2end_shuffle_witnesses, generate_shuffle_witnesses, ShuffleCircuit, ShuffleJson,
+    self, end2end_shuffle_witnesses, end2end_shuffle_witnesses_with_assignments, generate_shuffle_witnesses, ShuffleCircuit, ShuffleJson
 };
 use crate::utils::{get_solver, read_from_json_file};
 use crate::validator::{
@@ -24,7 +22,7 @@ use crate::validator::{
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-pub fn end2end_witness(dir: &str) {
+pub fn end2end_witness_go_assignment(dir: &str) {
     let start_time = std::time::Instant::now();
     let dir_str1 = dir.to_string();
     let shuffle_thread = thread::spawn(move || {
@@ -64,7 +62,7 @@ pub fn end2end_witness(dir: &str) {
 //2. the first half of the bls_verifier witnesses (slot 0 to 15)
 //3. all hash witnesses
 //4. all permutation_hash witnesses
-pub fn end2end_witness_streamline_end(
+pub fn end2end_witness_streamline_end_go_assignment(
     dir: &str,
     solver_shuffle: WitnessSolver<M31Config>,
     solver_hash: WitnessSolver<M31Config>,
@@ -281,7 +279,7 @@ pub fn end2end_witness_streamline_end(
 //at the start of the current prove process (e.g., epoch = N - 1), generate the following witnesses for current epoch (e.g., epoch = N - 1):
 //1. the second half of the shuffle witnesses (slot 16 to 31)
 //2. the second half of the bls_verifier witnesses (slot 16 to 31)
-pub fn end2end_witness_streamline_start(
+pub fn end2end_witness_streamline_start_go_assignment(
     dir: &str,
     solver_shuffle: WitnessSolver<M31Config>,
     solver_pairing: WitnessSolver<M31Config>,
@@ -332,7 +330,7 @@ pub fn end2end_witness_streamline_start(
     );
 }
 
-pub fn end2end_witness_streamline(stage: &str) {
+pub fn end2end_witness_streamline_go_assignment(stage: &str) {
     if stage == "end" {
         log::debug!("end stage");
         //get the solver for shuffle
@@ -372,7 +370,7 @@ pub fn end2end_witness_streamline(stage: &str) {
         let solver_validator_subtree = get_solver(witnesses_dir, circuit_name, circuit);
 
         let dir = "./efc/data";
-        end2end_witness_streamline_end(
+        end2end_witness_streamline_end_go_assignment(
             dir,
             solver_shuffle,
             solver_hash,
@@ -396,7 +394,7 @@ pub fn end2end_witness_streamline(stage: &str) {
         let solver_blsverifier = get_solver(witnesses_dir, circuit_name, circuit);
 
         let dir = "./efc/data";
-        end2end_witness_streamline_start(dir, solver_shuffle, solver_blsverifier);
+        end2end_witness_streamline_start_go_assignment(dir, solver_shuffle, solver_blsverifier);
     }
 }
 
@@ -518,6 +516,174 @@ pub fn end2end_start_assignments(epoch: u64) -> (Vec<Vec<ShuffleCircuit<M31>>>, 
     let blsverifier_assignments = bls_verifier::end2end_blsverifier_assignments_with_beacon_data(aggregated_pubkeys, attestations.into_iter().flatten().collect());
     (shuffle_assignments, blsverifier_assignments)
 }
+
+pub fn end2end_witness_streamline_from_beacon_data(epoch: u64, stage: &str) {
+    if stage == "end" {
+        log::debug!("end stage");
+        let start_time = std::time::Instant::now();
+        //get the solver for shuffle
+        let circuit_name = &format!("shuffle_{}", shuffle::VALIDATOR_CHUNK_SIZE);
+        let circuit = ShuffleCircuit::default();
+        let witnesses_dir = &format!("./witnesses/{}", circuit_name);
+        let solver_shuffle = get_solver(witnesses_dir, circuit_name, circuit);
+
+        //get the solver for hash
+        let circuit_name = &format!("hashtable{}", hashtable::HASHTABLESIZE);
+        let circuit = HASHTABLECircuit::default();
+        let witnesses_dir = &format!("./witnesses/{}", circuit_name);
+        let solver_hash = get_solver(witnesses_dir, circuit_name, circuit);
+
+        //get the solver for bls verifier
+        let circuit_name = "blsverifier";
+        let circuit = BLSVERIFIERCircuit::default();
+        let witnesses_dir = &format!("./witnesses/{}", circuit_name);
+        let solver_blsverifier = get_solver(witnesses_dir, circuit_name, circuit);
+
+        //get the solver for permutation query
+        let circuit_name = "permutationquery";
+        let circuit = PermutationQueryCircuit::default();
+        let witnesses_dir = &format!("./witnesses/{}", circuit_name);
+        let solver_permutation_query = get_solver(witnesses_dir, circuit_name, circuit);
+
+        //get the solver for permutation hash
+        let circuit_name = &format!("permutationhashbit_{}", permutation::VALIDATOR_COUNT);
+        let circuit = PermutationIndicesValidatorHashBitCircuit::default();
+        let witnesses_dir = &format!("./witnesses/{}", circuit_name);
+        let solver_permutation_hash = get_solver(witnesses_dir, circuit_name, circuit);
+
+        //get the solver for validator subtree
+        let circuit_name = &format!("validatorsubtree{}", validator::SUBTREE_SIZE);
+        let circuit = ConvertValidatorListToMerkleTreeCircuit::default();
+        let witnesses_dir = &format!("./witnesses/{}", circuit_name);
+        let solver_validator_subtree = get_solver(witnesses_dir, circuit_name, circuit);
+
+        //get the solver for merkle subtree with limit
+        let circuit_name = &format!("merklesubtree{}", validator::SUBTREE_SIZE);
+        let circuit = MerkleSubTreeWithLimitCircuit::default();
+        let witnesses_dir = &format!("./witnesses/{}", circuit_name);
+        let solver_merkle_subtree_with_limit = get_solver(witnesses_dir, circuit_name, circuit);
+
+        let (shuffle_assignments, hashtable_assignments, bls_verifier_assignments, permutation_query_assignments, permutation_hashbit_assignments, convert_validator_subtree_assignments, merkle_subtree_with_limit_assignments) = end2end_end_assignments(epoch);
+
+        let shuffle_thread = thread::spawn(move || {
+            end2end_shuffle_witnesses_with_assignments(
+                solver_shuffle,
+                shuffle_assignments,
+            );
+        });
+
+        let hash_thread = thread::spawn(move || {
+            end2end_hashtable_witnesses_with_assignments(
+                solver_hash,
+                hashtable_assignments,
+            );
+        });
+
+        let blsverifier_thread = thread::spawn(move || {
+            end2end_blsverifier_witnesses_with_assignments(
+                solver_blsverifier,
+                bls_verifier_assignments,
+            );
+        });
+
+        let permutation_query_thread = thread::spawn(move || {
+            end2end_permutation_query_witnesses_with_assignments(
+                solver_permutation_query,
+                permutation_query_assignments,
+            );
+        });
+
+        let permutation_hash_thread = thread::spawn(move || {
+            end2end_permutation_hashbit_witnesses_with_assignments(
+                solver_permutation_hash,
+                permutation_hashbit_assignments,
+            );
+        });
+
+        let validator_subtree_thread = thread::spawn(move || {
+            validator::end2end_validator_subtree_witnesses_with_assignments(
+                solver_validator_subtree,
+                convert_validator_subtree_assignments
+            );
+        });
+
+        let merkle_subtree_with_limit_thread = thread::spawn(move || {
+            validator::end2end_merkle_subtree_with_limit_witnesses_with_assignments(
+                solver_merkle_subtree_with_limit,
+                merkle_subtree_with_limit_assignments
+            );
+        });
+
+        shuffle_thread
+            .join()
+            .expect("ShufflePairing thread panicked");
+        hash_thread.join().expect("Hash thread panicked");
+        blsverifier_thread.join().expect("Pairing thread panicked");
+        permutation_query_thread
+            .join()
+            .expect("Permutation query thread panicked");
+        permutation_hash_thread
+            .join()
+            .expect("Permutation hash thread panicked");
+        validator_subtree_thread
+            .join()
+            .expect("Validator subtree thread panicked");
+        merkle_subtree_with_limit_thread
+            .join()
+            .expect("Merkle subtree with limit thread panicked");
+
+        let end_time = std::time::Instant::now();
+        log::debug!(
+            "generate end2end end witness, time: {:?}",
+            end_time.duration_since(start_time)
+        );
+
+
+        
+    } else if stage == "start" {
+        log::debug!("start stage");
+        let start_time = std::time::Instant::now();
+        //get the solver for shuffle
+        let circuit_name = &format!("shuffle_{}", shuffle::VALIDATOR_CHUNK_SIZE);
+        let circuit = ShuffleCircuit::default();
+        let witnesses_dir = &format!("./witnesses/{}", circuit_name);
+        let solver_shuffle = get_solver(witnesses_dir, circuit_name, circuit);
+
+        //get the solver for bls verifier
+        let circuit_name = "blsverifier";
+        let circuit = BLSVERIFIERCircuit::default();
+        let witnesses_dir = &format!("./witnesses/{}", circuit_name);
+        let solver_blsverifier = get_solver(witnesses_dir, circuit_name, circuit);
+
+        let (shuffle_assignments, bls_verifier_assignments) = end2end_start_assignments(epoch);
+
+        let shuffle_thread = thread::spawn(move || {
+            end2end_shuffle_witnesses_with_assignments(
+                solver_shuffle,
+                shuffle_assignments,
+            );
+        });
+
+        let blsverifier_thread = thread::spawn(move || {
+            end2end_blsverifier_witnesses_with_assignments(
+                solver_blsverifier,
+                bls_verifier_assignments,
+            );
+        });
+
+        shuffle_thread
+            .join()
+            .expect("ShufflePairing thread panicked");
+        blsverifier_thread.join().expect("Pairing thread panicked");
+        let end_time = std::time::Instant::now();
+        log::debug!(
+            "generate end2end start witness, time: {:?}",
+            end_time.duration_since(start_time)
+        );
+
+    }
+}
+
 #[test]
 fn test_end2end_end_assignments(){
     let epoch = 290000;

@@ -393,28 +393,15 @@ pub fn end2end_blsverifier_witness(
 }
 
 
-pub fn end2end_blsverifier_witness_with_beacon_data(
+pub fn end2end_blsverifier_witnesses_with_assignments(
     w_s: WitnessSolver<M31Config>,
-    aggregated_pubkeys: Vec<BlsG1Affine>,
-    attestations: Vec<Attestation>,
+    assignment_chunks: Vec<Vec<BLSVERIFIERCircuit<M31>>>,
 ) {
     let circuit_name = "pairing_3checks";
 
     let witnesses_dir = format!("./witnesses/{}", circuit_name);
-    ensure_directory_exists(&witnesses_dir);
 
-    //get assignments
     let start_time = std::time::Instant::now();
-    let assignments =
-        BLSVERIFIERCircuit::<M31>::get_assignments_from_beacon_data(aggregated_pubkeys, attestations);
-    let end_time = std::time::Instant::now();
-    log::debug!(
-        "assigned assignments time: {:?}",
-        end_time.duration_since(start_time)
-    );
-    let assignment_chunks: Vec<Vec<BLSVERIFIERCircuit<M31>>> =
-        assignments.chunks(16).map(|x| x.to_vec()).collect();
-
     //generate witnesses (multi-thread)
     log::debug!("Start generating  {} witnesses...", circuit_name);
     let witness_solver = Arc::new(w_s);

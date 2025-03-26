@@ -235,28 +235,14 @@ pub fn end2end_hashtable_witnesses(
     );
 }
 
-pub fn end2end_hashtable_witnesses_with_beacon_data(
+pub fn end2end_hashtable_witnesses_with_assignments(
     w_s: WitnessSolver<M31Config>,
-    seed: &[u8],
-    hash_bytes: Vec<[u8; 32]>,
+    assignment_chunks: Vec<Vec<HASHTABLECircuit<M31>>>,
 ) {
     let circuit_name = &format!("hashtable{}", HASHTABLESIZE);
 
     let witnesses_dir = format!("./witnesses/{}", circuit_name);
-    ensure_directory_exists(&witnesses_dir);
-
-    let subcircuit_count = hash_bytes.len() / HASHTABLESIZE;
-    //get assignments
     let start_time = std::time::Instant::now();
-    let assignments = HASHTABLECircuit::get_assignments_from_beacon_data(seed, &hash_bytes, subcircuit_count);
-    let end_time = std::time::Instant::now();
-    log::debug!(
-        "assigned assignments time: {:?}",
-        end_time.duration_since(start_time)
-    );
-    let assignment_chunks: Vec<Vec<HASHTABLECircuit<M31>>> =
-        assignments.chunks(16).map(|x| x.to_vec()).collect();
-
     //generate witnesses (multi-thread)
     log::debug!("Start generating witnesses...");
     let witness_solver = Arc::new(w_s);
