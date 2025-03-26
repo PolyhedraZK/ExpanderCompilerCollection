@@ -74,3 +74,15 @@ impl Config for GF2Config {
 
     const ENABLE_RANDOM_COMBINATION: bool = false;
 }
+
+#[derive(Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub struct GoldilocksConfig {}
+
+impl Config for GoldilocksConfig {
+    type CircuitField = crate::field::Goldilocks;
+
+    type DefaultSimdField = goldilocks::Goldilocksx8;
+    type DefaultGKRFieldConfig = gkr_field_config::GoldilocksExtConfig;
+    type DefaultGKRConfig = gkr::gkr_configs::GoldilocksExtConfigSha2Raw;
+    const CONFIG_ID: usize = 4;
+}
