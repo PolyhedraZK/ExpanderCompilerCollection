@@ -20,6 +20,7 @@ use std::thread;
 use rayon::prelude::*;
 
 use crate::attestation::{Attestation, CheckpointPlain};
+use crate::merkle;
 use crate::merkle::{merkle_tree_element_with_limit, merkleize_with_mixin_poseidon};
 use crate::validator::ValidatorPlain;
 use circuit_std_rs::poseidon::poseidon::*;
@@ -37,8 +38,8 @@ const DOMAIN_BEACON_ATTESTER: &str = "01000000";
 pub const SLOTSPEREPOCH: u64 = 32;
 pub const SHUFFLEROUND: usize = 90;
 pub const MAXCOMMITTEESPERSLOT: usize = 64;
-const MAXBEACONVALIDATORDEPTH: usize = 40;
-const MAXBEACONVALIDATORSIZE: usize = 1 << MAXBEACONVALIDATORDEPTH;
+pub const MAXBEACONVALIDATORDEPTH: usize = merkle::MAX_BEACON_VALIDATOR_DEPTH;
+pub const MAXBEACONVALIDATORSIZE: usize = 1 << MAXBEACONVALIDATORDEPTH;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct BeaconCommitteeJson {
@@ -510,7 +511,6 @@ pub fn prepare_assignment_data(
     Vec<u64>,
     Vec<Vec<u64>>,
     Vec<Vec<u64>>,
-    Vec<Vec<u64>>,
     Vec<Vec<u8>>,
     Vec<Vec<u8>>,
     Vec<Vec<Attestation>>,
@@ -519,6 +519,7 @@ pub fn prepare_assignment_data(
     Vec<u64>,
     Vec<Vec<Vec<u32>>>,
     Vec<[u8; 32]>,
+    Vec<ValidatorPlain>,
 ) {
     let epoch = start / SLOTSPEREPOCH;
     let seed = get_beacon_seed(epoch).unwrap();
@@ -619,7 +620,6 @@ pub fn prepare_assignment_data(
         committee_indices,
         pivots,
         activated_indices,
-        shuffle_round_indices,
         flips,
         positions,
         flip_bits,
@@ -630,6 +630,7 @@ pub fn prepare_assignment_data(
         real_committee_size,
         validator_tree,
         hash_bytes,
+        validator_list,
     )
 }
 pub fn calculate_and_save_validator_tree(
@@ -727,6 +728,6 @@ fn test_load_attestations_and_bytes() {
 fn test_prepare_assignment_data() {
     let epoch = 290000;
     let slot = epoch * SLOTSPEREPOCH;
-    let (seed, shuffle_indices, committee_indices, pivots, activated_indices, shuffle_round_indices, flips, positions, flip_bits, round_hash_bits, attestations, aggregated_pubkeys, balance_list, real_committee_size, validator_tree, hash_bytes) = prepare_assignment_data(slot, slot + 32);
+    let (seed, shuffle_indices, committee_indices, pivots, activated_indices, flips, positions, flip_bits, round_hash_bits, attestations, aggregated_pubkeys, balance_list, real_committee_size, validator_tree, hash_bytes, plain_validators) = prepare_assignment_data(slot, slot + 32);
     println!("aggregated_pubkeys: {:?}", aggregated_pubkeys);
 }

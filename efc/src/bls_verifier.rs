@@ -1,5 +1,5 @@
 use crate::attestation::{Attestation, AttestationDataSSZ};
-use crate::bls;
+use crate::{beacon, bls};
 use crate::utils::convert_limbs;
 use crate::utils::ensure_directory_exists;
 use crate::utils::read_from_json_file;
@@ -447,4 +447,31 @@ pub fn end2end_blsverifier_witness_with_beacon_data(
         circuit_name,
         end_time.duration_since(start_time)
     );
+}
+
+
+pub fn end2end_blsverifier_assignments_with_beacon_data(
+    aggregated_pubkeys: Vec<BlsG1Affine>,
+    attestations: Vec<Attestation>,
+) -> Vec<Vec<BLSVERIFIERCircuit<M31>>> {
+    //get assignments
+    let start_time = std::time::Instant::now();
+    let assignments =
+        BLSVERIFIERCircuit::<M31>::get_assignments_from_beacon_data(aggregated_pubkeys, attestations);
+    let end_time = std::time::Instant::now();
+    log::debug!(
+        "assigned assignments time: {:?}",
+        end_time.duration_since(start_time)
+    );
+    let assignment_chunks: Vec<Vec<BLSVERIFIERCircuit<M31>>> =
+        assignments.chunks(16).map(|x| x.to_vec()).collect();
+    assignment_chunks
+}
+
+
+#[test]
+fn test_end2end_blsverifier_assignments(){
+    let slot = 290000*32;
+    let (seed, shuffle_indices, committee_indices, pivots, activated_indices, flips, positions, flip_bits, round_hash_bits, attestations, aggregated_pubkeys, balance_list, real_committee_size, validator_tree, hash_bytes, plain_validators) = beacon::prepare_assignment_data(slot, slot + 32);
+    let assignments = end2end_blsverifier_assignments_with_beacon_data(aggregated_pubkeys, attestations.into_iter().flatten().collect());
 }

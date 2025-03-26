@@ -956,3 +956,70 @@ pub fn end2end_shuffle_witnesses_with_beacon_data(
         );
     });
 }
+
+
+pub fn end2end_shuffle_assignments_with_beacon_data(
+    plain_validators: Vec<ValidatorPlain>,
+    real_committee_size: Vec<u64>, 
+    shuffle_indices: Vec<u64>,
+    committee_indices: Vec<u64>,
+    slot_attestations: Vec<Vec<Attestation>>,
+    aggregated_pubkeys: Vec<BlsG1Affine>,
+    pivots: Vec<u64>,
+    flips: Vec<Vec<u64>>,
+    positions: Vec<Vec<u64>>,
+    flip_bits: Vec<Vec<u8>>,
+    validator_hashes: Vec<Vec<u32>>,
+    balance_list: Vec<u64>,
+    start: usize,
+    end: usize,
+) -> Vec<Vec<ShuffleCircuit<M31>>> {
+    //get assignments
+    let start_time = std::time::Instant::now();
+    let assignments = ShuffleCircuit::get_assignments_from_beacon_data(
+        plain_validators,
+        real_committee_size,
+        shuffle_indices,
+        committee_indices,
+        slot_attestations,
+        aggregated_pubkeys,
+        pivots,
+        flips,
+        positions,
+        flip_bits,
+        validator_hashes,
+        balance_list,
+        start,
+        end,
+    );
+    let end_time = std::time::Instant::now();
+    log::debug!(
+        "assigned assignments time: {:?}",
+        end_time.duration_since(start_time)
+    );
+    let assignment_chunks: Vec<Vec<ShuffleCircuit<M31>>> =
+        assignments.chunks(16).map(|x| x.to_vec()).collect();
+    assignment_chunks
+}
+
+#[test]
+fn test_end2end_shuffle_assignments(){
+    let slot = 290000*32;
+    let (seed, shuffle_indices, committee_indices, pivots, activated_indices,  flips, positions, flip_bits, round_hash_bits, attestations, aggregated_pubkeys, balance_list, real_committee_size, validator_tree, hash_bytes, plain_validators) = beacon::prepare_assignment_data(slot, slot + 32);
+    let assignments = end2end_shuffle_assignments_with_beacon_data(
+        plain_validators,
+        real_committee_size, 
+        shuffle_indices,
+        committee_indices,
+        attestations,
+        aggregated_pubkeys,
+        pivots,
+        flips,
+        positions,
+        flip_bits,
+        validator_tree[validator_tree.len()-1].clone(),
+        balance_list,
+        0,
+        16,
+    );
+}

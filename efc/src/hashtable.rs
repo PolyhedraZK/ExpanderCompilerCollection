@@ -289,3 +289,30 @@ pub fn end2end_hashtable_witnesses_with_beacon_data(
         end_time.duration_since(start_time)
     );
 }
+
+pub fn end2end_hashtable_assignments_with_beacon_data(
+    seed: &[u8],
+    hash_bytes: Vec<[u8; 32]>,
+) -> Vec<Vec<HASHTABLECircuit<M31>>> {
+    let subcircuit_count = hash_bytes.len() / HASHTABLESIZE;
+    //get assignments
+    let start_time = std::time::Instant::now();
+    let assignments = HASHTABLECircuit::get_assignments_from_beacon_data(seed, &hash_bytes, subcircuit_count);
+    let end_time = std::time::Instant::now();
+    log::debug!(
+        "assigned assignments time: {:?}",
+        end_time.duration_since(start_time)
+    );
+    let assignment_chunks: Vec<Vec<HASHTABLECircuit<M31>>> =
+        assignments.chunks(16).map(|x| x.to_vec()).collect();
+    assignment_chunks
+}
+
+
+
+#[test]
+fn test_end2end_hashtable_assignments(){
+    let slot = 290000*32;
+    let (seed, shuffle_indices, committee_indices, pivots, activated_indices, flips, positions, flip_bits, round_hash_bits, attestations, aggregated_pubkeys, balance_list, real_committee_size, validator_tree, hash_bytes, plain_validators) = beacon::prepare_assignment_data(slot, slot + 32);
+    let assignments = end2end_hashtable_assignments_with_beacon_data(&seed, hash_bytes);
+}
