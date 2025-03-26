@@ -549,7 +549,10 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
         }
     }
 
-    pub fn proving_system_setup(&self, computation_graph: &ComputationGraph<C>) -> (P::ProverSetup, P::VerifierSetup) {
+    pub fn proving_system_setup(
+        &self,
+        computation_graph: &ComputationGraph<C>,
+    ) -> (P::ProverSetup, P::VerifierSetup) {
         P::setup(computation_graph)
     }
 
@@ -594,7 +597,11 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
 }
 
 impl<C: Config> ComputationGraph<C> {
-    pub fn verify<P: ProvingSystem<C>>(&self, combined_proof: &CombinedProof<C, P>, verifier_setup: &P::VerifierSetup) -> bool {
+    pub fn verify<P: ProvingSystem<C>>(
+        &self,
+        combined_proof: &CombinedProof<C, P>,
+        verifier_setup: &P::VerifierSetup,
+    ) -> bool {
         for (commitment, len) in combined_proof
             .commitments
             .iter()

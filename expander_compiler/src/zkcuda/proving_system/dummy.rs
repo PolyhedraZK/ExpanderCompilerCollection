@@ -36,10 +36,15 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
     type Commitment = DummyCommitment<C>;
     type CommitmentExtraInfo = ();
 
-    fn setup(computation_graph: &crate::zkcuda::proof::ComputationGraph<C>) -> (Self::ProverSetup, Self::VerifierSetup) {
+    fn setup(
+        computation_graph: &crate::zkcuda::proof::ComputationGraph<C>,
+    ) -> (Self::ProverSetup, Self::VerifierSetup) {
         // let _ = computation_graph;
-        computation_graph.commitments_lens.iter().for_each(|&x| println!("Setup length {}", x));
-        
+        computation_graph
+            .commitments_lens
+            .iter()
+            .for_each(|&x| println!("Setup length {}", x));
+
         ((), ())
     }
 
