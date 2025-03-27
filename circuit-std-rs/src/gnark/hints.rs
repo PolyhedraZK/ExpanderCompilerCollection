@@ -1,18 +1,25 @@
-use crate::gnark::limbs::*;
-use crate::gnark::utils::*;
+use std::str::FromStr;
+
+use arith::Field as ArithField;
 use ark_bls12_381::Fq;
 use ark_bls12_381::Fq12;
 use ark_bls12_381::Fq2;
 use ark_bls12_381::Fq6;
 use ark_ff::fields::Field;
 use ark_ff::Zero;
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{Error, M31};
 use num_bigint::BigInt;
 use num_bigint::BigUint;
 use num_traits::One;
 use num_traits::Signed;
 use num_traits::ToPrimitive;
-use std::str::FromStr;
+
+use crate::gnark::limbs::{
+    bigint_to_m31, decompose, m31_to_bigint, m31_to_bigint_array, recompose,
+};
+use crate::gnark::utils::{
+    fq2_has_sqrt, fq_has_sqrt, get_fq2_sign, get_fq_sign, nb_multiplication_res_limbs,
+};
 
 pub fn mul_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     let nb_bits = inputs[0].to_u256().as_usize();

@@ -2,7 +2,7 @@ use crate::compile::{
     compile_step_1, compile_step_2, compile_step_3, compile_step_4, print_ir_stats,
     print_layered_circuit_stats,
 };
-use crate::frontend::*;
+use crate::frontend::{extra, BasicAPI, CompileOptions, Error, RootAPI, Variable, API};
 use crate::{
     circuit::{
         config::Config,
@@ -11,9 +11,11 @@ use crate::{
         layered::{Circuit as LayeredCircuit, NormalInputType},
     },
     field::FieldArith,
-    utils::{misc::next_power_of_two, serde::Serde},
+    utils::misc::next_power_of_two,
 };
 pub use macros::kernel;
+
+use serdes::{ExpSerde, SerdeResult};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Kernel<C: Config> {
@@ -25,8 +27,10 @@ pub struct Kernel<C: Config> {
     pub layered_circuit_input: Vec<LayeredCircuitInputVec>,
 }
 
-impl<C: Config> Serde for Kernel<C> {
-    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> Result<(), std::io::Error> {
+impl<C: Config> ExpSerde for Kernel<C> {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+
+    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> SerdeResult<()> {
         self.witness_solver.serialize_into(&mut writer)?;
         self.layered_circuit.serialize_into(&mut writer)?;
         self.io_shapes.serialize_into(&mut writer)?;
@@ -34,7 +38,7 @@ impl<C: Config> Serde for Kernel<C> {
         self.witness_solver_hint_input.serialize_into(&mut writer)?;
         self.layered_circuit_input.serialize_into(&mut writer)
     }
-    fn deserialize_from<R: std::io::Read>(mut reader: R) -> Result<Self, std::io::Error> {
+    fn deserialize_from<R: std::io::Read>(mut reader: R) -> SerdeResult<Self> {
         let witness_solver = ir::hint_normalized::RootCircuit::<C>::deserialize_from(&mut reader)?;
         let layered_circuit = LayeredCircuit::<C, NormalInputType>::deserialize_from(&mut reader)?;
         let io_shapes = Vec::<Shape>::deserialize_from(&mut reader)?;
@@ -73,13 +77,15 @@ pub struct WitnessSolverIOVec {
     pub output_offset: Option<usize>,
 }
 
-impl Serde for WitnessSolverIOVec {
-    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> Result<(), std::io::Error> {
+impl ExpSerde for WitnessSolverIOVec {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+
+    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> SerdeResult<()> {
         self.len.serialize_into(&mut writer)?;
         self.input_offset.serialize_into(&mut writer)?;
         self.output_offset.serialize_into(&mut writer)
     }
-    fn deserialize_from<R: std::io::Read>(mut reader: R) -> Result<Self, std::io::Error> {
+    fn deserialize_from<R: std::io::Read>(mut reader: R) -> SerdeResult<Self> {
         let len = usize::deserialize_from(&mut reader)?;
         let input_offset = Option::<usize>::deserialize_from(&mut reader)?;
         let output_offset = Option::<usize>::deserialize_from(&mut reader)?;
@@ -97,12 +103,14 @@ pub struct LayeredCircuitInputVec {
     pub offset: usize,
 }
 
-impl Serde for LayeredCircuitInputVec {
-    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> Result<(), std::io::Error> {
+impl ExpSerde for LayeredCircuitInputVec {
+    const SERIALIZED_SIZE: usize = <usize as ExpSerde>::SERIALIZED_SIZE * 2;
+
+    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> SerdeResult<()> {
         self.len.serialize_into(&mut writer)?;
         self.offset.serialize_into(&mut writer)
     }
-    fn deserialize_from<R: std::io::Read>(mut reader: R) -> Result<Self, std::io::Error> {
+    fn deserialize_from<R: std::io::Read>(mut reader: R) -> SerdeResult<Self> {
         let len = usize::deserialize_from(&mut reader)?;
         let offset = usize::deserialize_from(&mut reader)?;
         Ok(Self { len, offset })
@@ -372,6 +380,7 @@ fn reorder_ir_inputs<C: Config>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::frontend::M31Config;
 
     fn example_kernel_1<C: Config>(api: &mut API<C>, a: &mut Vec<Vec<Variable>>) {
         let x = a[1][1];

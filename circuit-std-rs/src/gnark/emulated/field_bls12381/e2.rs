@@ -1,12 +1,12 @@
-use crate::gnark::element::*;
-use crate::gnark::emparam::*;
+use crate::gnark::element::{value_of, Element};
+use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::field::GField;
 use expander_compiler::frontend::{Config, RootAPI, Variable};
 use num_bigint::BigInt;
 use std::collections::HashMap;
 
 pub type CurveF = GField<Bls12381Fp>;
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct GE2 {
     pub a0: Element<Bls12381Fp>,
     pub a1: Element<Bls12381Fp>,

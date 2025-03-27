@@ -1,11 +1,12 @@
 use crate::gnark::emparam::FieldParams;
-use crate::gnark::limbs::*;
-use expander_compiler::frontend::*;
+use crate::gnark::limbs::decompose;
+use expander_compiler::frontend::{Config, RootAPI, Variable};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use std::any::Any;
 use std::cmp::Ordering;
-//#[derive(Default, Clone)]
+
+#[derive(Debug)]
 pub struct Element<T: FieldParams> {
     pub limbs: Vec<Variable>,
     pub overflow: u32,

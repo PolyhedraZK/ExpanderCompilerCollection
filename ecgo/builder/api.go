@@ -201,8 +201,6 @@ func (builder *builder) ToBinary(i1 frontend.Variable, n ...int) []frontend.Vari
 		if nbBits < 0 {
 			panic("invalid n")
 		}
-	} else {
-		panic("only one argument is supported")
 	}
 
 	return bits.ToBinary(builder, i1, bits.WithNbDigits(nbBits))

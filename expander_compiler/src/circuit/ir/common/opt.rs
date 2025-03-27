@@ -3,7 +3,10 @@ use crate::{
     utils::{bucket_sort::bucket_sort, static_hash_map::StaticHashMap},
 };
 
-use super::*;
+use super::{
+    Circuit, Config, Constraint, Debug, FieldArith, Hash, HashMap, HashSet, Instruction, IrConfig,
+    RootCircuit,
+};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 struct Element {

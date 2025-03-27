@@ -1,7 +1,7 @@
 use expander_compiler::frontend::*;
-use expander_compiler::utils::serde::Serde;
 use expander_compiler::zkcuda::proving_system::ExpanderGKRProvingSystem;
 use expander_compiler::zkcuda::{context::*, kernel::*};
+use serdes::ExpSerde;
 
 fn add_2<C: Config>(api: &mut API<C>, inputs: &mut Vec<Vec<Variable>>) {
     let a = inputs[0][0];
@@ -56,21 +56,22 @@ fn zkcuda_1_expander() {
     let mut ctx: Context<M31Config> = Context::default();
     let mut a = vec![];
     for i in 0..32 {
-        a.push(M31::from(i + 1 as u32));
+        a.push(M31::from(i + 1_u32));
     }
     let a = ctx.copy_raw_to_device(&a);
     let mut io = vec![a, None];
-    ctx.call_kernel_raw(&kernel_add_2, &mut io, 16, &vec![false, false]);
+    ctx.call_kernel_raw(&kernel_add_2, &mut io, 16, &[false, false]);
     let b = io[1].clone();
     let mut io = vec![b, None];
-    ctx.call_kernel_raw(&kernel_add_16, &mut io, 1, &vec![false, false]);
+    ctx.call_kernel_raw(&kernel_add_16, &mut io, 1, &[false, false]);
     let c = io[1].clone();
     let result = ctx.copy_raw_to_host(c);
     assert_eq!(result, vec![M31::from(32 * 33 / 2)]);
 
     let computation_graph = ctx.to_computation_graph();
-    let proof = ctx.to_proof();
-    assert!(computation_graph.verify(&proof));
+    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
+    let proof = ctx.to_proof(&prover_setup);
+    assert!(computation_graph.verify(&proof, &verifier_setup));
 }
 
 #[kernel]
@@ -113,8 +114,9 @@ fn zkcuda_2() {
     assert_eq!(result, M31::from(32 * 33 / 2));
 
     let computation_graph = ctx.to_computation_graph();
-    let proof = ctx.to_proof();
-    assert!(computation_graph.verify(&proof));
+    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
+    let proof = ctx.to_proof(&prover_setup);
+    assert!(computation_graph.verify(&proof, &verifier_setup));
 }
 
 #[test]
@@ -153,8 +155,9 @@ fn zkcuda_2_simd() {
     }
 
     let computation_graph = ctx.to_computation_graph();
-    let proof = ctx.to_proof();
-    assert!(computation_graph.verify(&proof));
+    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
+    let proof = ctx.to_proof(&prover_setup);
+    assert!(computation_graph.verify(&proof, &verifier_setup));
 }
 
 fn to_binary<C: Config>(api: &mut API<C>, x: Variable, n_bits: usize) -> Vec<Variable> {
@@ -208,8 +211,9 @@ fn zkcuda_to_binary() {
     );
 
     let computation_graph = ctx.to_computation_graph();
-    let proof = ctx.to_proof();
-    assert!(computation_graph.verify(&proof));
+    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
+    let proof = ctx.to_proof(&prover_setup);
+    assert!(computation_graph.verify(&proof, &verifier_setup));
 }
 
 #[kernel]
@@ -227,8 +231,9 @@ fn zkcuda_assertion() {
     call_kernel!(ctx, kernel_tmp, a, b);
 
     let computation_graph = ctx.to_computation_graph();
-    let proof = ctx.to_proof();
-    assert!(computation_graph.verify(&proof));
+    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
+    let proof = ctx.to_proof(&prover_setup);
+    assert!(computation_graph.verify(&proof, &verifier_setup));
 }
 
 #[test]
@@ -242,6 +247,7 @@ fn zkcuda_assertion_fail() {
     call_kernel!(ctx, kernel_tmp, a, b);
 
     let computation_graph = ctx.to_computation_graph();
-    let proof = ctx.to_proof();
-    assert!(computation_graph.verify(&proof));
+    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
+    let proof = ctx.to_proof(&prover_setup);
+    assert!(computation_graph.verify(&proof, &verifier_setup));
 }

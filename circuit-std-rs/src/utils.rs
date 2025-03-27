@@ -1,6 +1,15 @@
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{Config, HintRegistry, RootAPI, Variable, M31};
 
-use crate::{gnark::hints::*, logup::*, sha256::m31_utils::to_binary_hint};
+use crate::{
+    gnark::hints::{
+        copy_e12_hint, copy_e2_hint, copy_element_hint, copy_vars_hint, div_e12_hint, div_e2_hint,
+        div_e6_by_6_hint, div_e6_hint, div_hint, final_exp_hint, get_e2_sqrt_hint,
+        get_element_sqrt_hint, get_sqrt_x0x1_fq2_new_hint, get_sqrt_x0x1_fq_new_hint, inv_hint,
+        inverse_e12_hint, inverse_e2_hint, inverse_e6_hint, mul_hint, simple_rangecheck_hint,
+    },
+    logup::{query_count_by_key_hint, query_count_hint, rangeproof_hint},
+    sha256::m31_utils::to_binary_hint,
+};
 
 pub fn simple_select<C: Config, B: RootAPI<C>>(
     native: &mut B,

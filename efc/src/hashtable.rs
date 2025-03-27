@@ -1,14 +1,20 @@
-use crate::utils::{ensure_directory_exists, read_from_json_file};
+use std::sync::Arc;
+use std::thread;
+
 use ark_std::primitive::u8;
 use circuit_std_rs::sha256::m31::check_sha256_37bytes;
 use circuit_std_rs::sha256::m31_utils::big_array_add;
 use circuit_std_rs::utils::register_hint;
 use expander_compiler::circuit::ir::hint_normalized::witness_solver;
-use expander_compiler::frontend::extra::*;
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::extra::HintRegistry;
+use expander_compiler::frontend::{
+    compile, declare_circuit, CompileOptions, CompileResult, Define, M31Config, RootAPI, Variable,
+    M31,
+};
 use serde::Deserialize;
-use std::sync::Arc;
-use std::thread;
+use serdes::ExpSerde;
+
+use crate::utils::{ensure_directory_exists, read_from_json_file};
 
 pub const SHA256LEN: usize = 32;
 pub const HASHTABLESIZE: usize = 32;

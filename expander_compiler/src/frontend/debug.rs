@@ -20,6 +20,7 @@ use super::{
 
 pub struct DebugBuilder<C: Config, H: HintCaller<C::CircuitField>> {
     values: Vec<C::CircuitField>,
+    outputs: Vec<Variable>,
     hint_caller: H,
 }
 
@@ -412,6 +413,10 @@ impl<C: Config, H: HintCaller<C::CircuitField>> RootAPI<C> for DebugBuilder<C, H
         let inputs = inputs.to_vec();
         f(self, &inputs)
     }
+    fn set_outputs(&mut self, outputs: Vec<Variable>) {
+        ensure_variables_valid(&outputs);
+        self.outputs = outputs;
+    }
 }
 
 impl<C: Config, H: HintCaller<C::CircuitField>> DebugBuilder<C, H> {
@@ -423,6 +428,7 @@ impl<C: Config, H: HintCaller<C::CircuitField>> DebugBuilder<C, H> {
         let mut builder = DebugBuilder {
             values: vec![C::CircuitField::zero()],
             hint_caller,
+            outputs: vec![],
         };
         let vars = (1..=inputs.len()).map(new_variable).collect();
         let public_vars = (inputs.len() + 1..=inputs.len() + public_inputs.len())
@@ -464,5 +470,12 @@ impl<C: Config, H: HintCaller<C::CircuitField>> DebugBuilder<C, H> {
             EvalResult::Value(v) => self.return_as_variable(v),
             EvalResult::Values(_) => unreachable!(),
         }
+    }
+
+    pub fn get_outputs(&self) -> Vec<C::CircuitField> {
+        self.outputs
+            .iter()
+            .map(|v| self.values[get_variable_id(*v)])
+            .collect()
     }
 }

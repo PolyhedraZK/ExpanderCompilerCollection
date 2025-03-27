@@ -5,8 +5,8 @@ edition = "2021"
 
 
 [dependencies]
+arith.workspace = true
 ark-std.workspace = true
-rand.workspace = true
 chrono.workspace = true
 clap.workspace = true
 ethnum.workspace = true
@@ -18,7 +18,6 @@ expander_config.workspace = true
 expander_circuit.workspace = true
 expander_transcript.workspace = true
 gkr.workspace = true
-arith.workspace = true
 gf2.workspace = true
 mersenne31.workspace = true
 macros = {path = "./macros" }
@@ -26,6 +25,8 @@ crosslayer_prototype.workspace = true
 poly_commit.workspace = true
 polynomials.workspace = true
 sumcheck.workspace = true
+rand.workspace = true
+serdes.workspace = true
 
 [dev-dependencies]
 rayon = "1.9"

@@ -4,6 +4,5 @@ pub mod function_id;
 pub mod heap;
 pub mod misc;
 pub mod pool;
-pub mod serde;
 pub mod static_hash_map;
 pub mod union_find;
