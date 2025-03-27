@@ -1,6 +1,7 @@
 pub use arith::{Field as FieldArith, Fr as BN254Fr};
 pub use gf2::GF2;
 pub use goldilocks::Goldilocks;
+pub use goldilocks::Goldilocksx8;
 pub use mersenne31::M31;
 use serdes::ExpSerde;
 
