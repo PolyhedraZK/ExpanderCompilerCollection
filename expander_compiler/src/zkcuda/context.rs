@@ -560,15 +560,15 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
         let commitments = self
             .device_memories
             .iter()
-            .map(|x| P::commit(&prover_setup, &x.values))
+            .map(|x| P::commit(prover_setup, &x.values))
             .collect::<Vec<_>>();
         let proofs = self
             .proof_templates
             .iter()
             .map(|template| {
                 P::prove(
-                    &prover_setup,
-                    &self.kernels.get(template.kernel_id),
+                    prover_setup,
+                    self.kernels.get(template.kernel_id),
                     &template
                         .commitment_indices
                         .iter()
@@ -617,7 +617,7 @@ impl<C: Config> ComputationGraph<C> {
             .zip(self.proof_templates.iter())
         {
             if !P::verify(
-                &verifier_setup,
+                verifier_setup,
                 &self.kernels[template.kernel_id],
                 proof,
                 &template

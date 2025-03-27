@@ -74,6 +74,7 @@ impl<C: Config> Clone for ExpanderGKRCommitmentExtraInfo<C> {
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub struct ExpanderGKRProverSetup<C: Config>
 {
     p_keys: HashMap<usize, <<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::SRS as StructuredReferenceString>::PKey>,
@@ -87,6 +88,7 @@ impl<C: Config> Clone for ExpanderGKRProverSetup<C> {
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub struct ExpanderGKRVerifierSetup<C: Config>
 {
     v_keys: HashMap<usize, <<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::SRS as StructuredReferenceString>::VKey>,
@@ -280,7 +282,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
             verified &= verify_input_claim(
                 &mut cursor,
                 kernel,
-                &verifier_setup,
+                verifier_setup,
                 &rz0,
                 &r_simd,
                 &claimed_v0,
@@ -294,7 +296,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
                 verified &= verify_input_claim(
                     &mut cursor,
                     kernel,
-                    &verifier_setup,
+                    verifier_setup,
                     &rz1,
                     &r_simd,
                     &claimed_v1.unwrap(),
@@ -315,6 +317,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn pcs_testing_setup_fixed_seed<
     FConfig: GKRFieldConfig,
     T: Transcript<FConfig::ChallengeField>,
@@ -345,6 +348,7 @@ fn max_n_vars<C: GKRFieldConfig>(circuit: &Circuit<C>) -> (usize, usize) {
     (max_num_input_var, max_num_output_var)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn prove_input_claim<C: Config>(
     kernel: &Kernel<C>,
     commitments_values: &[&[C::DefaultSimdField]],
@@ -392,7 +396,7 @@ fn prove_input_claim<C: Config>(
             vals,
             &challenge_vars,
             x_simd,
-            &vec![],
+            &[],
         );
         transcript.append_field_element(&v);
 
@@ -400,7 +404,7 @@ fn prove_input_claim<C: Config>(
         let opening = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::open(
             &params,
             &MPIConfig::default(),
-            &p_key,
+            p_key,
             &poly,
             &ExpanderGKRChallenge::<C::DefaultGKRFieldConfig> {
                 x: challenge_vars.to_vec(),

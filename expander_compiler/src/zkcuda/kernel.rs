@@ -2,7 +2,7 @@ use crate::compile::{
     compile_step_1, compile_step_2, compile_step_3, compile_step_4, print_ir_stats,
     print_layered_circuit_stats,
 };
-use crate::frontend::*;
+use crate::frontend::{API, BasicAPI, CompileOptions, Error, RootAPI, Variable, extra};
 use crate::{
     circuit::{
         config::Config,

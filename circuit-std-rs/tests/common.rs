@@ -8,7 +8,7 @@ where
     Cfg: Config,
     Cir: StdCircuit<Cfg>,
 {
-    circuit_test_helper_with_hint::<Cfg, Cir>(params, &mut EmptyHintCaller::default());
+    circuit_test_helper_with_hint::<Cfg, Cir>(params, &mut EmptyHintCaller);
 }
 
 pub fn circuit_test_helper_with_hint<Cfg, Cir>(
