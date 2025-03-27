@@ -380,6 +380,7 @@ fn reorder_ir_inputs<C: Config>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::frontend::M31Config;
 
     fn example_kernel_1<C: Config>(api: &mut API<C>, a: &mut Vec<Vec<Variable>>) {
         let x = a[1][1];
