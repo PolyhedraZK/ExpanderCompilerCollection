@@ -222,20 +222,20 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
                 parallel_count,
                 &mut transcript,
             );
-            // if let Some(ry) = ry {
-            //     prove_input_claim(
-            //         kernel,
-            //         commitments_values,
-            //         prover_setup,
-            //         commitments_extra_info,
-            //         &ry,
-            //         &rsimd,
-            //         is_broadcast,
-            //         i,
-            //         parallel_count,
-            //         &mut transcript,
-            //     );
-            // }
+            if let Some(ry) = ry {
+                prove_input_claim(
+                    kernel,
+                    commitments_values,
+                    prover_setup,
+                    commitments_extra_info,
+                    &ry,
+                    &rsimd,
+                    is_broadcast,
+                    i,
+                    parallel_count,
+                    &mut transcript,
+                );
+            }
 
             proof.data.push(transcript.finalize_and_get_proof());
         }
@@ -271,13 +271,11 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
                 &mut transcript,
                 &mut cursor,
             );
-            
+
             if !verified {
                 println!("Failed to verify GKR proof for parallel index {}", i);
                 return false;
             }
-
-            println!("Cursor remaining bytes: {}", cursor.get_ref().len() - cursor.position() as usize);
 
             verified &= verify_input_claim(
                 &mut cursor,
@@ -292,21 +290,21 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
                 parallel_count,
                 &mut transcript,
             );
-            // if let Some(rz1) = rz1 {
-            //     verified &= verify_input_claim(
-            //         &mut cursor,
-            //         kernel,
-            //         &verifier_setup,
-            //         &rz1,
-            //         &r_simd,
-            //         &claimed_v1.unwrap(),
-            //         commitments,
-            //         is_broadcast,
-            //         i,
-            //         parallel_count,
-            //         &mut transcript,
-            //     );
-            // }
+            if let Some(rz1) = rz1 {
+                verified &= verify_input_claim(
+                    &mut cursor,
+                    kernel,
+                    &verifier_setup,
+                    &rz1,
+                    &r_simd,
+                    &claimed_v1.unwrap(),
+                    commitments,
+                    is_broadcast,
+                    i,
+                    parallel_count,
+                    &mut transcript,
+                );
+            }
 
             if !verified {
                 println!("Failed to verify overall pcs for parallel index {}", i);
@@ -381,11 +379,6 @@ fn prove_input_claim<C: Config>(
                 .collect::<Vec<_>>()
         };
         challenge_vars.extend_from_slice(&parallel_index_as_bits);
-        
-        if parallel_index == 0 {
-            println!("Proving challenge vars: {:?}, Simd vars: {:?}", challenge_vars, x_simd);
-            println!("commitment values len: {}, first value {:?}", commitment_val.len(), commitment_val[0]);
-        }
 
         let vals = commitment_val;
         let params = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::gen_params(
@@ -403,11 +396,6 @@ fn prove_input_claim<C: Config>(
         );
         transcript.append_field_element(&v);
 
-        if parallel_index == 0 {
-            println!("Prover encoded v: {:?}", v);
-            println!();
-        }
-
         transcript.lock_proof();
         let opening = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::open(
             &params,
@@ -421,7 +409,8 @@ fn prove_input_claim<C: Config>(
             },
             transcript,
             &extra_info.scratch,
-        ).unwrap();
+        )
+        .unwrap();
         transcript.unlock_proof();
 
         let mut buffer = vec![];
@@ -468,8 +457,6 @@ fn verify_input_claim<C: Config>(
                 .collect::<Vec<_>>()
         };
         challenge_vars.extend_from_slice(&parallel_index_as_bits);
-        println!("Verifying Parallel index: {}, challenge vars: {:?}", parallel_index, challenge_vars);
-        println!("commitment values len: {}", commitment.vals_len());
 
         let commitment_len = commitment.vals_len();
         let params = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::gen_params(
@@ -482,7 +469,6 @@ fn verify_input_claim<C: Config>(
                 .unwrap();
         transcript.append_field_element(&claim);
 
-        println!("Verifier Decoded Claim: {:?}", claim);
         let opening =
             <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::Opening::deserialize_from(
                 &mut proof_reader,
@@ -506,7 +492,10 @@ fn verify_input_claim<C: Config>(
         transcript.unlock_proof();
 
         if !verified {
-            println!("Failed to verify single pcs opening for parallel index {}", parallel_index);
+            println!(
+                "Failed to verify single pcs opening for parallel index {}",
+                parallel_index
+            );
             return false;
         }
 
