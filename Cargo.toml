@@ -41,6 +41,7 @@ expander_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "m
 expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "circuit" }
 gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "transcript" }
 crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "main"}

@@ -74,6 +74,11 @@ fn example_m31() {
 }
 
 #[test]
+fn example_goldilocks() {
+    example::<GoldilocksConfig>();
+}
+
+#[test]
 fn example_bn254() {
     example::<BN254Config>();
 }
