@@ -2,7 +2,9 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use circuit_std_rs::{
     poseidon::{
         poseidon::PoseidonParams, poseidon_m31::PoseidonM31Params, utils::POSEIDON_M31X16_RATE,
-    }, sha256, utils::simple_select
+    },
+    sha256,
+    utils::simple_select,
 };
 use expander_compiler::frontend::{Config, RootAPI, Variable};
 pub const MAX_BEACON_VALIDATOR_DEPTH: usize = 40;
@@ -237,9 +239,11 @@ pub fn verify_merkle_tree_path_var<C: Config, B: RootAPI<C>>(
         let mut combined = left.clone();
         combined.extend_from_slice(&right);
         let mut new_leaf;
-        if root.len() == 32 {   //sha256 merkletree
+        if root.len() == 32 {
+            //sha256 merkletree
             new_leaf = sha256::m31::sha256_var_bytes(builder, &combined);
-        } else if root.len() == params.rate {    //poseidon merkletree
+        } else if root.len() == params.rate {
+            //poseidon merkletree
             new_leaf = params.hash_to_state_flatten(builder, &combined)[..params.rate].to_vec();
         } else {
             panic!("Unsupported type of merkle tree");
@@ -284,9 +288,11 @@ pub fn calculate_merkle_tree_root_var<C: Config, B: RootAPI<C>>(
         combined.extend_from_slice(&right);
 
         let new_leaf;
-        if cur_leaf.len() == 32 {   //sha256 merkletree
+        if cur_leaf.len() == 32 {
+            //sha256 merkletree
             new_leaf = sha256::m31::sha256_var_bytes(builder, &combined);
-        } else if cur_leaf.len() == params.rate {    //poseidon merkletree
+        } else if cur_leaf.len() == params.rate {
+            //poseidon merkletree
             new_leaf = params.hash_to_state_flatten(builder, &combined)[..params.rate].to_vec();
         } else {
             panic!("Unsupported type of merkle tree");

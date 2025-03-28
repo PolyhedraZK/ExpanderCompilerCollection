@@ -147,24 +147,24 @@ impl ValidatorSSZ {
     }
 }
 declare_circuit!(UpdateValidatorTreeCircuit {
-    index: Variable,    //validator index
+    index: Variable, //validator index
     // old validator
-    old_pubkey: [Variable; 48], 
-    old_withdrawal_credentials: [Variable; 32], 
+    old_pubkey: [Variable; 48],
+    old_withdrawal_credentials: [Variable; 32],
     old_effective_balance: [Variable; 8], //all -1 if empty
     old_slashed: [Variable; 1],
-    old_activation_eligibility_epoch: [Variable; 8], 
+    old_activation_eligibility_epoch: [Variable; 8],
     old_activation_epoch: [Variable; 8],
-    old_exit_epoch: [Variable; 8], 
+    old_exit_epoch: [Variable; 8],
     old_withdrawable_epoch: [Variable; 8],
     // new validator
-    new_pubkey: [Variable; 48], 
-    new_withdrawal_credentials: [Variable; 32], 
-    new_effective_balance: [Variable; 8], 
+    new_pubkey: [Variable; 48],
+    new_withdrawal_credentials: [Variable; 32],
+    new_effective_balance: [Variable; 8],
     new_slashed: [Variable; 1],
-    new_activation_eligibility_epoch: [Variable; 8], 
+    new_activation_eligibility_epoch: [Variable; 8],
     new_activation_epoch: [Variable; 8],
-    new_exit_epoch: [Variable; 8], 
+    new_exit_epoch: [Variable; 8],
     new_withdrawable_epoch: [Variable; 8],
     //sha256 tree path, aunts, root hash
     sha256_path: [Variable; beacon::MAXBEACONVALIDATORDEPTH],
@@ -192,19 +192,20 @@ impl GenericDefine<M31Config> for UpdateValidatorTreeCircuit<Variable> {
         let zero_var = builder.constant(0);
         for i in 0..8 {
             if i < 3 {
-                validator_count_var = builder.add(&self.validator_count[i], &validator_count_var);
-                validator_count_var = builder.mul(&validator_count_var, 1<<8);
-                next_validator_count_var = builder.add(&self.next_validator_count[i], &next_validator_count_var);
-                next_validator_count_var = builder.mul(&next_validator_count_var, 1<<8);
+                validator_count_var = builder.add(self.validator_count[i], validator_count_var);
+                validator_count_var = builder.mul(validator_count_var, 1 << 8);
+                next_validator_count_var =
+                    builder.add(self.next_validator_count[i], next_validator_count_var);
+                next_validator_count_var = builder.mul(&next_validator_count_var, 1 << 8);
             } else {
                 //assume the validator count is less than 2^24
-                builder.assert_is_equal(&self.validator_count[i], zero_var);
-                builder.assert_is_equal(&self.next_validator_count[i], zero_var);
+                builder.assert_is_equal(self.validator_count[i], zero_var);
+                builder.assert_is_equal(self.next_validator_count[i], zero_var);
             }
         }
-        let validator_count_diff = builder.sub(&next_validator_count_var,&validator_count_var);
+        let validator_count_diff = builder.sub(next_validator_count_var, validator_count_var);
         builder.assert_is_bool(validator_count_diff);
-        let modified_validator_flag = builder.is_zero(validator_count_diff);    //if the index is equal to the validator count, then it is a new insert validator
+        let modified_validator_flag = builder.is_zero(validator_count_diff); //if the index is equal to the validator count, then it is a new insert validator
         let old_validator_ssz = ValidatorSSZ {
             public_key: self.old_pubkey,
             withdrawal_credentials: self.old_withdrawal_credentials,
@@ -228,13 +229,23 @@ impl GenericDefine<M31Config> for UpdateValidatorTreeCircuit<Variable> {
         let mut old_validator_sha256_hash = old_validator_ssz.sha256_hash(builder);
         //if this is a new "insert" validator, then set the old validator hash to all 0
         for i in 0..32 {
-            old_validator_sha256_hash[i] = simple_select(builder, modified_validator_flag, old_validator_sha256_hash[i], zero_var);
+            old_validator_sha256_hash[i] = simple_select(
+                builder,
+                modified_validator_flag,
+                old_validator_sha256_hash[i],
+                zero_var,
+            );
         }
         let new_validator_sha256_hash = new_validator_ssz.sha256_hash(builder);
         let mut old_validator_poseidon_hash = old_validator_ssz.poseidon_hash(builder);
         //if this is a new "insert" validator, then set the old validator hash to all 0
         for i in 0..POSEIDON_M31X16_RATE {
-            old_validator_poseidon_hash[i] = simple_select(builder, modified_validator_flag, old_validator_poseidon_hash[i], zero_var);
+            old_validator_poseidon_hash[i] = simple_select(
+                builder,
+                modified_validator_flag,
+                old_validator_poseidon_hash[i],
+                zero_var,
+            );
         }
         let new_validator_poseidon_hash = new_validator_ssz.poseidon_hash(builder);
         let params = PoseidonM31Params::new(
@@ -246,10 +257,8 @@ impl GenericDefine<M31Config> for UpdateValidatorTreeCircuit<Variable> {
         );
 
         //############ SHA256 ############
-        let aunts_vec: Vec<Vec<Variable>> = self.sha256_aunts
-                .iter()
-                .map(|arr| arr.to_vec())
-                .collect();
+        let aunts_vec: Vec<Vec<Variable>> =
+            self.sha256_aunts.iter().map(|arr| arr.to_vec()).collect();
         //make sure the old one is correct
         merkle::verify_merkle_tree_path_var(
             builder,
@@ -264,9 +273,9 @@ impl GenericDefine<M31Config> for UpdateValidatorTreeCircuit<Variable> {
         let mut mixin_input = self.sha256_root_hash.to_vec();
         mixin_input.extend_from_slice(&self.validator_count);
         let tree_root_mix_in = sha256::m31::sha256_var_bytes(builder, &mixin_input);
-        for i in 0..32{
-            builder.assert_is_equal(&tree_root_mix_in[i], &self.sha256_root_mix_in[i]);
-        }
+        (0..32)
+            .for_each(|i| builder.assert_is_equal(tree_root_mix_in[i], self.sha256_root_mix_in[i]));
+
         //make sure the new one is correct
         let new_sha256_root_hash = merkle::calculate_merkle_tree_root_var(
             builder,
@@ -279,15 +288,13 @@ impl GenericDefine<M31Config> for UpdateValidatorTreeCircuit<Variable> {
         let mut mixin_input = new_sha256_root_hash;
         mixin_input.extend_from_slice(&self.next_validator_count);
         let new_tree_root_mix_in = sha256::m31::sha256_var_bytes(builder, &mixin_input);
-        for i in 0..32{
-            builder.assert_is_equal(&new_tree_root_mix_in[i], &self.next_sha256_root_mix_in[i]);
-        }
+        (0..32).for_each(|i| {
+            builder.assert_is_equal(new_tree_root_mix_in[i], self.next_sha256_root_mix_in[i])
+        });
 
         // //############ POSEIDON ############
-        let aunts_vec: Vec<Vec<Variable>> = self.poseidon_aunts
-                .iter()
-                .map(|arr| arr.to_vec())
-                .collect();
+        let aunts_vec: Vec<Vec<Variable>> =
+            self.poseidon_aunts.iter().map(|arr| arr.to_vec()).collect();
         //make sure the old one is correct
         merkle::verify_merkle_tree_path_var(
             builder,
@@ -302,9 +309,9 @@ impl GenericDefine<M31Config> for UpdateValidatorTreeCircuit<Variable> {
         let mut mixin_input = self.poseidon_root_hash.to_vec();
         mixin_input.extend_from_slice(&self.validator_count);
         let tree_root_mix_in = params.hash_to_state_flatten(builder, &mixin_input);
-        for i in 0..32{
-            builder.assert_is_equal(&tree_root_mix_in[i], &self.poseidon_root_mix_in[i]);
-        }
+        (0..POSEIDON_M31X16_RATE).for_each(|i| {
+            builder.assert_is_equal(tree_root_mix_in[i], self.poseidon_root_mix_in[i])
+        });
         //make sure the new one is correct
         let new_poseidon_root_hash = merkle::calculate_merkle_tree_root_var(
             builder,
@@ -317,10 +324,9 @@ impl GenericDefine<M31Config> for UpdateValidatorTreeCircuit<Variable> {
         let mut mixin_input = new_poseidon_root_hash;
         mixin_input.extend_from_slice(&self.next_validator_count);
         let new_tree_root_mix_in = params.hash_to_state_flatten(builder, &mixin_input);
-        for i in 0..32{
-            builder.assert_is_equal(&new_tree_root_mix_in[i], &self.next_poseidon_root_mix_in[i]);
-        }
-        
+        (0..POSEIDON_M31X16_RATE).for_each(|i| {
+            builder.assert_is_equal(new_tree_root_mix_in[i], self.next_poseidon_root_mix_in[i])
+        });
     }
 }
 #[derive(Debug, Deserialize, Clone)]
@@ -634,9 +640,8 @@ impl GenericDefine<M31Config> for MerkleSubTreeWithLimitCircuit<Variable> {
         mixin_input.extend_from_slice(&self.real_validator_count);
         let tree_root_mix_in = params.hash_to_state_flatten(builder, &mixin_input);
 
-        for i in 0..POSEIDON_M31X16_RATE {
-            builder.assert_is_equal(&tree_root_mix_in[i], &self.tree_root_mix_in[i]);
-        }
+        (0..POSEIDON_M31X16_RATE)
+            .for_each(|i| builder.assert_is_equal(tree_root_mix_in[i], self.tree_root_mix_in[i]));
     }
 }
 
@@ -667,8 +672,8 @@ impl MerkleSubTreeWithLimitCircuit<M31> {
             assignment.tree_root_mix_in[i] = M31::from(validator_tree[0][0][i]);
         }
         let real_validator_count = real_validator_count.to_le_bytes();
-        for i in 0..real_validator_count.len() {
-            assignment.real_validator_count[i] = M31::from(real_validator_count[i] as u32);
+        for (i, &v) in real_validator_count.iter().enumerate() {
+            assignment.real_validator_count[i] = M31::from(v as u32);
         }
         assignment
     }

@@ -80,11 +80,9 @@ impl HASHTABLECircuit<M31> {
         for i in 0..4 {
             self.start_index[i] = M31::from(start_index_bytes_le[i] as u32);
         }
-        for i in 0..HASHTABLESIZE {
-            for j in 0..SHA256LEN {
-                self.output[i][j] = M31::from(output[i][j] as u32);
-            }
-        }
+        (0..HASHTABLESIZE).for_each(|i| {
+            (0..SHA256LEN).for_each(|j| self.output[i][j] = M31::from(output[i][j] as u32))
+        });
     }
     pub fn get_assignments_from_beacon_data(
         seed: &[u8],

@@ -291,10 +291,10 @@ pub fn affine_point_to_bytes_g1(point: &BlsG1Affine) -> [[u8; 48]; 2] {
     let mut y_bytes = [0u8; 48];
 
     // serialize x
-    point.x.serialize_compressed(&mut x_bytes.as_mut()).unwrap();
+    point.x.serialize_compressed(x_bytes.as_mut()).unwrap();
 
     //serialize y
-    point.y.serialize_compressed(&mut y_bytes.as_mut()).unwrap();
+    point.y.serialize_compressed(y_bytes.as_mut()).unwrap();
 
     [x_bytes, y_bytes]
 }

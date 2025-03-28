@@ -55,7 +55,7 @@ impl PermutationQueryCircuit<M31> {
     }
 
     pub fn get_assignments_from_data(
-        hashtable_bits: &Vec<Vec<u8>>,
+        hashtable_bits: &[Vec<u8>],
         query_bits: Vec<Vec<u8>>,
         query_indices: Vec<Vec<u64>>,
     ) -> Vec<Self> {
@@ -446,7 +446,7 @@ impl PermutationIndicesValidatorHashBitCircuit<M31> {
         assignments
     }
     pub fn get_assignments_from_data(
-        valid_validator_list: &Vec<u64>,
+        valid_validator_list: &[u64],
         validator_hashes: Vec<Vec<u32>>,
         shuffle_indices: Vec<u64>,
     ) -> Vec<Self> {
@@ -485,8 +485,8 @@ impl PermutationIndicesValidatorHashBitCircuit<M31> {
         let mut assignments = vec![];
         for i in 0..POSEIDON_M31X16_RATE {
             let mut assignment = PermutationIndicesValidatorHashBitCircuit::default();
-            for j in 0..POSEIDON_M31X16_RATE {
-                assignment.active_validator_bits_hash[j] = M31::from(active_hash[j]);
+            for (j, &v) in active_hash.iter().enumerate().take(POSEIDON_M31X16_RATE) {
+                assignment.active_validator_bits_hash[j] = M31::from(v);
             }
             for j in 0..VALIDATOR_COUNT {
                 assignment.real_keys[j] = M31::from(real_keys[j] as u32);
@@ -760,15 +760,15 @@ pub fn end2end_permutation_hashbit_witnesses_with_assignments(
     );
 }
 pub fn end2end_permutation_assignments_with_beacon_data(
-    hashtable_bits: &Vec<Vec<u8>>,
-    raw_query_bits: &Vec<Vec<u8>>,
-    raw_query_indices: &Vec<Vec<u64>>,
-    valid_validator_list: &Vec<u64>,
-    raw_shuffle_indices: &Vec<u64>,
-    raw_committee_indices: &Vec<u64>,
-    real_committee_size: &Vec<u64>,
+    hashtable_bits: &[Vec<u8>],
+    raw_query_bits: &[Vec<u8>],
+    raw_query_indices: &[Vec<u64>],
+    valid_validator_list: &[u64],
+    raw_shuffle_indices: &[u64],
+    raw_committee_indices: &[u64],
+    real_committee_size: &[u64],
     padding_size: usize,
-    validator_hashes: &Vec<Vec<u32>>,
+    validator_hashes: &[Vec<u32>],
 ) -> (
     Vec<Vec<PermutationQueryCircuit<M31>>>,
     Vec<Vec<PermutationIndicesValidatorHashBitCircuit<M31>>>,
@@ -777,18 +777,14 @@ pub fn end2end_permutation_assignments_with_beacon_data(
     let bit_len = raw_query_bits[0].len();
 
     let mut pad_bits = vec![vec![0u8; bit_len]; to_pad];
-    let mut pad_indices = vec![vec![0u64; raw_query_indices[0].len()]; to_pad];
+    let pad_indices = vec![vec![0u64; raw_query_indices[0].len()]; to_pad];
 
-    for i in 0..to_pad {
-        for j in 0..bit_len {
-            pad_bits[i][j] = hashtable_bits[j][0];
-        }
-    }
+    (0..to_pad).for_each(|i| (0..bit_len).for_each(|j| pad_bits[i][j] = hashtable_bits[j][0]));
 
-    let mut copy_query_bits = raw_query_bits.clone();
+    let mut copy_query_bits = raw_query_bits.to_vec();
     copy_query_bits.extend(pad_bits);
 
-    let mut copy_query_indices = raw_query_indices.clone();
+    let mut copy_query_indices = raw_query_indices.to_vec();
     copy_query_indices.extend(pad_indices);
 
     let mut query_bits: Vec<Vec<u8>> = Vec::new();
@@ -802,9 +798,9 @@ pub fn end2end_permutation_assignments_with_beacon_data(
         start += real_size as usize;
     }
 
-    let mut pad_shuffle_indices = raw_shuffle_indices.clone();
+    let mut pad_shuffle_indices = raw_shuffle_indices.to_vec();
     pad_shuffle_indices.extend(vec![raw_shuffle_indices[0]; to_pad]);
-    let mut pad_committee_indices = raw_committee_indices.clone();
+    let mut pad_committee_indices = raw_committee_indices.to_vec();
     pad_committee_indices.extend(vec![raw_committee_indices[0]; to_pad]);
 
     let mut shuffle_indices = vec![];
@@ -833,7 +829,7 @@ pub fn end2end_permutation_assignments_with_beacon_data(
     let permutation_hashbit_assignments =
         PermutationIndicesValidatorHashBitCircuit::get_assignments_from_data(
             valid_validator_list,
-            validator_hashes.clone(),
+            validator_hashes.to_vec(),
             shuffle_indices,
         );
     //copy permutation_hashbit_assignments to 16

@@ -274,15 +274,15 @@ impl ShuffleCircuit<M31> {
         //assign shuffle_json
         self.start_index = M31::from(start as u32);
         self.chunk_length = M31::from(VALIDATOR_CHUNK_SIZE as u32);
-        let lower = start.min(real_validator_count as usize);
-        let upper = (start + VALIDATOR_CHUNK_SIZE).min(real_validator_count as usize);
+        let lower = start.min(real_validator_count);
+        let upper = (start + VALIDATOR_CHUNK_SIZE).min(real_validator_count);
         let sub_shuffle_indices = &shuffle_indices[lower..upper];
         let sub_committee_indices = &committee_indices[lower..upper];
         let slot_idx = circuit_id / beacon::MAXCOMMITTEESPERSLOT;
         let committee_idx = circuit_id % beacon::MAXCOMMITTEESPERSLOT;
         let mut att = &slot_attestations[0][0];
         let mut pubkey: [[u8; 48]; 2] = [[0; 48]; 2];
-        if slot_attestations.len() == 0 {
+        if slot_attestations.is_empty() {
             panic!("slot_attestations is empty");
         }
         if slot_attestations[slot_idx].len() != 0
@@ -353,7 +353,7 @@ impl ShuffleCircuit<M31> {
         }
 
         //assign attestation_balance
-        let balance = balance_list[circuit_id as usize];
+        let balance = balance_list[circuit_id];
         let balance_bytes = balance.to_le_bytes(); // [u8; 8]
 
         for i in 0..8 {
