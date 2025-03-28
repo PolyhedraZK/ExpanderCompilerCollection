@@ -1,5 +1,9 @@
 use byteorder::{LittleEndian, WriteBytesExt};
-use circuit_std_rs::{poseidon::{poseidon::PoseidonParams, poseidon_m31::PoseidonM31Params, utils::POSEIDON_M31X16_RATE}, utils::simple_select};
+use circuit_std_rs::{
+    poseidon::{
+        poseidon::PoseidonParams, poseidon_m31::PoseidonM31Params, utils::POSEIDON_M31X16_RATE,
+    }, sha256, utils::simple_select
+};
 use expander_compiler::frontend::{Config, RootAPI, Variable};
 pub const MAX_BEACON_VALIDATOR_DEPTH: usize = 40;
 const ZERO_HASHES_MAX_DEPTH: usize = MAX_BEACON_VALIDATOR_DEPTH;
@@ -205,42 +209,92 @@ pub fn merkleize_with_mixin_poseidon(root: &[u32], num: u64, param: &PoseidonPar
     param.hash(&combined)
 }
 
-
 pub fn verify_merkle_tree_path_var<C: Config, B: RootAPI<C>>(
     builder: &mut B,
     root: &[Variable],
     leaf: &[Variable],
     path: &[Variable],
     aunts: &[Vec<Variable>],
-    param: &PoseidonM31Params,
+    params: &PoseidonM31Params,
     ignore_opt: Variable,
-)  {
+) {
     let depth = path.len();
     let mut cur_leaf = leaf.to_vec();
     let one_var = builder.constant(1);
     for i in 0..depth {
-		//if path[i] is -1, set reach_end to 1
+        //if path[i] is -1, set reach_end to 1
         let zero_flag = builder.add(path[i], one_var);
         let reach_end = builder.is_zero(zero_flag);
-        
+
         //start merging the leaf with the aunts
         let is_left = builder.is_zero(path[i]);
         let mut left = cur_leaf.clone();
         let mut right = cur_leaf.clone();
-        for j in 0..cur_leaf.len(){
+        for j in 0..cur_leaf.len() {
             left[j] = simple_select(builder, is_left, cur_leaf[j], aunts[i][j]);
             right[j] = simple_select(builder, is_left, aunts[i][j], cur_leaf[j]);
         }
         let mut combined = left.clone();
         combined.extend_from_slice(&right);
-        let mut new_leaf = param.hash_to_state_flatten(builder, &combined)[..param.rate].to_vec();
-        for j in 0..new_leaf.len(){
+        let mut new_leaf;
+        if root.len() == 32 {   //sha256 merkletree
+            new_leaf = sha256::m31::sha256_var_bytes(builder, &combined);
+        } else if root.len() == params.rate {    //poseidon merkletree
+            new_leaf = params.hash_to_state_flatten(builder, &combined)[..params.rate].to_vec();
+        } else {
+            panic!("Unsupported type of merkle tree");
+        }
+        for j in 0..cur_leaf.len() {
             new_leaf[j] = simple_select(builder, reach_end, cur_leaf[j], new_leaf[j]);
         }
         cur_leaf = new_leaf;
     }
-    for i in 0..root.len(){
+    for i in 0..root.len() {
         cur_leaf[i] = simple_select(builder, ignore_opt, root[i], cur_leaf[i]);
         builder.assert_is_equal(cur_leaf[i], root[i]);
     }
+}
+
+pub fn calculate_merkle_tree_root_var<C: Config, B: RootAPI<C>>(
+    builder: &mut B,
+    aunts: &[Vec<Variable>],
+    path: &[Variable],
+    leaf: Vec<Variable>,
+    params: &PoseidonM31Params,
+) -> Vec<Variable> {
+    let index_bin = path;
+    let mut cur_leaf = leaf;
+    let one_var = builder.constant(1);
+    let zero_var = builder.constant(0);
+    for i in 0..path.len() {
+        let non_neg_flag = builder.add(index_bin[i], one_var);
+        let reach_end = builder.is_zero(non_neg_flag);
+        let is_left = builder.is_zero(index_bin[i]);
+
+        let mut left = vec![zero_var; cur_leaf.len()];
+        let mut right = vec![zero_var; cur_leaf.len()];
+
+        for j in 0..cur_leaf.len() {
+            left[j] = simple_select(builder, is_left, cur_leaf[j], aunts[i][j]);
+            right[j] = simple_select(builder, is_left, aunts[i][j], cur_leaf[j]);
+        }
+
+        let mut combined = Vec::with_capacity(left.len() + right.len());
+        combined.extend_from_slice(&left);
+        combined.extend_from_slice(&right);
+
+        let new_leaf;
+        if cur_leaf.len() == 32 {   //sha256 merkletree
+            new_leaf = sha256::m31::sha256_var_bytes(builder, &combined);
+        } else if cur_leaf.len() == params.rate {    //poseidon merkletree
+            new_leaf = params.hash_to_state_flatten(builder, &combined)[..params.rate].to_vec();
+        } else {
+            panic!("Unsupported type of merkle tree");
+        }
+        for j in 0..new_leaf.len() {
+            cur_leaf[j] = simple_select(builder, reach_end, cur_leaf[j], new_leaf[j]);
+        }
+    }
+
+    cur_leaf
 }

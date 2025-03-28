@@ -1,3 +1,5 @@
+use ark_bls12_381::G1Affine as BlsG1Affine;
+use ark_serialize::CanonicalSerialize;
 use circuit_std_rs::gnark::emulated::sw_bls12381::g1::{G1Affine, G1};
 use circuit_std_rs::sha256::m31_utils::{
     big_is_zero, big_less_than, bigint_to_m31_array, to_binary,
@@ -6,8 +8,6 @@ use circuit_std_rs::utils::{simple_lookup2, simple_select};
 use expander_compiler::frontend::*;
 use num_bigint::BigInt;
 use std::str::FromStr;
-use ark_bls12_381::G1Affine as BlsG1Affine;
-use ark_serialize::CanonicalSerialize;
 
 const K: usize = 48;
 const N: usize = 8;

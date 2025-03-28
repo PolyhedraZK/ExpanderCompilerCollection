@@ -3,7 +3,9 @@ use base64::Engine;
 use circuit_std_rs::poseidon::poseidon::PoseidonParams;
 use circuit_std_rs::poseidon::poseidon_m31::*;
 use circuit_std_rs::poseidon::utils::*;
+use circuit_std_rs::sha256;
 use circuit_std_rs::utils::register_hint;
+use circuit_std_rs::utils::simple_select;
 use expander_compiler::frontend::*;
 use serde::Deserialize;
 use std::sync::{Arc, Mutex};
@@ -16,10 +18,12 @@ pub const SUBTREE_DEPTH: usize = 10;
 pub const SUBTREE_NUM_DEPTH: usize = 11;
 pub const SUBTREE_SIZE: usize = 1 << SUBTREE_DEPTH;
 pub const SUBTREE_NUM: usize = 1 << SUBTREE_NUM_DEPTH;
+
 // SUBTREENUMDEPTH           = 11
 // SUBTREENUM                = 1 << SUBTREENUMDEPTH
 // PADDINGDEPTH              = MAXBEACONVALIDATORDEPTH - SUBTREEDEPTH - SUBTREENUMDEPTH
-pub const PADDING_DEPTH: usize = beacon::MAXBEACONVALIDATORDEPTH - SUBTREE_DEPTH - SUBTREE_NUM_DEPTH;
+pub const PADDING_DEPTH: usize =
+    beacon::MAXBEACONVALIDATORDEPTH - SUBTREE_DEPTH - SUBTREE_NUM_DEPTH;
 #[derive(Debug, Deserialize, Clone)]
 pub struct ValidatorPlain {
     #[serde(default)]
@@ -47,9 +51,9 @@ impl ValidatorPlain {
             .unwrap();
 
         let mut inputs: Vec<u8> = Vec::with_capacity(
-            48 + 32 + 8 + 1 + 8 + 8 + 8 + 8 // total expected bytes
+            48 + 32 + 8 + 1 + 8 + 8 + 8 + 8, // total expected bytes
         );
-        
+
         inputs.extend_from_slice(&pubkey);
         inputs.extend_from_slice(&withdrawal_credentials);
         inputs.extend_from_slice(&self.effective_balance.to_le_bytes());
@@ -106,7 +110,7 @@ impl ValidatorSSZ {
             withdrawable_epoch: [Variable::default(); 8],
         }
     }
-    pub fn hash<C: Config, B: RootAPI<C>>(&self, builder: &mut B) -> Vec<Variable> {
+    pub fn poseidon_hash<C: Config, B: RootAPI<C>>(&self, builder: &mut B) -> Vec<Variable> {
         let inputs = [
             &self.public_key[..],
             &self.withdrawal_credentials[..],
@@ -125,10 +129,200 @@ impl ValidatorSSZ {
             POSEIDON_M31X16_FULL_ROUNDS,
             POSEIDON_M31X16_PARTIAL_ROUNDS,
         );
-        params.hash_to_state_flatten(builder, &inputs)
+        params.hash_to_state_flatten(builder, &inputs)[..POSEIDON_M31X16_RATE].to_vec()
+    }
+    pub fn sha256_hash<C: Config, B: RootAPI<C>>(&self, builder: &mut B) -> Vec<Variable> {
+        let inputs = [
+            &self.public_key[..],
+            &self.withdrawal_credentials[..],
+            &self.effective_balance[..],
+            &self.slashed[..],
+            &self.activation_eligibility_epoch[..],
+            &self.activation_epoch[..],
+            &self.exit_epoch[..],
+            &self.withdrawable_epoch[..],
+        ]
+        .concat();
+        sha256::m31::sha256_var_bytes(builder, &inputs)
     }
 }
+declare_circuit!(UpdateValidatorTreeCircuit {
+    index: Variable,    //validator index
+    // old validator
+    old_pubkey: [Variable; 48], 
+    old_withdrawal_credentials: [Variable; 32], 
+    old_effective_balance: [Variable; 8], //all -1 if empty
+    old_slashed: [Variable; 1],
+    old_activation_eligibility_epoch: [Variable; 8], 
+    old_activation_epoch: [Variable; 8],
+    old_exit_epoch: [Variable; 8], 
+    old_withdrawable_epoch: [Variable; 8],
+    // new validator
+    new_pubkey: [Variable; 48], 
+    new_withdrawal_credentials: [Variable; 32], 
+    new_effective_balance: [Variable; 8], 
+    new_slashed: [Variable; 1],
+    new_activation_eligibility_epoch: [Variable; 8], 
+    new_activation_epoch: [Variable; 8],
+    new_exit_epoch: [Variable; 8], 
+    new_withdrawable_epoch: [Variable; 8],
+    //sha256 tree path, aunts, root hash
+    sha256_path: [Variable; beacon::MAXBEACONVALIDATORDEPTH],
+    sha256_aunts: [[Variable; 32]; beacon::MAXBEACONVALIDATORDEPTH],
+    sha256_root_hash: [Variable; 32],
+    next_sha256_root_hash: [Variable; 32],
+    sha256_root_mix_in: [Variable; 32],
+    next_sha256_root_mix_in: [Variable; 32],
+    //poseidon tree path, aunts, root hash
+    poseidon_path: [Variable; beacon::MAXBEACONVALIDATORDEPTH],
+    poseidon_aunts: [[Variable; POSEIDON_M31X16_RATE]; beacon::MAXBEACONVALIDATORDEPTH],
+    poseidon_root_hash: [Variable; POSEIDON_M31X16_RATE],
+    next_poseidon_root_hash: [Variable; POSEIDON_M31X16_RATE],
+    poseidon_root_mix_in: [Variable; POSEIDON_M31X16_RATE],
+    next_poseidon_root_mix_in: [Variable; POSEIDON_M31X16_RATE],
+    //validatorlist.len()
+    validator_count: [Variable; 8],
+    next_validator_count: [Variable; 8],
+});
+impl GenericDefine<M31Config> for UpdateValidatorTreeCircuit<Variable> {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
+        //if this is a new "insert" validator, then set the old validator hash to all 0
+        let mut validator_count_var = builder.constant(0);
+        let mut next_validator_count_var = builder.constant(0);
+        let zero_var = builder.constant(0);
+        for i in 0..8 {
+            if i < 3 {
+                validator_count_var = builder.add(&self.validator_count[i], &validator_count_var);
+                validator_count_var = builder.mul(&validator_count_var, 1<<8);
+                next_validator_count_var = builder.add(&self.next_validator_count[i], &next_validator_count_var);
+                next_validator_count_var = builder.mul(&next_validator_count_var, 1<<8);
+            } else {
+                //assume the validator count is less than 2^24
+                builder.assert_is_equal(&self.validator_count[i], zero_var);
+                builder.assert_is_equal(&self.next_validator_count[i], zero_var);
+            }
+        }
+        let validator_count_diff = builder.sub(&next_validator_count_var,&validator_count_var);
+        builder.assert_is_bool(validator_count_diff);
+        let modified_validator_flag = builder.is_zero(validator_count_diff);    //if the index is equal to the validator count, then it is a new insert validator
+        let old_validator_ssz = ValidatorSSZ {
+            public_key: self.old_pubkey,
+            withdrawal_credentials: self.old_withdrawal_credentials,
+            effective_balance: self.old_effective_balance,
+            slashed: self.old_slashed,
+            activation_eligibility_epoch: self.old_activation_eligibility_epoch,
+            activation_epoch: self.old_activation_epoch,
+            exit_epoch: self.old_exit_epoch,
+            withdrawable_epoch: self.old_withdrawable_epoch,
+        };
+        let new_validator_ssz = ValidatorSSZ {
+            public_key: self.new_pubkey,
+            withdrawal_credentials: self.new_withdrawal_credentials,
+            effective_balance: self.new_effective_balance,
+            slashed: self.new_slashed,
+            activation_eligibility_epoch: self.new_activation_eligibility_epoch,
+            activation_epoch: self.new_activation_epoch,
+            exit_epoch: self.new_exit_epoch,
+            withdrawable_epoch: self.new_withdrawable_epoch,
+        };
+        let mut old_validator_sha256_hash = old_validator_ssz.sha256_hash(builder);
+        //if this is a new "insert" validator, then set the old validator hash to all 0
+        for i in 0..32 {
+            old_validator_sha256_hash[i] = simple_select(builder, modified_validator_flag, old_validator_sha256_hash[i], zero_var);
+        }
+        let new_validator_sha256_hash = new_validator_ssz.sha256_hash(builder);
+        let mut old_validator_poseidon_hash = old_validator_ssz.poseidon_hash(builder);
+        //if this is a new "insert" validator, then set the old validator hash to all 0
+        for i in 0..POSEIDON_M31X16_RATE {
+            old_validator_poseidon_hash[i] = simple_select(builder, modified_validator_flag, old_validator_poseidon_hash[i], zero_var);
+        }
+        let new_validator_poseidon_hash = new_validator_ssz.poseidon_hash(builder);
+        let params = PoseidonM31Params::new(
+            builder,
+            POSEIDON_M31X16_RATE,
+            16,
+            POSEIDON_M31X16_FULL_ROUNDS,
+            POSEIDON_M31X16_PARTIAL_ROUNDS,
+        );
 
+        //############ SHA256 ############
+        let aunts_vec: Vec<Vec<Variable>> = self.sha256_aunts
+                .iter()
+                .map(|arr| arr.to_vec())
+                .collect();
+        //make sure the old one is correct
+        merkle::verify_merkle_tree_path_var(
+            builder,
+            &self.sha256_root_hash,
+            &old_validator_sha256_hash,
+            &self.sha256_path,
+            &aunts_vec,
+            &params,
+            zero_var,
+        );
+        //check mixin
+        let mut mixin_input = self.sha256_root_hash.to_vec();
+        mixin_input.extend_from_slice(&self.validator_count);
+        let tree_root_mix_in = sha256::m31::sha256_var_bytes(builder, &mixin_input);
+        for i in 0..32{
+            builder.assert_is_equal(&tree_root_mix_in[i], &self.sha256_root_mix_in[i]);
+        }
+        //make sure the new one is correct
+        let new_sha256_root_hash = merkle::calculate_merkle_tree_root_var(
+            builder,
+            &aunts_vec,
+            &self.sha256_path,
+            new_validator_sha256_hash,
+            &params,
+        );
+        //check mixin
+        let mut mixin_input = new_sha256_root_hash;
+        mixin_input.extend_from_slice(&self.next_validator_count);
+        let new_tree_root_mix_in = sha256::m31::sha256_var_bytes(builder, &mixin_input);
+        for i in 0..32{
+            builder.assert_is_equal(&new_tree_root_mix_in[i], &self.next_sha256_root_mix_in[i]);
+        }
+
+        // //############ POSEIDON ############
+        let aunts_vec: Vec<Vec<Variable>> = self.poseidon_aunts
+                .iter()
+                .map(|arr| arr.to_vec())
+                .collect();
+        //make sure the old one is correct
+        merkle::verify_merkle_tree_path_var(
+            builder,
+            &self.poseidon_root_hash,
+            &old_validator_poseidon_hash,
+            &self.poseidon_path,
+            &aunts_vec,
+            &params,
+            zero_var,
+        );
+        //check mixin
+        let mut mixin_input = self.poseidon_root_hash.to_vec();
+        mixin_input.extend_from_slice(&self.validator_count);
+        let tree_root_mix_in = params.hash_to_state_flatten(builder, &mixin_input);
+        for i in 0..32{
+            builder.assert_is_equal(&tree_root_mix_in[i], &self.poseidon_root_mix_in[i]);
+        }
+        //make sure the new one is correct
+        let new_poseidon_root_hash = merkle::calculate_merkle_tree_root_var(
+            builder,
+            &aunts_vec,
+            &self.poseidon_path,
+            new_validator_poseidon_hash,
+            &params,
+        );
+        //check mixin
+        let mut mixin_input = new_poseidon_root_hash;
+        mixin_input.extend_from_slice(&self.next_validator_count);
+        let new_tree_root_mix_in = params.hash_to_state_flatten(builder, &mixin_input);
+        for i in 0..32{
+            builder.assert_is_equal(&new_tree_root_mix_in[i], &self.next_poseidon_root_mix_in[i]);
+        }
+        
+    }
+}
 #[derive(Debug, Deserialize, Clone)]
 pub struct ValidatorSubTreeJson {
     #[serde(rename = "ValidatorHashChunk")]
@@ -192,15 +386,21 @@ impl ConvertValidatorListToMerkleTreeCircuit<M31> {
     pub fn get_assignments_from_beacon_data(validator_tree: &[Vec<Vec<u32>>]) -> Vec<Self> {
         let validator_hashes = validator_tree.last().unwrap();
         let mut assignments = vec![];
-        for i in 0..SUBTREE_NUM{
+        for i in 0..SUBTREE_NUM {
             let mut assignment = ConvertValidatorListToMerkleTreeCircuit::<M31>::default();
             for j in 0..SUBTREE_SIZE {
                 for k in 0..POSEIDON_M31X16_RATE {
-                    assignment.validator_hash_chunk[j][k] = M31::from(*validator_hashes.get(i * SUBTREE_SIZE + j).and_then(|row| row.get(k)).unwrap_or(&0));
+                    assignment.validator_hash_chunk[j][k] = M31::from(
+                        *validator_hashes
+                            .get(i * SUBTREE_SIZE + j)
+                            .and_then(|row| row.get(k))
+                            .unwrap_or(&0),
+                    );
                 }
             }
             for j in 0..POSEIDON_M31X16_RATE {
-                assignment.subtree_root[j] = M31::from(validator_tree[validator_tree.len() - SUBTREE_DEPTH][i][j]);
+                assignment.subtree_root[j] =
+                    M31::from(validator_tree[validator_tree.len() - SUBTREE_DEPTH][i][j]);
             }
             assignments.push(assignment);
         }
@@ -410,7 +610,8 @@ impl GenericDefine<M31Config> for MerkleSubTreeWithLimitCircuit<Variable> {
             POSEIDON_M31X16_PARTIAL_ROUNDS,
         );
 
-        let sub_tree_root_root = params.hash_to_state_flatten(builder, &inputs);
+        let sub_tree_root_root =
+            params.hash_to_state_flatten(builder, &inputs)[..POSEIDON_M31X16_RATE].to_vec();
 
         let mut aunts_vec = vec![];
         for i in 0..PADDING_DEPTH {
@@ -442,19 +643,23 @@ impl GenericDefine<M31Config> for MerkleSubTreeWithLimitCircuit<Variable> {
 impl MerkleSubTreeWithLimitCircuit<M31> {
     pub fn get_assignments_from_beacon_data(
         validator_tree: &[Vec<Vec<u32>>],
-        real_validator_count: u64
+        real_validator_count: u64,
     ) -> Self {
         let mut assignment = MerkleSubTreeWithLimitCircuit::<M31>::default();
-        let validator_tree_depth = (validator_tree.last().unwrap().len() as f64).log2().ceil() as usize;
+        let validator_tree_depth =
+            (validator_tree.last().unwrap().len() as f64).log2().ceil() as usize;
         for i in 0..SUBTREE_NUM {
             for j in 0..POSEIDON_M31X16_RATE {
-                assignment.subtree_root[i][j] = M31::from(validator_tree[validator_tree.len() - SUBTREE_DEPTH][i][j]);
+                assignment.subtree_root[i][j] =
+                    M31::from(validator_tree[validator_tree.len() - SUBTREE_DEPTH][i][j]);
             }
         }
         for i in 0..PADDING_DEPTH {
             assignment.path[i] = M31::from(0);
             for j in 0..POSEIDON_M31X16_RATE {
-                assignment.aunts[i][j] = M31::from(validator_tree[validator_tree.len() - i - validator_tree_depth][1][j]);
+                assignment.aunts[i][j] = M31::from(
+                    validator_tree[validator_tree.len() - i - validator_tree_depth][1][j],
+                );
             }
         }
         for i in 0..POSEIDON_M31X16_RATE {
@@ -513,24 +718,57 @@ pub fn end2end_merkle_subtree_with_limit_witnesses_with_assignments(
 }
 pub fn end2end_validator_tree_assignments(
     validator_tree: Vec<Vec<Vec<u32>>>,
-    real_validator_count: u64
-) -> (Vec<Vec<ConvertValidatorListToMerkleTreeCircuit<M31>>>, Vec<Vec<MerkleSubTreeWithLimitCircuit<M31>>>) {
+    real_validator_count: u64,
+) -> (
+    Vec<Vec<ConvertValidatorListToMerkleTreeCircuit<M31>>>,
+    Vec<Vec<MerkleSubTreeWithLimitCircuit<M31>>>,
+) {
     let start_time = std::time::Instant::now();
-    let merkle_subtree_with_limit_assignment = MerkleSubTreeWithLimitCircuit::get_assignments_from_beacon_data(&validator_tree, real_validator_count);
-    let convert_validator_list_to_merkle_tree_assignment = ConvertValidatorListToMerkleTreeCircuit::get_assignments_from_beacon_data(&validator_tree);
-    let convert_validator_list_to_merkle_tree_assignments_chunks: Vec<Vec<ConvertValidatorListToMerkleTreeCircuit<M31>>> =
-        convert_validator_list_to_merkle_tree_assignment.chunks(16).map(|x| x.to_vec()).collect();
+    let merkle_subtree_with_limit_assignment =
+        MerkleSubTreeWithLimitCircuit::get_assignments_from_beacon_data(
+            &validator_tree,
+            real_validator_count,
+        );
+    let convert_validator_list_to_merkle_tree_assignment =
+        ConvertValidatorListToMerkleTreeCircuit::get_assignments_from_beacon_data(&validator_tree);
+    let convert_validator_list_to_merkle_tree_assignments_chunks: Vec<
+        Vec<ConvertValidatorListToMerkleTreeCircuit<M31>>,
+    > = convert_validator_list_to_merkle_tree_assignment
+        .chunks(16)
+        .map(|x| x.to_vec())
+        .collect();
     let end_time = std::time::Instant::now();
     log::debug!(
         "assigned assignment data, time: {:?}",
         end_time.duration_since(start_time)
     );
-    (convert_validator_list_to_merkle_tree_assignments_chunks, vec![vec![merkle_subtree_with_limit_assignment; 16];1])
+    (
+        convert_validator_list_to_merkle_tree_assignments_chunks,
+        vec![vec![merkle_subtree_with_limit_assignment; 16]; 1],
+    )
 }
 
 #[test]
-fn test_end2end_validators_assignments(){
-    let slot = 290000*32;
-    let (seed, shuffle_indices, committee_indices, pivots, activated_indices, flips, positions, flip_bits, round_hash_bits, attestations, aggregated_pubkeys, balance_list, real_committee_size, validator_tree, hash_bytes, plain_validators) = beacon::prepare_assignment_data(slot, slot + 32);
-    let assignments = end2end_validator_tree_assignments(validator_tree, activated_indices.len() as u64);
+fn test_end2end_validators_assignments() {
+    let slot = 290000 * 32;
+    let (
+        seed,
+        shuffle_indices,
+        committee_indices,
+        pivots,
+        activated_indices,
+        flips,
+        positions,
+        flip_bits,
+        round_hash_bits,
+        attestations,
+        aggregated_pubkeys,
+        balance_list,
+        real_committee_size,
+        validator_tree,
+        hash_bytes,
+        plain_validators,
+    ) = beacon::prepare_assignment_data(slot, slot + 32);
+    let assignments =
+        end2end_validator_tree_assignments(validator_tree, activated_indices.len() as u64);
 }

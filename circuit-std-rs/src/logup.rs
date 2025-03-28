@@ -369,7 +369,12 @@ impl LogUpRangeProofTable {
             // println!("n:{}", n);
             mul_factor <<= n;
             let a_shift = builder.mul(constant, mul_factor);
+            builder.display("constant", constant);
+            builder.display("mul_factor", mul_factor);
+            builder.display("a_shift", a_shift);
+            builder.display("a", a);
             new_a = builder.add(a, a_shift);
+            builder.display("new_a", new_a);
             n += shift;
         }
         let hint_input = vec![
@@ -481,10 +486,13 @@ pub fn rangeproof_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error>
     let n = inputs[0].to_u256().as_i64();
     let m = inputs[1].to_u256().as_i64();
     let mut a = inputs[2].to_u256().as_i64();
+    println!("a:{}", a);
     for i in 0..n / m {
         let r = a % (1 << m);
+        println!("r:{}", r);
         a /= 1 << m;
         outputs[i as usize] = M31::from(r as u32);
     }
+    println!("end");
     Ok(())
 }

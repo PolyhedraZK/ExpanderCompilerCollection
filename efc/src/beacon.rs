@@ -1,4 +1,8 @@
 //read beacon info from files
+use ark_bls12_381::{Bls12_381, G1Affine};
+use ark_ec::AffineRepr;
+use ark_ff::{AdditiveGroup, UniformRand};
+use ark_serialize::CanonicalDeserialize;
 use base64::engine::general_purpose;
 use base64::Engine;
 use bincode;
@@ -10,14 +14,10 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::path::Path;
 use std::{error::Error, fs};
-use ark_ec::AffineRepr;
-use ark_bls12_381::{G1Affine, Bls12_381};
-use ark_serialize::CanonicalDeserialize;
-use ark_ff::{AdditiveGroup, UniformRand};
 
+use rayon::prelude::*;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use rayon::prelude::*;
 
 use crate::attestation::{Attestation, CheckpointPlain};
 use crate::merkle;
@@ -295,10 +295,10 @@ pub fn load_target_attestations(start: u64, end: u64) -> Vec<Vec<Attestation>> {
     let mut slots_attestations = vec![];
     let mut slots_beacon_root = vec!["".to_string(); SLOTSPEREPOCH as usize];
     for slot in start..end {
-        let att_and_parent_root = load_attestations_and_bytes(slot+1).unwrap();
+        let att_and_parent_root = load_attestations_and_bytes(slot + 1).unwrap();
         slots_attestations.extend_from_slice(att_and_parent_root.attestations.as_slice());
-        slots_beacon_root[(slot % SLOTSPEREPOCH) as usize ] = general_purpose::STANDARD.encode(att_and_parent_root.data);
-        println!("i:{}, slots_beacn_root: {:?}", slot,  slots_beacon_root);
+        slots_beacon_root[(slot % SLOTSPEREPOCH) as usize] =
+            general_purpose::STANDARD.encode(att_and_parent_root.data);
     }
     //find the target attestation
     let mut candidate_attestations = vec![vec![]; SLOTSPEREPOCH as usize];
@@ -400,7 +400,7 @@ pub fn getting_pubkey_list_and_balance_with_validator_list_committee(
 ) -> (Vec<String>, u64) {
     const SLOTS_PER_EPOCH: u64 = 32;
     const MAX_COMMITTEES_PER_SLOT: u64 = 64;
-//committeeIndex = (slot%common.SLOTSPEREPOCH)*common.MAXCOMMITTEESPERSLOT + committeeIndex
+    //committeeIndex = (slot%common.SLOTSPEREPOCH)*common.MAXCOMMITTEESPERSLOT + committeeIndex
     let committee_idx = (slot % SLOTS_PER_EPOCH) * MAX_COMMITTEES_PER_SLOT + committee_index;
     // Get a reference to validators directly (no cloning)
     let committee_indices = &committees[committee_idx as usize].validators;
@@ -427,7 +427,11 @@ pub fn getting_pubkey_list_and_balance_with_validator_list_committee(
 pub fn bls_aggregate_pubkeys(pubkeys_string: Vec<String>) -> Option<G1Affine> {
     // base64 decode to bytes
     let pubkeys_bytes = (0..pubkeys_string.len())
-        .map(|i| general_purpose::STANDARD.decode(pubkeys_string[i].clone()).unwrap())
+        .map(|i| {
+            general_purpose::STANDARD
+                .decode(pubkeys_string[i].clone())
+                .unwrap()
+        })
         .collect::<Vec<Vec<u8>>>();
     if pubkeys_bytes.is_empty() {
         return None;
@@ -462,41 +466,62 @@ pub fn bls_aggregate_pubkeys(pubkeys_string: Vec<String>) -> Option<G1Affine> {
 pub fn parallel_process_attestations(
     new_slot_attestations: &[Vec<Attestation>],
     current_slot: u64,
-    validator_list: &[ValidatorPlain], // Placeholder type
-    committees: &[BeaconCommitteeJson],        // Placeholder type
+    validator_list: &[ValidatorPlain],  // Placeholder type
+    committees: &[BeaconCommitteeJson], // Placeholder type
 ) -> (Vec<G1Affine>, Vec<u64>) {
     const MAX_COMMITTEES_PER_SLOT: usize = 64; // Example constant, replace with actual
 
-    let aggregated_pubkey_list = Arc::new(Mutex::new(vec![G1Affine::default(); new_slot_attestations.len() * MAX_COMMITTEES_PER_SLOT]));
-    let balances_list = Arc::new(Mutex::new(vec![0u64; new_slot_attestations.len() * MAX_COMMITTEES_PER_SLOT]));
+    let aggregated_pubkey_list = Arc::new(Mutex::new(vec![
+        G1Affine::default();
+        new_slot_attestations.len()
+            * MAX_COMMITTEES_PER_SLOT
+    ]));
+    let balances_list = Arc::new(Mutex::new(vec![
+        0u64;
+        new_slot_attestations.len()
+            * MAX_COMMITTEES_PER_SLOT
+    ]));
 
-    new_slot_attestations.par_iter().enumerate().for_each(|(i, att_list)| {
-        for (j, attestation) in att_list.iter().enumerate() {
-            let aggregation_bits = attestation_get_aggregation_bits_from_bytes(&attestation.aggregation_bits);
-            let (att_pubkey_list, balances) = getting_pubkey_list_and_balance_with_validator_list_committee(
-                i as u64 + current_slot,
-                j as u64,
-                &aggregation_bits,
-                validator_list,
-                committees,
-            );
+    new_slot_attestations
+        .par_iter()
+        .enumerate()
+        .for_each(|(i, att_list)| {
+            for (j, attestation) in att_list.iter().enumerate() {
+                let aggregation_bits =
+                    attestation_get_aggregation_bits_from_bytes(&attestation.aggregation_bits);
+                let (att_pubkey_list, balances) =
+                    getting_pubkey_list_and_balance_with_validator_list_committee(
+                        i as u64 + current_slot,
+                        j as u64,
+                        &aggregation_bits,
+                        validator_list,
+                        committees,
+                    );
 
-            let aggregated_pubkey = bls_aggregate_pubkeys(att_pubkey_list);
-            // test_aggregated_pubkey(&aggregated_pubkey, attestation);
+                let aggregated_pubkey = bls_aggregate_pubkeys(att_pubkey_list);
+                // test_aggregated_pubkey(&aggregated_pubkey, attestation);
 
-            let mut agg_pubkey_list = aggregated_pubkey_list.lock().unwrap();
-            match aggregated_pubkey {
-                Some(agg_pubkey) => agg_pubkey_list[i * MAX_COMMITTEES_PER_SLOT + j] = agg_pubkey,
-                None => (),
+                let mut agg_pubkey_list = aggregated_pubkey_list.lock().unwrap();
+                match aggregated_pubkey {
+                    Some(agg_pubkey) => {
+                        agg_pubkey_list[i * MAX_COMMITTEES_PER_SLOT + j] = agg_pubkey
+                    }
+                    None => (),
+                }
+
+                let mut bal_list = balances_list.lock().unwrap();
+                bal_list[i * MAX_COMMITTEES_PER_SLOT + j] = balances;
             }
+        });
 
-            let mut bal_list = balances_list.lock().unwrap();
-            bal_list[i * MAX_COMMITTEES_PER_SLOT + j] = balances;
-        }
-    });
-
-    let aggregated_pubkey_list = Arc::try_unwrap(aggregated_pubkey_list).expect("Lock still held").into_inner().unwrap();
-    let balances_list = Arc::try_unwrap(balances_list).expect("Lock still held").into_inner().unwrap();
+    let aggregated_pubkey_list = Arc::try_unwrap(aggregated_pubkey_list)
+        .expect("Lock still held")
+        .into_inner()
+        .unwrap();
+    let balances_list = Arc::try_unwrap(balances_list)
+        .expect("Lock still held")
+        .into_inner()
+        .unwrap();
 
     (aggregated_pubkey_list, balances_list)
 }
@@ -539,8 +564,8 @@ pub fn prepare_assignment_data(
     }
     let bits_per_round = hash_bits.len() / SHUFFLEROUND;
     let round_hash_bits: Vec<Vec<u8>> = (0..SHUFFLEROUND)
-    .map(|i| hash_bits[i * bits_per_round..(i + 1) * bits_per_round].to_vec())
-    .collect();
+        .map(|i| hash_bits[i * bits_per_round..(i + 1) * bits_per_round].to_vec())
+        .collect();
     println!("get round hash bits");
 
     //shuffle the indices
@@ -555,9 +580,9 @@ pub fn prepare_assignment_data(
         real_committee_size.push(committee.validators.len() as u64);
     }
     let committee_indices: Vec<u64> = committees
-    .iter()
-    .flat_map(|c| c.validators.iter().map(|s| s.parse::<u64>().unwrap()))
-    .collect();
+        .iter()
+        .flat_map(|c| c.validators.iter().map(|s| s.parse::<u64>().unwrap()))
+        .collect();
     println!("get committee_indices");
 
     let validator_list = load_validators_from_file(first_slot).unwrap();
@@ -570,7 +595,6 @@ pub fn prepare_assignment_data(
     let validator_tree_filename = format!("{}poseidon_{}.txt", LOCAL_TREE_DIR, first_slot);
     if Path::new(&validator_tree_filename).exists() {
         validator_tree = load_nested_vec(&validator_tree_filename).unwrap();
-        println!("load validator_tree, {}, {}", validator_tree.len(), validator_tree[validator_tree.len() - 1].len());
     } else {
         let validator_list_arc = Arc::new(validator_list.clone());
         let validator_hashes = Arc::new(Mutex::new(vec![vec![]; validator_list_arc.len()]));
@@ -587,32 +611,27 @@ pub fn prepare_assignment_data(
                     let validator_hash = validator_list[j].hash();
                     let mut hashes = validator_hashes.lock().unwrap();
                     hashes[j] = validator_hash;
-                    println!("thread {} get hash {}", i, j);
                 }
             });
             handles.push(handle);
         }
-        
+
         for handle in handles {
             handle.join().unwrap();
         }
-        
+
         let validator_hashes = Arc::try_unwrap(validator_hashes)
-        .expect("Arc still has multiple owners")
-        .into_inner()
-        .unwrap();
+            .expect("Arc still has multiple owners")
+            .into_inner()
+            .unwrap();
         //calculate and save validator tree
         validator_tree =
             calculate_and_save_validator_tree(validator_tree_filename, validator_hashes);
     }
     println!("get validator_tree");
     let attestations = load_target_attestations(start, end);
-    let (aggregated_pubkeys, balance_list) = parallel_process_attestations(
-        &attestations,
-        first_slot,
-        &validator_list,
-        &committees,
-    );
+    let (aggregated_pubkeys, balance_list) =
+        parallel_process_attestations(&attestations, first_slot, &validator_list, &committees);
     println!("get attestations");
     (
         seed,
@@ -700,7 +719,8 @@ fn test_shuffle_indices() {
             }
         }
     }
-    let (shuffle_indices, flips, positions, shuffle_round_indices, pivots, flip_bits) = shuffle_indices(&indices, &seed, &hash_bits, 90);
+    let (shuffle_indices, flips, positions, shuffle_round_indices, pivots, flip_bits) =
+        shuffle_indices(&indices, &seed, &hash_bits, 90);
 }
 
 #[test]
@@ -728,6 +748,23 @@ fn test_load_attestations_and_bytes() {
 fn test_prepare_assignment_data() {
     let epoch = 290000;
     let slot = epoch * SLOTSPEREPOCH;
-    let (seed, shuffle_indices, committee_indices, pivots, activated_indices, flips, positions, flip_bits, round_hash_bits, attestations, aggregated_pubkeys, balance_list, real_committee_size, validator_tree, hash_bytes, plain_validators) = prepare_assignment_data(slot, slot + 32);
+    let (
+        seed,
+        shuffle_indices,
+        committee_indices,
+        pivots,
+        activated_indices,
+        flips,
+        positions,
+        flip_bits,
+        round_hash_bits,
+        attestations,
+        aggregated_pubkeys,
+        balance_list,
+        real_committee_size,
+        validator_tree,
+        hash_bytes,
+        plain_validators,
+    ) = prepare_assignment_data(slot, slot + 32);
     println!("aggregated_pubkeys: {:?}", aggregated_pubkeys);
 }

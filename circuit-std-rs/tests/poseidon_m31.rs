@@ -110,8 +110,6 @@ fn test_poseidon_m31x16_hash_to_state_input_len16() {
     assert_eq!(output, vec![true]);
 }
 
-
-
 declare_circuit!(PoseidonSpongeLen8DebugCircuit {
     inputs: [Variable; 8],
     outputs: [Variable; 16]
@@ -156,5 +154,9 @@ fn test_poseidon_m31x16_hash_to_state_input_len8_debug() {
         ],
     };
 
-    debug_eval(&PoseidonSpongeLen8DebugCircuit::default(), &assignment, HintRegistry::<M31>::new());
+    debug_eval(
+        &PoseidonSpongeLen8DebugCircuit::default(),
+        &assignment,
+        HintRegistry::<M31>::new(),
+    );
 }

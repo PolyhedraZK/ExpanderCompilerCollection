@@ -1,9 +1,9 @@
 use crate::attestation::{Attestation, AttestationDataSSZ};
-use crate::{beacon, bls};
 use crate::utils::convert_limbs;
 use crate::utils::ensure_directory_exists;
 use crate::utils::read_from_json_file;
 use crate::utils::{get_solver, write_witness_to_file};
+use crate::{beacon, bls};
 use ark_bls12_381::G1Affine as BlsG1Affine;
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
@@ -162,8 +162,7 @@ impl BLSVERIFIERCircuit<M31> {
         attestations: Vec<Attestation>,
     ) -> Vec<Self> {
         let mut assignments = vec![];
-        for (cur_pubkey, cur_attestation_data) in pubkeys.iter().zip(attestations.iter())
-        {
+        for (cur_pubkey, cur_attestation_data) in pubkeys.iter().zip(attestations.iter()) {
             let mut pairing_assignment = BLSVERIFIERCircuit::default();
             pairing_assignment.from_beacon(cur_pubkey, cur_attestation_data);
             assignments.push(pairing_assignment);
@@ -392,10 +391,10 @@ pub fn end2end_blsverifier_witness(
     );
 }
 
-
 pub fn end2end_blsverifier_witnesses_with_assignments(
     w_s: WitnessSolver<M31Config>,
     assignment_chunks: Vec<Vec<BLSVERIFIERCircuit<M31>>>,
+    offset: usize,
 ) {
     let circuit_name = "pairing_3checks";
 
@@ -419,7 +418,7 @@ pub fn end2end_blsverifier_witnesses_with_assignments(
                     .solve_witnesses_with_hints(&assignments, &mut hint_registry)
                     .unwrap();
                 write_witness_to_file(
-                    &format!("{}/witness_{}.txt", witnesses_dir_clone, i),
+                    &format!("{}/witness_{}.txt", witnesses_dir_clone, i + offset),
                     witness,
                 )
             })
@@ -436,15 +435,18 @@ pub fn end2end_blsverifier_witnesses_with_assignments(
     );
 }
 
-
 pub fn end2end_blsverifier_assignments_with_beacon_data(
     aggregated_pubkeys: Vec<BlsG1Affine>,
     attestations: Vec<Attestation>,
 ) -> Vec<Vec<BLSVERIFIERCircuit<M31>>> {
+    println!("aggregated_pubkeys: {:?}", aggregated_pubkeys.len());
+    println!("attestations: {:?}", attestations.len());
     //get assignments
     let start_time = std::time::Instant::now();
-    let assignments =
-        BLSVERIFIERCircuit::<M31>::get_assignments_from_beacon_data(aggregated_pubkeys, attestations);
+    let assignments = BLSVERIFIERCircuit::<M31>::get_assignments_from_beacon_data(
+        aggregated_pubkeys,
+        attestations,
+    );
     let end_time = std::time::Instant::now();
     log::debug!(
         "assigned assignments time: {:?}",
@@ -455,10 +457,117 @@ pub fn end2end_blsverifier_assignments_with_beacon_data(
     assignment_chunks
 }
 
+#[test]
+fn test_end2end_blsverifier_assignments() {
+    let slot = 290000 * 32;
+    let (
+        seed,
+        shuffle_indices,
+        committee_indices,
+        pivots,
+        activated_indices,
+        flips,
+        positions,
+        flip_bits,
+        round_hash_bits,
+        attestations,
+        aggregated_pubkeys,
+        balance_list,
+        real_committee_size,
+        validator_tree,
+        hash_bytes,
+        plain_validators,
+    ) = beacon::prepare_assignment_data(slot, slot + 32);
+    let assignments = end2end_blsverifier_assignments_with_beacon_data(
+        aggregated_pubkeys,
+        attestations.into_iter().flatten().collect(),
+    );
+}
 
 #[test]
-fn test_end2end_blsverifier_assignments(){
-    let slot = 290000*32;
-    let (seed, shuffle_indices, committee_indices, pivots, activated_indices, flips, positions, flip_bits, round_hash_bits, attestations, aggregated_pubkeys, balance_list, real_committee_size, validator_tree, hash_bytes, plain_validators) = beacon::prepare_assignment_data(slot, slot + 32);
-    let assignments = end2end_blsverifier_assignments_with_beacon_data(aggregated_pubkeys, attestations.into_iter().flatten().collect());
+fn test_blsverifier_witnesses_end() {
+    stacker::grow(128 * 1024 * 1024 * 1024, || {
+        let epoch = 290000;
+        let slot = epoch * 32;
+        let blsverifier_handle = thread::spawn(|| {
+            let circuit_name = "blsverifier";
+            let circuit = BLSVERIFIERCircuit::default();
+            let witnesses_dir = format!("./witnesses/{}", circuit_name);
+            get_solver(&witnesses_dir, circuit_name, circuit)
+        });
+        let solver_blsverifier = blsverifier_handle.join().unwrap();
+        let (
+            seed,
+            shuffle_indices,
+            committee_indices,
+            pivots,
+            activated_indices,
+            flips,
+            positions,
+            flip_bits,
+            round_hash_bits,
+            attestations,
+            aggregated_pubkeys,
+            balance_list,
+            real_committee_size,
+            validator_tree,
+            hash_bytes,
+            plain_validators,
+        ) = beacon::prepare_assignment_data(slot, slot + 32);
+        let assignments = end2end_blsverifier_assignments_with_beacon_data(
+            aggregated_pubkeys,
+            attestations.into_iter().flatten().collect(),
+        );
+        end2end_blsverifier_witnesses_with_assignments(solver_blsverifier, assignments, 0);
+    });
 }
+
+// #[test]
+// fn test_shuffle_witnesses_start(){
+//     stacker::grow(128 * 1024 * 1024 * 1024, || {
+//         let epoch = 290000;
+//         let slot = epoch * 32;
+//         let shuffle_handle = thread::spawn(|| {
+//             let circuit_name = format!("shuffle_{}", VALIDATOR_CHUNK_SIZE);
+//             let circuit = ShuffleCircuit::default();
+//             let witnesses_dir = format!("./witnesses/{}", circuit_name);
+//             get_solver(&witnesses_dir, &circuit_name, circuit)
+//         });
+//         let solver_shuffle = shuffle_handle.join().unwrap();
+//         let (
+//             seed,
+//             shuffle_indices,
+//             committee_indices,
+//             pivots,
+//             activated_indices,
+//             flips,
+//             positions,
+//             flip_bits,
+//             round_hash_bits,
+//             attestations,
+//             aggregated_pubkeys,
+//             balance_list,
+//             real_committee_size,
+//             validator_tree,
+//             hash_bytes,
+//             plain_validators,
+//         ) = beacon::prepare_assignment_data(slot+16, slot + 32);
+//         let assignments = end2end_shuffle_assignments_with_beacon_data(
+//             plain_validators,
+//             real_committee_size,
+//             shuffle_indices,
+//             committee_indices,
+//             attestations,
+//             aggregated_pubkeys,
+//             pivots,
+//             flips,
+//             positions,
+//             flip_bits,
+//             validator_tree[validator_tree.len() - 1].clone(),
+//             balance_list,
+//             16,
+//             32,
+//         );
+//         end2end_shuffle_witnesses_with_assignments(solver_shuffle, assignments, 16*64/16);
+//     });
+// }

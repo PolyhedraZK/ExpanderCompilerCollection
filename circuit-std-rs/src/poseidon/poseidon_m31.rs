@@ -1,6 +1,5 @@
-use expander_compiler::frontend::*;
 use super::utils::*;
-
+use expander_compiler::frontend::*;
 
 fn power_5<C: Config, B: RootAPI<C>>(api: &mut B, base: Variable) -> Variable {
     let pow2 = api.mul(base, base);

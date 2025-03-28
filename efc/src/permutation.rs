@@ -1,7 +1,7 @@
-use crate::{beacon, shuffle, validator};
 use crate::utils::{
     ensure_directory_exists, get_solver, read_from_json_file, write_witness_to_file,
 };
+use crate::{beacon, shuffle, validator};
 use circuit_std_rs::logup::LogUpSingleKeyTable;
 use circuit_std_rs::poseidon::poseidon::PoseidonParams;
 use circuit_std_rs::poseidon::poseidon_m31::*;
@@ -54,14 +54,21 @@ impl PermutationQueryCircuit<M31> {
         assignments
     }
 
-    pub fn get_assignments_from_data(hashtable_bits: &Vec<Vec<u8>>, query_bits: Vec<Vec<u8>>, query_indices: Vec<Vec<u64>>) -> Vec<Self> {
+    pub fn get_assignments_from_data(
+        hashtable_bits: &Vec<Vec<u8>>,
+        query_bits: Vec<Vec<u8>>,
+        query_indices: Vec<Vec<u64>>,
+    ) -> Vec<Self> {
         let mut assignments = vec![];
         for i in 0..hashtable_bits.len() {
             let mut assignment = PermutationQueryCircuit::default();
             for j in 0..QUERY_TABLE_SIZE {
-                assignment.table[j] = M31::from(*hashtable_bits.get(i).and_then(|v| v.get(j)).unwrap_or(&0) as u32);
-                assignment.index[j] = M31::from(*query_indices.get(j).and_then(|v| v.get(i)).unwrap_or(&0) as u32);
-                assignment.value[j] = M31::from(*query_bits.get(j).and_then(|v| v.get(i)).unwrap_or(&0) as u32);
+                assignment.table[j] =
+                    M31::from(*hashtable_bits.get(i).and_then(|v| v.get(j)).unwrap_or(&0) as u32);
+                assignment.index[j] =
+                    M31::from(*query_indices.get(j).and_then(|v| v.get(i)).unwrap_or(&0) as u32);
+                assignment.value[j] =
+                    M31::from(*query_bits.get(j).and_then(|v| v.get(i)).unwrap_or(&0) as u32);
             }
             assignments.push(assignment);
         }
@@ -484,10 +491,12 @@ impl PermutationIndicesValidatorHashBitCircuit<M31> {
             for j in 0..VALIDATOR_COUNT {
                 assignment.real_keys[j] = M31::from(real_keys[j] as u32);
                 assignment.active_validator_bits[j] = M31::from(active_validator_bits[j]);
-                assignment.table_validator_hashes[j] = M31::from(*validator_hashes.get(i).and_then(|h| h.get(j)).unwrap_or(&0));
+                assignment.table_validator_hashes[j] =
+                    M31::from(*validator_hashes.get(i).and_then(|h| h.get(j)).unwrap_or(&0));
             }
             for j in 0..QUERY_SIZE {
-                assignment.query_indices[j] = M31::from(*shuffle_indices.get(j).unwrap_or(&0) as u32);
+                assignment.query_indices[j] =
+                    M31::from(*shuffle_indices.get(j).unwrap_or(&0) as u32);
                 assignment.query_validator_hashes[j] = M31::from(
                     *valid_validator_list
                         .get(*shuffle_indices.get(i).unwrap_or(&0) as usize)
@@ -760,8 +769,10 @@ pub fn end2end_permutation_assignments_with_beacon_data(
     real_committee_size: &Vec<u64>,
     padding_size: usize,
     validator_hashes: &Vec<Vec<u32>>,
-) -> (Vec<Vec<PermutationQueryCircuit<M31>>>, Vec<Vec<PermutationIndicesValidatorHashBitCircuit<M31>>>) {
-
+) -> (
+    Vec<Vec<PermutationQueryCircuit<M31>>>,
+    Vec<Vec<PermutationIndicesValidatorHashBitCircuit<M31>>>,
+) {
     let to_pad = padding_size - real_committee_size.last().copied().unwrap_or(0) as usize;
     let bit_len = raw_query_bits[0].len();
 
@@ -814,24 +825,118 @@ pub fn end2end_permutation_assignments_with_beacon_data(
     );
 
     let permutation_query_assignment_chunks: Vec<Vec<PermutationQueryCircuit<M31>>> =
-    permutation_query_assignments.chunks(16).map(|x| x.to_vec()).collect();
+        permutation_query_assignments
+            .chunks(16)
+            .map(|x| x.to_vec())
+            .collect();
 
-    let permutation_hashbit_assignments = PermutationIndicesValidatorHashBitCircuit::get_assignments_from_data(
-        valid_validator_list,
-        validator_hashes.clone(),
-        shuffle_indices,
-    );
-    //copy permutation_hashbit_assignments to 16 
-    let mut permutation_hashbit_assignment_chunks: Vec<Vec<PermutationIndicesValidatorHashBitCircuit<M31>>> = vec![permutation_hashbit_assignments.clone(); 1];
+    let permutation_hashbit_assignments =
+        PermutationIndicesValidatorHashBitCircuit::get_assignments_from_data(
+            valid_validator_list,
+            validator_hashes.clone(),
+            shuffle_indices,
+        );
+    //copy permutation_hashbit_assignments to 16
+    let mut permutation_hashbit_assignment_chunks: Vec<
+        Vec<PermutationIndicesValidatorHashBitCircuit<M31>>,
+    > = vec![permutation_hashbit_assignments.clone(); 1];
     permutation_hashbit_assignment_chunks[0].extend(permutation_hashbit_assignments.clone());
     permutation_hashbit_assignment_chunks.push(permutation_hashbit_assignment_chunks[0].clone());
 
-    (permutation_query_assignment_chunks, permutation_hashbit_assignment_chunks)
+    (
+        permutation_query_assignment_chunks,
+        permutation_hashbit_assignment_chunks,
+    )
 }
 
 #[test]
-fn test_end2end_permutation_assignments(){
-    let slot = 290000*32;
-    let (seed, shuffle_indices, committee_indices, pivots, activated_indices, flips, positions, flip_bits, round_hash_bits, attestations, aggregated_pubkeys, balance_list, real_committee_size, validator_tree, hash_bytes, plain_validators) = beacon::prepare_assignment_data(slot, slot + 32);
-    let (permutation_query_assignment_chunks, permutation_hashbit_assignment_chunks) = end2end_permutation_assignments_with_beacon_data(&round_hash_bits, &flip_bits, &positions, &activated_indices, &shuffle_indices, &committee_indices, &real_committee_size, shuffle::VALIDATOR_CHUNK_SIZE, &validator_tree[validator_tree.len()-1]);
+fn test_end2end_permutation_assignments() {
+    let slot = 290000 * 32;
+    let (
+        seed,
+        shuffle_indices,
+        committee_indices,
+        pivots,
+        activated_indices,
+        flips,
+        positions,
+        flip_bits,
+        round_hash_bits,
+        attestations,
+        aggregated_pubkeys,
+        balance_list,
+        real_committee_size,
+        validator_tree,
+        hash_bytes,
+        plain_validators,
+    ) = beacon::prepare_assignment_data(slot, slot + 32);
+    let (permutation_query_assignment_chunks, permutation_hashbit_assignment_chunks) =
+        end2end_permutation_assignments_with_beacon_data(
+            &round_hash_bits,
+            &flip_bits,
+            &positions,
+            &activated_indices,
+            &shuffle_indices,
+            &committee_indices,
+            &real_committee_size,
+            shuffle::VALIDATOR_CHUNK_SIZE,
+            &validator_tree[validator_tree.len() - 1],
+        );
+}
+
+#[test]
+fn test_permutation_hashbit_witnesses_end() {
+    stacker::grow(128 * 1024 * 1024 * 1024, || {
+        let epoch = 290000;
+        let slot = epoch * 32;
+        let circuit_name = format!("permutationhashbit_{}", VALIDATOR_COUNT);
+        let circuit = PermutationIndicesValidatorHashBitCircuit::default();
+        let witnesses_dir = format!("./witnesses/{}", circuit_name);
+        let permutation_query_handle = thread::spawn(|| {
+            let circuit_name = "permutationquery";
+            let circuit = PermutationQueryCircuit::default();
+            let witnesses_dir = format!("./witnesses/{}", circuit_name);
+            get_solver(&witnesses_dir, circuit_name, circuit)
+        });
+        let solver_permutation_hash = get_solver(&witnesses_dir, &circuit_name, circuit);
+        let solver_permutation_query = permutation_query_handle.join().unwrap();
+        let (
+            seed,
+            shuffle_indices,
+            committee_indices,
+            pivots,
+            activated_indices,
+            flips,
+            positions,
+            flip_bits,
+            round_hash_bits,
+            attestations,
+            aggregated_pubkeys,
+            balance_list,
+            real_committee_size,
+            validator_tree,
+            hash_bytes,
+            plain_validators,
+        ) = beacon::prepare_assignment_data(slot, slot + 32);
+        let (permutation_query_assignment_chunks, permutation_hashbit_assignment_chunks) =
+            end2end_permutation_assignments_with_beacon_data(
+                &round_hash_bits,
+                &flip_bits,
+                &positions,
+                &activated_indices,
+                &shuffle_indices,
+                &committee_indices,
+                &real_committee_size,
+                shuffle::VALIDATOR_CHUNK_SIZE,
+                &validator_tree[validator_tree.len() - 1],
+            );
+        end2end_permutation_query_witnesses_with_assignments(
+            solver_permutation_query,
+            permutation_query_assignment_chunks,
+        );
+        // end2end_permutation_hashbit_witnesses_with_assignments(
+        //     solver_permutation_hash,
+        //     permutation_hashbit_assignment_chunks,
+        // );
+    });
 }

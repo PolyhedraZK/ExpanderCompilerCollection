@@ -1,24 +1,32 @@
 use expander_compiler::frontend::{M31Config, WitnessSolver};
 
-use expander_compiler::frontend::*;
 use crate::attestation::Attestation;
-use crate::{beacon, bls_verifier, merkle};
 use crate::bls_verifier::{
-    end2end_blsverifier_witness, end2end_blsverifier_witnesses_with_assignments, generate_blsverifier_witnesses, BLSVERIFIERCircuit, PairingEntry
+    end2end_blsverifier_witness, end2end_blsverifier_witnesses_with_assignments,
+    generate_blsverifier_witnesses, BLSVERIFIERCircuit, PairingEntry,
 };
 use crate::hashtable::{
-    self, end2end_hashtable_witnesses, end2end_hashtable_witnesses_with_assignments, generate_hash_witnesses, HASHTABLECircuit, HashTableJson
+    self, end2end_hashtable_witnesses, end2end_hashtable_witnesses_with_assignments,
+    generate_hash_witnesses, HASHTABLECircuit, HashTableJson,
 };
 use crate::permutation::{
-    self, end2end_permutation_hashbit_witness, end2end_permutation_hashbit_witnesses_with_assignments, end2end_permutation_query_witness, end2end_permutation_query_witnesses_with_assignments, generate_permutation_hashbit_witnesses, PermutationHashEntry, PermutationIndicesValidatorHashBitCircuit, PermutationQueryCircuit, PermutationQueryEntry
+    self, end2end_permutation_hashbit_witness,
+    end2end_permutation_hashbit_witnesses_with_assignments, end2end_permutation_query_witness,
+    end2end_permutation_query_witnesses_with_assignments, generate_permutation_hashbit_witnesses,
+    PermutationHashEntry, PermutationIndicesValidatorHashBitCircuit, PermutationQueryCircuit,
+    PermutationQueryEntry,
 };
 use crate::shuffle::{
-    self, end2end_shuffle_witnesses, end2end_shuffle_witnesses_with_assignments, generate_shuffle_witnesses, ShuffleCircuit, ShuffleJson
+    self, end2end_shuffle_witnesses, end2end_shuffle_witnesses_with_assignments,
+    generate_shuffle_witnesses, ShuffleCircuit, ShuffleJson,
 };
 use crate::utils::{get_solver, read_from_json_file};
 use crate::validator::{
-    self, ConvertValidatorListToMerkleTreeCircuit, MerkleSubTreeWithLimitCircuit, ValidatorPlain, ValidatorSubTreeJson
+    self, ConvertValidatorListToMerkleTreeCircuit, MerkleSubTreeWithLimitCircuit, ValidatorPlain,
+    ValidatorSubTreeJson,
 };
+use crate::{beacon, bls_verifier, merkle};
+use expander_compiler::frontend::*;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -245,7 +253,10 @@ pub fn end2end_witness_streamline_end_go_assignment(
     });
 
     let permutation_hash_thread = thread::spawn(move || {
-        end2end_permutation_hashbit_witness(solver_permutation_hashbit, permutation_hash_data_result);
+        end2end_permutation_hashbit_witness(
+            solver_permutation_hashbit,
+            permutation_hash_data_result,
+        );
     });
 
     let validator_subtree_thread = thread::spawn(move || {
@@ -468,12 +479,39 @@ pub fn end2end_witness_streamline_go_assignment(stage: &str) {
 //     }
 // }
 
-pub fn end2end_end_assignments(epoch: u64) -> (Vec<Vec<ShuffleCircuit<M31>>>, Vec<Vec<HASHTABLECircuit<M31>>>, Vec<Vec<BLSVERIFIERCircuit<M31>>>, Vec<Vec<PermutationQueryCircuit<M31>>>, Vec<Vec<PermutationIndicesValidatorHashBitCircuit<M31>>>, Vec<Vec<ConvertValidatorListToMerkleTreeCircuit<M31>>>, Vec<Vec<MerkleSubTreeWithLimitCircuit<M31>>>) {
-    let slot: u64 = epoch*32;
-    let (seed, shuffle_indices, committee_indices, pivots, activated_indices,  flips, positions, flip_bits, round_hash_bits, attestations, aggregated_pubkeys, balance_list, real_committee_size, validator_tree, hash_bytes, plain_validators) = beacon::prepare_assignment_data(slot, slot + 16);
+pub fn end2end_end_assignments(
+    epoch: u64,
+) -> (
+    Vec<Vec<ShuffleCircuit<M31>>>,
+    Vec<Vec<HASHTABLECircuit<M31>>>,
+    Vec<Vec<BLSVERIFIERCircuit<M31>>>,
+    Vec<Vec<PermutationQueryCircuit<M31>>>,
+    Vec<Vec<PermutationIndicesValidatorHashBitCircuit<M31>>>,
+    Vec<Vec<ConvertValidatorListToMerkleTreeCircuit<M31>>>,
+    Vec<Vec<MerkleSubTreeWithLimitCircuit<M31>>>,
+) {
+    let slot: u64 = epoch * 32;
+    let (
+        seed,
+        shuffle_indices,
+        committee_indices,
+        pivots,
+        activated_indices,
+        flips,
+        positions,
+        flip_bits,
+        round_hash_bits,
+        attestations,
+        aggregated_pubkeys,
+        balance_list,
+        real_committee_size,
+        validator_tree,
+        hash_bytes,
+        plain_validators,
+    ) = beacon::prepare_assignment_data(slot, slot + 16);
     let shuffle_assignments = shuffle::end2end_shuffle_assignments_with_beacon_data(
         plain_validators,
-        real_committee_size.clone(), 
+        real_committee_size.clone(),
         shuffle_indices.clone(),
         committee_indices.clone(),
         attestations.clone(),
@@ -482,24 +520,73 @@ pub fn end2end_end_assignments(epoch: u64) -> (Vec<Vec<ShuffleCircuit<M31>>>, Ve
         flips,
         positions.clone(),
         flip_bits.clone(),
-        validator_tree[validator_tree.len()-1].clone(),
+        validator_tree[validator_tree.len() - 1].clone(),
         balance_list,
         0,
         16,
     );
-    let hash_assignments = hashtable::end2end_hashtable_assignments_with_beacon_data(&seed, hash_bytes);
-    let blsverifier_assignments = bls_verifier::end2end_blsverifier_assignments_with_beacon_data(aggregated_pubkeys, attestations.into_iter().flatten().collect());
-    let (permutation_query_assignment_chunks, permutation_hashbit_assignment_chunks) = permutation::end2end_permutation_assignments_with_beacon_data(&round_hash_bits, &flip_bits, &positions, &activated_indices, &shuffle_indices, &committee_indices, &real_committee_size, shuffle::VALIDATOR_CHUNK_SIZE, &validator_tree[validator_tree.len()-1]);
-    let (convert_validator_subtree_assignments, merkle_subtree_with_limit_assignments) = validator::end2end_validator_tree_assignments(validator_tree, activated_indices.len() as u64);
-    (shuffle_assignments, hash_assignments, blsverifier_assignments, permutation_query_assignment_chunks, permutation_hashbit_assignment_chunks, convert_validator_subtree_assignments, merkle_subtree_with_limit_assignments)
+    let hash_assignments =
+        hashtable::end2end_hashtable_assignments_with_beacon_data(&seed, hash_bytes);
+    let blsverifier_assignments = bls_verifier::end2end_blsverifier_assignments_with_beacon_data(
+        aggregated_pubkeys,
+        attestations.into_iter().flatten().collect(),
+    );
+    let (permutation_query_assignment_chunks, permutation_hashbit_assignment_chunks) =
+        permutation::end2end_permutation_assignments_with_beacon_data(
+            &round_hash_bits,
+            &flip_bits,
+            &positions,
+            &activated_indices,
+            &shuffle_indices,
+            &committee_indices,
+            &real_committee_size,
+            shuffle::VALIDATOR_CHUNK_SIZE,
+            &validator_tree[validator_tree.len() - 1],
+        );
+    let (convert_validator_subtree_assignments, merkle_subtree_with_limit_assignments) =
+        validator::end2end_validator_tree_assignments(
+            validator_tree,
+            activated_indices.len() as u64,
+        );
+    (
+        shuffle_assignments,
+        hash_assignments,
+        blsverifier_assignments,
+        permutation_query_assignment_chunks,
+        permutation_hashbit_assignment_chunks,
+        convert_validator_subtree_assignments,
+        merkle_subtree_with_limit_assignments,
+    )
 }
 
-pub fn end2end_start_assignments(epoch: u64) -> (Vec<Vec<ShuffleCircuit<M31>>>, Vec<Vec<BLSVERIFIERCircuit<M31>>>) {
-    let slot: u64 = epoch*32;
-    let (seed, shuffle_indices, committee_indices, pivots, activated_indices,  flips, positions, flip_bits, round_hash_bits, attestations, aggregated_pubkeys, balance_list, real_committee_size, validator_tree, hash_bytes, plain_validators) = beacon::prepare_assignment_data(slot+16, slot + 32);
+pub fn end2end_start_assignments(
+    epoch: u64,
+) -> (
+    Vec<Vec<ShuffleCircuit<M31>>>,
+    Vec<Vec<BLSVERIFIERCircuit<M31>>>,
+) {
+    let slot: u64 = epoch * 32;
+    let (
+        seed,
+        shuffle_indices,
+        committee_indices,
+        pivots,
+        activated_indices,
+        flips,
+        positions,
+        flip_bits,
+        round_hash_bits,
+        attestations,
+        aggregated_pubkeys,
+        balance_list,
+        real_committee_size,
+        validator_tree,
+        hash_bytes,
+        plain_validators,
+    ) = beacon::prepare_assignment_data(slot + 16, slot + 32);
     let shuffle_assignments = shuffle::end2end_shuffle_assignments_with_beacon_data(
         plain_validators,
-        real_committee_size.clone(), 
+        real_committee_size.clone(),
         shuffle_indices.clone(),
         committee_indices.clone(),
         attestations.clone(),
@@ -508,12 +595,15 @@ pub fn end2end_start_assignments(epoch: u64) -> (Vec<Vec<ShuffleCircuit<M31>>>, 
         flips,
         positions.clone(),
         flip_bits.clone(),
-        validator_tree[validator_tree.len()-1].clone(),
+        validator_tree[validator_tree.len() - 1].clone(),
         balance_list,
         0,
         16,
     );
-    let blsverifier_assignments = bls_verifier::end2end_blsverifier_assignments_with_beacon_data(aggregated_pubkeys, attestations.into_iter().flatten().collect());
+    let blsverifier_assignments = bls_verifier::end2end_blsverifier_assignments_with_beacon_data(
+        aggregated_pubkeys,
+        attestations.into_iter().flatten().collect(),
+    );
     (shuffle_assignments, blsverifier_assignments)
 }
 
@@ -522,67 +612,90 @@ pub fn end2end_witness_streamline_from_beacon_data(epoch: u64, stage: &str) {
         log::debug!("end stage");
         let start_time = std::time::Instant::now();
         //get the solver for shuffle
-        let circuit_name = &format!("shuffle_{}", shuffle::VALIDATOR_CHUNK_SIZE);
-        let circuit = ShuffleCircuit::default();
-        let witnesses_dir = &format!("./witnesses/{}", circuit_name);
-        let solver_shuffle = get_solver(witnesses_dir, circuit_name, circuit);
+        let shuffle_handle = thread::spawn(|| {
+            let circuit_name = format!("shuffle_{}", shuffle::VALIDATOR_CHUNK_SIZE);
+            let circuit = ShuffleCircuit::default();
+            let witnesses_dir = format!("./witnesses/{}", circuit_name);
+            get_solver(&witnesses_dir, &circuit_name, circuit)
+        });
 
-        //get the solver for hash
-        let circuit_name = &format!("hashtable{}", hashtable::HASHTABLESIZE);
-        let circuit = HASHTABLECircuit::default();
-        let witnesses_dir = &format!("./witnesses/{}", circuit_name);
-        let solver_hash = get_solver(witnesses_dir, circuit_name, circuit);
+        //get the solver for hashtable
+        let hashtable_handle = thread::spawn(|| {
+            let circuit_name = format!("hashtable{}", hashtable::HASHTABLESIZE);
+            let circuit = HASHTABLECircuit::default();
+            let witnesses_dir = format!("./witnesses/{}", circuit_name);
+            get_solver(&witnesses_dir, &circuit_name, circuit)
+        });
 
         //get the solver for bls verifier
-        let circuit_name = "blsverifier";
-        let circuit = BLSVERIFIERCircuit::default();
-        let witnesses_dir = &format!("./witnesses/{}", circuit_name);
-        let solver_blsverifier = get_solver(witnesses_dir, circuit_name, circuit);
+        let blsverifier_handle = thread::spawn(|| {
+            let circuit_name = "blsverifier";
+            let circuit = BLSVERIFIERCircuit::default();
+            let witnesses_dir = format!("./witnesses/{}", circuit_name);
+            get_solver(&witnesses_dir, circuit_name, circuit)
+        });
+
+        let solver_shuffle = shuffle_handle.join().unwrap();
+        let solver_hashtable = hashtable_handle.join().unwrap();
+        let solver_blsverifier = blsverifier_handle.join().unwrap();
 
         //get the solver for permutation query
-        let circuit_name = "permutationquery";
-        let circuit = PermutationQueryCircuit::default();
-        let witnesses_dir = &format!("./witnesses/{}", circuit_name);
-        let solver_permutation_query = get_solver(witnesses_dir, circuit_name, circuit);
-
-        //get the solver for permutation hash
-        let circuit_name = &format!("permutationhashbit_{}", permutation::VALIDATOR_COUNT);
-        let circuit = PermutationIndicesValidatorHashBitCircuit::default();
-        let witnesses_dir = &format!("./witnesses/{}", circuit_name);
-        let solver_permutation_hash = get_solver(witnesses_dir, circuit_name, circuit);
+        let permutation_query_handle = thread::spawn(|| {
+            let circuit_name = "permutationquery";
+            let circuit = PermutationQueryCircuit::default();
+            let witnesses_dir = format!("./witnesses/{}", circuit_name);
+            get_solver(&witnesses_dir, circuit_name, circuit)
+        });
 
         //get the solver for validator subtree
-        let circuit_name = &format!("validatorsubtree{}", validator::SUBTREE_SIZE);
-        let circuit = ConvertValidatorListToMerkleTreeCircuit::default();
-        let witnesses_dir = &format!("./witnesses/{}", circuit_name);
-        let solver_validator_subtree = get_solver(witnesses_dir, circuit_name, circuit);
+        let validator_subtree_handle = thread::spawn(|| {
+            let circuit_name = format!("validatorsubtree{}", validator::SUBTREE_SIZE);
+            let circuit = ConvertValidatorListToMerkleTreeCircuit::default();
+            let witnesses_dir = format!("./witnesses/{}", circuit_name);
+            get_solver(&witnesses_dir, &circuit_name, circuit)
+        });
 
         //get the solver for merkle subtree with limit
-        let circuit_name = &format!("merklesubtree{}", validator::SUBTREE_SIZE);
-        let circuit = MerkleSubTreeWithLimitCircuit::default();
-        let witnesses_dir = &format!("./witnesses/{}", circuit_name);
-        let solver_merkle_subtree_with_limit = get_solver(witnesses_dir, circuit_name, circuit);
+        let merkle_subtree_with_limit_handle = thread::spawn(|| {
+            let circuit_name = format!("merklesubtree{}", validator::SUBTREE_SIZE);
+            let circuit = MerkleSubTreeWithLimitCircuit::default();
+            let witnesses_dir = format!("./witnesses/{}", circuit_name);
+            get_solver(&witnesses_dir, &circuit_name, circuit)
+        });
+        let solver_permutation_query = permutation_query_handle.join().unwrap();
+        let solver_validator_subtree = validator_subtree_handle.join().unwrap();
+        let solver_merkle_subtree_with_limit = merkle_subtree_with_limit_handle.join().unwrap();
 
-        let (shuffle_assignments, hashtable_assignments, bls_verifier_assignments, permutation_query_assignments, permutation_hashbit_assignments, convert_validator_subtree_assignments, merkle_subtree_with_limit_assignments) = end2end_end_assignments(epoch);
+        //get the solver for permutation hash
+        let circuit_name = format!("permutationhashbit_{}", permutation::VALIDATOR_COUNT);
+        let circuit = PermutationIndicesValidatorHashBitCircuit::default();
+        let witnesses_dir = format!("./witnesses/{}", circuit_name);
+        let solver_permutation_hash = get_solver(&witnesses_dir, &circuit_name, circuit);
+        log::debug!("loaded solvers");
 
+        let (
+            shuffle_assignments,
+            hashtable_assignments,
+            bls_verifier_assignments,
+            permutation_query_assignments,
+            permutation_hashbit_assignments,
+            convert_validator_subtree_assignments,
+            merkle_subtree_with_limit_assignments,
+        ) = end2end_end_assignments(epoch);
+        log::debug!("loaded assignments");
         let shuffle_thread = thread::spawn(move || {
-            end2end_shuffle_witnesses_with_assignments(
-                solver_shuffle,
-                shuffle_assignments,
-            );
+            end2end_shuffle_witnesses_with_assignments(solver_shuffle, shuffle_assignments, 0);
         });
 
         let hash_thread = thread::spawn(move || {
-            end2end_hashtable_witnesses_with_assignments(
-                solver_hash,
-                hashtable_assignments,
-            );
+            end2end_hashtable_witnesses_with_assignments(solver_hashtable, hashtable_assignments);
         });
 
         let blsverifier_thread = thread::spawn(move || {
             end2end_blsverifier_witnesses_with_assignments(
                 solver_blsverifier,
                 bls_verifier_assignments,
+                0,
             );
         });
 
@@ -603,14 +716,14 @@ pub fn end2end_witness_streamline_from_beacon_data(epoch: u64, stage: &str) {
         let validator_subtree_thread = thread::spawn(move || {
             validator::end2end_validator_subtree_witnesses_with_assignments(
                 solver_validator_subtree,
-                convert_validator_subtree_assignments
+                convert_validator_subtree_assignments,
             );
         });
 
         let merkle_subtree_with_limit_thread = thread::spawn(move || {
             validator::end2end_merkle_subtree_with_limit_witnesses_with_assignments(
                 solver_merkle_subtree_with_limit,
-                merkle_subtree_with_limit_assignments
+                merkle_subtree_with_limit_assignments,
             );
         });
 
@@ -637,9 +750,6 @@ pub fn end2end_witness_streamline_from_beacon_data(epoch: u64, stage: &str) {
             "generate end2end end witness, time: {:?}",
             end_time.duration_since(start_time)
         );
-
-
-        
     } else if stage == "start" {
         log::debug!("start stage");
         let start_time = std::time::Instant::now();
@@ -661,6 +771,7 @@ pub fn end2end_witness_streamline_from_beacon_data(epoch: u64, stage: &str) {
             end2end_shuffle_witnesses_with_assignments(
                 solver_shuffle,
                 shuffle_assignments,
+                16 * 64 / 16,
             );
         });
 
@@ -668,6 +779,7 @@ pub fn end2end_witness_streamline_from_beacon_data(epoch: u64, stage: &str) {
             end2end_blsverifier_witnesses_with_assignments(
                 solver_blsverifier,
                 bls_verifier_assignments,
+                16 * 64 / 16,
             );
         });
 
@@ -680,18 +792,29 @@ pub fn end2end_witness_streamline_from_beacon_data(epoch: u64, stage: &str) {
             "generate end2end start witness, time: {:?}",
             end_time.duration_since(start_time)
         );
-
     }
 }
 
 #[test]
-fn test_end2end_end_assignments(){
+fn test_end2end_end_assignments() {
     let epoch = 290000;
     end2end_end_assignments(epoch);
 }
 
 #[test]
-fn test_end2end_start_assignments(){
+fn test_end2end_start_assignments() {
     let epoch = 290000;
     end2end_start_assignments(epoch);
+}
+
+#[test]
+fn test_end2end_witness_streamline_from_beacon_data() {
+    let epoch = 290000;
+    let stage = "end";
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Debug) // set global log level to debug
+        .init();
+    stacker::grow(128 * 1024 * 1024 * 1024, || {
+        end2end_witness_streamline_from_beacon_data(epoch, stage);
+    });
 }

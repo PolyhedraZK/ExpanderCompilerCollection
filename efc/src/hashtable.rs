@@ -65,7 +65,13 @@ impl HASHTABLECircuit<M31> {
         }
         assignments
     }
-    pub fn from_beacon(&mut self, seed: &[u8], shuffle_round: usize, start_index: usize, output: &[[u8; 32]]) {
+    pub fn from_beacon(
+        &mut self,
+        seed: &[u8],
+        shuffle_round: usize,
+        start_index: usize,
+        output: &[[u8; 32]],
+    ) {
         for i in 0..SHA256LEN {
             self.seed[i] = M31::from(seed[i] as u32);
         }
@@ -80,14 +86,23 @@ impl HASHTABLECircuit<M31> {
             }
         }
     }
-    pub fn get_assignments_from_beacon_data(seed: &[u8], output: &[[u8; 32]], subcircuit_count: usize) -> Vec<Self> {
+    pub fn get_assignments_from_beacon_data(
+        seed: &[u8],
+        output: &[[u8; 32]],
+        subcircuit_count: usize,
+    ) -> Vec<Self> {
         let mut assignments = vec![];
         let size_per_round = output.len() / beacon::SHUFFLEROUND;
         for i in 0..subcircuit_count {
             let current_round = i * HASHTABLESIZE / size_per_round;
             let start_index = (i * HASHTABLESIZE) % size_per_round;
             let mut hash_assignment = HASHTABLECircuit::default();
-            hash_assignment.from_beacon(seed, current_round, start_index, &output[i*HASHTABLESIZE..(i+1)*HASHTABLESIZE]);
+            hash_assignment.from_beacon(
+                seed,
+                current_round,
+                start_index,
+                &output[i * HASHTABLESIZE..(i + 1) * HASHTABLESIZE],
+            );
             assignments.push(hash_assignment);
         }
         assignments
@@ -283,7 +298,8 @@ pub fn end2end_hashtable_assignments_with_beacon_data(
     let subcircuit_count = hash_bytes.len() / HASHTABLESIZE;
     //get assignments
     let start_time = std::time::Instant::now();
-    let assignments = HASHTABLECircuit::get_assignments_from_beacon_data(seed, &hash_bytes, subcircuit_count);
+    let assignments =
+        HASHTABLECircuit::get_assignments_from_beacon_data(seed, &hash_bytes, subcircuit_count);
     let end_time = std::time::Instant::now();
     log::debug!(
         "assigned assignments time: {:?}",
@@ -294,11 +310,61 @@ pub fn end2end_hashtable_assignments_with_beacon_data(
     assignment_chunks
 }
 
-
+#[test]
+fn test_end2end_hashtable_assignments() {
+    let slot = 290000 * 32;
+    let (
+        seed,
+        shuffle_indices,
+        committee_indices,
+        pivots,
+        activated_indices,
+        flips,
+        positions,
+        flip_bits,
+        round_hash_bits,
+        attestations,
+        aggregated_pubkeys,
+        balance_list,
+        real_committee_size,
+        validator_tree,
+        hash_bytes,
+        plain_validators,
+    ) = beacon::prepare_assignment_data(slot, slot + 32);
+    let assignments = end2end_hashtable_assignments_with_beacon_data(&seed, hash_bytes);
+}
 
 #[test]
-fn test_end2end_hashtable_assignments(){
-    let slot = 290000*32;
-    let (seed, shuffle_indices, committee_indices, pivots, activated_indices, flips, positions, flip_bits, round_hash_bits, attestations, aggregated_pubkeys, balance_list, real_committee_size, validator_tree, hash_bytes, plain_validators) = beacon::prepare_assignment_data(slot, slot + 32);
-    let assignments = end2end_hashtable_assignments_with_beacon_data(&seed, hash_bytes);
+fn test_hashtable_witnesses_end() {
+    stacker::grow(128 * 1024 * 1024 * 1024, || {
+        let epoch = 290000;
+        let slot = epoch * 32;
+        let hashtable_handle = thread::spawn(|| {
+            let circuit_name = format!("hashtable{}", HASHTABLESIZE);
+            let circuit = HASHTABLECircuit::default();
+            let witnesses_dir = format!("./witnesses/{}", circuit_name);
+            get_solver(&witnesses_dir, &circuit_name, circuit)
+        });
+        let solver_hashtable = hashtable_handle.join().unwrap();
+        let (
+            seed,
+            shuffle_indices,
+            committee_indices,
+            pivots,
+            activated_indices,
+            flips,
+            positions,
+            flip_bits,
+            round_hash_bits,
+            attestations,
+            aggregated_pubkeys,
+            balance_list,
+            real_committee_size,
+            validator_tree,
+            hash_bytes,
+            plain_validators,
+        ) = beacon::prepare_assignment_data(slot, slot + 32);
+        let assignments = end2end_hashtable_assignments_with_beacon_data(&seed, hash_bytes);
+        end2end_hashtable_witnesses_with_assignments(solver_hashtable, assignments);
+    });
 }

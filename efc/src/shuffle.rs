@@ -1,22 +1,22 @@
 use crate::attestation::Attestation;
-use ark_bls12_381::G1Affine as BlsG1Affine;
-use ark_serialize::CanonicalDeserialize;
-use num_traits::real;
-use crate::{beacon, bls};
 use crate::bls::{aggregate_attestation_public_key_flatten, check_pubkey_key_bls};
 use crate::bls_verifier::G1Json;
 use crate::utils::{get_solver, read_from_json_file, write_witness_to_file};
 use crate::validator::{ValidatorPlain, ValidatorSSZ};
+use crate::{beacon, bls};
+use ark_bls12_381::G1Affine as BlsG1Affine;
+use ark_serialize::CanonicalDeserialize;
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use circuit_std_rs::gnark::emulated::sw_bls12381::g1::*;
 use circuit_std_rs::sha256::m31_utils::big_array_add;
 use circuit_std_rs::utils::{register_hint, simple_select};
+use core::panic;
 use expander_compiler::frontend::extra::*;
 use expander_compiler::frontend::*;
+use num_traits::real;
 use serde::de::{Deserializer, SeqAccess, Visitor};
 use serde::Deserialize;
-use core::panic;
 use std::fmt;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -248,23 +248,28 @@ impl ShuffleCircuit<M31> {
                 self.withdrawable_epoch[i][j] = M31::from(*withdrawable_epoch_byte as u32);
             }
         }
-    }pub fn from_beacon(
+    }
+    pub fn from_beacon(
         &mut self,
         circuit_id: usize,
-        real_committee_size: &[u64], 
-        shuffle_indices: &[u64], 
-        committee_indices: &[u64], 
+        real_committee_size: &[u64],
+        shuffle_indices: &[u64],
+        committee_indices: &[u64],
         slot_attestations: &[Vec<Attestation>],
         aggregated_pubkeys: &[BlsG1Affine],
-        pivots: &[u64], 
+        pivots: &[u64],
         flips: &[Vec<u64>],
         positions: &[Vec<u64>],
         flip_bits: &[Vec<u8>],
         validator_hashes: &[Vec<u32>],
-        balance_list: &[u64], 
+        balance_list: &[u64],
         plain_validators: &[ValidatorPlain],
     ) {
-        let start: usize = real_committee_size.iter().take(circuit_id).copied().sum::<u64>() as usize;
+        let start: usize = real_committee_size
+            .iter()
+            .take(circuit_id)
+            .copied()
+            .sum::<u64>() as usize;
         let real_validator_count = shuffle_indices.len();
         //assign shuffle_json
         self.start_index = M31::from(start as u32);
@@ -273,18 +278,21 @@ impl ShuffleCircuit<M31> {
         let upper = (start + VALIDATOR_CHUNK_SIZE).min(real_validator_count as usize);
         let sub_shuffle_indices = &shuffle_indices[lower..upper];
         let sub_committee_indices = &committee_indices[lower..upper];
-        let slot_idx = circuit_id/ beacon::MAXCOMMITTEESPERSLOT;
-        let committee_idx = circuit_id% beacon::MAXCOMMITTEESPERSLOT;
+        let slot_idx = circuit_id / beacon::MAXCOMMITTEESPERSLOT;
+        let committee_idx = circuit_id % beacon::MAXCOMMITTEESPERSLOT;
         let mut att = &slot_attestations[0][0];
         let mut pubkey: [[u8; 48]; 2] = [[0; 48]; 2];
         if slot_attestations.len() == 0 {
             panic!("slot_attestations is empty");
         }
-        if slot_attestations[slot_idx].len() != 0 && slot_attestations[slot_idx].len() > committee_idx{
+        if slot_attestations[slot_idx].len() != 0
+            && slot_attestations[slot_idx].len() > committee_idx
+        {
             pubkey = bls::affine_point_to_bytes_g1(&aggregated_pubkeys[circuit_id]);
             att = &slot_attestations[slot_idx][committee_idx];
         }
-        let aggregated_bits = beacon::attestation_get_aggregation_bits_from_bytes(&att.aggregation_bits);
+        let aggregated_bits =
+            beacon::attestation_get_aggregation_bits_from_bytes(&att.aggregation_bits);
         for i in 0..VALIDATOR_CHUNK_SIZE {
             self.shuffle_indices[i] = M31::from(0);
             self.committee_indices[i] = M31::from(0);
@@ -308,18 +316,21 @@ impl ShuffleCircuit<M31> {
         let sub_positions = &positions[lower..upper];
         let sub_flip_bits = &flip_bits[lower..upper];
         for i in 0..SHUFFLE_ROUND {
-            for j in 0.. VALIDATOR_CHUNK_SIZE {
+            for j in 0..VALIDATOR_CHUNK_SIZE {
                 self.position_results[i * VALIDATOR_CHUNK_SIZE + j] = neg_one;
                 self.position_bit_results[i * VALIDATOR_CHUNK_SIZE + j] = M31::from(0);
                 self.flip_results[i * VALIDATOR_CHUNK_SIZE + j] = neg_one;
                 if j < sub_flips.len() {
-                    self.flip_results[i * VALIDATOR_CHUNK_SIZE + j] = M31::from(sub_flips[j][i] as u32);
+                    self.flip_results[i * VALIDATOR_CHUNK_SIZE + j] =
+                        M31::from(sub_flips[j][i] as u32);
                 }
                 if j < sub_positions.len() {
-                    self.position_results[i * VALIDATOR_CHUNK_SIZE + j] = M31::from(sub_positions[j][i] as u32);
+                    self.position_results[i * VALIDATOR_CHUNK_SIZE + j] =
+                        M31::from(sub_positions[j][i] as u32);
                 }
                 if j < sub_flip_bits.len() {
-                    self.position_bit_results[i * VALIDATOR_CHUNK_SIZE + j] = M31::from(sub_flip_bits[j][i] as u32);
+                    self.position_bit_results[i * VALIDATOR_CHUNK_SIZE + j] =
+                        M31::from(sub_flip_bits[j][i] as u32);
                 }
             }
         }
@@ -329,7 +340,8 @@ impl ShuffleCircuit<M31> {
             for j in 0..POSEIDON_HASH_LENGTH {
                 self.validator_hashes[i][j] = M31::from(validator_hashes[0][j]);
                 if i < sub_committee_indices.len() {
-                    self.validator_hashes[i][j] = M31::from(validator_hashes[sub_committee_indices[i] as usize][j]);
+                    self.validator_hashes[i][j] =
+                        M31::from(validator_hashes[sub_committee_indices[i] as usize][j]);
                 }
             }
         }
@@ -349,9 +361,9 @@ impl ShuffleCircuit<M31> {
         }
 
         for i in 0..VALIDATOR_CHUNK_SIZE {
-
             //assign validator
-            let validator = plain_validators[sub_committee_indices[i] as usize].clone();
+            let validator =
+                plain_validators[*sub_committee_indices.get(i).unwrap_or(&0) as usize].clone();
 
             //assign pubkey
             let raw_pubkey = validator.public_key.clone();
@@ -448,7 +460,7 @@ impl ShuffleCircuit<M31> {
     }
     pub fn get_assignments_from_beacon_data(
         plain_validators: Vec<ValidatorPlain>,
-        real_committee_size: Vec<u64>, 
+        real_committee_size: Vec<u64>,
         shuffle_indices: Vec<u64>,
         committee_indices: Vec<u64>,
         slot_attestations: Vec<Vec<Attestation>>,
@@ -462,6 +474,8 @@ impl ShuffleCircuit<M31> {
         start: usize,
         end: usize,
     ) -> Vec<Self> {
+        let start = start * beacon::MAXCOMMITTEESPERSLOT;
+        let end = end * beacon::MAXCOMMITTEESPERSLOT;
         let mut handles = vec![];
         let plain_validators = Arc::new(plain_validators);
         let real_committee_size = Arc::new(real_committee_size);
@@ -475,7 +489,7 @@ impl ShuffleCircuit<M31> {
         let flip_bits = Arc::new(flip_bits);
         let validator_hashes = Arc::new(validator_hashes);
         let balance_list = Arc::new(balance_list);
-        let assignments = Arc::new(Mutex::new(vec![None; end-start]));
+        let assignments = Arc::new(Mutex::new(vec![None; end - start]));
         for i in (start..end) {
             let assignments = Arc::clone(&assignments);
             let target_plain_validators = Arc::clone(&plain_validators);
@@ -490,7 +504,7 @@ impl ShuffleCircuit<M31> {
             let target_flip_bits = Arc::clone(&flip_bits);
             let target_validator_hashes = Arc::clone(&validator_hashes);
             let target_balance_list = Arc::clone(&balance_list);
-            
+
             let handle = thread::spawn(move || {
                 let mut assignment = ShuffleCircuit::<M31>::default();
                 assignment.from_beacon(
@@ -510,7 +524,7 @@ impl ShuffleCircuit<M31> {
                 );
 
                 let mut assignments = assignments.lock().unwrap();
-                assignments[i] = Some(assignment);
+                assignments[i - start] = Some(assignment);
             });
             handles.push(handle);
         }
@@ -651,7 +665,7 @@ impl GenericDefine<M31Config> for ShuffleCircuit<Variable> {
             for i in 0..8 {
                 validator.withdrawable_epoch[i] = self.withdrawable_epoch[index][i];
             }
-            let hash = validator.hash(builder);
+            let hash = validator.poseidon_hash(builder);
             for (i, hashbit) in hash.iter().enumerate().take(8) {
                 builder.assert_is_equal(hashbit, self.validator_hashes[index][i]);
             }
@@ -874,53 +888,51 @@ pub fn end2end_shuffle_witnesses(
     });
 }
 
-
 pub fn end2end_shuffle_witnesses_with_assignments(
     w_s: WitnessSolver<M31Config>,
     assignment_chunks: Vec<Vec<ShuffleCircuit<M31>>>,
+    offset: usize,
 ) {
-        let circuit_name = &format!("shuffle_{}", VALIDATOR_CHUNK_SIZE);
-
-        //get solver
-        log::debug!("preparing {} solver...", circuit_name);
-        let start_time = std::time::Instant::now();
-        let witnesses_dir = format!("./witnesses/{}", circuit_name);
-        let witness_solver = Arc::new(w_s);
-        let handles = assignment_chunks
-            .into_iter()
-            .enumerate()
-            .map(|(i, assignments)| {
-                let witness_solver = Arc::clone(&witness_solver);
-                let witnesses_dir_clone = witnesses_dir.clone();
-                thread::spawn(move || {
-                    let mut hint_registry = HintRegistry::<M31>::new();
-                    register_hint(&mut hint_registry);
-                    let witness = witness_solver
-                        .solve_witnesses_with_hints(&assignments, &mut hint_registry)
-                        .unwrap();
-                    write_witness_to_file(
-                        &format!("{}/witness_{}.txt", witnesses_dir_clone, i),
-                        witness,
-                    )
-                })
+    let circuit_name = &format!("shuffle_{}", VALIDATOR_CHUNK_SIZE);
+    //get solver
+    log::debug!("preparing {} solver...", circuit_name);
+    let start_time = std::time::Instant::now();
+    let witnesses_dir = format!("./witnesses/{}", circuit_name);
+    let witness_solver = Arc::new(w_s);
+    let handles = assignment_chunks
+        .into_iter()
+        .enumerate()
+        .map(|(i, assignments)| {
+            let witness_solver = Arc::clone(&witness_solver);
+            let witnesses_dir_clone = witnesses_dir.clone();
+            thread::spawn(move || {
+                let mut hint_registry = HintRegistry::<M31>::new();
+                register_hint(&mut hint_registry);
+                let witness = witness_solver
+                    .solve_witnesses_with_hints(&assignments, &mut hint_registry)
+                    .unwrap();
+                write_witness_to_file(
+                    &format!("{}/witness_{}.txt", witnesses_dir_clone, i + offset),
+                    witness,
+                )
             })
-            .collect::<Vec<_>>();
-        for handle in handles {
-            handle.join().unwrap();
-        }
-        let end_time = std::time::Instant::now();
-        log::debug!(
-            "Generate {} witness Time: {:?}",
-            circuit_name,
-            end_time.duration_since(start_time)
-        );
+        })
+        .collect::<Vec<_>>();
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    let end_time = std::time::Instant::now();
+    log::debug!(
+        "Generate {} witness Time: {:?}",
+        circuit_name,
+        end_time.duration_since(start_time)
+    );
 }
-
 
 pub fn end2end_shuffle_witnesses_with_beacon_data(
     w_s: WitnessSolver<M31Config>,
     plain_validators: Vec<ValidatorPlain>,
-    real_committee_size: Vec<u64>, 
+    real_committee_size: Vec<u64>,
     shuffle_indices: Vec<u64>,
     committee_indices: Vec<u64>,
     slot_attestations: Vec<Vec<Attestation>>,
@@ -999,10 +1011,9 @@ pub fn end2end_shuffle_witnesses_with_beacon_data(
     });
 }
 
-
 pub fn end2end_shuffle_assignments_with_beacon_data(
     plain_validators: Vec<ValidatorPlain>,
-    real_committee_size: Vec<u64>, 
+    real_committee_size: Vec<u64>,
     shuffle_indices: Vec<u64>,
     committee_indices: Vec<u64>,
     slot_attestations: Vec<Vec<Attestation>>,
@@ -1045,12 +1056,29 @@ pub fn end2end_shuffle_assignments_with_beacon_data(
 }
 
 #[test]
-fn test_end2end_shuffle_assignments(){
-    let slot = 290000*32;
-    let (seed, shuffle_indices, committee_indices, pivots, activated_indices,  flips, positions, flip_bits, round_hash_bits, attestations, aggregated_pubkeys, balance_list, real_committee_size, validator_tree, hash_bytes, plain_validators) = beacon::prepare_assignment_data(slot, slot + 32);
+fn test_end2end_shuffle_assignments() {
+    let slot = 290000 * 32;
+    let (
+        seed,
+        shuffle_indices,
+        committee_indices,
+        pivots,
+        activated_indices,
+        flips,
+        positions,
+        flip_bits,
+        round_hash_bits,
+        attestations,
+        aggregated_pubkeys,
+        balance_list,
+        real_committee_size,
+        validator_tree,
+        hash_bytes,
+        plain_validators,
+    ) = beacon::prepare_assignment_data(slot, slot + 32);
     let assignments = end2end_shuffle_assignments_with_beacon_data(
         plain_validators,
-        real_committee_size, 
+        real_committee_size,
         shuffle_indices,
         committee_indices,
         attestations,
@@ -1059,9 +1087,109 @@ fn test_end2end_shuffle_assignments(){
         flips,
         positions,
         flip_bits,
-        validator_tree[validator_tree.len()-1].clone(),
+        validator_tree[validator_tree.len() - 1].clone(),
         balance_list,
         0,
         16,
     );
+}
+
+#[test]
+fn test_shuffle_witnesses_end() {
+    stacker::grow(128 * 1024 * 1024 * 1024, || {
+        let epoch = 290000;
+        let slot = epoch * 32;
+        let shuffle_handle = thread::spawn(|| {
+            let circuit_name = format!("shuffle_{}", VALIDATOR_CHUNK_SIZE);
+            let circuit = ShuffleCircuit::default();
+            let witnesses_dir = format!("./witnesses/{}", circuit_name);
+            get_solver(&witnesses_dir, &circuit_name, circuit)
+        });
+        let solver_shuffle = shuffle_handle.join().unwrap();
+        let (
+            seed,
+            shuffle_indices,
+            committee_indices,
+            pivots,
+            activated_indices,
+            flips,
+            positions,
+            flip_bits,
+            round_hash_bits,
+            attestations,
+            aggregated_pubkeys,
+            balance_list,
+            real_committee_size,
+            validator_tree,
+            hash_bytes,
+            plain_validators,
+        ) = beacon::prepare_assignment_data(slot, slot + 16);
+        let assignments = end2end_shuffle_assignments_with_beacon_data(
+            plain_validators,
+            real_committee_size,
+            shuffle_indices,
+            committee_indices,
+            attestations,
+            aggregated_pubkeys,
+            pivots,
+            flips,
+            positions,
+            flip_bits,
+            validator_tree[validator_tree.len() - 1].clone(),
+            balance_list,
+            0,
+            16,
+        );
+        end2end_shuffle_witnesses_with_assignments(solver_shuffle, assignments, 0);
+    });
+}
+
+#[test]
+fn test_shuffle_witnesses_start() {
+    stacker::grow(128 * 1024 * 1024 * 1024, || {
+        let epoch = 290000;
+        let slot = epoch * 32;
+        let shuffle_handle = thread::spawn(|| {
+            let circuit_name = format!("shuffle_{}", VALIDATOR_CHUNK_SIZE);
+            let circuit = ShuffleCircuit::default();
+            let witnesses_dir = format!("./witnesses/{}", circuit_name);
+            get_solver(&witnesses_dir, &circuit_name, circuit)
+        });
+        let solver_shuffle = shuffle_handle.join().unwrap();
+        let (
+            seed,
+            shuffle_indices,
+            committee_indices,
+            pivots,
+            activated_indices,
+            flips,
+            positions,
+            flip_bits,
+            round_hash_bits,
+            attestations,
+            aggregated_pubkeys,
+            balance_list,
+            real_committee_size,
+            validator_tree,
+            hash_bytes,
+            plain_validators,
+        ) = beacon::prepare_assignment_data(slot + 16, slot + 32);
+        let assignments = end2end_shuffle_assignments_with_beacon_data(
+            plain_validators,
+            real_committee_size,
+            shuffle_indices,
+            committee_indices,
+            attestations,
+            aggregated_pubkeys,
+            pivots,
+            flips,
+            positions,
+            flip_bits,
+            validator_tree[validator_tree.len() - 1].clone(),
+            balance_list,
+            16,
+            32,
+        );
+        end2end_shuffle_witnesses_with_assignments(solver_shuffle, assignments, 16 * 64 / 16);
+    });
 }
