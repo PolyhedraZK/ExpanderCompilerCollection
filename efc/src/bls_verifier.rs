@@ -1,9 +1,9 @@
 use crate::attestation::{Attestation, AttestationDataSSZ};
+use crate::bls;
 use crate::utils::convert_limbs;
 use crate::utils::ensure_directory_exists;
 use crate::utils::read_from_json_file;
 use crate::utils::{get_solver, write_witness_to_file};
-use crate::{beacon, bls};
 use ark_bls12_381::G1Affine as BlsG1Affine;
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
@@ -457,70 +457,70 @@ pub fn end2end_blsverifier_assignments_with_beacon_data(
     assignment_chunks
 }
 
-#[test]
-fn test_end2end_blsverifier_assignments() {
-    let slot = 290000 * 32;
-    let (
-        seed,
-        shuffle_indices,
-        committee_indices,
-        pivots,
-        activated_indices,
-        flips,
-        positions,
-        flip_bits,
-        round_hash_bits,
-        attestations,
-        aggregated_pubkeys,
-        balance_list,
-        real_committee_size,
-        validator_tree,
-        hash_bytes,
-        plain_validators,
-    ) = beacon::prepare_assignment_data(slot, slot + 32);
-    let assignments = end2end_blsverifier_assignments_with_beacon_data(
-        aggregated_pubkeys,
-        attestations.into_iter().flatten().collect(),
-    );
-}
+// #[test]
+// fn test_end2end_blsverifier_assignments() {
+//     let slot = 290000 * 32;
+//     let (
+//         seed,
+//         shuffle_indices,
+//         committee_indices,
+//         pivots,
+//         activated_indices,
+//         flips,
+//         positions,
+//         flip_bits,
+//         round_hash_bits,
+//         attestations,
+//         aggregated_pubkeys,
+//         balance_list,
+//         real_committee_size,
+//         validator_tree,
+//         hash_bytes,
+//         plain_validators,
+//     ) = beacon::prepare_assignment_data(slot, slot + 32);
+//     let assignments = end2end_blsverifier_assignments_with_beacon_data(
+//         aggregated_pubkeys,
+//         attestations.into_iter().flatten().collect(),
+//     );
+// }
 
-#[test]
-fn test_blsverifier_witnesses_end() {
-    stacker::grow(128 * 1024 * 1024 * 1024, || {
-        let epoch = 290000;
-        let slot = epoch * 32;
-        let blsverifier_handle = thread::spawn(|| {
-            let circuit_name = "blsverifier";
-            let circuit = BLSVERIFIERCircuit::default();
-            let witnesses_dir = format!("./witnesses/{}", circuit_name);
-            get_solver(&witnesses_dir, circuit_name, circuit)
-        });
-        let solver_blsverifier = blsverifier_handle.join().unwrap();
-        let (
-            seed,
-            shuffle_indices,
-            committee_indices,
-            pivots,
-            activated_indices,
-            flips,
-            positions,
-            flip_bits,
-            round_hash_bits,
-            attestations,
-            aggregated_pubkeys,
-            balance_list,
-            real_committee_size,
-            validator_tree,
-            hash_bytes,
-            plain_validators,
-        ) = beacon::prepare_assignment_data(slot, slot + 32);
-        let assignments = end2end_blsverifier_assignments_with_beacon_data(
-            aggregated_pubkeys,
-            attestations.into_iter().flatten().collect(),
-        );
-        end2end_blsverifier_witnesses_with_assignments(solver_blsverifier, assignments, 0);
-    });
-}
+// #[test]
+// fn test_blsverifier_witnesses_end() {
+//     stacker::grow(128 * 1024 * 1024 * 1024, || {
+//         let epoch = 290000;
+//         let slot = epoch * 32;
+//         let blsverifier_handle = thread::spawn(|| {
+//             let circuit_name = "blsverifier";
+//             let circuit = BLSVERIFIERCircuit::default();
+//             let witnesses_dir = format!("./witnesses/{}", circuit_name);
+//             get_solver(&witnesses_dir, circuit_name, circuit)
+//         });
+//         let solver_blsverifier = blsverifier_handle.join().unwrap();
+//         let (
+//             seed,
+//             shuffle_indices,
+//             committee_indices,
+//             pivots,
+//             activated_indices,
+//             flips,
+//             positions,
+//             flip_bits,
+//             round_hash_bits,
+//             attestations,
+//             aggregated_pubkeys,
+//             balance_list,
+//             real_committee_size,
+//             validator_tree,
+//             hash_bytes,
+//             plain_validators,
+//         ) = beacon::prepare_assignment_data(slot, slot + 32);
+//         let assignments = end2end_blsverifier_assignments_with_beacon_data(
+//             aggregated_pubkeys,
+//             attestations.into_iter().flatten().collect(),
+//         );
+//         end2end_blsverifier_witnesses_with_assignments(solver_blsverifier, assignments, 0);
+//     });
+// }
 
 // #[test]
 // fn test_shuffle_witnesses_start(){

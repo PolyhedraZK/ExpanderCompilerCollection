@@ -369,12 +369,7 @@ impl LogUpRangeProofTable {
             // println!("n:{}", n);
             mul_factor <<= n;
             let a_shift = builder.mul(constant, mul_factor);
-            builder.display("constant", constant);
-            builder.display("mul_factor", mul_factor);
-            builder.display("a_shift", a_shift);
-            builder.display("a", a);
             new_a = builder.add(a, a_shift);
-            builder.display("new_a", new_a);
             n += shift;
         }
         let hint_input = vec![

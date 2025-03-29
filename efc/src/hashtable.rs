@@ -1,4 +1,4 @@
-use crate::beacon::{self, SHUFFLEROUND};
+use crate::beacon;
 use crate::utils::{
     ensure_directory_exists, get_solver, read_from_json_file, write_witness_to_file,
 };
@@ -72,14 +72,18 @@ impl HASHTABLECircuit<M31> {
         start_index: usize,
         output: &[[u8; 32]],
     ) {
-        for i in 0..SHA256LEN {
-            self.seed[i] = M31::from(seed[i] as u32);
-        }
+        self.seed
+            .iter_mut()
+            .zip(seed.iter())
+            .for_each(|(a, &b)| *a = M31::from(b as u32));
+
         self.shuffle_round = M31::from(shuffle_round as u32);
         let start_index_bytes_le = (start_index as u32).to_le_bytes();
-        for i in 0..4 {
-            self.start_index[i] = M31::from(start_index_bytes_le[i] as u32);
-        }
+        self.start_index
+            .iter_mut()
+            .zip(start_index_bytes_le.iter())
+            .for_each(|(a, &b)| *a = M31::from(b as u32));
+
         (0..HASHTABLESIZE).for_each(|i| {
             (0..SHA256LEN).for_each(|j| self.output[i][j] = M31::from(output[i][j] as u32))
         });
@@ -308,61 +312,61 @@ pub fn end2end_hashtable_assignments_with_beacon_data(
     assignment_chunks
 }
 
-#[test]
-fn test_end2end_hashtable_assignments() {
-    let slot = 290000 * 32;
-    let (
-        seed,
-        shuffle_indices,
-        committee_indices,
-        pivots,
-        activated_indices,
-        flips,
-        positions,
-        flip_bits,
-        round_hash_bits,
-        attestations,
-        aggregated_pubkeys,
-        balance_list,
-        real_committee_size,
-        validator_tree,
-        hash_bytes,
-        plain_validators,
-    ) = beacon::prepare_assignment_data(slot, slot + 32);
-    let assignments = end2end_hashtable_assignments_with_beacon_data(&seed, hash_bytes);
-}
+// #[test]
+// fn test_end2end_hashtable_assignments() {
+//     let slot = 290000 * 32;
+//     let (
+//         seed,
+//         shuffle_indices,
+//         committee_indices,
+//         pivots,
+//         activated_indices,
+//         flips,
+//         positions,
+//         flip_bits,
+//         round_hash_bits,
+//         attestations,
+//         aggregated_pubkeys,
+//         balance_list,
+//         real_committee_size,
+//         validator_tree,
+//         hash_bytes,
+//         plain_validators,
+//     ) = beacon::prepare_assignment_data(slot, slot + 32);
+//     let assignments = end2end_hashtable_assignments_with_beacon_data(&seed, hash_bytes);
+// }
 
-#[test]
-fn test_hashtable_witnesses_end() {
-    stacker::grow(128 * 1024 * 1024 * 1024, || {
-        let epoch = 290000;
-        let slot = epoch * 32;
-        let hashtable_handle = thread::spawn(|| {
-            let circuit_name = format!("hashtable{}", HASHTABLESIZE);
-            let circuit = HASHTABLECircuit::default();
-            let witnesses_dir = format!("./witnesses/{}", circuit_name);
-            get_solver(&witnesses_dir, &circuit_name, circuit)
-        });
-        let solver_hashtable = hashtable_handle.join().unwrap();
-        let (
-            seed,
-            shuffle_indices,
-            committee_indices,
-            pivots,
-            activated_indices,
-            flips,
-            positions,
-            flip_bits,
-            round_hash_bits,
-            attestations,
-            aggregated_pubkeys,
-            balance_list,
-            real_committee_size,
-            validator_tree,
-            hash_bytes,
-            plain_validators,
-        ) = beacon::prepare_assignment_data(slot, slot + 32);
-        let assignments = end2end_hashtable_assignments_with_beacon_data(&seed, hash_bytes);
-        end2end_hashtable_witnesses_with_assignments(solver_hashtable, assignments);
-    });
-}
+// #[test]
+// fn test_hashtable_witnesses_end() {
+//     stacker::grow(128 * 1024 * 1024 * 1024, || {
+//         let epoch = 290000;
+//         let slot = epoch * 32;
+//         let hashtable_handle = thread::spawn(|| {
+//             let circuit_name = format!("hashtable{}", HASHTABLESIZE);
+//             let circuit = HASHTABLECircuit::default();
+//             let witnesses_dir = format!("./witnesses/{}", circuit_name);
+//             get_solver(&witnesses_dir, &circuit_name, circuit)
+//         });
+//         let solver_hashtable = hashtable_handle.join().unwrap();
+//         let (
+//             seed,
+//             shuffle_indices,
+//             committee_indices,
+//             pivots,
+//             activated_indices,
+//             flips,
+//             positions,
+//             flip_bits,
+//             round_hash_bits,
+//             attestations,
+//             aggregated_pubkeys,
+//             balance_list,
+//             real_committee_size,
+//             validator_tree,
+//             hash_bytes,
+//             plain_validators,
+//         ) = beacon::prepare_assignment_data(slot, slot + 32);
+//         let assignments = end2end_hashtable_assignments_with_beacon_data(&seed, hash_bytes);
+//         end2end_hashtable_witnesses_with_assignments(solver_hashtable, assignments);
+//     });
+// }

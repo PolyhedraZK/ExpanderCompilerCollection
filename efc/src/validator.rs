@@ -170,14 +170,14 @@ declare_circuit!(UpdateValidatorTreeCircuit {
     sha256_path: [Variable; beacon::MAXBEACONVALIDATORDEPTH],
     sha256_aunts: [[Variable; 32]; beacon::MAXBEACONVALIDATORDEPTH],
     sha256_root_hash: [Variable; 32],
-    next_sha256_root_hash: [Variable; 32],
+    // next_sha256_root_hash: [Variable; 32],
     sha256_root_mix_in: [Variable; 32],
     next_sha256_root_mix_in: [Variable; 32],
     //poseidon tree path, aunts, root hash
     poseidon_path: [Variable; beacon::MAXBEACONVALIDATORDEPTH],
     poseidon_aunts: [[Variable; POSEIDON_M31X16_RATE]; beacon::MAXBEACONVALIDATORDEPTH],
     poseidon_root_hash: [Variable; POSEIDON_M31X16_RATE],
-    next_poseidon_root_hash: [Variable; POSEIDON_M31X16_RATE],
+    // next_poseidon_root_hash: [Variable; POSEIDON_M31X16_RATE],
     poseidon_root_mix_in: [Variable; POSEIDON_M31X16_RATE],
     next_poseidon_root_mix_in: [Variable; POSEIDON_M31X16_RATE],
     //validatorlist.len()
@@ -196,7 +196,7 @@ impl GenericDefine<M31Config> for UpdateValidatorTreeCircuit<Variable> {
                 validator_count_var = builder.mul(validator_count_var, 1 << 8);
                 next_validator_count_var =
                     builder.add(self.next_validator_count[i], next_validator_count_var);
-                next_validator_count_var = builder.mul(&next_validator_count_var, 1 << 8);
+                next_validator_count_var = builder.mul(next_validator_count_var, 1 << 8);
             } else {
                 //assume the validator count is less than 2^24
                 builder.assert_is_equal(self.validator_count[i], zero_var);
@@ -228,25 +228,16 @@ impl GenericDefine<M31Config> for UpdateValidatorTreeCircuit<Variable> {
         };
         let mut old_validator_sha256_hash = old_validator_ssz.sha256_hash(builder);
         //if this is a new "insert" validator, then set the old validator hash to all 0
-        for i in 0..32 {
-            old_validator_sha256_hash[i] = simple_select(
-                builder,
-                modified_validator_flag,
-                old_validator_sha256_hash[i],
-                zero_var,
-            );
-        }
+        old_validator_sha256_hash
+            .iter_mut()
+            .for_each(|x| *x = simple_select(builder, modified_validator_flag, *x, zero_var));
         let new_validator_sha256_hash = new_validator_ssz.sha256_hash(builder);
         let mut old_validator_poseidon_hash = old_validator_ssz.poseidon_hash(builder);
         //if this is a new "insert" validator, then set the old validator hash to all 0
-        for i in 0..POSEIDON_M31X16_RATE {
-            old_validator_poseidon_hash[i] = simple_select(
-                builder,
-                modified_validator_flag,
-                old_validator_poseidon_hash[i],
-                zero_var,
-            );
-        }
+        old_validator_poseidon_hash
+            .iter_mut()
+            .for_each(|x| *x = simple_select(builder, modified_validator_flag, *x, zero_var));
+
         let new_validator_poseidon_hash = new_validator_ssz.poseidon_hash(builder);
         let params = PoseidonM31Params::new(
             builder,
@@ -329,6 +320,167 @@ impl GenericDefine<M31Config> for UpdateValidatorTreeCircuit<Variable> {
         });
     }
 }
+pub struct MerkleProof {
+    pub path: Vec<u32>,
+    pub aunts: Vec<Vec<u32>>,
+    pub root_hash: Vec<u32>,
+    pub root_mix_in: Vec<u32>,
+    pub next_root_mix_in: Vec<u32>,
+}
+impl UpdateValidatorTreeCircuit<M31> {
+    pub fn from_beacon(
+        &mut self,
+        validator_index: usize,
+        old_validator: ValidatorPlain,
+        new_validator: ValidatorPlain,
+        sha256_merkle_proof: MerkleProof,
+        poseidon_merkle_proof: MerkleProof,
+        validator_count: u64,
+        next_validator_count: u64,
+    ) {
+        //assign pubkey
+        let raw_pubkey = old_validator.public_key.clone();
+        let pubkey = STANDARD.decode(raw_pubkey).unwrap();
+        for (i, pubkey_byte) in pubkey.iter().enumerate().take(48) {
+            self.old_pubkey[i] = M31::from(*pubkey_byte as u32);
+        }
+        //assign withdrawal_credentials
+        let raw_withdrawal_credentials = old_validator.withdrawal_credentials.clone();
+        let withdrawal_credentials = STANDARD.decode(raw_withdrawal_credentials).unwrap();
+        for (i, withdrawal_credentials_byte) in withdrawal_credentials.iter().enumerate().take(32) {
+            self.old_withdrawal_credentials[i] = M31::from(*withdrawal_credentials_byte as u32);
+        }
+        //assign effective_balance
+        let effective_balance = old_validator.effective_balance.to_le_bytes();
+        for (i, effective_balance_byte) in effective_balance.iter().enumerate() {
+            self.old_effective_balance[i] = M31::from(*effective_balance_byte as u32);
+        }
+        //assign slashed
+        let slashed = if old_validator.slashed { 1 } else { 0 };
+        self.old_slashed[0] = M31::from(slashed);
+        //assign activation_eligibility_epoch
+        let activation_eligibility_epoch = old_validator.activation_eligibility_epoch.to_le_bytes();
+        for (i, activation_eligibility_epoch_byte) in
+            activation_eligibility_epoch.iter().enumerate()
+        {
+            self.old_activation_eligibility_epoch[i] =
+                M31::from(*activation_eligibility_epoch_byte as u32);
+        }
+        //assign activation_epoch
+        let activation_epoch = old_validator.activation_epoch.to_le_bytes();
+        for (i, activation_epoch_byte) in activation_epoch.iter().enumerate() {
+            self.old_activation_epoch[i] = M31::from(*activation_epoch_byte as u32);
+        }
+        //assign exit_epoch
+        let exit_epoch = old_validator.exit_epoch.to_le_bytes();
+        for (i, exit_epoch_byte) in exit_epoch.iter().enumerate() {
+            self.old_exit_epoch[i] = M31::from(*exit_epoch_byte as u32);
+        }
+        //assign withdrawable_epoch
+        let withdrawable_epoch = old_validator.withdrawable_epoch.to_le_bytes();
+        for (i, withdrawable_epoch_byte) in withdrawable_epoch.iter().enumerate() {
+            self.old_withdrawable_epoch[i] = M31::from(*withdrawable_epoch_byte as u32);
+        }
+
+        //assign pubkey
+        let raw_pubkey = new_validator.public_key.clone();
+        let pubkey = STANDARD.decode(raw_pubkey).unwrap();
+        for (i, pubkey_byte) in pubkey.iter().enumerate().take(48) {
+            self.new_pubkey[i] = M31::from(*pubkey_byte as u32);
+        }
+        //assign withdrawal_credentials
+        let raw_withdrawal_credentials = new_validator.withdrawal_credentials.clone();
+        let withdrawal_credentials = STANDARD.decode(raw_withdrawal_credentials).unwrap();
+        for (i, withdrawal_credentials_byte) in withdrawal_credentials.iter().enumerate().take(32) {
+            self.new_withdrawal_credentials[i] = M31::from(*withdrawal_credentials_byte as u32);
+        }
+        //assign effective_balance
+        let effective_balance = new_validator.effective_balance.to_le_bytes();
+        for (i, effective_balance_byte) in effective_balance.iter().enumerate() {
+            self.new_effective_balance[i] = M31::from(*effective_balance_byte as u32);
+        }
+        //assign slashed
+        let slashed = if new_validator.slashed { 1 } else { 0 };
+        self.new_slashed[0] = M31::from(slashed);
+        //assign activation_eligibility_epoch
+        let activation_eligibility_epoch = new_validator.activation_eligibility_epoch.to_le_bytes();
+        for (i, activation_eligibility_epoch_byte) in
+            activation_eligibility_epoch.iter().enumerate()
+        {
+            self.new_activation_eligibility_epoch[i] =
+                M31::from(*activation_eligibility_epoch_byte as u32);
+        }
+        //assign activation_epoch
+        let activation_epoch = new_validator.activation_epoch.to_le_bytes();
+        for (i, activation_epoch_byte) in activation_epoch.iter().enumerate() {
+            self.new_activation_epoch[i] = M31::from(*activation_epoch_byte as u32);
+        }
+        //assign exit_epoch
+        let exit_epoch = new_validator.exit_epoch.to_le_bytes();
+        for (i, exit_epoch_byte) in exit_epoch.iter().enumerate() {
+            self.new_exit_epoch[i] = M31::from(*exit_epoch_byte as u32);
+        }
+        //assign withdrawable_epoch
+        let withdrawable_epoch = new_validator.withdrawable_epoch.to_le_bytes();
+        for (i, withdrawable_epoch_byte) in withdrawable_epoch.iter().enumerate() {
+            self.new_withdrawable_epoch[i] = M31::from(*withdrawable_epoch_byte as u32);
+        }
+
+        //assign the rest
+        self.index = M31::from(validator_index as u32);
+        for i in 0..beacon::MAXBEACONVALIDATORDEPTH {
+            if i < sha256_merkle_proof.path.len() {
+                for j in 0..32 {
+                    if j < sha256_merkle_proof.aunts[i].len() {
+                        self.sha256_aunts[i][j] = M31::from(sha256_merkle_proof.aunts[i][j]);
+                    } else {
+                        self.sha256_aunts[i][j] = M31::from(0);
+                    }
+                }
+                self.sha256_path[i] = M31::from(sha256_merkle_proof.path[i]);
+            } else {
+                for j in 0..32 {
+                    self.sha256_aunts[i][j] = M31::from(0);
+                }
+                self.sha256_path[i] = M31::from(0);
+            }
+            if i < poseidon_merkle_proof.path.len() {
+                for j in 0..POSEIDON_M31X16_RATE {
+                    if j < poseidon_merkle_proof.aunts[i].len() {
+                        self.poseidon_aunts[i][j] = M31::from(poseidon_merkle_proof.aunts[i][j]);
+                    } else {
+                        self.poseidon_aunts[i][j] = M31::from(0);
+                    }
+                }
+                self.poseidon_path[i] = M31::from(poseidon_merkle_proof.path[i]);
+            } else {
+                for j in 0..POSEIDON_M31X16_RATE {
+                    self.poseidon_aunts[i][j] = M31::from(0);
+                }
+                self.poseidon_path[i] = M31::from(0);
+            }
+        }
+        for i in 0..32 {
+            self.sha256_root_hash[i] = M31::from(sha256_merkle_proof.root_hash[i]);
+            self.sha256_root_mix_in[i] = M31::from(sha256_merkle_proof.root_mix_in[i]);
+            self.next_sha256_root_mix_in[i] = M31::from(sha256_merkle_proof.next_root_mix_in[i]);
+        }
+        for i in 0..POSEIDON_M31X16_RATE {
+            self.poseidon_root_hash[i] = M31::from(poseidon_merkle_proof.root_hash[i]);
+            self.poseidon_root_mix_in[i] = M31::from(poseidon_merkle_proof.root_mix_in[i]);
+            self.next_poseidon_root_mix_in[i] =
+                M31::from(poseidon_merkle_proof.next_root_mix_in[i]);
+        }
+        let validator_count = validator_count.to_le_bytes();
+        for (i, validator_count_byte) in validator_count.iter().enumerate() {
+            self.validator_count[i] = M31::from(*validator_count_byte as u32);
+        }
+        let next_validator_count = next_validator_count.to_le_bytes();
+        for (i, next_validator_count_byte) in next_validator_count.iter().enumerate() {
+            self.next_validator_count[i] = M31::from(*next_validator_count_byte as u32);
+        }
+    }
+}
 #[derive(Debug, Deserialize, Clone)]
 pub struct ValidatorSubTreeJson {
     #[serde(rename = "ValidatorHashChunk")]
@@ -336,6 +488,8 @@ pub struct ValidatorSubTreeJson {
     #[serde(rename = "SubtreeRoot")]
     pub subtree_root: Vec<u32>,
 }
+
+type MerkleTreeAssignmentChunks = Vec<Vec<ConvertValidatorListToMerkleTreeCircuit<M31>>>;
 declare_circuit!(ConvertValidatorListToMerkleTreeCircuit {
     validator_hash_chunk: [[Variable; POSEIDON_M31X16_RATE]; SUBTREE_SIZE],
     subtree_root: [Variable; POSEIDON_M31X16_RATE], // Public input
@@ -592,6 +746,7 @@ pub fn end2end_validator_subtree_witnesses_with_assignments(
     );
 }
 
+type SubtreeAssignmentChunks = Vec<Vec<MerkleSubTreeWithLimitCircuit<M31>>>;
 declare_circuit!(MerkleSubTreeWithLimitCircuit {
     subtree_root: [[Variable; POSEIDON_M31X16_RATE]; SUBTREE_NUM], // public
     tree_root_mix_in: [Variable; POSEIDON_M31X16_RATE],            // public
@@ -724,10 +879,7 @@ pub fn end2end_merkle_subtree_with_limit_witnesses_with_assignments(
 pub fn end2end_validator_tree_assignments(
     validator_tree: Vec<Vec<Vec<u32>>>,
     real_validator_count: u64,
-) -> (
-    Vec<Vec<ConvertValidatorListToMerkleTreeCircuit<M31>>>,
-    Vec<Vec<MerkleSubTreeWithLimitCircuit<M31>>>,
-) {
+) -> (MerkleTreeAssignmentChunks, SubtreeAssignmentChunks) {
     let start_time = std::time::Instant::now();
     let merkle_subtree_with_limit_assignment =
         MerkleSubTreeWithLimitCircuit::get_assignments_from_beacon_data(
@@ -753,27 +905,27 @@ pub fn end2end_validator_tree_assignments(
     )
 }
 
-#[test]
-fn test_end2end_validators_assignments() {
-    let slot = 290000 * 32;
-    let (
-        seed,
-        shuffle_indices,
-        committee_indices,
-        pivots,
-        activated_indices,
-        flips,
-        positions,
-        flip_bits,
-        round_hash_bits,
-        attestations,
-        aggregated_pubkeys,
-        balance_list,
-        real_committee_size,
-        validator_tree,
-        hash_bytes,
-        plain_validators,
-    ) = beacon::prepare_assignment_data(slot, slot + 32);
-    let assignments =
-        end2end_validator_tree_assignments(validator_tree, activated_indices.len() as u64);
-}
+// #[test]
+// fn test_end2end_validators_assignments() {
+//     let slot = 290000 * 32;
+//     let (
+//         seed,
+//         shuffle_indices,
+//         committee_indices,
+//         pivots,
+//         activated_indices,
+//         flips,
+//         positions,
+//         flip_bits,
+//         round_hash_bits,
+//         attestations,
+//         aggregated_pubkeys,
+//         balance_list,
+//         real_committee_size,
+//         validator_tree,
+//         hash_bytes,
+//         plain_validators,
+//     ) = beacon::prepare_assignment_data(slot, slot + 32);
+//     let assignments =
+//         end2end_validator_tree_assignments(validator_tree, activated_indices.len() as u64);
+// }

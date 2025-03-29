@@ -34,13 +34,13 @@ impl PoseidonParams {
         //mod all constants by M31_MODULUS
         (0..round_constants.len()).for_each(|i| {
             (0..round_constants[i].len()).for_each(|j| {
-                round_constants[i][j] = round_constants[i][j] % M31_MODULUS;
+                round_constants[i][j] %= M31_MODULUS;
             });
         });
         //mod all mds_matrix by M31_MODULUS
         (0..mds_matrix.len()).for_each(|i| {
             (0..mds_matrix[i].len()).for_each(|j| {
-                mds_matrix[i][j] = mds_matrix[i][j] % M31_MODULUS;
+                mds_matrix[i][j] %= M31_MODULUS;
             });
         });
         Self {

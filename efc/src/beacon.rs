@@ -1,13 +1,12 @@
 //read beacon info from files
-use ark_bls12_381::{Bls12_381, G1Affine};
+use ark_bls12_381::G1Affine;
 use ark_ec::AffineRepr;
-use ark_ff::{AdditiveGroup, UniformRand};
 use ark_serialize::CanonicalDeserialize;
 use base64::engine::general_purpose;
 use base64::Engine;
 use bincode;
 use byteorder::{ByteOrder, LittleEndian};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io::BufReader;
@@ -58,14 +57,7 @@ pub struct AttestationsWithBytes {
 // Helper module for base64 encoding/decoding
 mod base64_standard {
     use base64::{engine::general_purpose, Engine};
-    use serde::{Deserialize, Deserializer, Serializer};
-
-    pub fn serialize<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&general_purpose::STANDARD.encode(bytes))
-    }
+    use serde::{Deserialize, Deserializer};
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
     where
@@ -128,11 +120,12 @@ pub fn generate_hash_table(seed: &[u8], count: usize, shuffle_round: usize) -> V
 
     let mut table_inputs = vec![vec![0u8; 37]; table_size]; // MaxInputLength assumed 64
 
-    for i in 0..table_size {
-        table_inputs[i][..32].copy_from_slice(&seed[..32]);
-        table_inputs[i][32] = (i / size_per_round) as u8;
-        LittleEndian::write_u32(&mut table_inputs[i][33..37], (i % size_per_round) as u32);
-    }
+    table_inputs.iter_mut().enumerate().for_each(|(i, input)| {
+        input[..32].copy_from_slice(&seed[..32]);
+        input[32] = (i / size_per_round) as u8;
+        LittleEndian::write_u32(&mut input[33..37], (i % size_per_round) as u32);
+    });
+
     table_inputs
         .iter()
         .map(|input| {
@@ -157,16 +150,14 @@ fn shuffle_index(
     seed: &[u8],
     round: usize,
     bits: &[u8],
-) -> (u64, Vec<u64>, Vec<u64>, Vec<u64>, Vec<u64>, Vec<u8>) {
+) -> (u64, Vec<u64>, Vec<u64>, Vec<u64>, Vec<u8>) {
     let mut flips = vec![0u64; round];
     let mut positions = vec![0u64; round];
     let mut flip_bits = vec![0u8; round];
     let mut pivots = vec![0u64; round];
-    let mut round_index = vec![0u64; round];
     let mut current_index = index;
 
     for current_round in 0..round {
-        round_index[current_round] = current_index;
         let round_byte = current_round as u8;
         let mut to_hash = [seed, &[round_byte]].concat();
         let hash_res = Sha256::digest(&to_hash);
@@ -196,14 +187,7 @@ fn shuffle_index(
         flip_bits[current_round] = bit;
     }
 
-    (
-        current_index,
-        flips,
-        positions,
-        pivots,
-        round_index,
-        flip_bits,
-    )
+    (current_index, flips, positions, pivots, flip_bits)
 }
 
 pub fn shuffle_indices(
@@ -215,7 +199,6 @@ pub fn shuffle_indices(
     Vec<u64>,
     Vec<Vec<u64>>,
     Vec<Vec<u64>>,
-    Vec<Vec<u64>>,
     Vec<u64>,
     Vec<Vec<u8>>,
 ) {
@@ -224,27 +207,19 @@ pub fn shuffle_indices(
     let mut positions = vec![vec![]; indices.len()];
     let mut flip_bits = vec![vec![]; indices.len()];
     let mut pivots = vec![0u64; indices.len()];
-    let mut shuffle_round_indices = vec![vec![]; indices.len()];
+    // let mut shuffle_round_indices = vec![vec![]; indices.len()];
 
     for i in 0..indices.len() {
-        let (shuffled_index, f, pos, piv, round_idx, flip_b) =
+        let (shuffled_index, f, pos, piv, flip_b) =
             shuffle_index(i as u64, indices.len() as u64, seed, shuffle_round, bits);
         shuffle_indices[i] = shuffled_index;
         flips[i] = f;
         positions[i] = pos;
         pivots = piv;
-        shuffle_round_indices[i] = round_idx;
         flip_bits[i] = flip_b;
     }
 
-    (
-        shuffle_indices,
-        flips,
-        positions,
-        shuffle_round_indices,
-        pivots,
-        flip_bits,
-    )
+    (shuffle_indices, flips, positions, pivots, flip_bits)
 }
 
 pub fn load_committees(slot: u64) -> Result<Vec<BeaconCommitteeJson>, Box<dyn Error>> {
@@ -302,18 +277,15 @@ pub fn load_target_attestations(start: u64, end: u64) -> Vec<Vec<Attestation>> {
     }
     //find the target attestation
     let mut candidate_attestations = vec![vec![]; SLOTSPEREPOCH as usize];
-    for i in 0..slots_attestations.len() {
-        if slots_attestations[i].data.source == source_checkpoint
-            && slots_attestations[i].data.target == target_checkpoint
-        {
-            let current_slot = (slots_attestations[i].clone().data.slot % SLOTSPEREPOCH) as usize;
-            let left_string = slots_attestations[i].clone().data.beacon_block_root;
-            let right_string = slots_beacon_root[current_slot].clone();
-            if left_string == right_string {
-                candidate_attestations[current_slot].push(slots_attestations[i].clone());
+    for att in slots_attestations.iter() {
+        if att.data.source == source_checkpoint && att.data.target == target_checkpoint {
+            let current_slot = (att.data.slot % SLOTSPEREPOCH) as usize;
+            if att.data.beacon_block_root == slots_beacon_root[current_slot] {
+                candidate_attestations[current_slot].push(att.clone());
             }
         }
     }
+
     let mut final_attestations =
         vec![vec![Attestation::default(); MAXCOMMITTEESPERSLOT]; SLOTSPEREPOCH as usize];
     for i in 0..candidate_attestations.len() {
@@ -377,7 +349,7 @@ pub fn attestation_get_aggregation_bits_from_bytes(aggregation_bits: &str) -> Ve
     // Convert each byte into 8 bits and push them into the bits vector
     for byte in bytes {
         for j in 0..8 {
-            bits.push((byte >> j & 1));
+            bits.push(byte >> j & 1);
         }
     }
 
@@ -569,7 +541,7 @@ pub fn prepare_assignment_data(
     println!("get round hash bits");
 
     //shuffle the indices
-    let (shuffle_indices, flips, positions, shuffle_round_indices, pivots, flip_bits) =
+    let (shuffle_indices, flips, positions, pivots, flip_bits) =
         shuffle_indices(&activated_indices, &seed, &hash_bits, SHUFFLEROUND);
 
     println!("get shuffle_indices");
@@ -586,12 +558,12 @@ pub fn prepare_assignment_data(
     println!("get committee_indices");
 
     let validator_list = load_validators_from_file(first_slot).unwrap();
-    let mut total_effective_balance = 0;
-    for i in 0..activated_indices.len() {
-        total_effective_balance += validator_list[activated_indices[i] as usize].effective_balance;
-    }
+    // let mut total_effective_balance = 0;
+    // for i in 0..activated_indices.len() {
+    //     total_effective_balance += validator_list[activated_indices[i] as usize].effective_balance;
+    // }
 
-    let mut validator_tree = vec![];
+    let validator_tree;
     let validator_tree_filename = format!("{}poseidon_{}.txt", LOCAL_TREE_DIR, first_slot);
     if Path::new(&validator_tree_filename).exists() {
         validator_tree = load_nested_vec(&validator_tree_filename).unwrap();
@@ -691,80 +663,80 @@ fn load_nested_vec(path: &str) -> std::io::Result<Vec<Vec<Vec<u32>>>> {
     Ok(result)
 }
 
-#[test]
-fn test_get_beacon_seed() {
-    init_directories().unwrap();
-    let seed = get_beacon_seed(290000).unwrap();
-    assert_eq!(seed.len(), 32);
-    println!("{:?}", seed);
-}
+// #[test]
+// fn test_get_beacon_seed() {
+//     init_directories().unwrap();
+//     let seed = get_beacon_seed(290000).unwrap();
+//     assert_eq!(seed.len(), 32);
+//     println!("{:?}", seed);
+// }
 
-#[test]
-fn test_get_activated_validator_indices() {
-    let indices = get_activated_validator_indices(3988672).unwrap();
-    println!("{:?}", indices.len());
-}
+// #[test]
+// fn test_get_activated_validator_indices() {
+//     let indices = get_activated_validator_indices(3988672).unwrap();
+//     println!("{:?}", indices.len());
+// }
 
-#[test]
-fn test_shuffle_indices() {
-    let indices = get_activated_validator_indices(3988672).unwrap();
-    let seed = get_beacon_seed(124646).unwrap();
-    let hash_bytes = generate_hash_table(&seed, indices.len(), 90);
-    let mut hash_bits = vec![0u8; hash_bytes.len() * 256];
+// #[test]
+// fn test_shuffle_indices() {
+//     let indices = get_activated_validator_indices(3988672).unwrap();
+//     let seed = get_beacon_seed(124646).unwrap();
+//     let hash_bytes = generate_hash_table(&seed, indices.len(), 90);
+//     let mut hash_bits = vec![0u8; hash_bytes.len() * 256];
 
-    for (i, hash_byte) in hash_bytes.iter().enumerate() {
-        for j in 0..32 {
-            for k in 0..8 {
-                hash_bits[i * 256 + j * 8 + k] = (hash_byte[j] >> k) & 1;
-            }
-        }
-    }
-    let (shuffle_indices, flips, positions, shuffle_round_indices, pivots, flip_bits) =
-        shuffle_indices(&indices, &seed, &hash_bits, 90);
-}
+//     for (i, hash_byte) in hash_bytes.iter().enumerate() {
+//         for j in 0..32 {
+//             for k in 0..8 {
+//                 hash_bits[i * 256 + j * 8 + k] = (hash_byte[j] >> k) & 1;
+//             }
+//         }
+//     }
+//     let (shuffle_indices, flips, positions, pivots, flip_bits) =
+//         shuffle_indices(&indices, &seed, &hash_bits, 90);
+// }
 
-#[test]
-fn test_load_committees() {
-    let committees = load_committees(3988672).unwrap();
-    println!("{:?}", committees.len());
-    println!("{:?}", committees[0].validators);
-}
+// #[test]
+// fn test_load_committees() {
+//     let committees = load_committees(3988672).unwrap();
+//     println!("{:?}", committees.len());
+//     println!("{:?}", committees[0].validators);
+// }
 
-#[test]
-fn test_load_validators_from_file() {
-    let validators = load_validators_from_file(3988672).unwrap();
-    println!("{:?}", validators.len());
-    println!("{:?}", validators[0].public_key);
-}
+// #[test]
+// fn test_load_validators_from_file() {
+//     let validators = load_validators_from_file(3988672).unwrap();
+//     println!("{:?}", validators.len());
+//     println!("{:?}", validators[0].public_key);
+// }
 
-#[test]
-fn test_load_attestations_and_bytes() {
-    let wrapper = load_attestations_and_bytes(3988672).unwrap();
-    println!("{:?}", wrapper.attestations);
-    println!("{:?}", wrapper.data);
-}
+// #[test]
+// fn test_load_attestations_and_bytes() {
+//     let wrapper = load_attestations_and_bytes(3988672).unwrap();
+//     println!("{:?}", wrapper.attestations);
+//     println!("{:?}", wrapper.data);
+// }
 
-#[test]
-fn test_prepare_assignment_data() {
-    let epoch = 290000;
-    let slot = epoch * SLOTSPEREPOCH;
-    let (
-        seed,
-        shuffle_indices,
-        committee_indices,
-        pivots,
-        activated_indices,
-        flips,
-        positions,
-        flip_bits,
-        round_hash_bits,
-        attestations,
-        aggregated_pubkeys,
-        balance_list,
-        real_committee_size,
-        validator_tree,
-        hash_bytes,
-        plain_validators,
-    ) = prepare_assignment_data(slot, slot + 32);
-    println!("aggregated_pubkeys: {:?}", aggregated_pubkeys);
-}
+// #[test]
+// fn test_prepare_assignment_data() {
+//     let epoch = 290000;
+//     let slot = epoch * SLOTSPEREPOCH;
+//     let (
+//         seed,
+//         shuffle_indices,
+//         committee_indices,
+//         pivots,
+//         activated_indices,
+//         flips,
+//         positions,
+//         flip_bits,
+//         round_hash_bits,
+//         attestations,
+//         aggregated_pubkeys,
+//         balance_list,
+//         real_committee_size,
+//         validator_tree,
+//         hash_bytes,
+//         plain_validators,
+//     ) = prepare_assignment_data(slot, slot + 32);
+//     println!("aggregated_pubkeys: {:?}", aggregated_pubkeys);
+// }

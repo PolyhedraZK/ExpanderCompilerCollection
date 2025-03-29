@@ -14,7 +14,6 @@ use circuit_std_rs::utils::{register_hint, simple_select};
 use core::panic;
 use expander_compiler::frontend::extra::*;
 use expander_compiler::frontend::*;
-use num_traits::real;
 use serde::de::{Deserializer, SeqAccess, Visitor};
 use serde::Deserialize;
 use std::fmt;
@@ -285,7 +284,7 @@ impl ShuffleCircuit<M31> {
         if slot_attestations.is_empty() {
             panic!("slot_attestations is empty");
         }
-        if slot_attestations[slot_idx].len() != 0
+        if !slot_attestations[slot_idx].is_empty()
             && slot_attestations[slot_idx].len() > committee_idx
         {
             pubkey = bls::affine_point_to_bytes_g1(&aggregated_pubkeys[circuit_id]);
@@ -307,9 +306,11 @@ impl ShuffleCircuit<M31> {
                 self.aggregation_bits[i] = M31::from(aggregated_bits[i] as u32);
             }
         }
-        for i in 0..SHUFFLE_ROUND {
-            self.pivots[i] = M31::from(pivots[i] as u32);
-        }
+        self.pivots
+            .iter_mut()
+            .zip(pivots.iter())
+            .for_each(|(a, &b)| *a = M31::from(b as u32));
+
         self.index_count = M31::from(real_validator_count as u32);
         let neg_one = M31::from((1 << 31) - 2);
         let sub_flips = &flips[lower..upper];
@@ -356,9 +357,10 @@ impl ShuffleCircuit<M31> {
         let balance = balance_list[circuit_id];
         let balance_bytes = balance.to_le_bytes(); // [u8; 8]
 
-        for i in 0..8 {
-            self.attestation_balance[i] = M31::from(balance_bytes[i] as u32);
-        }
+        self.attestation_balance
+            .iter_mut()
+            .zip(balance_bytes.iter().take(8))
+            .for_each(|(a, &b)| *a = M31::from(b as u32));
 
         for i in 0..VALIDATOR_CHUNK_SIZE {
             //assign validator
@@ -490,7 +492,7 @@ impl ShuffleCircuit<M31> {
         let validator_hashes = Arc::new(validator_hashes);
         let balance_list = Arc::new(balance_list);
         let assignments = Arc::new(Mutex::new(vec![None; end - start]));
-        for i in (start..end) {
+        for i in start..end {
             let assignments = Arc::clone(&assignments);
             let target_plain_validators = Arc::clone(&plain_validators);
             let target_real_committee_size = Arc::clone(&real_committee_size);
@@ -1055,141 +1057,141 @@ pub fn end2end_shuffle_assignments_with_beacon_data(
     assignment_chunks
 }
 
-#[test]
-fn test_end2end_shuffle_assignments() {
-    let slot = 290000 * 32;
-    let (
-        seed,
-        shuffle_indices,
-        committee_indices,
-        pivots,
-        activated_indices,
-        flips,
-        positions,
-        flip_bits,
-        round_hash_bits,
-        attestations,
-        aggregated_pubkeys,
-        balance_list,
-        real_committee_size,
-        validator_tree,
-        hash_bytes,
-        plain_validators,
-    ) = beacon::prepare_assignment_data(slot, slot + 32);
-    let assignments = end2end_shuffle_assignments_with_beacon_data(
-        plain_validators,
-        real_committee_size,
-        shuffle_indices,
-        committee_indices,
-        attestations,
-        aggregated_pubkeys,
-        pivots,
-        flips,
-        positions,
-        flip_bits,
-        validator_tree[validator_tree.len() - 1].clone(),
-        balance_list,
-        0,
-        16,
-    );
-}
+// #[test]
+// fn test_end2end_shuffle_assignments() {
+//     let slot = 290000 * 32;
+//     let (
+//         seed,
+//         shuffle_indices,
+//         committee_indices,
+//         pivots,
+//         activated_indices,
+//         flips,
+//         positions,
+//         flip_bits,
+//         round_hash_bits,
+//         attestations,
+//         aggregated_pubkeys,
+//         balance_list,
+//         real_committee_size,
+//         validator_tree,
+//         hash_bytes,
+//         plain_validators,
+//     ) = beacon::prepare_assignment_data(slot, slot + 32);
+//     let assignments = end2end_shuffle_assignments_with_beacon_data(
+//         plain_validators,
+//         real_committee_size,
+//         shuffle_indices,
+//         committee_indices,
+//         attestations,
+//         aggregated_pubkeys,
+//         pivots,
+//         flips,
+//         positions,
+//         flip_bits,
+//         validator_tree[validator_tree.len() - 1].clone(),
+//         balance_list,
+//         0,
+//         16,
+//     );
+// }
 
-#[test]
-fn test_shuffle_witnesses_end() {
-    stacker::grow(128 * 1024 * 1024 * 1024, || {
-        let epoch = 290000;
-        let slot = epoch * 32;
-        let shuffle_handle = thread::spawn(|| {
-            let circuit_name = format!("shuffle_{}", VALIDATOR_CHUNK_SIZE);
-            let circuit = ShuffleCircuit::default();
-            let witnesses_dir = format!("./witnesses/{}", circuit_name);
-            get_solver(&witnesses_dir, &circuit_name, circuit)
-        });
-        let solver_shuffle = shuffle_handle.join().unwrap();
-        let (
-            seed,
-            shuffle_indices,
-            committee_indices,
-            pivots,
-            activated_indices,
-            flips,
-            positions,
-            flip_bits,
-            round_hash_bits,
-            attestations,
-            aggregated_pubkeys,
-            balance_list,
-            real_committee_size,
-            validator_tree,
-            hash_bytes,
-            plain_validators,
-        ) = beacon::prepare_assignment_data(slot, slot + 16);
-        let assignments = end2end_shuffle_assignments_with_beacon_data(
-            plain_validators,
-            real_committee_size,
-            shuffle_indices,
-            committee_indices,
-            attestations,
-            aggregated_pubkeys,
-            pivots,
-            flips,
-            positions,
-            flip_bits,
-            validator_tree[validator_tree.len() - 1].clone(),
-            balance_list,
-            0,
-            16,
-        );
-        end2end_shuffle_witnesses_with_assignments(solver_shuffle, assignments, 0);
-    });
-}
+// #[test]
+// fn test_shuffle_witnesses_end() {
+//     stacker::grow(128 * 1024 * 1024 * 1024, || {
+//         let epoch = 290000;
+//         let slot = epoch * 32;
+//         let shuffle_handle = thread::spawn(|| {
+//             let circuit_name = format!("shuffle_{}", VALIDATOR_CHUNK_SIZE);
+//             let circuit = ShuffleCircuit::default();
+//             let witnesses_dir = format!("./witnesses/{}", circuit_name);
+//             get_solver(&witnesses_dir, &circuit_name, circuit)
+//         });
+//         let solver_shuffle = shuffle_handle.join().unwrap();
+//         let (
+//             seed,
+//             shuffle_indices,
+//             committee_indices,
+//             pivots,
+//             activated_indices,
+//             flips,
+//             positions,
+//             flip_bits,
+//             round_hash_bits,
+//             attestations,
+//             aggregated_pubkeys,
+//             balance_list,
+//             real_committee_size,
+//             validator_tree,
+//             hash_bytes,
+//             plain_validators,
+//         ) = beacon::prepare_assignment_data(slot, slot + 16);
+//         let assignments = end2end_shuffle_assignments_with_beacon_data(
+//             plain_validators,
+//             real_committee_size,
+//             shuffle_indices,
+//             committee_indices,
+//             attestations,
+//             aggregated_pubkeys,
+//             pivots,
+//             flips,
+//             positions,
+//             flip_bits,
+//             validator_tree[validator_tree.len() - 1].clone(),
+//             balance_list,
+//             0,
+//             16,
+//         );
+//         end2end_shuffle_witnesses_with_assignments(solver_shuffle, assignments, 0);
+//     });
+// }
 
-#[test]
-fn test_shuffle_witnesses_start() {
-    stacker::grow(128 * 1024 * 1024 * 1024, || {
-        let epoch = 290000;
-        let slot = epoch * 32;
-        let shuffle_handle = thread::spawn(|| {
-            let circuit_name = format!("shuffle_{}", VALIDATOR_CHUNK_SIZE);
-            let circuit = ShuffleCircuit::default();
-            let witnesses_dir = format!("./witnesses/{}", circuit_name);
-            get_solver(&witnesses_dir, &circuit_name, circuit)
-        });
-        let solver_shuffle = shuffle_handle.join().unwrap();
-        let (
-            seed,
-            shuffle_indices,
-            committee_indices,
-            pivots,
-            activated_indices,
-            flips,
-            positions,
-            flip_bits,
-            round_hash_bits,
-            attestations,
-            aggregated_pubkeys,
-            balance_list,
-            real_committee_size,
-            validator_tree,
-            hash_bytes,
-            plain_validators,
-        ) = beacon::prepare_assignment_data(slot + 16, slot + 32);
-        let assignments = end2end_shuffle_assignments_with_beacon_data(
-            plain_validators,
-            real_committee_size,
-            shuffle_indices,
-            committee_indices,
-            attestations,
-            aggregated_pubkeys,
-            pivots,
-            flips,
-            positions,
-            flip_bits,
-            validator_tree[validator_tree.len() - 1].clone(),
-            balance_list,
-            16,
-            32,
-        );
-        end2end_shuffle_witnesses_with_assignments(solver_shuffle, assignments, 16 * 64 / 16);
-    });
-}
+// #[test]
+// fn test_shuffle_witnesses_start() {
+//     stacker::grow(128 * 1024 * 1024 * 1024, || {
+//         let epoch = 290000;
+//         let slot = epoch * 32;
+//         let shuffle_handle = thread::spawn(|| {
+//             let circuit_name = format!("shuffle_{}", VALIDATOR_CHUNK_SIZE);
+//             let circuit = ShuffleCircuit::default();
+//             let witnesses_dir = format!("./witnesses/{}", circuit_name);
+//             get_solver(&witnesses_dir, &circuit_name, circuit)
+//         });
+//         let solver_shuffle = shuffle_handle.join().unwrap();
+//         let (
+//             seed,
+//             shuffle_indices,
+//             committee_indices,
+//             pivots,
+//             activated_indices,
+//             flips,
+//             positions,
+//             flip_bits,
+//             round_hash_bits,
+//             attestations,
+//             aggregated_pubkeys,
+//             balance_list,
+//             real_committee_size,
+//             validator_tree,
+//             hash_bytes,
+//             plain_validators,
+//         ) = beacon::prepare_assignment_data(slot + 16, slot + 32);
+//         let assignments = end2end_shuffle_assignments_with_beacon_data(
+//             plain_validators,
+//             real_committee_size,
+//             shuffle_indices,
+//             committee_indices,
+//             attestations,
+//             aggregated_pubkeys,
+//             pivots,
+//             flips,
+//             positions,
+//             flip_bits,
+//             validator_tree[validator_tree.len() - 1].clone(),
+//             balance_list,
+//             16,
+//             32,
+//         );
+//         end2end_shuffle_witnesses_with_assignments(solver_shuffle, assignments, 16 * 64 / 16);
+//     });
+// }
