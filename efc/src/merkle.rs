@@ -1,7 +1,7 @@
 use byteorder::{LittleEndian, WriteBytesExt};
 use circuit_std_rs::{
     poseidon::{
-        poseidon::PoseidonParams, poseidon_m31::PoseidonM31Params, utils::POSEIDON_M31X16_RATE,
+        poseidon_m31::PoseidonM31Params, poseidon_u32::PoseidonParams, utils::POSEIDON_M31X16_RATE,
     },
     sha256,
     utils::simple_select,

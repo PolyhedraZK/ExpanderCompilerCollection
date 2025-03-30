@@ -1,5 +1,4 @@
-use circuit_std_rs::{poseidon::poseidon::*, poseidon::utils::*, utils::register_hint};
-use expander_compiler::frontend::*;
+use circuit_std_rs::{poseidon::poseidon_u32::*, poseidon::utils::*};
 
 #[test]
 // NOTE(HS) Poseidon Mersenne-31 Width-16 Sponge tested over input length 8

@@ -22,7 +22,7 @@ use crate::attestation::{Attestation, CheckpointPlain};
 use crate::merkle;
 use crate::merkle::{merkle_tree_element_with_limit, merkleize_with_mixin_poseidon};
 use crate::validator::ValidatorPlain;
-use circuit_std_rs::poseidon::poseidon::*;
+use circuit_std_rs::poseidon::poseidon_u32::*;
 use circuit_std_rs::poseidon::utils::*;
 
 const SUBCIRCUIT_TREE_CACHE_DIR: &str = "./data/subcircuitTreeCache/";
@@ -47,6 +47,16 @@ pub struct BeaconCommitteeJson {
     pub index: String,
     pub validators: Vec<String>,
 }
+#[derive(Debug, Clone)]
+pub struct HashtableData {
+    pub seed: Vec<u8>,
+    pub hash_bytes: Vec<[u8; 32]>,
+}
+#[derive(Debug, Clone)]
+pub struct CommitteeData {
+    pub committee_indices: Vec<u64>,
+    pub real_committee_size: Vec<u64>,
+}
 #[derive(Deserialize, Debug)]
 pub struct AttestationsWithBytes {
     pub attestations: Vec<Attestation>,
@@ -54,6 +64,14 @@ pub struct AttestationsWithBytes {
     pub data: Vec<u8>,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct ShuffleData {
+    pub shuffle_indices: Vec<u64>,
+    pub pivots: Vec<u64>,
+    pub flips: Vec<Vec<u64>>,
+    pub positions: Vec<Vec<u64>>,
+    pub flip_bits: Vec<Vec<u8>>,
+}
 // Helper module for base64 encoding/decoding
 mod base64_standard {
     use base64::{engine::general_purpose, Engine};
@@ -190,18 +208,12 @@ fn shuffle_index(
     (current_index, flips, positions, pivots, flip_bits)
 }
 
-pub fn shuffle_indices(
+pub fn cal_shuffle_indices(
     indices: &[u64],
     seed: &[u8],
     bits: &[u8],
     shuffle_round: usize,
-) -> (
-    Vec<u64>,
-    Vec<Vec<u64>>,
-    Vec<Vec<u64>>,
-    Vec<u64>,
-    Vec<Vec<u8>>,
-) {
+) -> ShuffleData {
     let mut shuffle_indices = vec![0u64; indices.len()];
     let mut flips = vec![vec![]; indices.len()];
     let mut positions = vec![vec![]; indices.len()];
@@ -219,7 +231,13 @@ pub fn shuffle_indices(
         flip_bits[i] = flip_b;
     }
 
-    (shuffle_indices, flips, positions, pivots, flip_bits)
+    ShuffleData {
+        shuffle_indices,
+        pivots,
+        flips,
+        positions,
+        flip_bits,
+    }
 }
 
 pub fn load_committees(slot: u64) -> Result<Vec<BeaconCommitteeJson>, Box<dyn Error>> {
@@ -474,11 +492,8 @@ pub fn parallel_process_attestations(
                 // test_aggregated_pubkey(&aggregated_pubkey, attestation);
 
                 let mut agg_pubkey_list = aggregated_pubkey_list.lock().unwrap();
-                match aggregated_pubkey {
-                    Some(agg_pubkey) => {
-                        agg_pubkey_list[i * MAX_COMMITTEES_PER_SLOT + j] = agg_pubkey
-                    }
-                    None => (),
+                if let Some(agg_pubkey) = aggregated_pubkey {
+                    agg_pubkey_list[i * MAX_COMMITTEES_PER_SLOT + j] = agg_pubkey
                 }
 
                 let mut bal_list = balances_list.lock().unwrap();
@@ -497,27 +512,19 @@ pub fn parallel_process_attestations(
 
     (aggregated_pubkey_list, balances_list)
 }
-pub fn prepare_assignment_data(
-    start: u64,
-    end: u64,
-) -> (
-    Vec<u8>,
-    Vec<u64>,
-    Vec<u64>,
-    Vec<u64>,
-    Vec<u64>,
-    Vec<Vec<u64>>,
-    Vec<Vec<u64>>,
-    Vec<Vec<u8>>,
-    Vec<Vec<u8>>,
-    Vec<Vec<Attestation>>,
-    Vec<G1Affine>,
-    Vec<u64>,
-    Vec<u64>,
-    Vec<Vec<Vec<u32>>>,
-    Vec<[u8; 32]>,
-    Vec<ValidatorPlain>,
-) {
+pub struct BeaconAssignmentData {
+    pub hashtable_data: HashtableData,
+    pub shuffle_data: ShuffleData,
+    pub committee_data: CommitteeData,
+    pub activated_indices: Vec<u64>,
+    pub round_hash_bits: Vec<Vec<u8>>,
+    pub attestations: Vec<Vec<Attestation>>,
+    pub aggregated_pubkeys: Vec<G1Affine>,
+    pub balance_list: Vec<u64>,
+    pub validator_tree: Vec<Vec<Vec<u32>>>,
+    pub validator_list: Vec<ValidatorPlain>,
+}
+pub fn prepare_assignment_data(start: u64, end: u64) -> BeaconAssignmentData {
     let epoch = start / SLOTSPEREPOCH;
     let seed = get_beacon_seed(epoch).unwrap();
     let first_slot = start / SLOTSPEREPOCH * SLOTSPEREPOCH;
@@ -541,8 +548,7 @@ pub fn prepare_assignment_data(
     println!("get round hash bits");
 
     //shuffle the indices
-    let (shuffle_indices, flips, positions, pivots, flip_bits) =
-        shuffle_indices(&activated_indices, &seed, &hash_bits, SHUFFLEROUND);
+    let shuffle_data = cal_shuffle_indices(&activated_indices, &seed, &hash_bits, SHUFFLEROUND);
 
     println!("get shuffle_indices");
     //get committees from chain, check it with the shuffled indices
@@ -605,24 +611,21 @@ pub fn prepare_assignment_data(
     let (aggregated_pubkeys, balance_list) =
         parallel_process_attestations(&attestations, first_slot, &validator_list, &committees);
     println!("get attestations");
-    (
-        seed,
-        shuffle_indices,
-        committee_indices,
-        pivots,
+    BeaconAssignmentData {
+        hashtable_data: HashtableData { seed, hash_bytes },
+        shuffle_data,
+        committee_data: CommitteeData {
+            committee_indices,
+            real_committee_size,
+        },
         activated_indices,
-        flips,
-        positions,
-        flip_bits,
         round_hash_bits,
         attestations,
         aggregated_pubkeys,
         balance_list,
-        real_committee_size,
         validator_tree,
-        hash_bytes,
         validator_list,
-    )
+    }
 }
 pub fn calculate_and_save_validator_tree(
     filename: String,

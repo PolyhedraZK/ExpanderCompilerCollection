@@ -1,9 +1,10 @@
+use crate::beacon;
 use crate::utils::{
     ensure_directory_exists, get_solver, read_from_json_file, write_witness_to_file,
 };
 use circuit_std_rs::logup::LogUpSingleKeyTable;
-use circuit_std_rs::poseidon::poseidon::PoseidonParams;
 use circuit_std_rs::poseidon::poseidon_m31::*;
+use circuit_std_rs::poseidon::poseidon_u32::PoseidonParams;
 use circuit_std_rs::poseidon::utils::*;
 use circuit_std_rs::sha256::m31_utils::*;
 use circuit_std_rs::utils::{register_hint, simple_lookup2, simple_select};
@@ -12,7 +13,6 @@ use expander_compiler::frontend::*;
 use serde::Deserialize;
 use std::sync::Arc;
 use std::thread;
-
 pub const QUERY_TABLE_SIZE: usize = 1024;
 #[derive(Debug, Clone, Deserialize)]
 pub struct PermutationQueryEntry {
@@ -28,6 +28,7 @@ declare_circuit!(PermutationQueryCircuit {
     value: [Variable; QUERY_TABLE_SIZE],
     table: [Variable; QUERY_TABLE_SIZE],
 });
+pub type PermutationQueryAssignmentChunks = Vec<Vec<PermutationQueryCircuit<M31>>>;
 impl PermutationQueryCircuit<M31> {
     pub fn from_entry(entry: &PermutationQueryEntry) -> Self {
         let mut assignment = PermutationQueryCircuit {
@@ -116,7 +117,7 @@ pub fn end2end_permutation_query_witness(
             "assigned assignments time: {:?}",
             end_time.duration_since(start_time)
         );
-        let assignment_chunks: Vec<Vec<PermutationQueryCircuit<M31>>> =
+        let assignment_chunks: PermutationQueryAssignmentChunks =
             assignments.chunks(16).map(|x| x.to_vec()).collect();
 
         //generate witnesses (multi-thread)
@@ -155,7 +156,7 @@ pub fn end2end_permutation_query_witness(
 }
 pub fn end2end_permutation_query_witnesses_with_assignments(
     w_s: WitnessSolver<M31Config>,
-    assignment_chunks: Vec<Vec<PermutationQueryCircuit<M31>>>,
+    assignment_chunks: PermutationQueryAssignmentChunks,
 ) {
     let circuit_name = "permutationquery";
 
@@ -199,7 +200,7 @@ pub fn end2end_permutation_query_witnesses_with_assignments(
 
 pub fn end2end_permutation_query_assignments(
     permutation_query_data: Vec<PermutationQueryEntry>,
-) -> Vec<Vec<PermutationQueryCircuit<M31>>> {
+) -> PermutationQueryAssignmentChunks {
     //get assignments
     let start_time = std::time::Instant::now();
     let assignments = PermutationQueryCircuit::from_entries(&permutation_query_data);
@@ -208,7 +209,7 @@ pub fn end2end_permutation_query_assignments(
         "assigned assignments time: {:?}",
         end_time.duration_since(start_time)
     );
-    let assignment_chunks: Vec<Vec<PermutationQueryCircuit<M31>>> =
+    let assignment_chunks: PermutationQueryAssignmentChunks =
         assignments.chunks(16).map(|x| x.to_vec()).collect();
     assignment_chunks
 }
@@ -260,7 +261,6 @@ declare_circuit!(PermutationIndicesValidatorHashesCircuit {
     table_validator_hashes: [[Variable; POSEIDON_M31X16_RATE]; VALIDATOR_COUNT],
     real_keys: [Variable; VALIDATOR_COUNT],
 });
-
 impl PermutationIndicesValidatorHashesCircuit<M31> {
     pub fn from_entry(entry: &PermutationHashEntry) -> Self {
         let mut assignment = PermutationIndicesValidatorHashesCircuit {
@@ -412,6 +412,8 @@ declare_circuit!(PermutationIndicesValidatorHashBitCircuit {
     table_validator_hashes: [Variable; VALIDATOR_COUNT], //PCS: share with validatortree circuit
     real_keys: [Variable; VALIDATOR_COUNT], //HINT
 });
+pub type PermutationIndicesValidatorHashBitAssignmentChunks =
+    Vec<Vec<PermutationIndicesValidatorHashBitCircuit<M31>>>;
 impl PermutationIndicesValidatorHashBitCircuit<M31> {
     pub fn from_assignment(entry: &PermutationIndicesValidatorHashesCircuit<M31>) -> Vec<Self> {
         let mut assignment = PermutationIndicesValidatorHashBitCircuit {
@@ -627,7 +629,7 @@ pub fn generate_permutation_hashbit_witnesses(dir: &str) {
             "assigned assignments time: {:?}",
             end_time.duration_since(start_time)
         );
-        let assignment_chunks: Vec<Vec<PermutationIndicesValidatorHashBitCircuit<M31>>> =
+        let assignment_chunks: PermutationIndicesValidatorHashBitAssignmentChunks =
             assignments.chunks(16).map(|x| x.to_vec()).collect();
 
         //generate witnesses (multi-thread)
@@ -686,7 +688,7 @@ pub fn end2end_permutation_hashbit_witness(
             "assigned assignments time: {:?}",
             end_time.duration_since(start_time)
         );
-        let assignment_chunks: Vec<Vec<PermutationIndicesValidatorHashBitCircuit<M31>>> =
+        let assignment_chunks: PermutationIndicesValidatorHashBitAssignmentChunks =
             assignments.chunks(16).map(|x| x.to_vec()).collect();
 
         let witness_solver = Arc::new(w_s);
@@ -721,7 +723,7 @@ pub fn end2end_permutation_hashbit_witness(
 }
 pub fn end2end_permutation_hashbit_witnesses_with_assignments(
     w_s: WitnessSolver<M31Config>,
-    assignment_chunks: Vec<Vec<PermutationIndicesValidatorHashBitCircuit<M31>>>,
+    assignment_chunks: PermutationIndicesValidatorHashBitAssignmentChunks,
 ) {
     let circuit_name = &format!("permutationhashbit_{}", VALIDATOR_COUNT);
 
@@ -760,18 +762,20 @@ pub fn end2end_permutation_hashbit_witnesses_with_assignments(
 }
 pub fn end2end_permutation_assignments_with_beacon_data(
     hashtable_bits: &[Vec<u8>],
-    raw_query_bits: &[Vec<u8>],
-    raw_query_indices: &[Vec<u64>],
+    shuffle_data: &beacon::ShuffleData,
     valid_validator_list: &[u64],
-    raw_shuffle_indices: &[u64],
-    raw_committee_indices: &[u64],
-    real_committee_size: &[u64],
+    committee_data: &beacon::CommitteeData,
     padding_size: usize,
     validator_hashes: &[Vec<u32>],
 ) -> (
-    Vec<Vec<PermutationQueryCircuit<M31>>>,
-    Vec<Vec<PermutationIndicesValidatorHashBitCircuit<M31>>>,
+    PermutationQueryAssignmentChunks,
+    PermutationIndicesValidatorHashBitAssignmentChunks,
 ) {
+    let raw_committee_indices = committee_data.committee_indices.to_vec();
+    let real_committee_size = &committee_data.real_committee_size;
+    let raw_query_bits = shuffle_data.flip_bits.to_vec();
+    let raw_query_indices = shuffle_data.positions.to_vec();
+    let raw_shuffle_indices = shuffle_data.shuffle_indices.to_vec();
     let to_pad = padding_size - real_committee_size.last().copied().unwrap_or(0) as usize;
     let bit_len = raw_query_bits[0].len();
 
@@ -819,7 +823,7 @@ pub fn end2end_permutation_assignments_with_beacon_data(
         query_indices,
     );
 
-    let permutation_query_assignment_chunks: Vec<Vec<PermutationQueryCircuit<M31>>> =
+    let permutation_query_assignment_chunks: PermutationQueryAssignmentChunks =
         permutation_query_assignments
             .chunks(16)
             .map(|x| x.to_vec())

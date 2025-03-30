@@ -84,7 +84,7 @@ declare_circuit!(BLSVERIFIERCircuit {
     source_root: [Variable; 32],              //PUBLIC
     target_root: [Variable; 32],              //PUBLIC
 });
-
+pub type BlsVerifierAssignmentChunks = Vec<Vec<BLSVERIFIERCircuit<M31>>>;
 impl BLSVERIFIERCircuit<M31> {
     pub fn get_assignments_from_data(
         pairing_data: Vec<PairingEntry>,
@@ -298,7 +298,7 @@ pub fn generate_blsverifier_witnesses(dir: &str) {
         "assigned assignments time: {:?}",
         end_time.duration_since(start_time)
     );
-    let assignment_chunks: Vec<Vec<BLSVERIFIERCircuit<M31>>> =
+    let assignment_chunks: BlsVerifierAssignmentChunks =
         assignments.chunks(16).map(|x| x.to_vec()).collect();
 
     //generate witnesses (multi-thread)
@@ -354,7 +354,7 @@ pub fn end2end_blsverifier_witness(
         "assigned assignments time: {:?}",
         end_time.duration_since(start_time)
     );
-    let assignment_chunks: Vec<Vec<BLSVERIFIERCircuit<M31>>> =
+    let assignment_chunks: BlsVerifierAssignmentChunks =
         assignments.chunks(16).map(|x| x.to_vec()).collect();
 
     //generate witnesses (multi-thread)
@@ -393,7 +393,7 @@ pub fn end2end_blsverifier_witness(
 
 pub fn end2end_blsverifier_witnesses_with_assignments(
     w_s: WitnessSolver<M31Config>,
-    assignment_chunks: Vec<Vec<BLSVERIFIERCircuit<M31>>>,
+    assignment_chunks: BlsVerifierAssignmentChunks,
     offset: usize,
 ) {
     let circuit_name = "pairing_3checks";
@@ -438,7 +438,7 @@ pub fn end2end_blsverifier_witnesses_with_assignments(
 pub fn end2end_blsverifier_assignments_with_beacon_data(
     aggregated_pubkeys: Vec<BlsG1Affine>,
     attestations: Vec<Attestation>,
-) -> Vec<Vec<BLSVERIFIERCircuit<M31>>> {
+) -> BlsVerifierAssignmentChunks {
     println!("aggregated_pubkeys: {:?}", aggregated_pubkeys.len());
     println!("attestations: {:?}", attestations.len());
     //get assignments
@@ -452,7 +452,7 @@ pub fn end2end_blsverifier_assignments_with_beacon_data(
         "assigned assignments time: {:?}",
         end_time.duration_since(start_time)
     );
-    let assignment_chunks: Vec<Vec<BLSVERIFIERCircuit<M31>>> =
+    let assignment_chunks: BlsVerifierAssignmentChunks =
         assignments.chunks(16).map(|x| x.to_vec()).collect();
     assignment_chunks
 }

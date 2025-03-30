@@ -41,6 +41,7 @@ declare_circuit!(HASHTABLECircuit {
     seed: [PublicVariable; SHA256LEN],
     output: [[Variable; SHA256LEN]; HASHTABLESIZE],
 });
+pub type HashtableAssignmentChunks = Vec<Vec<HASHTABLECircuit<M31>>>;
 impl HASHTABLECircuit<M31> {
     pub fn from_entry(&mut self, entry: &HashTableJson) {
         for i in 0..SHA256LEN {
@@ -163,7 +164,7 @@ pub fn generate_hash_witnesses(dir: &str) {
         "assigned assignments time: {:?}",
         end_time.duration_since(start_time)
     );
-    let assignment_chunks: Vec<Vec<HASHTABLECircuit<M31>>> =
+    let assignment_chunks: HashtableAssignmentChunks =
         assignments.chunks(16).map(|x| x.to_vec()).collect();
 
     //generate witnesses (multi-thread)
@@ -216,7 +217,7 @@ pub fn end2end_hashtable_witnesses(
         "assigned assignments time: {:?}",
         end_time.duration_since(start_time)
     );
-    let assignment_chunks: Vec<Vec<HASHTABLECircuit<M31>>> =
+    let assignment_chunks: HashtableAssignmentChunks =
         assignments.chunks(16).map(|x| x.to_vec()).collect();
 
     //generate witnesses (multi-thread)
@@ -254,7 +255,7 @@ pub fn end2end_hashtable_witnesses(
 
 pub fn end2end_hashtable_witnesses_with_assignments(
     w_s: WitnessSolver<M31Config>,
-    assignment_chunks: Vec<Vec<HASHTABLECircuit<M31>>>,
+    assignment_chunks: HashtableAssignmentChunks,
 ) {
     let circuit_name = &format!("hashtable{}", HASHTABLESIZE);
 
@@ -296,7 +297,7 @@ pub fn end2end_hashtable_witnesses_with_assignments(
 pub fn end2end_hashtable_assignments_with_beacon_data(
     seed: &[u8],
     hash_bytes: Vec<[u8; 32]>,
-) -> Vec<Vec<HASHTABLECircuit<M31>>> {
+) -> HashtableAssignmentChunks {
     let subcircuit_count = hash_bytes.len() / HASHTABLESIZE;
     //get assignments
     let start_time = std::time::Instant::now();
@@ -307,7 +308,7 @@ pub fn end2end_hashtable_assignments_with_beacon_data(
         "assigned assignments time: {:?}",
         end_time.duration_since(start_time)
     );
-    let assignment_chunks: Vec<Vec<HASHTABLECircuit<M31>>> =
+    let assignment_chunks: HashtableAssignmentChunks =
         assignments.chunks(16).map(|x| x.to_vec()).collect();
     assignment_chunks
 }
