@@ -23,22 +23,14 @@ fn logup_test() {
 declare_circuit!(LogUpRangeproofCircuit { test: Variable });
 impl GenericDefine<M31Config> for LogUpRangeproofCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
-        let mut table = LogUpRangeProofTable::new(8);
+        let mut table = LogUpRangeProofTable::new(16);
         table.initial(builder);
-        for i in 1024..1025 {
-            let element = builder.constant(i << 8);
-            table.rangeproof(builder, element, 13);
+        for i in 12..30 {
+            for j in ((1 << (i - 1))..(1 << i)).step_by(64) {
+                let key = builder.constant(j);
+                table.rangeproof(builder, key, i);
+            }
         }
-        // for i in 1..12 {
-        //     for j in (1 << (i - 1))..(1 << i) {
-        //         let key = builder.constant(j);
-        //         if i > 8 {
-        //             table.rangeproof(builder, key, i);
-        //         } else {
-        //             table.rangeproof_onechunk(builder, key, i);
-        //         }
-        //     }
-        // }
         table.final_check(builder);
     }
 }

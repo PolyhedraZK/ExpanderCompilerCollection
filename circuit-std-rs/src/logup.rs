@@ -358,30 +358,22 @@ impl LogUpRangeProofTable {
     }
 
     pub fn rangeproof<C: Config, B: RootAPI<C>>(&mut self, builder: &mut B, a: Variable, n: usize) {
-        //add a shift value
-        let mut n = n;
-        let mut new_a = a;
-        if n % self.rangeproof_bits != 0 {
-            let rem = n % self.rangeproof_bits;
-            let shift = self.rangeproof_bits - rem;
-            let constant = (1 << shift) - 1;
-            let mut mul_factor = 1;
-            // println!("n:{}", n);
-            mul_factor <<= n;
-            let a_shift = builder.mul(constant, mul_factor);
-            new_a = builder.add(a, a_shift);
-            n += shift;
+        if n <= self.rangeproof_bits {
+            self.rangeproof_onechunk(builder, a, n);
+            return;
         }
+        //split a into multiple chunks
         let hint_input = vec![
             builder.constant(n as u32),
             builder.constant(self.rangeproof_bits as u32),
-            new_a,
+            a,
         ];
         let witnesses = builder.new_hint(
             "myhint.rangeproofhint",
             &hint_input,
-            n / self.rangeproof_bits,
+            (n + self.rangeproof_bits - 1) / self.rangeproof_bits,
         );
+        //ensure the sum of the chunks is equal to a
         let mut sum = witnesses[0];
         for (i, witness) in witnesses.iter().enumerate().skip(1) {
             let constant = 1 << (self.rangeproof_bits * i);
@@ -389,10 +381,25 @@ impl LogUpRangeProofTable {
             let mul = builder.mul(witness, constant);
             sum = builder.add(sum, mul);
         }
-        builder.assert_is_equal(sum, new_a);
-        for witness in witnesses.iter().take(n / self.rangeproof_bits) {
+        builder.assert_is_equal(sum, a);
+
+        //add a shift value to the last chunk (highest bits)
+        let mut n = n;
+        let mut last_witness = witnesses.last().unwrap().clone();
+        if n % self.rangeproof_bits != 0 {
+            let rem = n % self.rangeproof_bits;
+            let shift = self.rangeproof_bits - rem;
+            let constant = (1 << shift) - 1;
+            let mut mul_factor = 1;
+            mul_factor <<= rem;
+            let shift_value = builder.mul(constant, mul_factor);
+            last_witness = builder.add(last_witness, shift_value);
+            n += shift;
+        }
+        for witness in witnesses.iter().take(n / self.rangeproof_bits - 1) {
             self.query_range(*witness);
         }
+        self.query_range(last_witness);
     }
 
     pub fn rangeproof_onechunk<C: Config, B: RootAPI<C>>(
@@ -481,13 +488,10 @@ pub fn rangeproof_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error>
     let n = inputs[0].to_u256().as_i64();
     let m = inputs[1].to_u256().as_i64();
     let mut a = inputs[2].to_u256().as_i64();
-    println!("a:{}", a);
-    for i in 0..n / m {
+    for i in 0..((n + m - 1) / m) {
         let r = a % (1 << m);
-        println!("r:{}", r);
         a /= 1 << m;
         outputs[i as usize] = M31::from(r as u32);
     }
-    println!("end");
     Ok(())
 }
