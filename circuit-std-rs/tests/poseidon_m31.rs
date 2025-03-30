@@ -55,7 +55,7 @@ fn test_poseidon_m31x16_hash_to_state_input_len8() {
 }
 
 declare_circuit!(PoseidonSpongeLen16Circuit {
-    inputs: [Variable; 8192],
+    inputs: [Variable; 16],
     outputs: [Variable; 16]
 });
 
@@ -69,7 +69,6 @@ impl Define<M31Config> for PoseidonSpongeLen16Circuit<Variable> {
             POSEIDON_M31X16_PARTIAL_ROUNDS,
         );
         let res = params.hash_to_state_flatten(builder, &self.inputs);
-        // let res = params.hash_to_state_flatten(builder, &self.inputs);
         (0..params.width).for_each(|i| builder.assert_is_equal(res[i], self.outputs[i]));
     }
 }
@@ -82,7 +81,7 @@ fn test_poseidon_m31x16_hash_to_state_input_len16() {
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let assignment = PoseidonSpongeLen16Circuit::<M31> {
-        inputs: [M31::from(114514); 8192],
+        inputs: [M31::from(114514); 16],
         outputs: [
             M31 { v: 1510043913 },
             M31 { v: 1840611937 },

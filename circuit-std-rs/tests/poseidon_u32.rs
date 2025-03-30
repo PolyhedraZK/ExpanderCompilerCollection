@@ -17,6 +17,5 @@ fn test_poseidon_x16_hash_to_state_input_len8() {
         POSEIDON_M31X16_PARTIAL_ROUNDS,
     );
     let res = params.hash_to_state(&inputs);
-    println!("{:?}", res);
     (0..params.width).for_each(|i| assert_eq!(res[i], outputs[i]));
 }
