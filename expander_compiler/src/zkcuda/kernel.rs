@@ -406,9 +406,7 @@ fn add_duplicate(st: usize, a: &mut Vec<usize>, b: &[usize]) {
         res.push(a[*i + st]);
     }
     a.resize(st + res.len(), 0);
-    for i in 0..res.len() {
-        a[i + st] = res[i];
-    }
+    a[st..(res.len() + st)].copy_from_slice(&res[..]);
 }
 
 #[cfg(test)]
