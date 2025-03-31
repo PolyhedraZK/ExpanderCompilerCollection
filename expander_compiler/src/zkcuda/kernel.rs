@@ -3,6 +3,7 @@ use crate::compile::{
     print_layered_circuit_stats,
 };
 use crate::frontend::*;
+use crate::utils::pool::Pool;
 use crate::{
     circuit::{
         config::Config,
@@ -234,7 +235,13 @@ where
     }
     c0.outputs.extend_from_slice(&output_vars_ids);
     // compile step 1
-    let (r_hint_normalized_opt, src_im) = compile_step_1(&r_source)?;
+    let en0 = r_source.expected_num_output_zeroes;
+    let c0 = r_source.circuits.get_mut(&0).unwrap();
+    let tmp = remove_duplicate(en0, &mut c0.outputs);
+    let (mut r_hint_normalized_opt, src_im) = compile_step_1(&r_source)?;
+    let en0 = r_hint_normalized_opt.expected_num_output_zeroes;
+    let c0 = r_hint_normalized_opt.circuits.get_mut(&0).unwrap();
+    add_duplicate(en0, &mut c0.outputs, &tmp);
     for (i, x) in src_im.mapping().iter().enumerate() {
         assert_eq!(i, *x);
     }
@@ -287,8 +294,16 @@ where
         rhl_c0.outputs.push(i);
     }
     // compile step 2
+    let en0 = r_hint_less.expected_num_output_zeroes;
+    let rhl_c0 = r_hint_less.circuits.get_mut(&0).unwrap();
+    let tmp = remove_duplicate(en0, &mut rhl_c0.outputs);
+    println!("before: {:?}", rhl_c0.outputs);
     let (mut r_dest_opt, hl_im) =
         compile_step_2::<C, NormalInputType>(r_hint_less, CompileOptions::default())?;
+    let en0 = r_dest_opt.expected_num_output_zeroes;
+    let rd_c0 = r_dest_opt.circuits.get_mut(&0).unwrap();
+    println!("after: {:?}", rd_c0.outputs);
+    add_duplicate(en0, &mut rd_c0.outputs, &tmp);
     for (i, x) in hl_im.mapping().iter().enumerate() {
         assert_eq!(i, *x);
     }
@@ -367,6 +382,33 @@ fn reorder_ir_inputs<C: Config>(
     r0.instructions = new_insns;
     r0.constraints = r0.constraints.iter().map(|x| var_new_id[*x]).collect();
     r0.outputs = r0.outputs.iter().map(|x| var_new_id[*x]).collect();
+}
+
+// To prevent reassign_duplicate_sub_circuit_outputs being executed too many times,
+// we can remove duplicate outputs from the circuit at the beginning of compile_step_X.
+fn remove_duplicate(st: usize, a: &mut Vec<usize>) -> Vec<usize> {
+    let mut p = Pool::new();
+    let mut res = vec![];
+    for i in a.iter().skip(st) {
+        res.push(p.add(i));
+    }
+    a.resize(st + p.len(), 0);
+    for i in 0..p.len() {
+        a[i + st] = *p.get(i);
+    }
+    res
+}
+
+// Inverse of remove_duplicate
+fn add_duplicate(st: usize, a: &mut Vec<usize>, b: &[usize]) {
+    let mut res = vec![];
+    for i in b.iter() {
+        res.push(a[*i + st]);
+    }
+    a.resize(st + res.len(), 0);
+    for i in 0..res.len() {
+        a[i + st] = res[i];
+    }
 }
 
 #[cfg(test)]
