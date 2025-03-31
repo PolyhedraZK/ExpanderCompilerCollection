@@ -416,60 +416,64 @@ pub struct End2EndAssignmentChunks {
     pub merkle_subtree_with_limit_chunks: validator::MergeSubMTLimitAssignmentChunks,
 }
 pub fn end2end_end_assignments(epoch: u64) -> End2EndAssignmentChunks {
-    let slot: u64 = epoch * 32;
-    let beacon_assignment_data = beacon::prepare_assignment_data(slot, slot + 16);
-    let validator_data = shuffle::ValidatorData {
-        validator_hashes: beacon_assignment_data
-            .validator_tree
-            .last()
-            .unwrap()
-            .to_vec(),
-        plain_validators: beacon_assignment_data.validator_list.clone(),
-        aggregated_pubkeys: beacon_assignment_data.aggregated_pubkeys.clone(),
-    };
-    let shuffle_assignments = shuffle::end2end_shuffle_assignments_with_beacon_data(
-        validator_data.clone(),
-        beacon_assignment_data.committee_data.clone(),
-        beacon_assignment_data.shuffle_data.clone(),
-        beacon_assignment_data.attestations.clone(),
-        beacon_assignment_data.balance_list,
-        [0, 16],
-    );
-    let hash_assignments = hashtable::end2end_hashtable_assignments_with_beacon_data(
-        &beacon_assignment_data.hashtable_data.seed,
-        beacon_assignment_data.hashtable_data.hash_bytes,
-    );
-    let blsverifier_assignments = bls_verifier::end2end_blsverifier_assignments_with_beacon_data(
-        beacon_assignment_data.aggregated_pubkeys,
-        beacon_assignment_data
-            .attestations
-            .into_iter()
-            .flatten()
-            .collect(),
-    );
-    let (permutation_query_assignment_chunks, permutation_hashbit_assignment_chunks) =
-        permutation::end2end_permutation_assignments_with_beacon_data(
-            &beacon_assignment_data.round_hash_bits,
-            &beacon_assignment_data.shuffle_data,
-            &beacon_assignment_data.activated_indices,
-            &beacon_assignment_data.committee_data,
-            shuffle::VALIDATOR_CHUNK_SIZE,
-            &validator_data.validator_hashes,
+    stacker::grow(128 * 1024 * 1024 * 1024, || {
+        let slot: u64 = epoch * 32;
+        let beacon_assignment_data = beacon::prepare_assignment_data(slot, slot + 17);
+        let validator_data = shuffle::ValidatorData {
+            validator_hashes: beacon_assignment_data
+                .validator_tree
+                .last()
+                .unwrap()
+                .to_vec(),
+            plain_validators: beacon_assignment_data.validator_list.clone(),
+            aggregated_pubkeys: beacon_assignment_data.aggregated_pubkeys.clone(),
+        };
+        let shuffle_assignments = shuffle::end2end_shuffle_assignments_with_beacon_data(
+            validator_data.clone(),
+            beacon_assignment_data.committee_data.clone(),
+            beacon_assignment_data.shuffle_data.clone(),
+            beacon_assignment_data.attestations.clone(),
+            beacon_assignment_data.balance_list,
+            [0, 16],
         );
-    let (convert_validator_subtree_assignments, merkle_subtree_with_limit_assignments) =
-        validator::end2end_validator_tree_assignments(
-            beacon_assignment_data.validator_tree,
-            beacon_assignment_data.activated_indices.len() as u64,
+        let hash_assignments = hashtable::end2end_hashtable_assignments_with_beacon_data(
+            &beacon_assignment_data.hashtable_data.seed,
+            beacon_assignment_data.hashtable_data.hash_bytes,
         );
-    End2EndAssignmentChunks {
-        shuffle_chunks: shuffle_assignments,
-        hashtable_chunks: hash_assignments,
-        blsverifier_chunks: blsverifier_assignments,
-        permutation_query_chunks: permutation_query_assignment_chunks,
-        permutation_hash_chunks: permutation_hashbit_assignment_chunks,
-        convert_validator_subtree_chunks: convert_validator_subtree_assignments,
-        merkle_subtree_with_limit_chunks: merkle_subtree_with_limit_assignments,
-    }
+        let blsverifier_assignments =
+            bls_verifier::end2end_blsverifier_assignments_with_beacon_data(
+                beacon_assignment_data.aggregated_pubkeys,
+                beacon_assignment_data
+                    .attestations
+                    .into_iter()
+                    .flatten()
+                    .collect(),
+                [0, 16],
+            );
+        let (permutation_query_assignment_chunks, permutation_hashbit_assignment_chunks) =
+            permutation::end2end_permutation_assignments_with_beacon_data(
+                &beacon_assignment_data.round_hash_bits,
+                &beacon_assignment_data.shuffle_data,
+                &beacon_assignment_data.activated_indices,
+                &beacon_assignment_data.committee_data,
+                shuffle::VALIDATOR_CHUNK_SIZE,
+                &validator_data.validator_hashes,
+            );
+        let (convert_validator_subtree_assignments, merkle_subtree_with_limit_assignments) =
+            validator::end2end_validator_tree_assignments(
+                beacon_assignment_data.validator_tree,
+                beacon_assignment_data.activated_indices.len() as u64,
+            );
+        End2EndAssignmentChunks {
+            shuffle_chunks: shuffle_assignments,
+            hashtable_chunks: hash_assignments,
+            blsverifier_chunks: blsverifier_assignments,
+            permutation_query_chunks: permutation_query_assignment_chunks,
+            permutation_hash_chunks: permutation_hashbit_assignment_chunks,
+            convert_validator_subtree_chunks: convert_validator_subtree_assignments,
+            merkle_subtree_with_limit_chunks: merkle_subtree_with_limit_assignments,
+        }
+    })
 }
 
 pub fn end2end_start_assignments(
@@ -495,7 +499,7 @@ pub fn end2end_start_assignments(
         beacon_assignment_data.shuffle_data.clone(),
         beacon_assignment_data.attestations.clone(),
         beacon_assignment_data.balance_list,
-        [0, 16],
+        [16, 32],
     );
     let blsverifier_assignments = bls_verifier::end2end_blsverifier_assignments_with_beacon_data(
         beacon_assignment_data.aggregated_pubkeys,
@@ -504,6 +508,7 @@ pub fn end2end_start_assignments(
             .into_iter()
             .flatten()
             .collect(),
+        [16, 32],
     );
     (shuffle_assignments, blsverifier_assignments)
 }
@@ -520,7 +525,7 @@ pub fn end2end_witness_streamline_from_beacon_data(epoch: u64, stage: &str) {
             get_solver(&witnesses_dir, &circuit_name, circuit)
         });
 
-        //get the solver for hashtable
+        // //get the solver for hashtable
         let hashtable_handle = thread::spawn(|| {
             let circuit_name = format!("hashtable{}", hashtable::HASHTABLESIZE);
             let circuit = HASHTABLECircuit::default();
@@ -535,11 +540,6 @@ pub fn end2end_witness_streamline_from_beacon_data(epoch: u64, stage: &str) {
             let witnesses_dir = format!("./witnesses/{}", circuit_name);
             get_solver(&witnesses_dir, circuit_name, circuit)
         });
-
-        let solver_shuffle = shuffle_handle.join().unwrap();
-        let solver_hashtable = hashtable_handle.join().unwrap();
-        let solver_blsverifier = blsverifier_handle.join().unwrap();
-
         //get the solver for permutation query
         let permutation_query_handle = thread::spawn(|| {
             let circuit_name = "permutationquery";
@@ -563,17 +563,20 @@ pub fn end2end_witness_streamline_from_beacon_data(epoch: u64, stage: &str) {
             let witnesses_dir = format!("./witnesses/{}", circuit_name);
             get_solver(&witnesses_dir, &circuit_name, circuit)
         });
-        let solver_permutation_query = permutation_query_handle.join().unwrap();
-        let solver_validator_subtree = validator_subtree_handle.join().unwrap();
-        let solver_merkle_subtree_with_limit = merkle_subtree_with_limit_handle.join().unwrap();
 
         //get the solver for permutation hash
         let circuit_name = format!("permutationhashbit_{}", permutation::VALIDATOR_COUNT);
         let circuit = PermutationIndicesValidatorHashBitCircuit::default();
         let witnesses_dir = format!("./witnesses/{}", circuit_name);
         let solver_permutation_hash = get_solver(&witnesses_dir, &circuit_name, circuit);
-        log::debug!("loaded solvers");
 
+        let solver_shuffle = shuffle_handle.join().unwrap();
+        let solver_hashtable = hashtable_handle.join().unwrap();
+        let solver_blsverifier = blsverifier_handle.join().unwrap();
+        let solver_permutation_query = permutation_query_handle.join().unwrap();
+        let solver_validator_subtree = validator_subtree_handle.join().unwrap();
+        let solver_merkle_subtree_with_limit = merkle_subtree_with_limit_handle.join().unwrap();
+        // let solver_permutation_hash = permutation_hash_handle.join().unwrap();
         let end2end_assignment_chunks = end2end_end_assignments(epoch);
         log::debug!("loaded assignments");
         let shuffle_thread = thread::spawn(move || {
@@ -708,13 +711,25 @@ fn test_end2end_start_assignments() {
 }
 
 #[test]
-fn test_end2end_witness_streamline_from_beacon_data() {
+fn test_end2end_witness_streamline_from_beacon_data_end() {
     let epoch = 290000;
     let stage = "end";
     env_logger::builder()
         .filter_level(log::LevelFilter::Debug) // set global log level to debug
         .init();
-    stacker::grow(128 * 1024 * 1024 * 1024, || {
+    stacker::grow(256 * 1024 * 1024 * 1024, || {
+        end2end_witness_streamline_from_beacon_data(epoch, stage);
+    });
+}
+
+#[test]
+fn test_end2end_witness_streamline_from_beacon_data_start() {
+    let epoch = 290000;
+    let stage = "start";
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Debug) // set global log level to debug
+        .init();
+    stacker::grow(256 * 1024 * 1024 * 1024, || {
         end2end_witness_streamline_from_beacon_data(epoch, stage);
     });
 }

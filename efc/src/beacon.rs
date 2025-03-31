@@ -325,6 +325,7 @@ pub fn load_target_attestations(start: u64, end: u64) -> Vec<Vec<Attestation>> {
             }
         }
     }
+    println!("final attestations {:?}", final_attestations);
     final_attestations
 }
 pub fn count_ones_in_aggregation_bits(base64_str: &str) -> Result<u32, Box<dyn std::error::Error>> {

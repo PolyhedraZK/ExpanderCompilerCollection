@@ -26,7 +26,7 @@ impl GenericDefine<M31Config> for LogUpRangeproofCircuit<Variable> {
         let mut table = LogUpRangeProofTable::new(16);
         table.initial(builder);
         for i in 12..30 {
-            for j in ((1 << (i - 1))..(1 << i)).step_by(64) {
+            for j in ((1 << (i - 1))..(1 << i)).step_by(256) {
                 let key = builder.constant(j);
                 table.rangeproof(builder, key, i);
             }

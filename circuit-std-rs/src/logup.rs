@@ -385,7 +385,7 @@ impl LogUpRangeProofTable {
 
         //add a shift value to the last chunk (highest bits)
         let mut n = n;
-        let mut last_witness = witnesses.last().unwrap().clone();
+        let mut last_witness = *witnesses.last().unwrap();
         if n % self.rangeproof_bits != 0 {
             let rem = n % self.rangeproof_bits;
             let shift = self.rangeproof_bits - rem;

@@ -287,8 +287,10 @@ impl ShuffleCircuit<M31> {
         if !slot_attestations[slot_idx].is_empty()
             && slot_attestations[slot_idx].len() > committee_idx
         {
+            println!("slot_idx{}, commitee_idx{}", slot_idx, committee_idx);
             pubkey = bls::affine_point_to_bytes_g1(&validator_data.aggregated_pubkeys[circuit_id]);
             att = &slot_attestations[slot_idx][committee_idx];
+            println!("attestation: {:?}", att);
         }
         let aggregated_bits =
             beacon::attestation_get_aggregation_bits_from_bytes(&att.aggregation_bits);
