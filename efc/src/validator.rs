@@ -69,7 +69,7 @@ impl ValidatorPlain {
             POSEIDON_M31X16_PARTIAL_ROUNDS,
         );
         let inputs_u32 = inputs.iter().map(|x| *x as u32).collect::<Vec<u32>>();
-        params.hash_to_state(&inputs_u32)
+        params.hash_to_state(&inputs_u32)[..POSEIDON_M31X16_RATE].to_vec()
     }
 }
 #[derive(Clone, Copy)]
@@ -565,7 +565,12 @@ impl ValidatorSubMTCircuit<M31> {
             }
             for j in 0..POSEIDON_M31X16_RATE {
                 assignment.subtree_root[j] =
-                    M31::from(validator_tree[validator_tree.len() - SUBTREE_DEPTH][i][j]);
+                    M31::from(validator_tree
+                        .get(validator_tree.len() - SUBTREE_DEPTH - 1)
+                        .and_then(|layer| layer.get(i))
+                        .and_then(|row| row.get(j))
+                        .copied()
+                        .unwrap_or(merkle::ZERO_HASHES_POSEIDON[SUBTREE_DEPTH][j]));
             }
             assignments.push(assignment);
         }
@@ -578,7 +583,7 @@ impl GenericDefine<M31Config> for ValidatorSubMTCircuit<Variable> {
 
         // Flatten `validator_hash_chunk` into a single input vector
         for i in 0..SUBTREE_SIZE {
-            inputs.extend_from_slice(&self.validator_hash_chunk[i]);
+            inputs.push(self.validator_hash_chunk[i].to_vec());
         }
 
         // Compute the Poseidon hash
@@ -589,7 +594,12 @@ impl GenericDefine<M31Config> for ValidatorSubMTCircuit<Variable> {
             POSEIDON_M31X16_FULL_ROUNDS,
             POSEIDON_M31X16_PARTIAL_ROUNDS,
         );
-        let sub_tree_root = params.hash_to_state_flatten(builder, &inputs);
+        let sub_tree_root = merkle::merkleize_var_with_limit(
+            builder,
+            &inputs,
+            &params,
+            0,
+        );
 
         // Enforce equality between computed root and given root
         for (i, elem) in sub_tree_root.iter().enumerate().take(POSEIDON_M31X16_RATE) {
