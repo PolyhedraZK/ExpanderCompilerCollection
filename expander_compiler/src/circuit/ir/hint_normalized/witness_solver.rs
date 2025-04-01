@@ -1,11 +1,9 @@
-use crate::{
-    circuit::layered::witness::{Witness, WitnessValues},
-    utils::serde::Serde,
-};
+use crate::circuit::layered::witness::{Witness, WitnessValues};
 
 use arith::SimdField;
+use serdes::{ExpSerde, SerdeResult};
 
-use super::*;
+use super::{Config, Error, FieldArith, HintCaller, RootCircuit};
 
 pub struct WitnessSolver<C: Config> {
     pub circuit: RootCircuit<C>,
@@ -104,12 +102,15 @@ impl<C: Config> WitnessSolver<C> {
     }
 }
 
-impl<C: Config> Serde for WitnessSolver<C> {
-    fn deserialize_from<R: std::io::Read>(mut reader: R) -> Result<Self, std::io::Error> {
+impl<C: Config> ExpSerde for WitnessSolver<C> {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+
+    fn deserialize_from<R: std::io::Read>(mut reader: R) -> SerdeResult<Self> {
         let circuit = RootCircuit::<C>::deserialize_from(&mut reader)?;
         Ok(Self { circuit })
     }
-    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> Result<(), std::io::Error> {
+
+    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> SerdeResult<()> {
         self.circuit.serialize_into(&mut writer)
     }
 }

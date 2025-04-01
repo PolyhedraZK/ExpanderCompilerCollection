@@ -1,5 +1,5 @@
 use circuit_std_rs::sha256::m31::sha256_var_bytes;
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{declare_circuit, Config, Define, M31Config, RootAPI, Variable};
 use serde::Deserialize;
 
 const ZERO_HASHES: [&[u8]; 40] = [
@@ -379,7 +379,7 @@ mod tests {
         let slot = slot.to_le_bytes();
         let committee_index: u64 = 0;
         let committee_index = committee_index.to_le_bytes();
-        let beacon_beacon_block_root = vec![
+        let beacon_beacon_block_root = [
             31, 28, 22, 87, 106, 251, 75, 169, 100, 167, 224, 201, 6, 63, 144, 105, 213, 235, 18,
             224, 169, 157, 122, 56, 47, 48, 28, 31, 124, 69, 38, 248,
         ];
@@ -387,19 +387,19 @@ mod tests {
         let source_epoch = source_epoch.to_le_bytes();
         let target_epoch: u64 = 290000;
         let target_epoch = target_epoch.to_le_bytes();
-        let source_root = vec![
+        let source_root = [
             194, 212, 152, 232, 56, 145, 101, 103, 73, 230, 240, 242, 89, 129, 63, 184, 38, 157,
             86, 185, 251, 148, 157, 68, 227, 144, 241, 74, 228, 200, 206, 199,
         ];
-        let target_root = vec![
+        let target_root = [
             31, 28, 22, 87, 106, 251, 75, 169, 100, 167, 224, 201, 6, 63, 144, 105, 213, 235, 18,
             224, 169, 157, 122, 56, 47, 48, 28, 31, 124, 69, 38, 248,
         ];
-        let domain = vec![
+        let domain = [
             1, 0, 0, 0, 187, 164, 218, 150, 53, 76, 159, 37, 71, 108, 241, 188, 105, 191, 88, 58,
             127, 158, 10, 240, 73, 48, 91, 98, 222, 103, 102, 64,
         ];
-        let output = vec![
+        let output = [
             108, 128, 22, 84, 10, 154, 231, 122, 105, 134, 112, 241, 41, 75, 92, 55, 89, 54, 23, 5,
             113, 63, 35, 4, 32, 197, 151, 179, 250, 27, 66, 13,
         ];
