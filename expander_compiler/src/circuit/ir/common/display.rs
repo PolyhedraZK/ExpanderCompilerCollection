@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::*;
+use super::{Circuit, Instruction, IrConfig, RootCircuit};
 
 impl<Irc: IrConfig> fmt::Display for Circuit<Irc>
 where

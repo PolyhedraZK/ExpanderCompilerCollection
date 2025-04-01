@@ -15,14 +15,28 @@ mod random_circuit_tests;
 #[cfg(test)]
 mod tests;
 
-#[derive(Default)]
+#[derive(Debug, Clone)]
 pub struct CompileOptions {
     pub mul_fanout_limit: Option<usize>,
+    pub allow_input_reorder: bool,
+}
+
+impl Default for CompileOptions {
+    fn default() -> Self {
+        Self {
+            mul_fanout_limit: None,
+            allow_input_reorder: true,
+        }
+    }
 }
 
 impl CompileOptions {
     pub fn with_mul_fanout_limit(mut self, mul_fanout_limit: usize) -> Self {
         self.mul_fanout_limit = Some(mul_fanout_limit);
+        self
+    }
+    pub fn without_input_reorder(mut self) -> Self {
+        self.allow_input_reorder = false;
         self
     }
 }
@@ -64,16 +78,9 @@ fn print_stat(stat_name: &str, stat: usize, is_last: bool) {
     }
 }
 
-pub fn compile<C: Config, I: InputType>(
+pub fn compile_step_1<C: Config>(
     r_source: &ir::source::RootCircuit<C>,
-) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C, I>), Error> {
-    compile_with_options(r_source, CompileOptions::default())
-}
-
-pub fn compile_with_options<C: Config, I: InputType>(
-    r_source: &ir::source::RootCircuit<C>,
-    options: CompileOptions,
-) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C, I>), Error> {
+) -> Result<(ir::hint_normalized::RootCircuit<C>, InputMapping), Error> {
     r_source.validate()?;
 
     let mut src_im = InputMapping::new_identity(r_source.input_size());
@@ -102,19 +109,13 @@ pub fn compile_with_options<C: Config, I: InputType>(
     r_hint_normalized_opt
         .validate()
         .map_err(|e| e.prepend("hint normalized ir circuit invalid"))?;
-    let ho_stats = r_hint_normalized_opt.get_stats();
-    print_info("built hint normalized ir");
-    print_stat("numInputs", ho_stats.num_inputs, false);
-    print_stat("numConstraints", ho_stats.num_constraints, false);
-    print_stat("numInsns", ho_stats.num_insns, false);
-    print_stat("numVars", ho_stats.num_variables, false);
-    print_stat("numTerms", ho_stats.num_terms, true);
+    Ok((r_hint_normalized_opt, src_im))
+}
 
-    let (r_hint_less, mut r_hint_exported) = r_hint_normalized_opt.remove_and_export_hints();
-    r_hint_exported
-        .validate()
-        .map_err(|e| e.prepend("hint exported circuit invalid"))?;
-
+pub fn compile_step_2<C: Config, I: InputType>(
+    r_hint_less: ir::hint_less::RootCircuit<C>,
+    options: CompileOptions,
+) -> Result<(ir::dest::RootCircuit<C>, InputMapping), Error> {
     let mut hl_im = InputMapping::new_identity(r_hint_less.input_size());
 
     let r_hint_less_opt = optimize_until_fixed_point(&r_hint_less, &mut hl_im, |r| {
@@ -187,8 +188,12 @@ pub fn compile_with_options<C: Config, I: InputType>(
     r_dest_opt
         .validate_circuit_has_inputs()
         .map_err(|e| e.prepend("dest ir circuit invalid"))?;
+    Ok((r_dest_opt, hl_im))
+}
 
-    let (mut lc, dest_im) = layering::compile(&r_dest_opt);
+pub fn compile_step_3<C: Config, I: InputType>(
+    mut lc: layered::Circuit<C, I>,
+) -> Result<layered::Circuit<C, I>, Error> {
     lc.validate()
         .map_err(|e| e.prepend("layered circuit invalid"))?;
 
@@ -208,7 +213,40 @@ pub fn compile_with_options<C: Config, I: InputType>(
     lc.validate()
         .map_err(|e| e.prepend("layered circuit invalid1"))?;
     lc.sort_everything(); // for deterministic output
+    Ok(lc)
+}
 
+pub fn compile_step_4<C: Config>(
+    r_hint_exported: ir::hint_normalized::RootCircuit<C>,
+    src_im: &mut InputMapping,
+) -> Result<ir::hint_normalized::RootCircuit<C>, Error> {
+    r_hint_exported
+        .validate()
+        .map_err(|e| e.prepend("final hint exported circuit invalid"))?;
+    let r_hint_exported_opt = optimize_until_fixed_point(&r_hint_exported, src_im, |r| {
+        let (r, im) = r.remove_unreachable();
+        (r, im)
+    });
+    Ok(r_hint_exported_opt)
+}
+
+pub fn compile<C: Config, I: InputType>(
+    r_source: &ir::source::RootCircuit<C>,
+) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C, I>), Error> {
+    compile_with_options(r_source, CompileOptions::default())
+}
+
+pub fn print_ir_stats<C: Config>(r_hint_normalized: &ir::hint_normalized::RootCircuit<C>) {
+    let ho_stats = r_hint_normalized.get_stats();
+    print_info("built hint normalized ir");
+    print_stat("numInputs", ho_stats.num_inputs, false);
+    print_stat("numConstraints", ho_stats.num_constraints, false);
+    print_stat("numInsns", ho_stats.num_insns, false);
+    print_stat("numVars", ho_stats.num_variables, false);
+    print_stat("numTerms", ho_stats.num_terms, true);
+}
+
+pub fn print_layered_circuit_stats<C: Config, I: InputType>(lc: &layered::Circuit<C, I>) {
     let lc_stats = lc.get_stats();
     print_info("built layered circuit");
     print_stat("numSegment", lc_stats.num_segments, false);
@@ -220,6 +258,33 @@ pub fn compile_with_options<C: Config, I: InputType>(
     print_stat("numCst", lc_stats.num_expanded_cst, false);
     print_stat("numMul", lc_stats.num_expanded_mul, false);
     print_stat("totalCost", lc_stats.total_cost, true);
+}
+
+pub fn compile_with_options<C: Config, I: InputType>(
+    r_source: &ir::source::RootCircuit<C>,
+    options: CompileOptions,
+) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C, I>), Error> {
+    let (r_hint_normalized_opt, mut src_im) = compile_step_1(r_source)?;
+
+    print_ir_stats(&r_hint_normalized_opt);
+
+    let (r_hint_less, mut r_hint_exported) = r_hint_normalized_opt.remove_and_export_hints();
+    r_hint_exported
+        .validate()
+        .map_err(|e| e.prepend("hint exported circuit invalid"))?;
+
+    let (r_dest_opt, mut hl_im) = compile_step_2::<C, I>(r_hint_less, options.clone())?;
+
+    let (lc, dest_im) = layering::compile(
+        &r_dest_opt,
+        layering::CompileOptions {
+            allow_input_reorder: options.allow_input_reorder,
+        },
+    );
+
+    let lc = compile_step_3(lc)?;
+
+    print_layered_circuit_stats(&lc);
 
     hl_im.compose_in_place(&dest_im);
 
@@ -229,14 +294,8 @@ pub fn compile_with_options<C: Config, I: InputType>(
         .iter()
         .map(|&x| x.max(1))
         .collect();
-    r_hint_exported
-        .validate()
-        .map_err(|e| e.prepend("final hint exported circuit invalid"))?;
 
-    let mut r_hint_exported_opt = optimize_until_fixed_point(&r_hint_exported, &mut src_im, |r| {
-        let (r, im) = r.remove_unreachable();
-        (r, im)
-    });
+    let mut r_hint_exported_opt = compile_step_4(r_hint_exported, &mut src_im)?;
     r_hint_exported_opt.add_back_removed_inputs(&src_im);
     r_hint_exported_opt
         .validate()

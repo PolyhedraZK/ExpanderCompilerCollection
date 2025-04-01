@@ -1,8 +1,8 @@
 use ethnum::U256;
-use expander_compiler::field::{FieldArith, FieldModulus};
+use expander_compiler::field::FieldArith;
 use expander_compiler::frontend::*;
-use internal::Serde;
 use rand::{Rng, SeedableRng};
+use serdes::ExpSerde;
 use tiny_keccak::Hasher;
 
 const N_HASHES: usize = 2;

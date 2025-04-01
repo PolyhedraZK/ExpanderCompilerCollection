@@ -7,7 +7,10 @@ use rand::{RngCore, SeedableRng};
 
 use crate::utils::{misc::next_power_of_two, union_find::UnionFind};
 
-use super::*;
+use super::{
+    Allocation, Circuit, Coef, Config, FieldArith, Gate, GateAdd, GateConst, GateCustom, GateMul,
+    Hash, Input, InputType, InputUsize, Segment,
+};
 
 impl<C: Config, I: InputType, const INPUT_NUM: usize> PartialOrd for Gate<C, I, INPUT_NUM> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -702,16 +705,17 @@ impl<C: Config, I: InputType> Circuit<C, I> {
 mod tests {
     use crate::circuit::layered;
     use crate::field::FieldArith;
-    use crate::layering::compile;
+    use crate::layering::{compile, CompileOptions};
     use crate::{
         circuit::{
             config::{Config, GF2Config as C},
             ir::{self, common::rand_gen::*},
+            layered::{CrossLayerInputType, NormalInputType},
         },
         utils::error::Error,
     };
 
-    use super::{CrossLayerInputType, InputType, NormalInputType};
+    use super::InputType;
 
     type CField = <C as Config>::CircuitField;
 
@@ -735,7 +739,12 @@ mod tests {
                 }
             },
         }
-        let (lc, _) = compile(&root);
+        let (lc, _) = compile(
+            &root,
+            CompileOptions {
+                allow_input_reorder: true,
+            },
+        );
         assert_eq!(lc.validate(), Ok(()));
         Some(lc)
     }

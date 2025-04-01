@@ -41,16 +41,11 @@ fn example<C: Config>() {
         assert!(*x);
     }
 
-    let mut expander_circuit = compile_result
-        .layered_circuit
-        .export_to_expander::<C::DefaultGKRFieldConfig>()
-        .flatten();
-    let config = expander_config::Config::<C::DefaultGKRConfig>::new(
-        expander_config::GKRScheme::Vanilla,
-        mpi_config::MPIConfig::new(),
-    );
+    let mut expander_circuit = compile_result.layered_circuit.export_to_expander_flatten();
 
-    let (simd_input, simd_public_input) = witness.to_simd::<C::DefaultSimdField>();
+    let config = C::new_expander_config();
+
+    let (simd_input, simd_public_input) = witness.to_simd();
     println!("{} {}", simd_input.len(), simd_public_input.len());
     expander_circuit.layers[0].input_vals = simd_input;
     expander_circuit.public_input = simd_public_input.clone();
