@@ -57,7 +57,7 @@ impl ValidatorPlain {
         inputs.extend_from_slice(&pubkey);
         inputs.extend_from_slice(&withdrawal_credentials);
         inputs.extend_from_slice(&self.effective_balance.to_le_bytes());
-        inputs.extend_from_slice(&if self.slashed { 1u64 } else { 0 }.to_le_bytes());
+        inputs.extend_from_slice(&if self.slashed { 1u8 } else { 0 }.to_le_bytes());
         inputs.extend_from_slice(&self.activation_eligibility_epoch.to_le_bytes());
         inputs.extend_from_slice(&self.activation_epoch.to_le_bytes());
         inputs.extend_from_slice(&self.exit_epoch.to_le_bytes());
