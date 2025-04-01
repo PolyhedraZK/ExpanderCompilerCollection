@@ -794,13 +794,6 @@ pub fn end2end_witnesses_streamline_from_beacon_data_single_thread(epoch: u64, s
             let witnesses_dir = format!("./witnesses/{}", circuit_name);
             get_solver(&witnesses_dir, circuit_name, circuit)
         });
-        //get the solver for permutation query
-        let permutation_query_handle = thread::spawn(|| {
-            let circuit_name = "permutationquery";
-            let circuit = PermutationQueryCircuit::default();
-            let witnesses_dir = format!("./witnesses/{}", circuit_name);
-            get_solver(&witnesses_dir, circuit_name, circuit)
-        });
 
         //get the solver for validator subtree
         let validator_subtree_handle = thread::spawn(|| {
@@ -818,6 +811,15 @@ pub fn end2end_witnesses_streamline_from_beacon_data_single_thread(epoch: u64, s
             get_solver(&witnesses_dir, &circuit_name, circuit)
         });
 
+        let end2end_assignment_handle = thread::spawn(move || {
+            end2end_end_assignments(epoch)
+        });
+        //get the solver for permutation query
+        let circuit_name = "permutationquery";
+        let circuit = PermutationQueryCircuit::default();
+        let witnesses_dir = format!("./witnesses/{}", circuit_name);
+        let solver_permutation_query = get_solver(&witnesses_dir, circuit_name, circuit);
+
         //get the solver for permutation hash
         let circuit_name = format!("permutationhashbit_{}", permutation::VALIDATOR_COUNT);
         let circuit = PermutationIndicesValidatorHashBitCircuit::default();
@@ -827,11 +829,9 @@ pub fn end2end_witnesses_streamline_from_beacon_data_single_thread(epoch: u64, s
         let solver_shuffle = shuffle_handle.join().unwrap();
         let solver_hashtable = hashtable_handle.join().unwrap();
         let solver_blsverifier = blsverifier_handle.join().unwrap();
-        let solver_permutation_query = permutation_query_handle.join().unwrap();
         let solver_validator_subtree = validator_subtree_handle.join().unwrap();
         let solver_merkle_subtree_with_limit = merkle_subtree_with_limit_handle.join().unwrap();
-        // let solver_permutation_hash = permutation_hash_handle.join().unwrap();
-        let end2end_assignment_chunks = end2end_end_assignments(epoch);
+        let end2end_assignment_chunks = end2end_assignment_handle.join().unwrap();
         log::debug!("loaded assignments");
         let shuffle_thread = thread::spawn(move || {
             end2end_shuffle_witnesses_with_assignments(

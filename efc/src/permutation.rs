@@ -13,7 +13,7 @@ use expander_compiler::frontend::*;
 use serde::Deserialize;
 use std::sync::Arc;
 use std::thread;
-pub const QUERY_TABLE_SIZE: usize = 1024;
+pub const QUERY_TABLE_SIZE: usize = 1024 * 1024;
 #[derive(Debug, Clone, Deserialize)]
 pub struct PermutationQueryEntry {
     #[serde(rename = "Index")]

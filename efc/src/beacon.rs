@@ -27,7 +27,7 @@ use circuit_std_rs::poseidon::utils::*;
 
 const SUBCIRCUIT_TREE_CACHE_DIR: &str = "./data/subcircuitTreeCache/";
 const CACHE_DIR: &str = "./data/cache/";
-const LOCAL_TREE_DIR: &str = "./data/localTree/";
+const LOCAL_TREE_DIR: &str = "./data/beacon/validator/";
 const RANDAO_DIR: &str = "./data/beacon/randao/";
 const VALIDATOR_DIR: &str = "./data/beacon/validator/";
 const COMMITTEE_DIR: &str = "./data/beacon/committee/";
