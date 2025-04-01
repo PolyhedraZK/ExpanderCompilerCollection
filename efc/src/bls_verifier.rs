@@ -351,7 +351,8 @@ pub fn end2end_blsverifier_witness(
         BLSVERIFIERCircuit::<M31>::get_assignments_from_data(pairing_data, attestations);
     let end_time = std::time::Instant::now();
     log::debug!(
-        "assigned assignments time: {:?}",
+        "assigned {:} assignments time: {:?}",
+        circuit_name,
         end_time.duration_since(start_time)
     );
     let assignment_chunks: BlsVerifierAssignmentChunks =
@@ -448,10 +449,29 @@ pub fn end2end_blsverifier_assignments_with_beacon_data(
     );
     let end_time = std::time::Instant::now();
     log::debug!(
-        "assigned assignments time: {:?}",
+        "assigned bls_verifier assignments time: {:?}",
         end_time.duration_since(start_time)
     );
     let assignment_chunks: BlsVerifierAssignmentChunks =
         assignments.chunks(16).map(|x| x.to_vec()).collect();
     assignment_chunks
+}
+
+pub fn end2end_blsverifier_witnesses_with_beacon_data(
+    w_s: WitnessSolver<M31Config>,
+    aggregated_pubkeys: Vec<BlsG1Affine>,
+    attestations: Vec<Attestation>,
+    range: [usize; 2],
+) {
+    stacker::grow(32 * 1024 * 1024 * 1024, || {
+        //get assignments
+        let assignment_chunks = end2end_blsverifier_assignments_with_beacon_data(
+            aggregated_pubkeys,
+            attestations,
+            range,
+        );
+
+        //generate witnesses (multi-thread)
+        end2end_blsverifier_witnesses_with_assignments(w_s, assignment_chunks, range[0] * 16);
+    });
 }

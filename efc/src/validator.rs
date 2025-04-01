@@ -615,7 +615,7 @@ pub fn generate_validator_subtree_witnesses(dir: &str) {
         let assignments = ValidatorSubMTCircuit::get_assignments_from_json(dir);
         let end_time = std::time::Instant::now();
         log::debug!(
-            "assigned assignment data, time: {:?}",
+            "assigned validator subtree assignment data, time: {:?}",
             end_time.duration_since(start_time)
         );
         let assignment_chunks: Vec<Vec<ValidatorSubMTCircuit<M31>>> =
@@ -668,7 +668,7 @@ pub fn end2end_validator_subtree_witnesses(
     let assignments = ValidatorSubMTCircuit::get_assignments_from_data(validator_subtree_data);
     let end_time = std::time::Instant::now();
     log::debug!(
-        "assigned assignment data, time: {:?}",
+        "assigned validator subtree assignment data, time: {:?}",
         end_time.duration_since(start_time)
     );
     let assignment_chunks: Vec<Vec<ValidatorSubMTCircuit<M31>>> =
@@ -880,7 +880,7 @@ pub fn end2end_merkle_subtree_with_limit_witnesses_with_assignments(
         end_time.duration_since(start_time)
     );
 }
-pub fn end2end_validator_tree_assignments(
+pub fn end2end_validator_tree_assignments_with_beacon_data(
     validator_tree: Vec<Vec<Vec<u32>>>,
     real_validator_count: u64,
 ) -> (
@@ -903,7 +903,7 @@ pub fn end2end_validator_tree_assignments(
         .collect();
     let end_time = std::time::Instant::now();
     log::debug!(
-        "assigned assignment data, time: {:?}",
+        "assigned validator tree assignment data, time: {:?}",
         end_time.duration_since(start_time)
     );
     (
@@ -912,6 +912,22 @@ pub fn end2end_validator_tree_assignments(
     )
 }
 
+pub fn end2end_validator_tree_witnesses_with_beacon_data(
+    w_s_subtree: WitnessSolver<M31Config>,
+    w_s_merkle: WitnessSolver<M31Config>,
+    validator_tree: &[Vec<Vec<u32>>],
+    real_validator_count: u64,
+) {
+    stacker::grow(32 * 1024 * 1024 * 1024, || {
+        let (
+            convert_validator_list_to_merkle_tree_assignments_chunks,
+            merkle_subtree_with_limit_assignment_chunks,
+        ) = end2end_validator_tree_assignments_with_beacon_data(validator_tree.to_vec(), real_validator_count);
+        //generate witnesses (multi-thread)
+        end2end_validator_subtree_witnesses_with_assignments(w_s_subtree, convert_validator_list_to_merkle_tree_assignments_chunks);
+        end2end_merkle_subtree_with_limit_witnesses_with_assignments(w_s_merkle, merkle_subtree_with_limit_assignment_chunks);
+    });
+}
 // #[test]
 // fn test_end2end_validators_assignments() {
 //     let slot = 290000 * 32;

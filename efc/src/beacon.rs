@@ -281,10 +281,12 @@ pub fn load_target_attestations(start: u64, end: u64) -> Vec<Vec<Attestation>> {
         epoch: source_epoch,
         root: general_purpose::STANDARD.encode(source_beacon_root),
     };
+    println!("source checkpoint {:?}", source_checkpoint);
     let target_checkpoint = CheckpointPlain {
         epoch: target_epoch,
         root: general_purpose::STANDARD.encode(target_beacon_root),
     };
+    println!("target checkpoint {:?}", target_checkpoint);
     let mut slots_attestations = vec![];
     let mut slots_beacon_root = vec!["".to_string(); SLOTSPEREPOCH as usize];
     for slot in start..end {
@@ -296,6 +298,7 @@ pub fn load_target_attestations(start: u64, end: u64) -> Vec<Vec<Attestation>> {
     //find the target attestation
     let mut candidate_attestations = vec![vec![]; SLOTSPEREPOCH as usize];
     for att in slots_attestations.iter() {
+        println!("attestation {:?}", att);
         if att.data.source == source_checkpoint && att.data.target == target_checkpoint {
             let current_slot = (att.data.slot % SLOTSPEREPOCH) as usize;
             if att.data.beacon_block_root == slots_beacon_root[current_slot] {
@@ -303,7 +306,7 @@ pub fn load_target_attestations(start: u64, end: u64) -> Vec<Vec<Attestation>> {
             }
         }
     }
-
+    println!("candidate attestations {:?}", candidate_attestations);
     let mut final_attestations =
         vec![vec![Attestation::default(); MAXCOMMITTEESPERSLOT]; SLOTSPEREPOCH as usize];
     for i in 0..candidate_attestations.len() {
@@ -513,6 +516,7 @@ pub fn parallel_process_attestations(
 
     (aggregated_pubkey_list, balances_list)
 }
+#[derive(Debug, Clone)]
 pub struct BeaconAssignmentData {
     pub hashtable_data: HashtableData,
     pub shuffle_data: ShuffleData,
@@ -546,12 +550,10 @@ pub fn prepare_assignment_data(start: u64, end: u64) -> BeaconAssignmentData {
     let round_hash_bits: Vec<Vec<u8>> = (0..SHUFFLEROUND)
         .map(|i| hash_bits[i * bits_per_round..(i + 1) * bits_per_round].to_vec())
         .collect();
-    println!("get round hash bits");
 
     //shuffle the indices
     let shuffle_data = cal_shuffle_indices(&activated_indices, &seed, &hash_bits, SHUFFLEROUND);
 
-    println!("get shuffle_indices");
     //get committees from chain, check it with the shuffled indices
     let committees = load_committees(first_slot).unwrap();
     let mut real_committee_size = vec![];
@@ -562,7 +564,6 @@ pub fn prepare_assignment_data(start: u64, end: u64) -> BeaconAssignmentData {
         .iter()
         .flat_map(|c| c.validators.iter().map(|s| s.parse::<u64>().unwrap()))
         .collect();
-    println!("get committee_indices");
 
     let validator_list = load_validators_from_file(first_slot).unwrap();
     // let mut total_effective_balance = 0;
@@ -607,11 +608,9 @@ pub fn prepare_assignment_data(start: u64, end: u64) -> BeaconAssignmentData {
         validator_tree =
             calculate_and_save_validator_tree(validator_tree_filename, validator_hashes);
     }
-    println!("get validator_tree");
     let attestations = load_target_attestations(start, end);
     let (aggregated_pubkeys, balance_list) =
         parallel_process_attestations(&attestations, first_slot, &validator_list, &committees);
-    println!("get attestations");
     BeaconAssignmentData {
         hashtable_data: HashtableData { seed, hash_bytes },
         shuffle_data,

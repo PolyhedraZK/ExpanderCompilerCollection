@@ -114,7 +114,7 @@ pub fn end2end_permutation_query_witness(
         let assignments = PermutationQueryCircuit::from_entries(&permutation_query_data);
         let end_time = std::time::Instant::now();
         log::debug!(
-            "assigned assignments time: {:?}",
+            "assigned permutation_query assignments time: {:?}",
             end_time.duration_since(start_time)
         );
         let assignment_chunks: PermutationQueryAssignmentChunks =
@@ -206,7 +206,7 @@ pub fn end2end_permutation_query_assignments(
     let assignments = PermutationQueryCircuit::from_entries(&permutation_query_data);
     let end_time = std::time::Instant::now();
     log::debug!(
-        "assigned assignments time: {:?}",
+        "assigned permutation_query assignments time: {:?}",
         end_time.duration_since(start_time)
     );
     let assignment_chunks: PermutationQueryAssignmentChunks =
@@ -626,7 +626,7 @@ pub fn generate_permutation_hashbit_witnesses(dir: &str) {
         }
         let end_time = std::time::Instant::now();
         log::debug!(
-            "assigned assignments time: {:?}",
+            "assigned permutation hashbit assignments time: {:?}",
             end_time.duration_since(start_time)
         );
         let assignment_chunks: PermutationIndicesValidatorHashBitAssignmentChunks =
@@ -672,7 +672,7 @@ pub fn end2end_permutation_hashbit_witness(
     stacker::grow(32 * 1024 * 1024 * 1024, || {
         let circuit_name = &format!("permutationhashbit_{}", VALIDATOR_COUNT);
 
-        log::debug!("preparing {} solver...", circuit_name);
+
         let witnesses_dir = format!("./witnesses/{}", circuit_name);
         let start_time = std::time::Instant::now();
         let assignment =
@@ -685,7 +685,7 @@ pub fn end2end_permutation_hashbit_witness(
         }
         let end_time = std::time::Instant::now();
         log::debug!(
-            "assigned assignments time: {:?}",
+            "assigned permutation hashbit assignments time: {:?}",
             end_time.duration_since(start_time)
         );
         let assignment_chunks: PermutationIndicesValidatorHashBitAssignmentChunks =
@@ -727,7 +727,6 @@ pub fn end2end_permutation_hashbit_witnesses_with_assignments(
 ) {
     let circuit_name = &format!("permutationhashbit_{}", VALIDATOR_COUNT);
 
-    log::debug!("preparing {} solver...", circuit_name);
     let start_time = std::time::Instant::now();
     let witnesses_dir = format!("./witnesses/{}", circuit_name);
 
@@ -848,6 +847,32 @@ pub fn end2end_permutation_assignments_with_beacon_data(
     )
 }
 
+pub fn end2end_permutation_witnesses_with_beacon_data(
+    w_s_query: WitnessSolver<M31Config>,
+    w_s_hashbit: WitnessSolver<M31Config>,
+    hashtable_bits: &[Vec<u8>],
+    shuffle_data: &beacon::ShuffleData,
+    valid_validator_list: &[u64],
+    committee_data: &beacon::CommitteeData,
+    padding_size: usize,
+    validator_hashes: &[Vec<u32>],
+) {
+    stacker::grow(32 * 1024 * 1024 * 1024, || {
+        let (
+            permutation_query_assignment_chunks,
+            permutation_hashbit_assignment_chunks,
+        ) = end2end_permutation_assignments_with_beacon_data(
+            hashtable_bits,
+            shuffle_data,
+            valid_validator_list,
+            committee_data,
+            padding_size,
+            validator_hashes,
+        );
+        end2end_permutation_hashbit_witnesses_with_assignments(w_s_hashbit, permutation_hashbit_assignment_chunks);
+        end2end_permutation_query_witnesses_with_assignments(w_s_query, permutation_query_assignment_chunks);
+    });
+}
 // #[test]
 // fn test_end2end_permutation_assignments() {
 //     let slot = 290000 * 32;

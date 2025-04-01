@@ -161,7 +161,8 @@ pub fn generate_hash_witnesses(dir: &str) {
     let assignments = HASHTABLECircuit::get_assignments_from_json(dir);
     let end_time = std::time::Instant::now();
     log::debug!(
-        "assigned assignments time: {:?}",
+        "assigned {:} assignments time: {:?}",
+        circuit_name,
         end_time.duration_since(start_time)
     );
     let assignment_chunks: HashtableAssignmentChunks =
@@ -214,7 +215,8 @@ pub fn end2end_hashtable_witnesses(
     let assignments = HASHTABLECircuit::get_assignments_from_data(hashtable_data);
     let end_time = std::time::Instant::now();
     log::debug!(
-        "assigned assignments time: {:?}",
+        "assigned {:} assignments time: {:?}",
+        circuit_name,
         end_time.duration_since(start_time)
     );
     let assignment_chunks: HashtableAssignmentChunks =
@@ -305,14 +307,23 @@ pub fn end2end_hashtable_assignments_with_beacon_data(
         HASHTABLECircuit::get_assignments_from_beacon_data(seed, &hash_bytes, subcircuit_count);
     let end_time = std::time::Instant::now();
     log::debug!(
-        "assigned assignments time: {:?}",
+        "assigned hahtable assignments time: {:?}",
         end_time.duration_since(start_time)
     );
     let assignment_chunks: HashtableAssignmentChunks =
         assignments.chunks(16).map(|x| x.to_vec()).collect();
     assignment_chunks
 }
-
+pub fn end2end_hashtable_witnesses_with_beacon_data(
+    w_s: WitnessSolver<M31Config>,
+    seed: &[u8],
+    hash_bytes: Vec<[u8; 32]>,
+) {
+    stacker::grow(32 * 1024 * 1024 * 1024, || {
+        let assignment_chunks = end2end_hashtable_assignments_with_beacon_data(seed, hash_bytes);
+        end2end_hashtable_witnesses_with_assignments(w_s, assignment_chunks);
+    });
+}
 // #[test]
 // fn test_end2end_hashtable_assignments() {
 //     let slot = 290000 * 32;
