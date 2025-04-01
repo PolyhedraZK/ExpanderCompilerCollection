@@ -281,12 +281,10 @@ pub fn load_target_attestations(start: u64, end: u64) -> Vec<Vec<Attestation>> {
         epoch: source_epoch,
         root: general_purpose::STANDARD.encode(source_beacon_root),
     };
-    println!("source checkpoint {:?}", source_checkpoint);
     let target_checkpoint = CheckpointPlain {
         epoch: target_epoch,
         root: general_purpose::STANDARD.encode(target_beacon_root),
     };
-    println!("target checkpoint {:?}", target_checkpoint);
     let mut slots_attestations = vec![];
     let mut slots_beacon_root = vec!["".to_string(); SLOTSPEREPOCH as usize];
     for slot in start..end {
@@ -298,7 +296,6 @@ pub fn load_target_attestations(start: u64, end: u64) -> Vec<Vec<Attestation>> {
     //find the target attestation
     let mut candidate_attestations = vec![vec![]; SLOTSPEREPOCH as usize];
     for att in slots_attestations.iter() {
-        println!("attestation {:?}", att);
         if att.data.source == source_checkpoint && att.data.target == target_checkpoint {
             let current_slot = (att.data.slot % SLOTSPEREPOCH) as usize;
             if att.data.beacon_block_root == slots_beacon_root[current_slot] {
@@ -306,7 +303,6 @@ pub fn load_target_attestations(start: u64, end: u64) -> Vec<Vec<Attestation>> {
             }
         }
     }
-    println!("candidate attestations {:?}", candidate_attestations);
     let mut final_attestations =
         vec![vec![Attestation::default(); MAXCOMMITTEESPERSLOT]; SLOTSPEREPOCH as usize];
     for i in 0..candidate_attestations.len() {
@@ -328,7 +324,6 @@ pub fn load_target_attestations(start: u64, end: u64) -> Vec<Vec<Attestation>> {
             }
         }
     }
-    println!("final attestations {:?}", final_attestations);
     final_attestations
 }
 pub fn count_ones_in_aggregation_bits(base64_str: &str) -> Result<u32, Box<dyn std::error::Error>> {

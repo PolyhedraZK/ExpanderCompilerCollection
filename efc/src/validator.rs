@@ -750,6 +750,28 @@ pub fn end2end_validator_subtree_witnesses_with_assignments(
     );
 }
 
+pub fn debug_validator_subtree_with_assignments(
+    assignment_chunks: ValidatorSubMTAssignmentChunks
+) {
+    stacker::grow(32 * 1024 * 1024 * 1024, || {
+        use expander_compiler::frontend::extra::debug_eval;
+        let circuit_name = format!("validatorsubtree{}", SUBTREE_SIZE);
+
+        let start_time = std::time::Instant::now();
+        let mut hint_registry = HintRegistry::<M31>::new();
+        register_hint(&mut hint_registry);
+        debug_eval(&ValidatorSubMTCircuit::default(), &assignment_chunks[0][0], hint_registry);
+        // let witness = w_s
+        //             .solve_witnesses_with_hints(&assignment_chunks[0], &mut hint_registry)
+        //             .unwrap();
+        let end_time = std::time::Instant::now();
+        log::debug!(
+            "Generate {} witness Time: {:?}",
+            circuit_name,
+            end_time.duration_since(start_time)
+        );
+    });
+}
 pub type MergeSubMTLimitAssignmentChunks = Vec<Vec<MergeSubMTLimitCircuit<M31>>>;
 declare_circuit!(MergeSubMTLimitCircuit {
     subtree_root: [[Variable; POSEIDON_M31X16_RATE]; SUBTREE_NUM], // public
@@ -934,6 +956,28 @@ pub fn end2end_validator_tree_witnesses_with_beacon_data(
         end2end_merkle_subtree_with_limit_witnesses_with_assignments(
             w_s_merkle,
             merkle_subtree_with_limit_assignment_chunks,
+        );
+    });
+}
+pub fn debug_merkle_subtree_with_limit_with_assignments(
+    assignment_chunks: MergeSubMTLimitAssignmentChunks,
+) {
+    stacker::grow(32 * 1024 * 1024 * 1024, || {
+        use expander_compiler::frontend::extra::debug_eval;
+        let circuit_name = format!("merklesubtree{}", SUBTREE_SIZE);
+
+        let start_time = std::time::Instant::now();
+        let mut hint_registry = HintRegistry::<M31>::new();
+        register_hint(&mut hint_registry);
+        debug_eval(&MergeSubMTLimitCircuit::default(), &assignment_chunks[0][0], hint_registry);
+        // let witness = w_s
+        //             .solve_witnesses_with_hints(&assignment_chunks[0], &mut hint_registry)
+        //             .unwrap();
+        let end_time = std::time::Instant::now();
+        log::debug!(
+            "Generate {} witness Time: {:?}",
+            circuit_name,
+            end_time.duration_since(start_time)
         );
     });
 }

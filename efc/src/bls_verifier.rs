@@ -488,3 +488,26 @@ pub fn end2end_blsverifier_witnesses_with_beacon_data(
         end2end_blsverifier_witnesses_with_assignments(w_s, assignment_chunks, range[0] * 16);
     });
 }
+
+pub fn debug_blsverifier_with_assignments(
+    assignment_chunks: BlsVerifierAssignmentChunks,
+) {
+    stacker::grow(32 * 1024 * 1024 * 1024, || {
+        use expander_compiler::frontend::extra::debug_eval;
+        let circuit_name = "blsverifier";
+
+        let start_time = std::time::Instant::now();
+        let mut hint_registry = HintRegistry::<M31>::new();
+        register_hint(&mut hint_registry);
+        debug_eval(&BLSVERIFIERCircuit::default(), &assignment_chunks[0][0], hint_registry);
+        // let witness = w_s
+        //             .solve_witnesses_with_hints(&assignment_chunks[0], &mut hint_registry)
+        //             .unwrap();
+        let end_time = std::time::Instant::now();
+        log::debug!(
+            "Generate {} witness Time: {:?}",
+            circuit_name,
+            end_time.duration_since(start_time)
+        );
+    });
+}

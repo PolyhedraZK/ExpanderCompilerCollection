@@ -287,12 +287,9 @@ impl ShuffleCircuit<M31> {
         if !slot_attestations[slot_idx].is_empty()
             && slot_attestations[slot_idx].len() > committee_idx
         {
-            println!("slot_idx{}, commitee_idx{}", slot_idx, committee_idx);
             pubkey = bls::affine_point_to_bytes_g1(&validator_data.aggregated_pubkeys[circuit_id]);
             att = &slot_attestations[slot_idx][committee_idx];
-            println!("attestation: {:?}", att);
         }
-        println!("attestation: {:?}", att);
         let aggregated_bits =
             beacon::attestation_get_aggregation_bits_from_bytes(&att.aggregation_bits);
         for i in 0..VALIDATOR_CHUNK_SIZE {
@@ -464,14 +461,11 @@ impl ShuffleCircuit<M31> {
         if !beacon_assignment_data.attestations[slot_idx].is_empty()
             && beacon_assignment_data.attestations[slot_idx].len() > committee_idx
         {
-            println!("slot_idx{}, commitee_idx{}", slot_idx, committee_idx);
             pubkey = bls::affine_point_to_bytes_g1(
                 &beacon_assignment_data.aggregated_pubkeys[circuit_id],
             );
             att = &beacon_assignment_data.attestations[slot_idx][committee_idx];
-            println!("attestation: {:?}", att);
         }
-        println!("attestation: {:?}", att);
         let aggregated_bits =
             beacon::attestation_get_aggregation_bits_from_bytes(&att.aggregation_bits);
         for i in 0..VALIDATOR_CHUNK_SIZE {
@@ -1207,6 +1201,27 @@ pub fn end2end_shuffle_witnesses_with_beacon_data_whole(
             w_s,
             assignment_chunks,
             range[0] * beacon::MAXBEACONVALIDATORDEPTH / 16,
+        );
+    });
+}
+pub fn debug_shuffle_with_assignments(
+    assignment_chunks: ShuffleAssignmentChunks,
+) {
+    stacker::grow(32 * 1024 * 1024 * 1024, || {
+        let circuit_name = &format!("shuffle_{}", VALIDATOR_CHUNK_SIZE);
+
+        let start_time = std::time::Instant::now();
+        let mut hint_registry = HintRegistry::<M31>::new();
+        register_hint(&mut hint_registry);
+        debug_eval(&ShuffleCircuit::default(), &assignment_chunks[0][0], hint_registry);
+        // let witness = w_s
+        //             .solve_witnesses_with_hints(&assignment_chunks[0], &mut hint_registry)
+        //             .unwrap();
+        let end_time = std::time::Instant::now();
+        log::debug!(
+            "Generate {} witness Time: {:?}",
+            circuit_name,
+            end_time.duration_since(start_time)
         );
     });
 }

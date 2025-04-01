@@ -9,6 +9,7 @@ use circuit_std_rs::utils::register_hint;
 use expander_compiler::frontend::extra::*;
 use expander_compiler::frontend::*;
 use serde::Deserialize;
+use std::hash::Hash;
 use std::sync::Arc;
 use std::thread;
 
@@ -322,6 +323,29 @@ pub fn end2end_hashtable_witnesses_with_beacon_data(
     stacker::grow(32 * 1024 * 1024 * 1024, || {
         let assignment_chunks = end2end_hashtable_assignments_with_beacon_data(seed, hash_bytes);
         end2end_hashtable_witnesses_with_assignments(w_s, assignment_chunks);
+    });
+}
+
+pub fn debug_hashtable_with_assignments(
+    assignment_chunks: HashtableAssignmentChunks,
+) {
+    stacker::grow(32 * 1024 * 1024 * 1024, || {
+        use expander_compiler::frontend::extra::debug_eval;
+        let circuit_name = format!("hashtable{}", HASHTABLESIZE);
+
+        let start_time = std::time::Instant::now();
+        let mut hint_registry = HintRegistry::<M31>::new();
+        register_hint(&mut hint_registry);
+        debug_eval(&HASHTABLECircuit::default(), &assignment_chunks[0][0], hint_registry);
+        // let witness = w_s
+        //             .solve_witnesses_with_hints(&assignment_chunks[0], &mut hint_registry)
+        //             .unwrap();
+        let end_time = std::time::Instant::now();
+        log::debug!(
+            "Generate {} witness Time: {:?}",
+            circuit_name,
+            end_time.duration_since(start_time)
+        );
     });
 }
 // #[test]
