@@ -464,7 +464,7 @@ impl PermutationIndicesValidatorHashBitCircuit<M31> {
                 cur_key += 1;
                 real_keys[i] = cur_key as u64;
             } else {
-                real_keys[i] = (cur_key + VALIDATOR_COUNT as i64) as u64;
+                real_keys[i] = (cur_key + QUERY_SIZE as i64) as u64;
             }
         }
 
@@ -493,16 +493,16 @@ impl PermutationIndicesValidatorHashBitCircuit<M31> {
                 assignment.real_keys[j] = M31::from(real_keys[j] as u32);
                 assignment.active_validator_bits[j] = M31::from(active_validator_bits[j]);
                 assignment.table_validator_hashes[j] =
-                    M31::from(*validator_hashes.get(i).and_then(|h| h.get(j)).unwrap_or(&0));
+                    M31::from(*validator_hashes.get(j).and_then(|h| h.get(i)).unwrap_or(&0));
             }
             for j in 0..QUERY_SIZE {
                 assignment.query_indices[j] =
                     M31::from(*shuffle_indices.get(j).unwrap_or(&0) as u32);
                 assignment.query_validator_hashes[j] = M31::from(
                     *valid_validator_list
-                        .get(*shuffle_indices.get(i).unwrap_or(&0) as usize)
+                        .get(*shuffle_indices.get(j).unwrap_or(&0) as usize)
                         .and_then(|vid| validator_hashes.get(*vid as usize))
-                        .and_then(|v| v.get(j))
+                        .and_then(|v| v.get(i))
                         .unwrap_or(&0),
                 );
             }
@@ -515,7 +515,7 @@ impl PermutationIndicesValidatorHashBitCircuit<M31> {
 impl GenericDefine<M31Config> for PermutationIndicesValidatorHashBitCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let zero_var = builder.constant(0);
-        let neg_one_count = builder.sub(1, VALIDATOR_COUNT as u32);
+        let neg_one_count = builder.sub(1, QUERY_SIZE as u32);
         //check the activeValidatorBitsHash
         if self.active_validator_bits.len() % 16 != 0 {
             panic!("activeValidatorBits length must be multiple of 16")
@@ -568,8 +568,8 @@ impl GenericDefine<M31Config> for PermutationIndicesValidatorHashBitCircuit<Vari
             //0 0 --> previous key
             let previous_plus_one = builder.add(sorted_table_key[i - 1], 1);
             let previous_minus_count_plus_one =
-                builder.sub(previous_plus_one, VALIDATOR_COUNT as u32);
-            let previous_plus_count = builder.add(sorted_table_key[i - 1], VALIDATOR_COUNT as u32);
+                builder.sub(previous_plus_one, QUERY_SIZE as u32);
+            let previous_plus_count = builder.add(sorted_table_key[i - 1], QUERY_SIZE as u32);
             let expected_key = simple_lookup2(
                 builder,
                 self.active_validator_bits[i - 1],
@@ -873,6 +873,71 @@ pub fn end2end_permutation_witnesses_with_beacon_data(
         end2end_permutation_query_witnesses_with_assignments(
             w_s_query,
             permutation_query_assignment_chunks,
+        );
+    });
+}
+// pub fn debug_shuffle_with_assignments(
+//     assignment_chunks: ShuffleAssignmentChunks,
+// ) {
+//     stacker::grow(32 * 1024 * 1024 * 1024, || {
+//         let circuit_name = &format!("shuffle_{}", VALIDATOR_CHUNK_SIZE);
+
+//         let start_time = std::time::Instant::now();
+//         let mut hint_registry = HintRegistry::<M31>::new();
+//         register_hint(&mut hint_registry);
+//         debug_eval(&ShuffleCircuit::default(), &assignment_chunks[0][0], hint_registry);
+//         // let witness = w_s
+//         //             .solve_witnesses_with_hints(&assignment_chunks[0], &mut hint_registry)
+//         //             .unwrap();
+//         let end_time = std::time::Instant::now();
+//         log::debug!(
+//             "Generate {} witness Time: {:?}",
+//             circuit_name,
+//             end_time.duration_since(start_time)
+//         );
+//     });
+// }
+pub fn debug_permutation_query_with_assignments(
+    assignment_chunks: PermutationQueryAssignmentChunks,
+) {
+    stacker::grow(32 * 1024 * 1024 * 1024, || {
+        let circuit_name = &format!("permutationquery_{}", QUERY_TABLE_SIZE);
+
+        let start_time = std::time::Instant::now();
+        let mut hint_registry = HintRegistry::<M31>::new();
+        register_hint(&mut hint_registry);
+        debug_eval(
+            &PermutationQueryCircuit::default(),
+            &assignment_chunks[0][0],
+            hint_registry,
+        );
+        let end_time = std::time::Instant::now();
+        log::debug!(
+            "Generate {} witness Time: {:?}",
+            circuit_name,
+            end_time.duration_since(start_time)
+        );
+    });
+}
+pub fn debug_permutation_hashbit_with_assignments(
+    assignment_chunks: PermutationIndicesValidatorHashBitAssignmentChunks,
+) {
+    stacker::grow(32 * 1024 * 1024 * 1024, || {
+        let circuit_name = &format!("permutationhashbit_{}", VALIDATOR_COUNT);
+
+        let start_time = std::time::Instant::now();
+        let mut hint_registry = HintRegistry::<M31>::new();
+        register_hint(&mut hint_registry);
+        debug_eval(
+            &PermutationIndicesValidatorHashBitCircuit::default(),
+            &assignment_chunks[0][0],
+            hint_registry,
+        );
+        let end_time = std::time::Instant::now();
+        log::debug!(
+            "Generate {} witness Time: {:?}",
+            circuit_name,
+            end_time.duration_since(start_time)
         );
     });
 }
