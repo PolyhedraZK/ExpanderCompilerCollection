@@ -434,10 +434,11 @@ impl ShuffleCircuit<M31> {
     }
     pub fn from_beacon_whole(
         circuit_id: usize,
-        beacon_assignment_data: &beacon::BeaconAssignmentData
+        beacon_assignment_data: &beacon::BeaconAssignmentData,
     ) -> Self {
         let mut assignment = Self::default();
-        let start: usize = beacon_assignment_data.committee_data
+        let start: usize = beacon_assignment_data
+            .committee_data
             .real_committee_size
             .iter()
             .take(circuit_id)
@@ -449,8 +450,10 @@ impl ShuffleCircuit<M31> {
         assignment.chunk_length = M31::from(VALIDATOR_CHUNK_SIZE as u32);
         let lower = start.min(real_validator_count);
         let upper = (start + VALIDATOR_CHUNK_SIZE).min(real_validator_count);
-        let sub_shuffle_indices = &beacon_assignment_data.shuffle_data.shuffle_indices[lower..upper];
-        let sub_committee_indices = &beacon_assignment_data.committee_data.committee_indices[lower..upper];
+        let sub_shuffle_indices =
+            &beacon_assignment_data.shuffle_data.shuffle_indices[lower..upper];
+        let sub_committee_indices =
+            &beacon_assignment_data.committee_data.committee_indices[lower..upper];
         let slot_idx = circuit_id / beacon::MAXCOMMITTEESPERSLOT;
         let committee_idx = circuit_id % beacon::MAXCOMMITTEESPERSLOT;
         let mut pubkey: [[u8; 48]; 2] = [[0; 48]; 2];
@@ -462,7 +465,9 @@ impl ShuffleCircuit<M31> {
             && beacon_assignment_data.attestations[slot_idx].len() > committee_idx
         {
             println!("slot_idx{}, commitee_idx{}", slot_idx, committee_idx);
-            pubkey = bls::affine_point_to_bytes_g1(&beacon_assignment_data.aggregated_pubkeys[circuit_id]);
+            pubkey = bls::affine_point_to_bytes_g1(
+                &beacon_assignment_data.aggregated_pubkeys[circuit_id],
+            );
             att = &beacon_assignment_data.attestations[slot_idx][committee_idx];
             println!("attestation: {:?}", att);
         }
@@ -516,15 +521,13 @@ impl ShuffleCircuit<M31> {
 
         //assign validator_hashes
         let validator_tree = &beacon_assignment_data.validator_tree;
-        let validator_hashes = &validator_tree[validator_tree.len()-1];
+        let validator_hashes = &validator_tree[validator_tree.len() - 1];
         for i in 0..VALIDATOR_CHUNK_SIZE {
             for j in 0..POSEIDON_HASH_LENGTH {
-                assignment.validator_hashes[i][j] =
-                    M31::from(validator_hashes[0][j]);
+                assignment.validator_hashes[i][j] = M31::from(validator_hashes[0][j]);
                 if i < sub_committee_indices.len() {
-                    assignment.validator_hashes[i][j] = M31::from(
-                        validator_hashes[sub_committee_indices[i] as usize][j],
-                    );
+                    assignment.validator_hashes[i][j] =
+                        M31::from(validator_hashes[sub_committee_indices[i] as usize][j]);
                 }
             }
         }
@@ -721,10 +724,8 @@ impl ShuffleCircuit<M31> {
             let target_beacon_assignment_data = Arc::clone(&beacon_assignment_data);
 
             let handle = thread::spawn(move || {
-                let assignment = ShuffleCircuit::<M31>::from_beacon_whole(
-                    i,
-                    &target_beacon_assignment_data,
-                );
+                let assignment =
+                    ShuffleCircuit::<M31>::from_beacon_whole(i, &target_beacon_assignment_data);
 
                 let mut assignments = assignments.lock().unwrap();
                 assignments[i - start] = Some(assignment);
@@ -1084,7 +1085,7 @@ pub fn end2end_shuffle_witnesses_with_assignments(
     offset: usize,
 ) {
     let circuit_name = &format!("shuffle_{}", VALIDATOR_CHUNK_SIZE);
-    
+
     let start_time = std::time::Instant::now();
     let witnesses_dir = format!("./witnesses/{}", circuit_name);
     let witness_solver = Arc::new(w_s);
@@ -1152,10 +1153,8 @@ pub fn end2end_shuffle_assignments_with_beacon_data_whole(
 ) -> ShuffleAssignmentChunks {
     //get assignments
     let start_time = std::time::Instant::now();
-    let assignments = ShuffleCircuit::get_assignments_from_beacon_data_whole(
-        beacon_assignment_data,
-        range,
-    );
+    let assignments =
+        ShuffleCircuit::get_assignments_from_beacon_data_whole(beacon_assignment_data, range);
     let end_time = std::time::Instant::now();
     log::debug!(
         "assigned shuffle assignments time: {:?}",
@@ -1179,13 +1178,23 @@ pub fn end2end_shuffle_witnesses_with_beacon_data(
         log::debug!("preparing shuffle witnesses...");
         //get assignments
         let assignment_chunks: ShuffleAssignmentChunks =
-            end2end_shuffle_assignments_with_beacon_data(validator_data, committee_data, shuffle_data, slot_attestations, balance_list, range);
+            end2end_shuffle_assignments_with_beacon_data(
+                validator_data,
+                committee_data,
+                shuffle_data,
+                slot_attestations,
+                balance_list,
+                range,
+            );
 
         //generate witnesses (multi-thread)
-        end2end_shuffle_witnesses_with_assignments(w_s, assignment_chunks, range[0]*beacon::MAXBEACONVALIDATORDEPTH/16);
+        end2end_shuffle_witnesses_with_assignments(
+            w_s,
+            assignment_chunks,
+            range[0] * beacon::MAXBEACONVALIDATORDEPTH / 16,
+        );
     });
 }
-
 
 pub fn end2end_shuffle_witnesses_with_beacon_data_whole(
     w_s: WitnessSolver<M31Config>,
@@ -1199,7 +1208,11 @@ pub fn end2end_shuffle_witnesses_with_beacon_data_whole(
             end2end_shuffle_assignments_with_beacon_data_whole(beacon_assignment_data, range);
 
         //generate witnesses (multi-thread)
-        end2end_shuffle_witnesses_with_assignments(w_s, assignment_chunks, range[0]*beacon::MAXBEACONVALIDATORDEPTH/16);
+        end2end_shuffle_witnesses_with_assignments(
+            w_s,
+            assignment_chunks,
+            range[0] * beacon::MAXBEACONVALIDATORDEPTH / 16,
+        );
     });
 }
 // #[test]

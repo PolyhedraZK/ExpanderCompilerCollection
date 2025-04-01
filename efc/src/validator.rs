@@ -922,10 +922,19 @@ pub fn end2end_validator_tree_witnesses_with_beacon_data(
         let (
             convert_validator_list_to_merkle_tree_assignments_chunks,
             merkle_subtree_with_limit_assignment_chunks,
-        ) = end2end_validator_tree_assignments_with_beacon_data(validator_tree.to_vec(), real_validator_count);
+        ) = end2end_validator_tree_assignments_with_beacon_data(
+            validator_tree.to_vec(),
+            real_validator_count,
+        );
         //generate witnesses (multi-thread)
-        end2end_validator_subtree_witnesses_with_assignments(w_s_subtree, convert_validator_list_to_merkle_tree_assignments_chunks);
-        end2end_merkle_subtree_with_limit_witnesses_with_assignments(w_s_merkle, merkle_subtree_with_limit_assignment_chunks);
+        end2end_validator_subtree_witnesses_with_assignments(
+            w_s_subtree,
+            convert_validator_list_to_merkle_tree_assignments_chunks,
+        );
+        end2end_merkle_subtree_with_limit_witnesses_with_assignments(
+            w_s_merkle,
+            merkle_subtree_with_limit_assignment_chunks,
+        );
     });
 }
 // #[test]

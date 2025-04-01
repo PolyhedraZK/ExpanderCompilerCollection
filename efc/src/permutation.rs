@@ -672,7 +672,6 @@ pub fn end2end_permutation_hashbit_witness(
     stacker::grow(32 * 1024 * 1024 * 1024, || {
         let circuit_name = &format!("permutationhashbit_{}", VALIDATOR_COUNT);
 
-
         let witnesses_dir = format!("./witnesses/{}", circuit_name);
         let start_time = std::time::Instant::now();
         let assignment =
@@ -858,19 +857,23 @@ pub fn end2end_permutation_witnesses_with_beacon_data(
     validator_hashes: &[Vec<u32>],
 ) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
-        let (
-            permutation_query_assignment_chunks,
+        let (permutation_query_assignment_chunks, permutation_hashbit_assignment_chunks) =
+            end2end_permutation_assignments_with_beacon_data(
+                hashtable_bits,
+                shuffle_data,
+                valid_validator_list,
+                committee_data,
+                padding_size,
+                validator_hashes,
+            );
+        end2end_permutation_hashbit_witnesses_with_assignments(
+            w_s_hashbit,
             permutation_hashbit_assignment_chunks,
-        ) = end2end_permutation_assignments_with_beacon_data(
-            hashtable_bits,
-            shuffle_data,
-            valid_validator_list,
-            committee_data,
-            padding_size,
-            validator_hashes,
         );
-        end2end_permutation_hashbit_witnesses_with_assignments(w_s_hashbit, permutation_hashbit_assignment_chunks);
-        end2end_permutation_query_witnesses_with_assignments(w_s_query, permutation_query_assignment_chunks);
+        end2end_permutation_query_witnesses_with_assignments(
+            w_s_query,
+            permutation_query_assignment_chunks,
+        );
     });
 }
 // #[test]
