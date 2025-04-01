@@ -9,7 +9,7 @@ use circuit_std_rs::{
 use expander_compiler::frontend::{Config, RootAPI, Variable};
 pub const MAX_BEACON_VALIDATOR_DEPTH: usize = 40;
 const ZERO_HASHES_MAX_DEPTH: usize = MAX_BEACON_VALIDATOR_DEPTH;
-const ZERO_HASHES_POSEIDON: [&[u32]; ZERO_HASHES_MAX_DEPTH] = [
+pub const ZERO_HASHES_POSEIDON: [&[u32]; ZERO_HASHES_MAX_DEPTH] = [
     &[0, 0, 0, 0, 0, 0, 0, 0],
     &[
         1479731193, 675523649, 2589942, 996409316, 662065262, 1747716529, 2069769266, 80342673,
@@ -196,6 +196,51 @@ pub fn merkle_tree_element_with_limit(
 
     tree[0] = cur_level;
     Ok(tree)
+}
+
+
+pub fn merkleize_var_with_limit<C: Config, B: RootAPI<C>>(
+    builder: &mut B,
+    leaves: &[Vec<Variable>],
+    param: &PoseidonM31Params,
+    limit: usize,
+) -> Vec<Variable> {
+    if leaves.is_empty() {
+        panic!("no leaves");
+    }
+
+    let mut length = leaves.len();
+    if limit != 0 {
+        if length > limit {
+            panic!("The length of leaves is larger than the limit");
+        }
+        length = limit;
+    }
+
+    if length == 1 {
+        return leaves[0].clone();
+    }
+
+    let depth = (length as f64).log2().ceil() as usize + 1;
+
+    let mut cur_level = leaves.to_vec();
+    for i in 0..depth - 1 {
+        if cur_level.len() % 2 == 1 {
+            let mut padding = vec![builder.constant(0); param.rate];
+            (0..param.rate).for_each(|j| padding[j] = builder.constant(ZERO_HASHES_POSEIDON[i][j]));
+            cur_level.push(padding); // Assume this function is defined
+        }
+
+        let mut new_level = Vec::new();
+        for j in (0..cur_level.len()).step_by(2) {
+            let mut combined = cur_level[j].clone();
+            combined.extend_from_slice(&cur_level[j + 1]);
+            let new_hash = param.hash_to_state_flatten(builder, &combined)[..param.rate].to_vec(); // Assume this function is defined
+            new_level.push(new_hash);
+        }
+        cur_level = new_level;
+    }
+    cur_level[0].clone()
 }
 
 pub fn merkleize_with_mixin_poseidon(root: &[u32], num: u64, param: &PoseidonParams) -> Vec<u32> {
