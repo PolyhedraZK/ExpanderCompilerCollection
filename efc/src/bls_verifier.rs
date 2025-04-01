@@ -239,9 +239,22 @@ impl GenericDefine<M31Config> for BLSVERIFIERCircuit<Variable> {
         };
         let mut g2 = G2::new(builder);
         // domain
+
+        // domain
+        /*
+        AttestationDomains[i]: 01000000b5303f2ad2010d699a76c8e62350947421a3e4a979779642cfdb0f66
+        attestation.AttestationDomains[i]: [1 0 0 0 181 48 63 42 210 1 13 105 154 118 200 230 35 80 148 116 33 163 228 169 121 119 150 66 207 219 15 102]
+        AttestationDomains[i]: 01000000afcaaba0efab1ca832a15152469bb09bb84641c405171dfa2d3fb45f
+        attestation.AttestationDomains[i]: [1 0 0 0 175 202 171 160 239 171 28 168 50 161 81 82 70 155 176 155 184 70 65 196 5 23 29 250 45 63 180 95]
+        AttestationDomains[i]: 010000004a26c58b08add8089b75caa540848881a8d4f0af0be83417a85c0f45
+        attestation.AttestationDomains[i]: [1 0 0 0 74 38 197 139 8 173 216 8 155 117 202 165 64 132 136 129 168 212 240 175 11 232 52 23 168 92 15 69]
+        AttestationDomains[i]: 01000000bba4da96354c9f25476cf1bc69bf583a7f9e0af049305b62de676640
+        attestation.AttestationDomains[i]: [1 0 0 0 187 164 218 150 53 76 159 37 71 108 241 188 105 191 88 58 127 158 10 240 73 48 91 98 222 103 102 64]
+        AttestationDomains[i]: 010000006a95a1a967855d676d48be69883b712607f952d5198d0f5677564636
+        attestation.AttestationDomains[i]: [1 0 0 0 106 149 161 169 103 133 93 103 109 72 190 105 136 59 113 38 7 249 82 213 25 141 15 86 119 86 70 54]
+         */
         let domain = [
-            1, 0, 0, 0, 187, 164, 218, 150, 53, 76, 159, 37, 71, 108, 241, 188, 105, 191, 88, 58,
-            127, 158, 10, 240, 73, 48, 91, 98, 222, 103, 102, 64,
+            1, 0, 0, 0, 106, 149, 161, 169, 103, 133, 93, 103, 109, 72, 190, 105, 136, 59, 113, 38, 7, 249, 82, 213, 25, 141, 15, 86, 119, 86, 70, 54
         ];
         let mut domain_var = vec![];
         for domain_byte in domain.iter() {

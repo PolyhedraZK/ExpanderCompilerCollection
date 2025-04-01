@@ -809,13 +809,8 @@ impl GenericDefine<M31Config> for ShuffleCircuit<Variable> {
         }
 
         let mut pubkey_list_bls = vec![];
-        for (i, cur_pubkey) in pubkey_list.iter().enumerate() {
-            let pubkey_g1 = G1Affine::from_vars(
-                self.pubkeys_bls[i][0].to_vec(),
-                self.pubkeys_bls[i][1].to_vec(),
-            );
-            let logup_var = check_pubkey_key_bls(builder, cur_pubkey.to_vec(), &pubkey_g1);
-            g1.curve_f.table.rangeproof(builder, logup_var, 5);
+        for cur_pubkey in pubkey_list.iter() {
+            let pubkey_g1 = g1.uncompressed(builder, cur_pubkey);
             pubkey_list_bls.push(pubkey_g1);
         }
 
