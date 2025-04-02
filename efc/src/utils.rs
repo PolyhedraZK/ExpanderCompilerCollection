@@ -27,12 +27,12 @@ pub fn run_circuit<C: Config>(compile_result: &CompileResult<C>, witness: Witnes
     // prove
     expander_circuit.evaluate();
     let mpi_config = MPIConfig::prover_new();
-    let mut prover = Prover::<C::DefaultGKRConfig>::new(mpi_config.clone());
+    let mut prover = Prover::<C>::new(mpi_config.clone());
     prover.prepare_mem(&expander_circuit);
-    let (claimed_v, proof) = gkr::executor::prove::<C::DefaultGKRConfig>(&mut expander_circuit, mpi_config.clone());
+    let (claimed_v, proof) = gkr::executor::prove::<C>(&mut expander_circuit, mpi_config.clone());
 
     // verify
-    assert!(gkr::executor::verify::<C::DefaultGKRConfig>(
+    assert!(gkr::executor::verify::<C>(
         &mut expander_circuit,
         mpi_config,
         &proof,

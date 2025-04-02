@@ -162,9 +162,11 @@ pub use declare_circuit_field_type;
 pub use declare_circuit_load_from;
 pub use declare_circuit_num_vars;
 
+use gkr_engine::FieldEngine;
+
 use crate::circuit::config::Config;
 
-use super::api::RootAPI;
+use super::{api::RootAPI, Field};
 
 pub trait Define<C: Config> {
     fn define<Builder: RootAPI<C>>(&self, api: &mut Builder);

@@ -3,6 +3,7 @@ use ethnum::U256;
 use crate::{
     circuit::{config::Config, layered::Coef},
     field::{Field, FieldArith},
+    frontend::CircuitField,
     hints::{self, circom_shift_l_impl, circom_shift_r_impl},
     utils::error::Error,
 };
@@ -122,11 +123,11 @@ impl<C: Config> common::Constraint<C> for Constraint {
 }
 
 impl<C: Config> common::ConstraintType<C> for ConstraintType {
-    fn verify(&self, value: &C::CircuitField) -> bool {
+    fn verify(&self, value: &CircuitField<C>) -> bool {
         match self {
             ConstraintType::Zero => value.is_zero(),
             ConstraintType::NonZero => !value.is_zero(),
-            ConstraintType::Bool => value.is_zero() || *value == C::CircuitField::one(),
+            ConstraintType::Bool => value.is_zero() || *value == CircuitField::<C>::one(),
         }
     }
 }
@@ -255,7 +256,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             },
         }
     }
-    fn from_kx_plus_b(x: usize, k: C::CircuitField, b: C::CircuitField) -> Self {
+    fn from_kx_plus_b(x: usize, k: CircuitField<C>, b: CircuitField<C>) -> Self {
         Instruction::LinComb(expr::LinComb::from_kx_plus_b(x, k, b))
     }
     fn validate(&self, num_public_inputs: usize) -> Result<(), Error> {
@@ -296,11 +297,11 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             _ => Ok(()),
         }
     }
-    fn eval_unsafe(&self, values: &[C::CircuitField]) -> EvalResult<C> {
+    fn eval_unsafe(&self, values: &[CircuitField<C>]) -> EvalResult<C> {
         match self {
             Instruction::LinComb(lc) => EvalResult::Value(lc.eval(values)),
             Instruction::Mul(inputs) => {
-                let mut res = C::CircuitField::one();
+                let mut res = CircuitField::<C>::one();
                 for &i in inputs.iter() {
                     res *= values[i];
                 }
@@ -311,7 +312,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 let y = values[*y];
                 if y.is_zero() {
                     if x.is_zero() && !checked {
-                        EvalResult::Value(C::CircuitField::zero())
+                        EvalResult::Value(CircuitField::<C>::zero())
                     } else {
                         EvalResult::Error(Error::UserError("division by zero".to_string()))
                     }
@@ -322,22 +323,22 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             Instruction::BoolBinOp { x, y, op } => {
                 let x = values[*x];
                 let y = values[*y];
-                if !x.is_zero() && x != C::CircuitField::one() {
+                if !x.is_zero() && x != CircuitField::<C>::one() {
                     return EvalResult::Error(Error::UserError("invalid bool value".to_string()));
                 }
-                if !y.is_zero() && y != C::CircuitField::one() {
+                if !y.is_zero() && y != CircuitField::<C>::one() {
                     return EvalResult::Error(Error::UserError("invalid bool value".to_string()));
                 }
                 match op {
                     BoolBinOpType::Xor => {
-                        EvalResult::Value(x + y - C::CircuitField::from(2) * x * y)
+                        EvalResult::Value(x + y - CircuitField::<C>::from(2) * x * y)
                     }
                     BoolBinOpType::Or => EvalResult::Value(x + y - x * y),
                     BoolBinOpType::And => EvalResult::Value(x * y),
                 }
             }
             Instruction::IsZero(x) => {
-                EvalResult::Value(C::CircuitField::from(values[*x].is_zero() as u32))
+                EvalResult::Value(CircuitField::<C>::from(values[*x].is_zero() as u32))
             }
             Instruction::Commit(_) => {
                 panic!("commit is not implemented")

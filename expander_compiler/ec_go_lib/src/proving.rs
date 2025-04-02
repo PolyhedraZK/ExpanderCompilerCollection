@@ -1,6 +1,13 @@
 use std::ptr;
 use std::slice;
 
+use arith::SimdField;
+use expander_compiler::frontend::ChallengeField;
+use expander_compiler::frontend::SIMDField;
+use gkr::{
+    BN254ConfigMIMC5Raw, GF2ExtConfigSha2Raw, GoldilocksExtConfigSha2Raw,
+    M31ExtConfigSha2RawVanilla,
+};
 use gkr_engine::FieldEngine;
 use libc::{c_uchar, c_ulong, malloc};
 
@@ -19,17 +26,16 @@ fn prove_circuit_file_inner<C: config::Config>(
     let mpi_config = MPIConfig::prover_new();
 
     let mut circuit =
-        expander_circuit::Circuit::<C::DefaultGKRFieldConfig>::single_thread_prover_load_circuit::<
-            C::DefaultGKRConfig,
-        >(circuit_filename);
+        expander_circuit::Circuit::<C::FieldConfig>::single_thread_prover_load_circuit::<C>(
+            circuit_filename,
+        );
     let witness =
         layered::witness::Witness::<C>::deserialize_from(witness).map_err(|e| e.to_string())?;
-    let (simd_input, simd_public_input) = witness.to_simd::<C::DefaultSimdField>();
+    let (simd_input, simd_public_input) = witness.to_simd::<SIMDField<C>>();
     circuit.layers[0].input_vals = simd_input;
     circuit.public_input = simd_public_input;
     circuit.evaluate();
-    let (claimed_v, proof) =
-        gkr::executor::prove::<C::DefaultGKRConfig>(&mut circuit, mpi_config.clone());
+    let (claimed_v, proof) = gkr::executor::prove::<C>(&mut circuit, mpi_config.clone());
     gkr::executor::dump_proof_and_claimed_v(&proof, &claimed_v).map_err(|e| e.to_string())
 }
 
@@ -39,25 +45,21 @@ fn verify_circuit_file_inner<C: config::Config>(
     proof_and_claimed_v: &[u8],
 ) -> Result<u8, String> {
     let mpi_config = gkr_engine::MPIConfig::prover_new();
-    let mut circuit = expander_circuit::Circuit::<C::DefaultGKRFieldConfig>::verifier_load_circuit::<
-        C::DefaultGKRConfig,
-    >(circuit_filename);
+    let mut circuit =
+        expander_circuit::Circuit::<C::FieldConfig>::verifier_load_circuit::<C>(circuit_filename);
     let witness =
         layered::witness::Witness::<C>::deserialize_from(witness).map_err(|e| e.to_string())?;
-    let (simd_input, simd_public_input) = witness.to_simd::<C::DefaultSimdField>();
+    let (simd_input, simd_public_input) = witness.to_simd::<SIMDField<C>>();
     circuit.layers[0].input_vals = simd_input;
     circuit.public_input = simd_public_input.clone();
     let (proof, claimed_v) =
-        match gkr::executor::load_proof_and_claimed_v::<<<C as Config>::DefaultGKRFieldConfig as FieldEngine>::ChallengeField>(proof_and_claimed_v) {
+        match gkr::executor::load_proof_and_claimed_v::<ChallengeField<C>>(proof_and_claimed_v) {
             Ok((proof, claimed_v)) => (proof, claimed_v),
             Err(_) => {
                 return Ok(0);
             }
         };
-    Ok(
-        gkr::executor::verify::<C::DefaultGKRConfig>(&mut circuit, mpi_config, &proof, &claimed_v)
-            as u8,
-    )
+    Ok(gkr::executor::verify::<C>(&mut circuit, mpi_config, &proof, &claimed_v) as u8)
 }
 
 #[no_mangle]

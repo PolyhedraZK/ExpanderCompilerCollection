@@ -1,6 +1,11 @@
+use gkr::{
+    BN254ConfigMIMC5Raw, BN254ConfigSha2Raw, GF2ExtConfigSha2Raw, GoldilocksExtConfigSha2Raw,
+    M31ExtConfigSha2RawVanilla,
+};
+
 use crate::{
     circuit::{
-        config::{BN254Config, Config, GF2Config, M31Config},
+        config::Config,
         ir::{
             common::rand_gen::{RandomCircuitConfig, RandomRange},
             source::RootCircuit as IrSourceRoot,
@@ -9,6 +14,7 @@ use crate::{
     },
     compile::compile,
     field::FieldArith,
+    frontend::CircuitField,
     utils::error::Error,
 };
 
@@ -32,8 +38,8 @@ fn do_test<C: Config, I: InputType>(mut config: RandomCircuitConfig, seed: Rando
                     root.circuits[&0].outputs.len() - root.expected_num_output_zeroes
                 );
                 for _ in 0..5 {
-                    let input: Vec<C::CircuitField> = (0..root.input_size())
-                        .map(|_| C::CircuitField::random_unsafe(&mut rand::thread_rng()))
+                    let input: Vec<CircuitField<C>> = (0..root.input_size())
+                        .map(|_| CircuitField::<C>::random_unsafe(&mut rand::thread_rng()))
                         .collect();
                     match root.eval_unsafe_with_errors(input.clone()) {
                         Ok((src_output, src_cond)) => {
@@ -100,32 +106,42 @@ fn do_tests<C: Config, I: InputType>(seed: usize) {
 
 #[test]
 fn test_m31() {
-    do_tests::<M31Config, NormalInputType>(1000000);
+    do_tests::<M31ExtConfigSha2RawVanilla, NormalInputType>(1000000);
 }
 
 #[test]
 fn test_bn254() {
-    do_tests::<BN254Config, NormalInputType>(2000000);
+    do_tests::<BN254ConfigMIMC5Raw, NormalInputType>(2000000);
 }
 
 #[test]
 fn test_gf2() {
-    do_tests::<GF2Config, NormalInputType>(3000000);
+    do_tests::<GF2ExtConfigSha2Raw, NormalInputType>(3000000);
+}
+
+#[test]
+fn test_goldilocks() {
+    do_tests::<GoldilocksExtConfigSha2Raw, NormalInputType>(4000000);
 }
 
 #[test]
 fn test_m31_cross() {
-    do_tests::<M31Config, CrossLayerInputType>(4000000);
+    do_tests::<M31ExtConfigSha2RawVanilla, CrossLayerInputType>(5000000);
 }
 
 #[test]
 fn test_bn254_cross() {
-    do_tests::<BN254Config, CrossLayerInputType>(5000000);
+    do_tests::<BN254ConfigMIMC5Raw, CrossLayerInputType>(6000000);
 }
 
 #[test]
 fn test_gf2_cross() {
-    do_tests::<GF2Config, CrossLayerInputType>(6000000);
+    do_tests::<GF2ExtConfigSha2Raw, CrossLayerInputType>(7000000);
+}
+
+#[test]
+fn test_goldilocks_cross() {
+    do_tests::<GoldilocksExtConfigSha2Raw, CrossLayerInputType>(8000000);
 }
 
 fn deterministic_<I: InputType>() {
@@ -141,7 +157,7 @@ fn deterministic_<I: InputType>() {
     };
     for i in 100000..103000 {
         config.seed = i;
-        let root = IrSourceRoot::<M31Config>::random(&config);
+        let root = IrSourceRoot::<M31ExtConfigSha2RawVanilla>::random(&config);
         assert_eq!(root.validate(), Ok(()));
         let res = compile::<_, I>(&root);
         let res2 = compile::<_, I>(&root);

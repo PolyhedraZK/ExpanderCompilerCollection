@@ -1,7 +1,5 @@
 use arith::Field;
-use expander_compiler::frontend::{
-    declare_circuit, Config, Define, Error, M31Config, RootAPI, Variable, M31,
-};
+use expander_compiler::frontend::{declare_circuit, Config, Define, Error, RootAPI, Variable, M31};
 
 #[cfg(test)]
 use expander_compiler::{
@@ -9,6 +7,7 @@ use expander_compiler::{
     hints::registry::HintRegistry,
 };
 
+use gkr::M31ExtConfigSha2RawVanilla;
 use num_bigint::BigInt;
 use num_traits::cast::ToPrimitive;
 
@@ -346,8 +345,8 @@ declare_circuit!(IDIVMODBITCircuit {
     remainder: Variable,
 });
 
-impl Define<M31Config> for IDIVMODBITCircuit<Variable> {
-    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
+impl Define<M31ExtConfigSha2RawVanilla> for IDIVMODBITCircuit<Variable> {
+    fn define<Builder: RootAPI<M31ExtConfigSha2RawVanilla>>(&self, builder: &mut Builder) {
         let (quotient, remainder) = idiv_mod_bit(builder, self.value, 8);
         builder.assert_is_equal(quotient, self.quotient);
         builder.assert_is_equal(remainder, self.remainder);
@@ -380,8 +379,8 @@ declare_circuit!(BITCONVERTCircuit {
     big_int_m31_bytes: [Variable; 4],
 });
 
-impl Define<M31Config> for BITCONVERTCircuit<Variable> {
-    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
+impl Define<M31ExtConfigSha2RawVanilla> for BITCONVERTCircuit<Variable> {
+    fn define<Builder: RootAPI<M31ExtConfigSha2RawVanilla>>(&self, builder: &mut Builder) {
         let mut big_int_bytes = [builder.constant(0); 8];
         big_endian_put_uint64(builder, &mut big_int_bytes, self.big_int);
         for (i, big_int_byte) in big_int_bytes.iter().enumerate() {

@@ -1,4 +1,5 @@
 use arith::Field;
+use arith::SimdField as _SimdField;
 use expander_compiler::frontend::*;
 use gkr_engine::{MPIConfig, MPIEngine};
 use rand::SeedableRng;
@@ -19,16 +20,16 @@ impl<C: Config> Define<C> for Circuit<Variable> {
 }
 
 fn example<C: Config>() {
-    let n_witnesses = <C::DefaultSimdField as arith::SimdField>::PACK_SIZE;
+    let n_witnesses = SIMDField::<C>::PACK_SIZE;
     println!("n_witnesses: {}", n_witnesses);
     let compile_result: CompileResult<C> =
         compile(&Circuit::default(), CompileOptions::default()).unwrap();
-    let mut s = [C::CircuitField::zero(); 100];
+    let mut s = [CircuitField::<C>::zero(); 100];
     let mut rng = rand::rngs::StdRng::seed_from_u64(1235);
     for i in 0..s.len() {
-        s[i] = C::CircuitField::random_unsafe(&mut rng);
+        s[i] = CircuitField::<C>::random_unsafe(&mut rng);
     }
-    let assignment = Circuit::<C::CircuitField> {
+    let assignment = Circuit::<CircuitField<C>> {
         s,
         sum: s.iter().sum(),
     };
@@ -53,10 +54,10 @@ fn example<C: Config>() {
 
     // prove
     expander_circuit.evaluate();
-    let (claimed_v, proof) = gkr::executor::prove::<C::DefaultGKRConfig>(&mut expander_circuit, mpi_config.clone());
+    let (claimed_v, proof) = gkr::executor::prove::<C>(&mut expander_circuit, mpi_config.clone());
 
     // verify
-    assert!(gkr::executor::verify::<C::DefaultGKRConfig>(
+    assert!(gkr::executor::verify::<C>(
         &mut expander_circuit,
         mpi_config,
         &proof,

@@ -1,4 +1,5 @@
 use builder::RootBuilder;
+use gkr_engine::FieldEngine;
 
 use crate::circuit::layered::{CrossLayerInputType, NormalInputType};
 use crate::circuit::{ir, layered};
@@ -32,23 +33,24 @@ pub mod internal {
 }
 
 pub mod extra {
+    use gkr_engine::FieldEngine;
+
     pub use super::api::UnconstrainedAPI;
     pub use super::debug::DebugBuilder;
     pub use crate::hints::registry::{EmptyHintCaller, HintCaller, HintRegistry};
-    // pub use crate::utils::serde::Serde;
 
-    use super::{internal, Config, Define, Variable};
+    use super::{internal, CircuitField, Config, Define, Field, Variable};
 
     pub fn debug_eval<
         C: Config,
         Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone,
-        CA: internal::DumpLoadTwoVariables<C::CircuitField>,
-        H: HintCaller<C::CircuitField>,
+        CA: internal::DumpLoadTwoVariables<CircuitField<C>>,
+        H: HintCaller<CircuitField<C>>,
     >(
         circuit: &Cir,
         assignment: &CA,
         hint_caller: H,
-    ) -> Vec<C::CircuitField> {
+    ) -> Vec<CircuitField<C>> {
         let (num_inputs, num_public_inputs) = circuit.num_vars();
         let (a_num_inputs, a_num_public_inputs) = assignment.num_vars();
         assert_eq!(num_inputs, a_num_inputs);

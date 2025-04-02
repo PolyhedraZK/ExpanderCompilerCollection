@@ -1,12 +1,19 @@
-use crate::circuit::{
-    config::{Config, M31Config as C},
-    input_mapping::InputMapping,
-    ir::{
-        common::rand_gen::*,
-        dest::{Circuit as IrCircuit, Instruction as IrInstruction, RootCircuit as IrRootCircuit},
-        expr::{Expression, Term},
+use gkr::M31ExtConfigSha2RawVanilla as C;
+
+use crate::{
+    circuit::{
+        config::Config,
+        input_mapping::InputMapping,
+        ir::{
+            common::rand_gen::*,
+            dest::{
+                Circuit as IrCircuit, Instruction as IrInstruction, RootCircuit as IrRootCircuit,
+            },
+            expr::{Expression, Term},
+        },
+        layered::{self, CrossLayerInputType, InputType, NormalInputType},
     },
-    layered::{self, CrossLayerInputType, InputType, NormalInputType},
+    frontend::CircuitField,
 };
 
 use crate::field::M31 as CField;
@@ -19,7 +26,7 @@ pub fn test_input<C: Config, I: InputType>(
     rc: &IrRootCircuit<C>,
     lc: &layered::Circuit<C, I>,
     input_mapping: &InputMapping,
-    input: &Vec<C::CircuitField>,
+    input: &Vec<CircuitField<C>>,
 ) {
     let (rc_output, rc_cond) = rc.eval_unsafe(input.clone());
     let lc_input = input_mapping.map_inputs(input);
@@ -38,8 +45,8 @@ pub fn compile_and_random_test<C: Config, I: InputType>(
     assert_eq!(rc.input_size(), input_mapping.cur_size());
     let input_size = rc.input_size();
     for _ in 0..n_tests {
-        let input: Vec<C::CircuitField> = (0..input_size)
-            .map(|_| C::CircuitField::random_unsafe(&mut rand::thread_rng()))
+        let input: Vec<CircuitField<C>> = (0..input_size)
+            .map(|_| CircuitField::<C>::random_unsafe(&mut rand::thread_rng()))
             .collect();
         test_input(rc, &lc, &input_mapping, &input);
     }

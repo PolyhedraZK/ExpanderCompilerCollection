@@ -4,6 +4,10 @@ use std::slice;
 
 use expander_compiler::circuit::layered::NormalInputType;
 use expander_compiler::circuit::{config, ir};
+use gkr::{
+    BN254ConfigMIMC5Raw, GF2ExtConfigSha2Raw, GoldilocksExtConfigSha2Raw,
+    M31ExtConfigSha2RawVanilla,
+};
 use serdes::ExpSerde;
 
 use super::{match_config_id, ByteArray, Config};

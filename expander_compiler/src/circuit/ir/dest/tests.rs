@@ -1,3 +1,5 @@
+use gkr::M31ExtConfigSha2RawVanilla as C;
+use mersenne31::M31;
 use rand::{Rng, RngCore};
 
 use super::{
@@ -5,17 +7,20 @@ use super::{
     Instruction::{self, ConstantLike, InternalVariable, SubCircuitCall},
     RootCircuit, RootCircuitRelaxed,
 };
-use crate::circuit::{
-    config::{Config, M31Config as C},
-    ir::{
-        common::rand_gen::*,
-        expr::{Expression, Term},
-    },
-    layered::Coef,
-};
 use crate::field::FieldArith;
+use crate::{
+    circuit::{
+        config::Config,
+        ir::{
+            common::rand_gen::*,
+            expr::{Expression, Term},
+        },
+        layered::Coef,
+    },
+    frontend::CircuitField,
+};
 
-type CField = <C as Config>::CircuitField;
+type CField = M31;
 
 #[test]
 fn validate_vars() {
@@ -253,7 +258,7 @@ impl<C: Config> RandomInstruction for Instruction<C> {
         } else {
             let mut terms = Vec::with_capacity(num_terms.random(&mut rnd));
             for _ in 0..terms.capacity() {
-                let coef = C::CircuitField::from(rnd.next_u32());
+                let coef = CircuitField::<C>::from(rnd.next_u32());
                 let op = rnd.next_u64() as usize % 3;
                 terms.push(match op {
                     0 => Term::new_const(coef),

@@ -7,9 +7,10 @@ const ABI_VERSION: c_ulong = 4;
 macro_rules! match_config_id {
     ($config_id:ident, $inner:ident, $args:tt) => {
         match $config_id {
-            x if x == config::M31Config::CONFIG_ID as u64 => $inner::<config::M31Config> $args,
-            x if x == config::BN254Config::CONFIG_ID as u64 => $inner::<config::BN254Config> $args,
-            x if x == config::GF2Config::CONFIG_ID as u64 => $inner::<config::GF2Config> $args,
+            x if x == M31ExtConfigSha2RawVanilla::CONFIG_ID as u64 => $inner::<M31ExtConfigSha2RawVanilla> $args,
+            x if x == BN254ConfigMIMC5Raw::CONFIG_ID as u64 => $inner::<BN254ConfigMIMC5Raw> $args,
+            x if x == GF2ExtConfigSha2Raw::CONFIG_ID as u64 => $inner::<GF2ExtConfigSha2Raw> $args,
+            x if x == GoldilocksExtConfigSha2Raw::CONFIG_ID as u64 => $inner::<GoldilocksExtConfigSha2Raw> $args,
             _ => Err(format!("unknown config id: {}", $config_id)),
         }
     }

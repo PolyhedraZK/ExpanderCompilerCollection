@@ -1,17 +1,22 @@
+use gkr::M31ExtConfigSha2RawVanilla as C;
+use mersenne31::M31;
 use rand::{Rng, RngCore};
 
 use super::{
     Instruction::{self, ConstantLike, LinComb, Mul},
     RootCircuit,
 };
-use crate::circuit::{
-    config::{Config, M31Config as C},
-    ir::{common::rand_gen::*, expr},
-    layered::Coef,
-};
 use crate::field::FieldArith;
+use crate::{
+    circuit::{
+        config::Config,
+        ir::{common::rand_gen::*, expr},
+        layered::Coef,
+    },
+    frontend::CircuitField,
+};
 
-type CField = <C as Config>::CircuitField;
+type CField = M31;
 
 impl<C: Config> RandomInstruction for Instruction<C> {
     fn random_no_sub_circuit(
@@ -26,11 +31,11 @@ impl<C: Config> RandomInstruction for Instruction<C> {
             LinComb(expr::LinComb {
                 terms: (0..num_terms.random(&mut rnd))
                     .map(|_| expr::LinCombTerm {
-                        coef: C::CircuitField::from(rnd.next_u32()),
+                        coef: CircuitField::<C>::from(rnd.next_u32()),
                         var: rnd.next_u64() as usize % num_vars + 1,
                     })
                     .collect(),
-                constant: C::CircuitField::from(rnd.next_u32()),
+                constant: CircuitField::<C>::from(rnd.next_u32()),
             })
         } else {
             Mul((0..num_terms.random(&mut rnd).max(2))

@@ -1,4 +1,5 @@
-use expander_compiler::frontend::{GF2Config, RootAPI, Variable};
+use expander_compiler::frontend::{RootAPI, Variable};
+use gkr::GF2ExtConfigSha2Raw;
 
 use super::gf2_utils::{
     add, add_const, capital_sigma0, capital_sigma1, ch, lower_case_sigma0, lower_case_sigma1, maj,
@@ -36,7 +37,7 @@ impl SHA256GF2 {
     }
 
     // finalize the hash, return the hash value
-    pub fn finalize(&mut self, api: &mut impl RootAPI<GF2Config>) -> Vec<Variable> {
+    pub fn finalize(&mut self, api: &mut impl RootAPI<GF2ExtConfigSha2Raw>) -> Vec<Variable> {
         let data_len = self.data.len();
 
         // padding according to the sha256 padding rule: https://helix.stormhub.org/papers/SHA-256.pdf
@@ -65,7 +66,7 @@ impl SHA256GF2 {
     // The compress function, usually not used directly
     pub fn sha256_compress(
         &self,
-        api: &mut impl RootAPI<GF2Config>,
+        api: &mut impl RootAPI<GF2ExtConfigSha2Raw>,
         state: &mut [Sha256Word; 8],
         input: &[Variable; 512],
     ) {
@@ -117,7 +118,7 @@ impl SHA256GF2 {
     }
 
     #[allow(dead_code)]
-    fn display_state(&self, api: &mut impl RootAPI<GF2Config>, state: &[Sha256Word; 8]) {
+    fn display_state(&self, api: &mut impl RootAPI<GF2ExtConfigSha2Raw>, state: &[Sha256Word; 8]) {
         for (i, s) in state.iter().enumerate() {
             api.display(&format!("{}", i), s[30]);
         }

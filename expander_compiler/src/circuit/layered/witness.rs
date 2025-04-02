@@ -1,16 +1,17 @@
 use std::any::{Any, TypeId};
 use std::mem;
 
-use arith::{Field, SimdField};
+use arith::{Field, SimdField as ExpSimdField};
 use serdes::{ExpSerde, SerdeResult};
 
 use super::{Circuit, InputType};
 use crate::circuit::config::Config;
+use crate::frontend::{CircuitField, SIMDField};
 
 #[derive(Clone, Debug)]
 pub enum WitnessValues<C: Config> {
-    Scalar(Vec<C::CircuitField>),
-    Simd(Vec<C::DefaultSimdField>),
+    Scalar(Vec<CircuitField<C>>),
+    Simd(Vec<SIMDField<C>>),
 }
 
 #[derive(Clone, Debug)]
@@ -81,13 +82,10 @@ fn pack_block<F: Field, SF: arith::SimdField<Scalar = F>>(
 }
 
 fn use_simd<C: Config>(num_witnesses: usize) -> bool {
-    num_witnesses > 1 && C::DefaultSimdField::PACK_SIZE > 1
+    num_witnesses > 1 && SIMDField::<C>::PACK_SIZE > 1
 }
 
-type UnpackedBlock<C> = Vec<(
-    Vec<<C as Config>::CircuitField>,
-    Vec<<C as Config>::CircuitField>,
-)>;
+type UnpackedBlock<C> = Vec<(Vec<CircuitField<C>>, Vec<CircuitField<C>>)>;
 
 pub struct WitnessIteratorScalar<'a, C: Config> {
     witness: &'a Witness<C>,
@@ -96,7 +94,7 @@ pub struct WitnessIteratorScalar<'a, C: Config> {
 }
 
 impl<'a, C: Config> Iterator for WitnessIteratorScalar<'a, C> {
-    type Item = (Vec<C::CircuitField>, Vec<C::CircuitField>);
+    type Item = (Vec<CircuitField<C>>, Vec<CircuitField<C>>);
     fn next(&mut self) -> Option<Self::Item> {
         if self.index >= self.witness.num_witnesses {
             return None;
@@ -113,7 +111,7 @@ impl<'a, C: Config> Iterator for WitnessIteratorScalar<'a, C> {
                 Some(res)
             }
             WitnessValues::Simd(values) => {
-                let pack_size = C::DefaultSimdField::PACK_SIZE;
+                let pack_size = SIMDField::<C>::PACK_SIZE;
                 if self.index % pack_size == 0 {
                     self.buf_unpacked =
                         unpack_block(&values[(self.index / pack_size) * (a + b)..], a, b);
@@ -135,9 +133,9 @@ pub struct WitnessIteratorSimd<'a, C: Config> {
 }
 
 impl<'a, C: Config> Iterator for WitnessIteratorSimd<'a, C> {
-    type Item = (Vec<C::DefaultSimdField>, Vec<C::DefaultSimdField>);
+    type Item = (Vec<SIMDField<C>>, Vec<SIMDField<C>>);
     fn next(&mut self) -> Option<Self::Item> {
-        let pack_size = C::DefaultSimdField::PACK_SIZE;
+        let pack_size = SIMDField::<C>::PACK_SIZE;
         if self.index * pack_size >= self.witness.num_witnesses {
             return None;
         }
@@ -186,14 +184,11 @@ impl<C: Config> Witness<C> {
         };
         let mut res = Vec::new();
         let a = self.num_inputs_per_witness + self.num_public_inputs_per_witness;
-        let pack_size = C::DefaultSimdField::PACK_SIZE;
+        let pack_size = SIMDField::<C>::PACK_SIZE;
         let num_blocks = (self.num_witnesses + pack_size - 1) / pack_size;
         for i in 0..num_blocks {
-            let tmp = pack_block::<C::CircuitField, C::DefaultSimdField>(
-                &values[i * pack_size * a..],
-                a,
-                0,
-            );
+            let tmp =
+                pack_block::<CircuitField<C>, SIMDField<C>>(&values[i * pack_size * a..], a, 0);
             res.extend(tmp.0);
         }
         self.values = WitnessValues::Simd(res);
@@ -205,7 +200,7 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         &self,
         witness: &Witness<C>,
         need_output: bool,
-    ) -> (Vec<bool>, Vec<Vec<C::CircuitField>>) {
+    ) -> (Vec<bool>, Vec<Vec<CircuitField<C>>>) {
         if witness.num_witnesses == 0 {
             panic!("expected at least 1 witness")
         }
@@ -217,7 +212,7 @@ impl<C: Config, I: InputType> Circuit<C, I> {
                     self.eval_with_public_inputs_simd(inputs, &public_inputs);
                 if need_output {
                     let n = outputs.len();
-                    for _ in 0..C::DefaultSimdField::PACK_SIZE {
+                    for _ in 0..SIMDField::<C>::PACK_SIZE {
                         outputs.push(Vec::new());
                     }
                     for o in out {
@@ -245,7 +240,7 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         constraints
     }
 
-    pub fn run_with_output(&self, witness: &Witness<C>) -> (Vec<bool>, Vec<Vec<C::CircuitField>>) {
+    pub fn run_with_output(&self, witness: &Witness<C>) -> (Vec<bool>, Vec<Vec<CircuitField<C>>>) {
         self.run_inner(witness, true)
     }
 }
@@ -253,7 +248,7 @@ impl<C: Config, I: InputType> Circuit<C, I> {
 impl<C: Config> Witness<C> {
     pub fn to_simd<T>(&self) -> (Vec<T>, Vec<T>)
     where
-        T: arith::SimdField<Scalar = C::CircuitField> + 'static,
+        T: arith::SimdField<Scalar = CircuitField<C>> + 'static,
     {
         match self.num_witnesses.cmp(&T::PACK_SIZE) {
             std::cmp::Ordering::Less => {
@@ -277,7 +272,7 @@ impl<C: Config> Witness<C> {
         match &self.values {
             WitnessValues::Scalar(values) => pack_block(values, a, b),
             WitnessValues::Simd(values) => {
-                if TypeId::of::<T>() == TypeId::of::<C::DefaultSimdField>() {
+                if TypeId::of::<T>() == TypeId::of::<SIMDField<C>>() {
                     let inputs = values[..a].to_vec();
                     let public_inputs = values[a..a + b].to_vec();
                     let tmp: Box<dyn Any> = Box::new((inputs, public_inputs));
@@ -307,7 +302,7 @@ impl<C: Config> ExpSerde for Witness<C> {
         let num_inputs_per_witness = usize::deserialize_from(&mut reader)?;
         let num_public_inputs_per_witness = usize::deserialize_from(&mut reader)?;
         let modulus = ethnum::U256::deserialize_from(&mut reader)?;
-        if modulus != C::CircuitField::MODULUS {
+        if modulus != CircuitField::<C>::MODULUS {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "invalid modulus",
@@ -317,7 +312,7 @@ impl<C: Config> ExpSerde for Witness<C> {
             num_witnesses * (num_inputs_per_witness + num_public_inputs_per_witness),
         );
         for _ in 0..num_witnesses * (num_inputs_per_witness + num_public_inputs_per_witness) {
-            values.push(C::CircuitField::deserialize_from(&mut reader)?);
+            values.push(CircuitField::<C>::deserialize_from(&mut reader)?);
         }
         let mut res = Self {
             num_witnesses,
@@ -336,7 +331,7 @@ impl<C: Config> ExpSerde for Witness<C> {
         self.num_inputs_per_witness.serialize_into(&mut writer)?;
         self.num_public_inputs_per_witness
             .serialize_into(&mut writer)?;
-        C::CircuitField::MODULUS.serialize_into(&mut writer)?;
+        CircuitField::<C>::MODULUS.serialize_into(&mut writer)?;
         match &self.values {
             WitnessValues::Scalar(values) => {
                 for v in values {
@@ -361,9 +356,9 @@ impl<C: Config> ExpSerde for Witness<C> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::circuit::config::M31Config;
     use crate::field::M31;
     use arith::Field;
+    use gkr::M31ExtConfigSha2RawVanilla;
 
     #[test]
     fn basic_simd() {
@@ -374,11 +369,11 @@ mod tests {
         for _ in 0..n * (a + b) {
             v.push(M31::random_unsafe(&mut rand::thread_rng()));
         }
-        let w1: Witness<M31Config> = Witness {
+        let w1: Witness<M31ExtConfigSha2RawVanilla> = Witness {
             num_witnesses: n,
             num_inputs_per_witness: a,
             num_public_inputs_per_witness: b,
-            values: WitnessValues::<M31Config>::Scalar(v),
+            values: WitnessValues::<M31ExtConfigSha2RawVanilla>::Scalar(v),
         };
         let mut w2 = w1.clone();
         w2.convert_to_simd();
