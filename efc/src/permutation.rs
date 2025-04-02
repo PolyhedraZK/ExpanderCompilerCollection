@@ -764,6 +764,8 @@ pub fn end2end_permutation_assignments_with_beacon_data(
     committee_data: &beacon::CommitteeData,
     padding_size: usize,
     validator_hashes: &[Vec<u32>],
+    mpi_size1: usize,
+    mpi_size2: usize,
 ) -> (
     PermutationQueryAssignmentChunks,
     PermutationIndicesValidatorHashBitAssignmentChunks,
@@ -822,7 +824,7 @@ pub fn end2end_permutation_assignments_with_beacon_data(
 
     let permutation_query_assignment_chunks: PermutationQueryAssignmentChunks =
         permutation_query_assignments
-            .chunks(16)
+            .chunks(16*mpi_size1)
             .map(|x| x.to_vec())
             .collect();
 
@@ -837,7 +839,14 @@ pub fn end2end_permutation_assignments_with_beacon_data(
         Vec<PermutationIndicesValidatorHashBitCircuit<M31>>,
     > = vec![permutation_hashbit_assignments.clone(); 1];
     permutation_hashbit_assignment_chunks[0].extend(permutation_hashbit_assignments.clone());
-    permutation_hashbit_assignment_chunks.push(permutation_hashbit_assignment_chunks[0].clone());
+    if mpi_size2 == 1 {
+        permutation_hashbit_assignment_chunks.push(permutation_hashbit_assignment_chunks[0].clone());
+    } else if mpi_size2 == 2 {
+        permutation_hashbit_assignment_chunks[0].extend(permutation_hashbit_assignments.clone());
+        permutation_hashbit_assignment_chunks[0].extend(permutation_hashbit_assignments.clone());
+    } else {
+        panic!("mpi_size2 must be 1 or 2");
+    }
 
     (
         permutation_query_assignment_chunks,
@@ -854,6 +863,8 @@ pub fn end2end_permutation_witnesses_with_beacon_data(
     committee_data: &beacon::CommitteeData,
     padding_size: usize,
     validator_hashes: &[Vec<u32>],
+    mpi_size1: usize,
+    mpi_size2: usize,
 ) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
         let (permutation_query_assignment_chunks, permutation_hashbit_assignment_chunks) =
@@ -864,6 +875,8 @@ pub fn end2end_permutation_witnesses_with_beacon_data(
                 committee_data,
                 padding_size,
                 validator_hashes,
+                mpi_size1,
+                mpi_size2,
             );
         end2end_permutation_hashbit_witnesses_with_assignments(
             w_s_hashbit,

@@ -6,6 +6,7 @@ use ark_std::primitive::u8;
 use circuit_std_rs::sha256::m31::check_sha256_37bytes_256batch_compress;
 use circuit_std_rs::sha256::m31_utils::{big_array_add_reduce, bytes_to_bits};
 use circuit_std_rs::utils::register_hint;
+use expander_compiler::circuit::layered::witness::Witness;
 use expander_compiler::frontend::extra::*;
 use expander_compiler::frontend::*;
 use serde::Deserialize;
@@ -296,9 +297,119 @@ pub fn end2end_hashtable_witnesses_with_assignments(
     );
 }
 
+pub fn end2end_hashtable_witnesses_with_assignments_chunk16(
+    w_s: WitnessSolver<M31Config>,
+    assignment_chunks: HashtableAssignmentChunks,
+) {
+    let circuit_name = &format!("hashtable{}", HASHTABLESIZE);
+
+    let witnesses_dir = format!("./witnesses/{}", circuit_name);
+    let start_time = std::time::Instant::now();
+    //generate witnesses (multi-thread)
+    log::debug!("Start generating witnesses...");
+    let witness_solver = Arc::new(w_s);
+    let handles = assignment_chunks
+        .into_iter()
+        .enumerate()
+        .map(|(i, assignments)| {
+            let witness_solver = Arc::clone(&witness_solver);
+            let witnesses_dir_clone = witnesses_dir.clone();
+            thread::spawn(move || {
+                let assignment_chunks: Vec<Vec<HASHTABLECircuit<M31>>> = assignments.chunks(16).map(|x| x.to_vec()).collect();
+                let handles = assignment_chunks
+                    .into_iter()
+                    .enumerate()
+                    .map(|(j, assignments)| {
+                        let witness_solver = Arc::clone(&witness_solver);
+                        thread::spawn(move || {
+                            let mut hint_registry = HintRegistry::<M31>::new();
+                            register_hint(&mut hint_registry);
+                            (j, witness_solver
+                                .solve_witnesses_with_hints(&assignments, &mut hint_registry)
+                                .unwrap())
+                        }
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                let mut results = Vec::new();
+                for handle in handles {
+                    results.push(handle.join().unwrap());
+                }
+                let num_inputs_per_witness = results[0].1.num_inputs_per_witness;
+                let num_public_inputs_per_witness = results[0].1.num_public_inputs_per_witness;
+                results.sort_by_key(|(j, _)| *j);
+                let new_values = results.into_iter().map(|(_, witness)| witness.values).flatten().collect::<Vec<M31>>();
+                let new_witness: Witness<M31Config> = Witness::<M31Config> {
+                    num_witnesses: assignments.len(),
+                    num_inputs_per_witness,
+                    num_public_inputs_per_witness,
+                    values: new_values
+                };
+                write_witness_to_file(
+                    &format!("{}/witness_{}.txt", witnesses_dir_clone, i),
+                    new_witness,
+                )
+            })
+        })
+        .collect::<Vec<_>>();
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    let end_time = std::time::Instant::now();
+    log::debug!(
+        "Generate {} witness Time: {:?}",
+        circuit_name,
+        end_time.duration_since(start_time)
+    );
+}
+
+pub fn end2end_hashtable_witnesses_with_assignments_mpi(
+    w_s: WitnessSolver<M31Config>,
+    assignment_chunks: HashtableAssignmentChunks,
+    mpi_size: usize,
+) {
+    let circuit_name = &format!("hashtable{}", HASHTABLESIZE);
+
+    let witnesses_dir = format!("./witnesses/{}", circuit_name);
+    let start_time = std::time::Instant::now();
+    let new_assignment_chunks: Vec<Vec<HASHTABLECircuit<M31>>> = assignment_chunks.chunks(mpi_size).map(|chunk| chunk.concat()).collect();
+    //generate witnesses (multi-thread)
+    log::debug!("Start generating witnesses...");
+    let witness_solver = Arc::new(w_s);
+    let handles = new_assignment_chunks
+        .into_iter()
+        .enumerate()
+        .map(|(i, assignments)| {
+            let witness_solver = Arc::clone(&witness_solver);
+            let witnesses_dir_clone = witnesses_dir.clone();
+            thread::spawn(move || {
+                let mut hint_registry = HintRegistry::<M31>::new();
+                register_hint(&mut hint_registry);
+                let witness = witness_solver
+                    .solve_witnesses_with_hints(&assignments, &mut hint_registry)
+                    .unwrap();
+                write_witness_to_file(
+                    &format!("{}/witness_{}.txt", witnesses_dir_clone, i),
+                    witness,
+                )
+            })
+        })
+        .collect::<Vec<_>>();
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    let end_time = std::time::Instant::now();
+    log::debug!(
+        "Generate {} witness Time: {:?}",
+        circuit_name,
+        end_time.duration_since(start_time)
+    );
+}
+
 pub fn end2end_hashtable_assignments_with_beacon_data(
     seed: &[u8],
     hash_bytes: Vec<[u8; 32]>,
+    mpi_size: usize,
 ) -> HashtableAssignmentChunks {
     let subcircuit_count = hash_bytes.len() / HASHTABLESIZE;
     //get assignments
@@ -311,16 +422,17 @@ pub fn end2end_hashtable_assignments_with_beacon_data(
         end_time.duration_since(start_time)
     );
     let assignment_chunks: HashtableAssignmentChunks =
-        assignments.chunks(16).map(|x| x.to_vec()).collect();
+        assignments.chunks(16*mpi_size).map(|x| x.to_vec()).collect();
     assignment_chunks
 }
 pub fn end2end_hashtable_witnesses_with_beacon_data(
     w_s: WitnessSolver<M31Config>,
     seed: &[u8],
     hash_bytes: Vec<[u8; 32]>,
+    mpi_size: usize,
 ) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
-        let assignment_chunks = end2end_hashtable_assignments_with_beacon_data(seed, hash_bytes);
+        let assignment_chunks = end2end_hashtable_assignments_with_beacon_data(seed, hash_bytes, mpi_size);
         end2end_hashtable_witnesses_with_assignments(w_s, assignment_chunks);
     });
 }

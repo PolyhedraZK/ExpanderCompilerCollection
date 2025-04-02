@@ -931,6 +931,7 @@ pub fn end2end_merkle_subtree_with_limit_witnesses_with_assignments(
 pub fn end2end_validator_tree_assignments_with_beacon_data(
     validator_tree: Vec<Vec<Vec<u32>>>,
     real_validator_count: u64,
+    mpi_size: usize,
 ) -> (
     ValidatorSubMTAssignmentChunks,
     MergeSubMTLimitAssignmentChunks,
@@ -946,7 +947,7 @@ pub fn end2end_validator_tree_assignments_with_beacon_data(
     let convert_validator_list_to_merkle_tree_assignments_chunks: Vec<
         Vec<ValidatorSubMTCircuit<M31>>,
     > = convert_validator_list_to_merkle_tree_assignment
-        .chunks(16)
+        .chunks(16*mpi_size)
         .map(|x| x.to_vec())
         .collect();
     let end_time = std::time::Instant::now();
@@ -965,6 +966,7 @@ pub fn end2end_validator_tree_witnesses_with_beacon_data(
     w_s_merkle: WitnessSolver<M31Config>,
     validator_tree: &[Vec<Vec<u32>>],
     real_validator_count: u64,
+    mpi_size: usize,
 ) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
         let (
@@ -973,6 +975,7 @@ pub fn end2end_validator_tree_witnesses_with_beacon_data(
         ) = end2end_validator_tree_assignments_with_beacon_data(
             validator_tree.to_vec(),
             real_validator_count,
+            mpi_size,
         );
         //generate witnesses (multi-thread)
         end2end_validator_subtree_witnesses_with_assignments(

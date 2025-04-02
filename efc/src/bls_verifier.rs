@@ -11,6 +11,7 @@ use circuit_std_rs::gnark::emulated::sw_bls12381::g1::*;
 use circuit_std_rs::gnark::emulated::sw_bls12381::g2::*;
 use circuit_std_rs::gnark::emulated::sw_bls12381::pairing::*;
 use circuit_std_rs::utils::register_hint;
+use expander_compiler::circuit::layered::witness::Witness;
 use expander_compiler::declare_circuit;
 use expander_compiler::frontend::extra::debug_eval;
 use expander_compiler::frontend::GenericDefine;
@@ -447,10 +448,78 @@ pub fn end2end_blsverifier_witnesses_with_assignments(
     );
 }
 
+pub fn end2end_blsverifier_witnesses_with_assignments_chunk16(
+    w_s: WitnessSolver<M31Config>,
+    assignment_chunks: BlsVerifierAssignmentChunks,
+    offset: usize,
+) {
+    let circuit_name = "blsverifier";
+
+    let witnesses_dir = format!("./witnesses/{}", circuit_name);
+    let start_time = std::time::Instant::now();
+    //generate witnesses (multi-thread)
+    log::debug!("Start generating {} witnesses...", circuit_name);
+    let witness_solver = Arc::new(w_s);
+    let handles = assignment_chunks
+        .into_iter()
+        .enumerate()
+        .map(|(i, assignments)| {
+            let witness_solver = Arc::clone(&witness_solver);
+            let witnesses_dir_clone = witnesses_dir.clone();
+            thread::spawn(move || {
+                let assignment_chunks: Vec<Vec<BLSVERIFIERCircuit<M31>>> = assignments.chunks(16).map(|x| x.to_vec()).collect();
+                let handles = assignment_chunks
+                    .into_iter()
+                    .enumerate()
+                    .map(|(j, assignments)| {
+                        let witness_solver = Arc::clone(&witness_solver);
+                        thread::spawn(move || {
+                            let mut hint_registry = HintRegistry::<M31>::new();
+                            register_hint(&mut hint_registry);
+                            (j, witness_solver
+                                .solve_witnesses_with_hints(&assignments, &mut hint_registry)
+                                .unwrap())
+                        }
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                let mut results = Vec::new();
+                for handle in handles {
+                    results.push(handle.join().unwrap());
+                }
+                let num_inputs_per_witness = results[0].1.num_inputs_per_witness;
+                let num_public_inputs_per_witness = results[0].1.num_public_inputs_per_witness;
+                results.sort_by_key(|(j, _)| *j);
+                let new_values = results.into_iter().map(|(_, witness)| witness.values).flatten().collect::<Vec<M31>>();
+                let new_witness: Witness<M31Config> = Witness::<M31Config> {
+                    num_witnesses: assignments.len(),
+                    num_inputs_per_witness,
+                    num_public_inputs_per_witness,
+                    values: new_values
+                };
+                write_witness_to_file(
+                    &format!("{}/witness_{}.txt", witnesses_dir_clone, i + offset),
+                    new_witness,
+                )
+            })
+        })
+        .collect::<Vec<_>>();
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    let end_time = std::time::Instant::now();
+    log::debug!(
+        "Generate {} witness Time: {:?}",
+        circuit_name,
+        end_time.duration_since(start_time)
+    );
+}
+
 pub fn end2end_blsverifier_assignments_with_beacon_data(
     aggregated_pubkeys: Vec<BlsG1Affine>,
     attestations: Vec<Attestation>,
     range: [usize; 2],
+    mpi_size: usize,
 ) -> BlsVerifierAssignmentChunks {
     //get assignments
     let start = range[0] * beacon::MAXCOMMITTEESPERSLOT;
@@ -466,7 +535,7 @@ pub fn end2end_blsverifier_assignments_with_beacon_data(
         end_time.duration_since(start_time)
     );
     let assignment_chunks: BlsVerifierAssignmentChunks =
-        assignments.chunks(16).map(|x| x.to_vec()).collect();
+        assignments.chunks(16*mpi_size).map(|x| x.to_vec()).collect();
     assignment_chunks
 }
 
@@ -475,6 +544,7 @@ pub fn end2end_blsverifier_witnesses_with_beacon_data(
     aggregated_pubkeys: Vec<BlsG1Affine>,
     attestations: Vec<Attestation>,
     range: [usize; 2],
+    mpi_size: usize,
 ) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
         //get assignments
@@ -482,6 +552,7 @@ pub fn end2end_blsverifier_witnesses_with_beacon_data(
             aggregated_pubkeys,
             attestations,
             range,
+            mpi_size,
         );
 
         //generate witnesses (multi-thread)

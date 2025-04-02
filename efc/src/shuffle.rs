@@ -11,6 +11,7 @@ use base64::Engine;
 use circuit_std_rs::gnark::emulated::sw_bls12381::g1::*;
 use circuit_std_rs::sha256::m31_utils::big_array_add;
 use circuit_std_rs::utils::{register_hint, simple_select};
+use expander_compiler::circuit::layered::witness::Witness;
 use core::panic;
 use expander_compiler::frontend::extra::*;
 use expander_compiler::frontend::*;
@@ -1107,6 +1108,72 @@ pub fn end2end_shuffle_witnesses_with_assignments(
         end_time.duration_since(start_time)
     );
 }
+pub fn end2end_shuffle_witnesses_with_assignments_chunk16(
+    w_s: WitnessSolver<M31Config>,
+    assignment_chunks: ShuffleAssignmentChunks,
+    offset: usize,
+) {
+    let circuit_name = &format!("shuffle_{}", VALIDATOR_CHUNK_SIZE);
+
+    let start_time = std::time::Instant::now();
+    //generate witnesses (multi-thread)
+    log::debug!("Start generating {} witnesses...", circuit_name);
+    let witnesses_dir = format!("./witnesses/{}", circuit_name);
+    let witness_solver = Arc::new(w_s);
+    let handles = assignment_chunks
+        .into_iter()
+        .enumerate()
+        .map(|(i, assignments)| {
+            let witness_solver = Arc::clone(&witness_solver);
+            let witnesses_dir_clone = witnesses_dir.clone();
+            thread::spawn(move || {
+                let assignment_chunks: Vec<Vec<ShuffleCircuit<M31>>> = assignments.chunks(16).map(|x| x.to_vec()).collect();
+                let handles = assignment_chunks
+                    .into_iter()
+                    .enumerate()
+                    .map(|(j, assignments)| {
+                        let witness_solver = Arc::clone(&witness_solver);
+                        thread::spawn(move || {
+                            let mut hint_registry = HintRegistry::<M31>::new();
+                            register_hint(&mut hint_registry);
+                            (j, witness_solver
+                                .solve_witnesses_with_hints(&assignments, &mut hint_registry)
+                                .unwrap())
+                        }
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                let mut results = Vec::new();
+                for handle in handles {
+                    results.push(handle.join().unwrap());
+                }
+                let num_inputs_per_witness = results[0].1.num_inputs_per_witness;
+                let num_public_inputs_per_witness = results[0].1.num_public_inputs_per_witness;
+                results.sort_by_key(|(j, _)| *j);
+                let new_values = results.into_iter().map(|(_, witness)| witness.values).flatten().collect::<Vec<M31>>();
+                let new_witness: Witness<M31Config> = Witness::<M31Config> {
+                    num_witnesses: assignments.len(),
+                    num_inputs_per_witness,
+                    num_public_inputs_per_witness,
+                    values: new_values
+                };
+                write_witness_to_file(
+                    &format!("{}/witness_{}.txt", witnesses_dir_clone, i + offset),
+                    new_witness,
+                )
+            })
+        })
+        .collect::<Vec<_>>();
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    let end_time = std::time::Instant::now();
+    log::debug!(
+        "Generate {} witness Time: {:?}",
+        circuit_name,
+        end_time.duration_since(start_time)
+    );
+}
 
 pub fn end2end_shuffle_assignments_with_beacon_data(
     validator_data: ValidatorData,
@@ -1115,6 +1182,7 @@ pub fn end2end_shuffle_assignments_with_beacon_data(
     slot_attestations: Vec<Vec<Attestation>>,
     balance_list: Vec<u64>,
     range: [usize; 2],
+    mpi_size: usize,
 ) -> ShuffleAssignmentChunks {
     //get assignments
     let start_time = std::time::Instant::now();
@@ -1132,7 +1200,7 @@ pub fn end2end_shuffle_assignments_with_beacon_data(
         end_time.duration_since(start_time)
     );
     let assignment_chunks: ShuffleAssignmentChunks =
-        assignments.chunks(16).map(|x| x.to_vec()).collect();
+        assignments.chunks(16 * mpi_size).map(|x| x.to_vec()).collect();
     assignment_chunks
 }
 
@@ -1162,6 +1230,7 @@ pub fn end2end_shuffle_witnesses_with_beacon_data(
     slot_attestations: Vec<Vec<Attestation>>,
     balance_list: Vec<u64>,
     range: [usize; 2],
+    mpi_size: usize,
 ) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
         log::debug!("preparing shuffle witnesses...");
@@ -1174,6 +1243,7 @@ pub fn end2end_shuffle_witnesses_with_beacon_data(
                 slot_attestations,
                 balance_list,
                 range,
+                mpi_size,
             );
 
         //generate witnesses (multi-thread)
