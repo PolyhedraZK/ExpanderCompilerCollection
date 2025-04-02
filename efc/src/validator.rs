@@ -796,7 +796,7 @@ impl GenericDefine<M31Config> for MergeSubMTLimitCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut inputs = vec![];
         for i in 0..SUBTREE_NUM {
-            inputs.extend_from_slice(&self.subtree_root[i]);
+            inputs.push(self.subtree_root[i].to_vec());
         }
 
         let params = PoseidonM31Params::new(
@@ -807,14 +807,17 @@ impl GenericDefine<M31Config> for MergeSubMTLimitCircuit<Variable> {
             POSEIDON_M31X16_PARTIAL_ROUNDS,
         );
 
-        let sub_tree_root_root =
-            params.hash_to_state_flatten(builder, &inputs)[..POSEIDON_M31X16_RATE].to_vec();
+        let sub_tree_root_root = merkle::merkleize_var_with_limit(
+            builder,
+            &inputs,
+            &params,
+            0,
+        );
 
         let mut aunts_vec = vec![];
         for i in 0..PADDING_DEPTH {
             aunts_vec.push(self.aunts[i].to_vec());
         }
-
         let ignore_opt = builder.constant(0);
         merkle::verify_merkle_tree_path_var(
             builder,
@@ -839,7 +842,7 @@ impl GenericDefine<M31Config> for MergeSubMTLimitCircuit<Variable> {
 impl MergeSubMTLimitCircuit<M31> {
     pub fn get_assignments_from_beacon_data(
         validator_tree: &[Vec<Vec<u32>>],
-        real_validator_count: u64,
+        validator_count: u64,
     ) -> Self {
         let mut assignment = MergeSubMTLimitCircuit::<M31>::default();
         let validator_tree_depth =
@@ -847,14 +850,19 @@ impl MergeSubMTLimitCircuit<M31> {
         for i in 0..SUBTREE_NUM {
             for j in 0..POSEIDON_M31X16_RATE {
                 assignment.subtree_root[i][j] =
-                    M31::from(validator_tree[validator_tree.len() - SUBTREE_DEPTH][i][j]);
+                    M31::from(validator_tree
+                        .get(validator_tree.len() - SUBTREE_DEPTH - 1)
+                        .and_then(|layer| layer.get(i))
+                        .and_then(|row| row.get(j))
+                        .copied()
+                        .unwrap_or(merkle::ZERO_HASHES_POSEIDON[SUBTREE_DEPTH][j]));
             }
         }
         for i in 0..PADDING_DEPTH {
             assignment.path[i] = M31::from(0);
             for j in 0..POSEIDON_M31X16_RATE {
                 assignment.aunts[i][j] = M31::from(
-                    validator_tree[validator_tree.len() - i - validator_tree_depth][1][j],
+                    validator_tree[validator_tree.len() - i - validator_tree_depth - 1][1][j],
                 );
             }
         }
@@ -862,7 +870,7 @@ impl MergeSubMTLimitCircuit<M31> {
             assignment.tree_root[i] = M31::from(validator_tree[1][0][i]);
             assignment.tree_root_mix_in[i] = M31::from(validator_tree[0][0][i]);
         }
-        let real_validator_count = real_validator_count.to_le_bytes();
+        let real_validator_count = validator_count.to_le_bytes();
         for (i, &v) in real_validator_count.iter().enumerate() {
             assignment.real_validator_count[i] = M31::from(v as u32);
         }

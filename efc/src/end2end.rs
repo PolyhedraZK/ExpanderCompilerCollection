@@ -464,7 +464,7 @@ pub fn end2end_end_assignments(epoch: u64) -> End2EndAssignmentChunks {
         let (convert_validator_subtree_assignments, merkle_subtree_with_limit_assignments) =
             validator::end2end_validator_tree_assignments_with_beacon_data(
                 beacon_assignment_data.validator_tree,
-                beacon_assignment_data.activated_indices.len() as u64,
+                beacon_assignment_data.validator_list.len() as u64,
             );
         End2EndAssignmentChunks {
             shuffle_chunks: shuffle_assignments,
@@ -1024,12 +1024,12 @@ pub fn end2end_witnesses_streamline_from_beacon_data_debug(epoch: u64, stage: &s
         permutation::debug_permutation_hashbit_with_assignments(
             end2end_assignment_chunks.permutation_hash_chunks,
         );
-        // validator::debug_validator_subtree_with_assignments(
-        //     end2end_assignment_chunks.convert_validator_subtree_chunks,
-        // );
-        // validator::debug_merkle_subtree_with_limit_with_assignments(
-        //     end2end_assignment_chunks.merkle_subtree_with_limit_chunks,
-        // );
+        validator::debug_validator_subtree_with_assignments(
+            end2end_assignment_chunks.convert_validator_subtree_chunks,
+        );
+        validator::debug_merkle_subtree_with_limit_with_assignments(
+            end2end_assignment_chunks.merkle_subtree_with_limit_chunks,
+        );
         // let shuffle_thread = thread::spawn(move || {
         //     shuffle::debug_shuffle_with_assignments(
         //         end2end_assignment_chunks.shuffle_chunks,
