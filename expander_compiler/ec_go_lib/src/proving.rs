@@ -1,3 +1,4 @@
+use gkr_engine::MPIEngine;
 use libc::{c_uchar, c_ulong, malloc};
 use std::ptr;
 use std::slice;
@@ -12,20 +13,19 @@ fn prove_circuit_file_inner<C: config::Config>(
     circuit_filename: &str,
     witness: &[u8],
 ) -> Result<Vec<u8>, String> {
-    let config = expander_config::Config::<C::DefaultGKRConfig>::new(
-        expander_config::GKRScheme::Vanilla,
-        mpi_config::MPIConfig::new(),
-    );
-    let mut circuit = expander_circuit::Circuit::<C::DefaultGKRFieldConfig>::load_circuit::<
+
+    let mpi_config = gkr_engine::MPIConfig::prover_new();
+
+    let (mut circuit, window) = expander_circuit::Circuit::<C::DefaultGKRFieldConfig>::prover_load_circuit::<
         C::DefaultGKRConfig,
-    >(circuit_filename);
+    >(circuit_filename, &mpi_config);
     let witness =
         layered::witness::Witness::<C>::deserialize_from(witness).map_err(|e| e.to_string())?;
     let (simd_input, simd_public_input) = witness.to_simd::<C::DefaultSimdField>();
     circuit.layers[0].input_vals = simd_input;
     circuit.public_input = simd_public_input;
     circuit.evaluate();
-    let (claimed_v, proof) = gkr::executor::prove(&mut circuit, &config);
+    let (claimed_v, proof) = gkr::executor::prove::<C::DefaultGKRConfig>(&mut circuit, mpi_config.clone());
     gkr::executor::dump_proof_and_claimed_v(&proof, &claimed_v).map_err(|e| e.to_string())
 }
 
@@ -34,11 +34,8 @@ fn verify_circuit_file_inner<C: config::Config>(
     witness: &[u8],
     proof_and_claimed_v: &[u8],
 ) -> Result<u8, String> {
-    let config = expander_config::Config::<C::DefaultGKRConfig>::new(
-        expander_config::GKRScheme::Vanilla,
-        mpi_config::MPIConfig::new(),
-    );
-    let mut circuit = expander_circuit::Circuit::<C::DefaultGKRFieldConfig>::load_circuit::<
+    let mpi_config = gkr_engine::MPIConfig::prover_new();
+    let mut circuit = expander_circuit::Circuit::<C::DefaultGKRFieldConfig>::verifier_load_circuit::<
         C::DefaultGKRConfig,
     >(circuit_filename);
     let witness =
@@ -46,13 +43,13 @@ fn verify_circuit_file_inner<C: config::Config>(
     let (simd_input, simd_public_input) = witness.to_simd::<C::DefaultSimdField>();
     circuit.layers[0].input_vals = simd_input;
     circuit.public_input = simd_public_input.clone();
-    let (proof, claimed_v) = match gkr::executor::load_proof_and_claimed_v(proof_and_claimed_v) {
+    let (proof, claimed_v) = match gkr::executor::load_proof_and_claimed_v::<C::DefaultSimdField>(proof_and_claimed_v) {
         Ok((proof, claimed_v)) => (proof, claimed_v),
         Err(_) => {
             return Ok(0);
         }
     };
-    Ok(gkr::executor::verify(&mut circuit, &config, &proof, &claimed_v) as u8)
+    Ok(gkr::executor::verify::<C::DefaultGKRConfig>(&mut circuit, mpi_config, &proof, &claimed_v) as u8)
 }
 
 #[no_mangle]

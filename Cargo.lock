@@ -112,7 +112,7 @@ dependencies = [
 [[package]]
 name = "arith"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#7a12023f99e5bde5fcead097b6747381d454acd2"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/refactor_configs#59e8b86ceadd5e29cc67b08241d07d08c1e50362"
 dependencies = [
  "ark-std 0.4.0",
  "cfg-if",
@@ -493,15 +493,16 @@ dependencies = [
 [[package]]
 name = "circuit"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#7a12023f99e5bde5fcead097b6747381d454acd2"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/refactor_configs#59e8b86ceadd5e29cc67b08241d07d08c1e50362"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
- "config",
+ "bytes",
  "ethnum",
- "gkr_field_config",
+ "gkr_engine",
+ "gkr_hashers",
  "log",
- "mpi_config",
+ "mpi",
  "rand",
  "serdes",
  "thiserror",
@@ -520,7 +521,6 @@ dependencies = [
  "ark-std 0.4.0",
  "big-int",
  "circuit",
- "config",
  "expander_compiler",
  "gf2",
  "gkr",
@@ -591,33 +591,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 
 [[package]]
-name = "config"
-version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#7a12023f99e5bde5fcead097b6747381d454acd2"
-dependencies = [
- "arith",
- "ark-std 0.4.0",
- "gf2",
- "gf2_128",
- "gkr_field_config",
- "halo2curves",
- "mersenne31",
- "mpi",
- "mpi_config",
- "poly_commit",
- "thiserror",
- "transcript",
-]
-
-[[package]]
 name = "config_macros"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#7a12023f99e5bde5fcead097b6747381d454acd2"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/refactor_configs#59e8b86ceadd5e29cc67b08241d07d08c1e50362"
 dependencies = [
- "config",
- "field_hashers",
- "gkr_field_config",
- "goldilocks",
+ "gkr_engine",
+ "gkr_hashers",
  "poly_commit",
  "proc-macro2",
  "quote",
@@ -719,13 +698,13 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 [[package]]
 name = "crosslayer_prototype"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#7a12023f99e5bde5fcead097b6747381d454acd2"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/refactor_configs#59e8b86ceadd5e29cc67b08241d07d08c1e50362"
 dependencies = [
  "arith",
- "config",
  "env_logger",
  "ethnum",
- "gkr_field_config",
+ "gkr_engine",
+ "gkr_hashers",
  "log",
  "polynomials",
  "rand",
@@ -802,12 +781,10 @@ version = "0.1.0"
 dependencies = [
  "arith",
  "circuit",
- "config",
  "expander_compiler",
  "gkr",
- "gkr_field_config",
+ "gkr_engine",
  "libc",
- "mpi_config",
  "rand",
  "serdes",
  "transcript",
@@ -826,13 +803,11 @@ dependencies = [
  "circuit",
  "circuit-std-rs",
  "clap",
- "config",
  "expander_compiler",
  "gf2",
  "gkr",
  "hex",
  "mersenne31",
- "mpi_config",
  "num-bigint",
  "num-traits",
  "rand",
@@ -913,16 +888,14 @@ dependencies = [
  "chrono",
  "circuit",
  "clap",
- "config",
  "crosslayer_prototype",
  "ethnum",
  "gf2",
  "gkr",
- "gkr_field_config",
+ "gkr_engine",
  "goldilocks",
  "halo2curves",
  "mersenne31",
- "mpi_config",
  "rand",
  "rayon",
  "serdes",
@@ -945,7 +918,7 @@ dependencies = [
 [[package]]
 name = "field_hashers"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#7a12023f99e5bde5fcead097b6747381d454acd2"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/refactor_configs#59e8b86ceadd5e29cc67b08241d07d08c1e50362"
 dependencies = [
  "arith",
  "halo2curves",
@@ -1040,7 +1013,7 @@ dependencies = [
 [[package]]
 name = "gf2"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#7a12023f99e5bde5fcead097b6747381d454acd2"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/refactor_configs#59e8b86ceadd5e29cc67b08241d07d08c1e50362"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
@@ -1058,7 +1031,7 @@ dependencies = [
 [[package]]
 name = "gf2_128"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#7a12023f99e5bde5fcead097b6747381d454acd2"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/refactor_configs#59e8b86ceadd5e29cc67b08241d07d08c1e50362"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
@@ -1077,7 +1050,7 @@ checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 [[package]]
 name = "gkr"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#7a12023f99e5bde5fcead097b6747381d454acd2"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/refactor_configs#59e8b86ceadd5e29cc67b08241d07d08c1e50362"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
@@ -1085,20 +1058,18 @@ dependencies = [
  "chrono",
  "circuit",
  "clap",
- "config",
  "config_macros",
  "env_logger",
  "ethnum",
- "field_hashers",
  "gf2",
  "gf2_128",
- "gkr_field_config",
+ "gkr_engine",
+ "gkr_hashers",
  "goldilocks",
  "halo2curves",
  "log",
  "mersenne31",
  "mpi",
- "mpi_config",
  "poly_commit",
  "polynomials",
  "rand",
@@ -1115,16 +1086,33 @@ dependencies = [
 ]
 
 [[package]]
-name = "gkr_field_config"
+name = "gkr_engine"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#7a12023f99e5bde5fcead097b6747381d454acd2"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/refactor_configs#59e8b86ceadd5e29cc67b08241d07d08c1e50362"
 dependencies = [
  "arith",
- "ark-std 0.4.0",
+ "field_hashers",
  "gf2",
  "gf2_128",
  "goldilocks",
  "mersenne31",
+ "mpi",
+ "polynomials",
+ "rand",
+ "serdes",
+ "thiserror",
+]
+
+[[package]]
+name = "gkr_hashers"
+version = "0.1.0"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/refactor_configs#59e8b86ceadd5e29cc67b08241d07d08c1e50362"
+dependencies = [
+ "arith",
+ "halo2curves",
+ "serdes",
+ "sha2",
+ "tiny-keccak",
 ]
 
 [[package]]
@@ -1136,7 +1124,7 @@ checksum = "a8d1add55171497b4705a648c6b583acafb01d58050a51727785f0b2c8e0a2b2"
 [[package]]
 name = "goldilocks"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#7a12023f99e5bde5fcead097b6747381d454acd2"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/refactor_configs#59e8b86ceadd5e29cc67b08241d07d08c1e50362"
 dependencies = [
  "arith",
  "ark-std 0.3.0",
@@ -1688,13 +1676,13 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 [[package]]
 name = "mersenne31"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#7a12023f99e5bde5fcead097b6747381d454acd2"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/refactor_configs#59e8b86ceadd5e29cc67b08241d07d08c1e50362"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
  "cfg-if",
  "ethnum",
- "field_hashers",
+ "gkr_hashers",
  "halo2curves",
  "log",
  "rand",
@@ -1770,15 +1758,6 @@ dependencies = [
  "bindgen",
  "build-probe-mpi",
  "cc",
-]
-
-[[package]]
-name = "mpi_config"
-version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#7a12023f99e5bde5fcead097b6747381d454acd2"
-dependencies = [
- "arith",
- "mpi",
 ]
 
 [[package]]
@@ -1986,17 +1965,16 @@ dependencies = [
 [[package]]
 name = "poly_commit"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#7a12023f99e5bde5fcead097b6747381d454acd2"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/refactor_configs#59e8b86ceadd5e29cc67b08241d07d08c1e50362"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
  "derivative",
  "ethnum",
  "gf2",
- "gkr_field_config",
+ "gkr_engine",
  "halo2curves",
  "itertools 0.13.0",
- "mpi_config",
  "polynomials",
  "rand",
  "serdes",
@@ -2008,15 +1986,13 @@ dependencies = [
 [[package]]
 name = "polynomials"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#7a12023f99e5bde5fcead097b6747381d454acd2"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/refactor_configs#59e8b86ceadd5e29cc67b08241d07d08c1e50362"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
  "criterion",
- "gkr_field_config",
  "halo2curves",
  "itertools 0.13.0",
- "mpi_config",
  "rand",
 ]
 
@@ -2304,7 +2280,7 @@ dependencies = [
 [[package]]
 name = "serdes"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#7a12023f99e5bde5fcead097b6747381d454acd2"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/refactor_configs#59e8b86ceadd5e29cc67b08241d07d08c1e50362"
 dependencies = [
  "ethnum",
  "halo2curves",
@@ -2425,15 +2401,13 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 [[package]]
 name = "sumcheck"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#7a12023f99e5bde5fcead097b6747381d454acd2"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/refactor_configs#59e8b86ceadd5e29cc67b08241d07d08c1e50362"
 dependencies = [
  "arith",
  "circuit",
- "config",
  "env_logger",
- "gkr_field_config",
+ "gkr_engine",
  "log",
- "mpi_config",
  "polynomials",
  "transcript",
  "utils",
@@ -2610,11 +2584,11 @@ dependencies = [
 [[package]]
 name = "transcript"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#7a12023f99e5bde5fcead097b6747381d454acd2"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/refactor_configs#59e8b86ceadd5e29cc67b08241d07d08c1e50362"
 dependencies = [
  "arith",
- "field_hashers",
- "mpi_config",
+ "gkr_engine",
+ "gkr_hashers",
  "serdes",
  "sha2",
  "tiny-keccak",
@@ -2623,7 +2597,7 @@ dependencies = [
 [[package]]
 name = "tree"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#7a12023f99e5bde5fcead097b6747381d454acd2"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/refactor_configs#59e8b86ceadd5e29cc67b08241d07d08c1e50362"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
@@ -2731,7 +2705,10 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 [[package]]
 name = "utils"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#7a12023f99e5bde5fcead097b6747381d454acd2"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zz/refactor_configs#59e8b86ceadd5e29cc67b08241d07d08c1e50362"
+dependencies = [
+ "halo2curves",
+]
 
 [[package]]
 name = "version_check"

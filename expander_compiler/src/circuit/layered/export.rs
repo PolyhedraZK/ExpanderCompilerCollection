@@ -2,7 +2,7 @@ use super::{Circuit, Config, CrossLayerInputType, Input, InputUsize, NormalInput
 
 impl<C: Config> Circuit<C, NormalInputType> {
     pub fn export_to_expander<
-        DestConfig: gkr_field_config::GKRFieldConfig<CircuitField = C::CircuitField>,
+        DestConfig: gkr_engine::FieldEngine<CircuitField = C::CircuitField>,
     >(
         &self,
     ) -> expander_circuit::RecursiveCircuit<DestConfig> {
@@ -78,7 +78,7 @@ impl<C: Config> Circuit<C, NormalInputType> {
 
 impl<C: Config> Circuit<C, CrossLayerInputType> {
     pub fn export_to_expander<
-        DestConfig: gkr_field_config::GKRFieldConfig<CircuitField = C::CircuitField>,
+        DestConfig: gkr_engine::FieldEngine<CircuitField = C::CircuitField>,
     >(
         &self,
     ) -> crosslayer_prototype::CrossLayerRecursiveCircuit<DestConfig> {

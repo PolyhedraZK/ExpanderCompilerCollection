@@ -283,7 +283,7 @@ pub struct Gate<C: Config, I: InputType, const INPUT_NUM: usize> {
 
 impl<C: Config, const INPUT_NUM: usize> Gate<C, NormalInputType, INPUT_NUM> {
     pub fn export_to_expander<
-        DestConfig: gkr_field_config::GKRFieldConfig<CircuitField = C::CircuitField>,
+        DestConfig: gkr_engine::FieldEngine<CircuitField = C::CircuitField>,
     >(
         &self,
     ) -> expander_circuit::Gate<DestConfig, INPUT_NUM> {
@@ -304,7 +304,7 @@ impl<C: Config, const INPUT_NUM: usize> Gate<C, NormalInputType, INPUT_NUM> {
 
 impl<C: Config, const INPUT_NUM: usize> Gate<C, CrossLayerInputType, INPUT_NUM> {
     pub fn export_to_crosslayer_simple<
-        DestConfig: gkr_field_config::GKRFieldConfig<CircuitField = C::CircuitField>,
+        DestConfig: gkr_engine::FieldEngine<CircuitField = C::CircuitField>,
     >(
         &self,
     ) -> crosslayer_prototype::SimpleGate<DestConfig, INPUT_NUM> {

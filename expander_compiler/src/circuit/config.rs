@@ -1,16 +1,18 @@
 use std::{fmt::Debug, hash::Hash};
 
+use gkr_engine::{FieldEngine, GKREngine};
+
 use crate::field::Field;
 
 pub trait Config: Default + Clone + Ord + Debug + Hash + Copy + 'static {
     type CircuitField: Field;
 
     type DefaultSimdField: arith::SimdField<Scalar = Self::CircuitField>;
-    type DefaultGKRFieldConfig: gkr_field_config::GKRFieldConfig<
+    type DefaultGKRFieldConfig: FieldEngine<
         CircuitField = Self::CircuitField,
         SimdCircuitField = Self::DefaultSimdField,
     >;
-    type DefaultGKRConfig: expander_config::GKRConfig<FieldConfig = Self::DefaultGKRFieldConfig>;
+    type DefaultGKRConfig: GKREngine<FieldConfig = Self::DefaultGKRFieldConfig> + Default;
 
     const CONFIG_ID: usize;
 
@@ -22,11 +24,8 @@ pub trait Config: Default + Clone + Ord + Debug + Hash + Copy + 'static {
 
     const ENABLE_RANDOM_COMBINATION: bool = true;
 
-    fn new_expander_config() -> expander_config::Config<Self::DefaultGKRConfig> {
-        expander_config::Config::new(
-            expander_config::GKRScheme::Vanilla,
-            mpi_config::MPIConfig::new(),
-        )
+    fn new_expander_config() -> Self::DefaultGKRConfig {
+        Self::DefaultGKRConfig::default()
     }
 }
 
@@ -37,8 +36,8 @@ impl Config for M31Config {
     type CircuitField = crate::field::M31;
 
     type DefaultSimdField = mersenne31::M31x16;
-    type DefaultGKRFieldConfig = gkr_field_config::M31ExtConfig;
-    type DefaultGKRConfig = gkr::gkr_configs::M31ExtConfigSha2Raw; //TODO: compare with M31ExtConfigSha2Orion
+    type DefaultGKRFieldConfig = gkr_engine::M31ExtConfig;
+    type DefaultGKRConfig = gkr::M31ExtConfigSha2RawVanilla; //TODO: compare with M31ExtConfigSha2Orion
 
     const CONFIG_ID: usize = 1;
 }
@@ -50,8 +49,8 @@ impl Config for BN254Config {
     type CircuitField = crate::field::BN254Fr;
 
     type DefaultSimdField = crate::field::BN254Fr;
-    type DefaultGKRFieldConfig = gkr_field_config::BN254Config;
-    type DefaultGKRConfig = gkr::gkr_configs::BN254ConfigMIMC5Raw; // TODO: compare with BN254ConfigSha2Raw
+    type DefaultGKRFieldConfig = gkr_engine::BN254Config;
+    type DefaultGKRConfig = gkr::BN254ConfigMIMC5Raw; // TODO: compare with BN254ConfigSha2Raw
 
     const CONFIG_ID: usize = 2;
 }
@@ -63,8 +62,8 @@ impl Config for GF2Config {
     type CircuitField = crate::field::GF2;
 
     type DefaultSimdField = gf2::GF2x8;
-    type DefaultGKRFieldConfig = gkr_field_config::GF2ExtConfig;
-    type DefaultGKRConfig = gkr::gkr_configs::GF2ExtConfigSha2Raw; // TODO: compare with GF2ExtConfigSha2Orion
+    type DefaultGKRFieldConfig = gkr_engine::GF2ExtConfig;
+    type DefaultGKRConfig = gkr::GF2ExtConfigSha2Raw; // TODO: compare with GF2ExtConfigSha2Orion
 
     const CONFIG_ID: usize = 3;
 
@@ -82,7 +81,7 @@ impl Config for GoldilocksConfig {
     type CircuitField = crate::field::Goldilocks;
 
     type DefaultSimdField = goldilocks::Goldilocksx8;
-    type DefaultGKRFieldConfig = gkr_field_config::GoldilocksExtConfig;
-    type DefaultGKRConfig = gkr::gkr_configs::GoldilocksExtConfigSha2Raw;
+    type DefaultGKRFieldConfig = gkr_engine::GoldilocksExtConfig;
+    type DefaultGKRConfig = gkr::GoldilocksExtConfigSha2Raw;
     const CONFIG_ID: usize = 4;
 }
