@@ -487,6 +487,7 @@ mod tests {
     use crate::circuit::config::{GF2Config, M31Config};
     use crate::circuit::ir::common::rand_gen::{RandomCircuitConfig, RandomRange};
     use crate::field::M31;
+    use crate::frontend::GoldilocksConfig;
 
     use super::*;
     use Instruction::*;
@@ -579,5 +580,10 @@ mod tests {
     #[test]
     fn rand_gf2() {
         rand_test::<GF2Config>();
+    }
+
+    #[test]
+    fn rand_goldilocks() {
+        rand_test::<GoldilocksConfig>();
     }
 }
