@@ -1,6 +1,7 @@
 use std::ptr;
 use std::slice;
 
+use gkr_engine::FieldEngine;
 use libc::{c_uchar, c_ulong, malloc};
 
 use expander_compiler::circuit::config;
@@ -47,7 +48,7 @@ fn verify_circuit_file_inner<C: config::Config>(
     circuit.layers[0].input_vals = simd_input;
     circuit.public_input = simd_public_input.clone();
     let (proof, claimed_v) =
-        match gkr::executor::load_proof_and_claimed_v::<C::DefaultSimdField>(proof_and_claimed_v) {
+        match gkr::executor::load_proof_and_claimed_v::<<<C as Config>::DefaultGKRFieldConfig as FieldEngine>::ChallengeField>(proof_and_claimed_v) {
             Ok((proof, claimed_v)) => (proof, claimed_v),
             Err(_) => {
                 return Ok(0);

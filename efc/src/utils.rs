@@ -18,7 +18,6 @@ pub fn run_circuit<C: Config>(compile_result: &CompileResult<C>, witness: Witnes
 
     //compile
     let mut expander_circuit = compile_result.layered_circuit.export_to_expander_flatten();
-    let config = C::new_expander_config();
 
     let (simd_input, simd_public_input) = witness.to_simd();
     println!("{} {}", simd_input.len(), simd_public_input.len());

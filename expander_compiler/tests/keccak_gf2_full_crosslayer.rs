@@ -1,5 +1,7 @@
 use expander_compiler::frontend::*;
 use expander_transcript::BytesHashTranscript;
+use gkr_engine::Transcript;
+use gkr_hashers::SHA256hasher;
 use rand::{Rng, SeedableRng};
 use tiny_keccak::Hasher;
 

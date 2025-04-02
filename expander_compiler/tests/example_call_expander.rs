@@ -1,5 +1,6 @@
 use arith::Field;
 use expander_compiler::frontend::*;
+use gkr_engine::{MPIConfig, MPIEngine};
 use rand::SeedableRng;
 
 declare_circuit!(Circuit {
@@ -43,7 +44,7 @@ fn example<C: Config>() {
 
     let mut expander_circuit = compile_result.layered_circuit.export_to_expander_flatten();
 
-    let config = C::new_expander_config();
+    let mpi_config = MPIConfig::prover_new();
 
     let (simd_input, simd_public_input) = witness.to_simd();
     println!("{} {}", simd_input.len(), simd_public_input.len());
@@ -52,12 +53,12 @@ fn example<C: Config>() {
 
     // prove
     expander_circuit.evaluate();
-    let (claimed_v, proof) = gkr::executor::prove(&mut expander_circuit, &config);
+    let (claimed_v, proof) = gkr::executor::prove::<C::DefaultGKRConfig>(&mut expander_circuit, mpi_config.clone());
 
     // verify
-    assert!(gkr::executor::verify(
+    assert!(gkr::executor::verify::<C::DefaultGKRConfig>(
         &mut expander_circuit,
-        &config,
+        mpi_config,
         &proof,
         &claimed_v
     ));
