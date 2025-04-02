@@ -34,15 +34,17 @@ sha2 = "0.10.8"
 stacker = "0.1.17"
 tiny-keccak = { version = "2.0", features = ["keccak"] }
 
-arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-expander_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "config" }
-expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "circuit" }
-gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "transcript" }
-crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "main"}
-serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "main"}
+
+# todo: switch back to main
+arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear" }
+mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear" }
+gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear" }
+expander_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear", package = "config" }
+expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear", package = "circuit" }
+gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear" }
+gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear" }
+goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear" }
+mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear" }
+expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear", package = "transcript" }
+crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear"}
+serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear"}
