@@ -9,7 +9,6 @@ use circuit_std_rs::utils::register_hint;
 use expander_compiler::frontend::extra::*;
 use expander_compiler::frontend::*;
 use serde::Deserialize;
-use std::hash::Hash;
 use std::sync::Arc;
 use std::thread;
 

@@ -1,5 +1,5 @@
 use crate::attestation::Attestation;
-use crate::bls::{aggregate_attestation_public_key_flatten, check_pubkey_key_bls};
+use crate::bls::aggregate_attestation_public_key_flatten;
 use crate::bls_verifier::G1Json;
 use crate::utils::{get_solver, read_from_json_file, write_witness_to_file};
 use crate::validator::{ValidatorPlain, ValidatorSSZ};
