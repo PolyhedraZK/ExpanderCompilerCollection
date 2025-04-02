@@ -6,13 +6,16 @@ use crate::{
             source::RootCircuit as IrSourceRoot,
         },
         layered::{CrossLayerInputType, InputType, NormalInputType},
-    }, compile::compile, field::FieldArith, frontend::GoldilocksConfig, utils::error::Error
+    },
+    compile::compile,
+    field::FieldArith,
+    frontend::GoldilocksConfig,
+    utils::error::Error,
 };
 
 fn do_test<C: Config, I: InputType>(mut config: RandomCircuitConfig, seed: RandomRange) {
     for i in seed.min..seed.max {
         println!("seed: {}", i);
-
 
         config.seed = i;
         let root = IrSourceRoot::<C>::random(&config);
