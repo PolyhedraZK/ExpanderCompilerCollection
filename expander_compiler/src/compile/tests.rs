@@ -1,7 +1,7 @@
-use gkr::M31ExtConfigSha2RawVanilla as C;
 use mersenne31::M31;
 
-use crate::circuit::{config::Config, ir, layered::NormalInputType};
+use crate::circuit::{ir, layered::NormalInputType};
+use crate::frontend::M31Config as C;
 
 type CField = M31;
 

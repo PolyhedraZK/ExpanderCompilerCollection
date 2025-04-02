@@ -337,15 +337,12 @@ pub fn process<C: Config>(
 #[cfg(test)]
 mod tests {
     use crate::field::FieldArith;
+    use crate::frontend::M31Config as C;
     use crate::{
-        circuit::{
-            config::Config,
-            ir::{self, common::rand_gen::*},
-        },
+        circuit::ir::{self, common::rand_gen::*},
         utils::error::Error,
     };
 
-    use gkr::M31ExtConfigSha2RawVanilla as C;
     use mersenne31::M31;
 
     type CField = M31;

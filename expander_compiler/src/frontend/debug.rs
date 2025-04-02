@@ -1,5 +1,3 @@
-use gkr_engine::FieldEngine;
-
 use crate::{
     circuit::{
         config::Config,
@@ -17,7 +15,7 @@ use super::{
     builder::{
         ensure_variables_valid, get_variable_id, new_variable, ToVariableOrValue, VariableOrValue,
     },
-    CircuitField, Field, Variable,
+    CircuitField, Variable,
 };
 
 pub struct DebugBuilder<C: Config, H: HintCaller<CircuitField<C>>> {

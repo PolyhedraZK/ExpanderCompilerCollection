@@ -1,5 +1,4 @@
-use gkr::M31ExtConfigSha2RawVanilla as C;
-
+use crate::frontend::M31Config as C;
 use crate::{
     circuit::{
         config::Config,

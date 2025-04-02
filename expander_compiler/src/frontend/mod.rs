@@ -1,5 +1,4 @@
 use builder::RootBuilder;
-use gkr_engine::FieldEngine;
 
 use crate::circuit::layered::{CrossLayerInputType, NormalInputType};
 use crate::circuit::{ir, layered};
@@ -29,17 +28,15 @@ pub mod internal {
         declare_circuit_load_from, declare_circuit_num_vars,
     };
     pub use super::variables::{DumpLoadTwoVariables, DumpLoadVariables};
-    // pub use crate::utils::serde::Serde;
 }
 
 pub mod extra {
-    use gkr_engine::FieldEngine;
 
     pub use super::api::UnconstrainedAPI;
     pub use super::debug::DebugBuilder;
     pub use crate::hints::registry::{EmptyHintCaller, HintCaller, HintRegistry};
 
-    use super::{internal, CircuitField, Config, Define, Field, Variable};
+    use super::{internal, CircuitField, Config, Define, Variable};
 
     pub fn debug_eval<
         C: Config,

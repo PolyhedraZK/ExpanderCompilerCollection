@@ -1,9 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
-use gkr_engine::FieldEngine;
-
 use crate::circuit::{config::Config, layered::Coef};
-use crate::field::{Field, FieldArith};
+use crate::field::FieldArith;
 use crate::frontend::CircuitField;
 use crate::hints;
 use crate::utils::error::Error;

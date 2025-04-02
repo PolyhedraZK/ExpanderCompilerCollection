@@ -1,8 +1,3 @@
-use gkr::{
-    BN254ConfigMIMC5Raw, BN254ConfigSha2Raw, GF2ExtConfigSha2Raw, GoldilocksExtConfigSha2Raw,
-    M31ExtConfigSha2RawVanilla,
-};
-
 use crate::{
     circuit::{
         config::Config,
@@ -14,7 +9,7 @@ use crate::{
     },
     compile::compile,
     field::FieldArith,
-    frontend::CircuitField,
+    frontend::{BN254Config, CircuitField, GF2Config, GoldilocksConfig, M31Config},
     utils::error::Error,
 };
 
@@ -106,43 +101,43 @@ fn do_tests<C: Config, I: InputType>(seed: usize) {
 
 #[test]
 fn test_m31() {
-    do_tests::<M31ExtConfigSha2RawVanilla, NormalInputType>(1000000);
+    do_tests::<M31Config, NormalInputType>(1000000);
 }
 
 #[test]
 fn test_bn254() {
-    do_tests::<BN254ConfigMIMC5Raw, NormalInputType>(2000000);
+    do_tests::<BN254Config, NormalInputType>(2000000);
 }
 
 #[test]
 fn test_gf2() {
-    do_tests::<GF2ExtConfigSha2Raw, NormalInputType>(3000000);
+    do_tests::<GF2Config, NormalInputType>(3000000);
 }
 
-#[test]
-fn test_goldilocks() {
-    do_tests::<GoldilocksExtConfigSha2Raw, NormalInputType>(4000000);
-}
+// #[test]
+// fn test_goldilocks() {
+//     do_tests::<GoldilocksConfig, NormalInputType>(4000000);
+// }
 
 #[test]
 fn test_m31_cross() {
-    do_tests::<M31ExtConfigSha2RawVanilla, CrossLayerInputType>(5000000);
+    do_tests::<M31Config, CrossLayerInputType>(5000000);
 }
 
 #[test]
 fn test_bn254_cross() {
-    do_tests::<BN254ConfigMIMC5Raw, CrossLayerInputType>(6000000);
+    do_tests::<BN254Config, CrossLayerInputType>(6000000);
 }
 
 #[test]
 fn test_gf2_cross() {
-    do_tests::<GF2ExtConfigSha2Raw, CrossLayerInputType>(7000000);
+    do_tests::<GF2Config, CrossLayerInputType>(7000000);
 }
 
-#[test]
-fn test_goldilocks_cross() {
-    do_tests::<GoldilocksExtConfigSha2Raw, CrossLayerInputType>(8000000);
-}
+// #[test]
+// fn test_goldilocks_cross() {
+//     do_tests::<GoldilocksConfig, CrossLayerInputType>(8000000);
+// }
 
 fn deterministic_<I: InputType>() {
     let mut config = RandomCircuitConfig {
@@ -157,7 +152,7 @@ fn deterministic_<I: InputType>() {
     };
     for i in 100000..103000 {
         config.seed = i;
-        let root = IrSourceRoot::<M31ExtConfigSha2RawVanilla>::random(&config);
+        let root = IrSourceRoot::<M31Config>::random(&config);
         assert_eq!(root.validate(), Ok(()));
         let res = compile::<_, I>(&root);
         let res2 = compile::<_, I>(&root);

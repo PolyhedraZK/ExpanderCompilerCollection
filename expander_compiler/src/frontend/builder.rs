@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::convert::From;
 
 use ethnum::U256;
-use gkr_engine::FieldEngine;
 use tiny_keccak::Hasher;
 
 use crate::{

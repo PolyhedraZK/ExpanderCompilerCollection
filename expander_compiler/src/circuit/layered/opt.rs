@@ -706,16 +706,15 @@ impl<C: Config, I: InputType> Circuit<C, I> {
 
 #[cfg(test)]
 mod tests {
-    use gkr::M31ExtConfigSha2RawVanilla as C;
     use mersenne31::M31;
 
     use crate::circuit::layered;
     use crate::field::FieldArith;
     use crate::frontend::CircuitField;
+    use crate::frontend::M31Config as C;
     use crate::layering::compile;
     use crate::{
         circuit::{
-            config::Config,
             ir::{self, common::rand_gen::*},
             layered::{CrossLayerInputType, NormalInputType},
         },

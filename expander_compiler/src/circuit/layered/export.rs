@@ -1,5 +1,3 @@
-use gkr_engine::GKREngine;
-
 use crate::frontend::CircuitField;
 
 use super::{Circuit, Config, CrossLayerInputType, Input, InputUsize, NormalInputType};

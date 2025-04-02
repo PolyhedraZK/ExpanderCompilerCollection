@@ -1,13 +1,8 @@
 use std::{fmt, hash::Hash};
 
-use gkr_engine::FieldEngine;
 use serdes::ExpSerde;
 
-use crate::{
-    field::{Field, FieldArith},
-    hints,
-    utils::error::Error,
-};
+use crate::{field::FieldArith, hints, utils::error::Error};
 
 use super::config::{CircuitField, Config};
 

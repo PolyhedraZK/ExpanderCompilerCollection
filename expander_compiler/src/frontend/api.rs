@@ -1,10 +1,8 @@
-use gkr_engine::FieldEngine;
-
 use crate::circuit::config::Config;
 
 use super::{
     builder::{ToVariableOrValue, Variable},
-    CircuitField, Field,
+    CircuitField,
 };
 
 macro_rules! binary_op {

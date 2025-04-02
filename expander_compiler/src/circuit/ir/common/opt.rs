@@ -5,7 +5,7 @@ use crate::{
 };
 
 use super::{
-    Circuit, Config, Constraint, Debug, FieldArith, Hash, HashMap, HashSet, Instruction, IrConfig,
+    Circuit, Constraint, Debug, FieldArith, Hash, HashMap, HashSet, Instruction, IrConfig,
     RootCircuit,
 };
 

@@ -485,17 +485,16 @@ pub fn split_to_single_layer<C: Config>(root: &IrRootCircuit<C>) -> IrRootCircui
 #[cfg(test)]
 mod tests {
 
-    use gkr::{GF2ExtConfigSha2Raw, M31ExtConfigSha2RawVanilla};
-
     use crate::circuit::ir::common::rand_gen::{RandomCircuitConfig, RandomRange};
     use crate::field::M31;
+    use crate::frontend::{GF2Config, M31Config};
 
     use super::*;
     use Instruction::*;
 
     #[test]
     fn simple1() {
-        let mut root = IrRootCircuit::<M31ExtConfigSha2RawVanilla>::default();
+        let mut root = IrRootCircuit::<M31Config>::default();
         root.circuits.insert(
             0,
             IrCircuit {
@@ -575,11 +574,11 @@ mod tests {
 
     #[test]
     fn rand_m31() {
-        rand_test::<M31ExtConfigSha2RawVanilla>();
+        rand_test::<M31Config>();
     }
 
     #[test]
     fn rand_gf2() {
-        rand_test::<GF2ExtConfigSha2Raw>();
+        rand_test::<GF2Config>();
     }
 }

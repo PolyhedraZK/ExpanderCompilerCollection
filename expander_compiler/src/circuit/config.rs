@@ -1,8 +1,8 @@
 use std::{fmt::Debug, hash::Hash};
 
 pub use gkr::{
-    BN254ConfigMIMC5Raw as BN254Config, GF2ExtConfigSha2Raw as GF2Config,
-    GoldilocksExtConfigSha2Raw as GoldilocksConfig, M31ExtConfigSha2RawVanilla as M31Config,
+    BN254ConfigMIMC5Raw, GF2ExtConfigSha2Raw, GoldilocksExtConfigSha2Raw,
+    M31ExtConfigSha2RawVanilla,
 };
 use gkr_engine::{FieldEngine, GKREngine};
 
@@ -31,9 +31,14 @@ pub trait Config:
     const ENABLE_RANDOM_COMBINATION: bool = true;
 }
 
-pub type CircuitField<C: Config> = <<C as GKREngine>::FieldConfig as FieldEngine>::CircuitField;
-pub type ChallengeField<C: Config> = <<C as GKREngine>::FieldConfig as FieldEngine>::ChallengeField;
-pub type SIMDField<C: Config> = <<C as GKREngine>::FieldConfig as FieldEngine>::SimdCircuitField;
+pub type CircuitField<C> = <<C as GKREngine>::FieldConfig as FieldEngine>::CircuitField;
+pub type ChallengeField<C> = <<C as GKREngine>::FieldConfig as FieldEngine>::ChallengeField;
+pub type SIMDField<C> = <<C as GKREngine>::FieldConfig as FieldEngine>::SimdCircuitField;
+
+pub type BN254Config = BN254ConfigMIMC5Raw;
+pub type M31Config = M31ExtConfigSha2RawVanilla;
+pub type GF2Config = GF2ExtConfigSha2Raw;
+pub type GoldilocksConfig = GoldilocksExtConfigSha2Raw;
 
 impl Config for M31Config {
     const CONFIG_ID: usize = 1;

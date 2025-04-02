@@ -1,12 +1,10 @@
-use gkr_engine::FieldEngine;
-
 pub use crate::circuit::ir::hint_normalized::witness_solver::WitnessSolver;
 use crate::{
     circuit::layered::witness::Witness,
     hints::registry::{EmptyHintCaller, HintCaller},
 };
 
-use super::{internal, CircuitField, Config, Error, Field};
+use super::{internal, CircuitField, Config, Error};
 
 impl<C: Config> WitnessSolver<C> {
     pub fn solve_witness<Cir: internal::DumpLoadTwoVariables<CircuitField<C>>>(

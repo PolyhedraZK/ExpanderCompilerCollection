@@ -257,16 +257,14 @@ impl<C: Config, I: InputType> ExpSerde for Circuit<C, I> {
 
 #[cfg(test)]
 mod tests {
-    use gkr::{
-        BN254ConfigMIMC5Raw, GF2ExtConfigSha2Raw, GoldilocksExtConfigSha2Raw,
-        M31ExtConfigSha2RawVanilla,
-    };
-    use gkr_engine::FieldEngine;
 
     use super::*;
-    use crate::circuit::{
-        ir::{common::rand_gen::*, dest::RootCircuit},
-        layered::{CrossLayerInputType, NormalInputType},
+    use crate::{
+        circuit::{
+            ir::{common::rand_gen::*, dest::RootCircuit},
+            layered::{CrossLayerInputType, NormalInputType},
+        },
+        frontend::{BN254Config, GF2Config, GoldilocksConfig, M31Config},
     };
 
     fn test_serde_for_field<C: Config, I: InputType>() {
@@ -295,14 +293,14 @@ mod tests {
 
     #[test]
     fn test_serde() {
-        test_serde_for_field::<M31ExtConfigSha2RawVanilla, NormalInputType>();
-        test_serde_for_field::<GF2ExtConfigSha2Raw, NormalInputType>();
-        test_serde_for_field::<BN254ConfigMIMC5Raw, NormalInputType>();
-        test_serde_for_field::<GoldilocksExtConfigSha2Raw, NormalInputType>();
+        test_serde_for_field::<M31Config, NormalInputType>();
+        test_serde_for_field::<GF2Config, NormalInputType>();
+        test_serde_for_field::<BN254Config, NormalInputType>();
+        test_serde_for_field::<GoldilocksConfig, NormalInputType>();
 
-        test_serde_for_field::<M31ExtConfigSha2RawVanilla, CrossLayerInputType>();
-        test_serde_for_field::<GF2ExtConfigSha2Raw, CrossLayerInputType>();
-        test_serde_for_field::<BN254ConfigMIMC5Raw, CrossLayerInputType>();
-        test_serde_for_field::<GoldilocksExtConfigSha2Raw, CrossLayerInputType>();
+        test_serde_for_field::<M31Config, CrossLayerInputType>();
+        test_serde_for_field::<GF2Config, CrossLayerInputType>();
+        test_serde_for_field::<BN254Config, CrossLayerInputType>();
+        test_serde_for_field::<GoldilocksConfig, CrossLayerInputType>();
     }
 }

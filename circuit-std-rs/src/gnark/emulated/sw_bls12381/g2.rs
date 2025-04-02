@@ -1,16 +1,16 @@
+use std::fmt::{Debug, Formatter, Result};
+use std::str::FromStr;
+
 use crate::gnark::element::{value_of, Element};
 use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::emulated::field_bls12381::e2::Ext2;
 use crate::gnark::emulated::field_bls12381::e2::GE2;
 use crate::sha256::m31_utils::{big_less_than, from_binary, to_binary};
 use crate::utils::simple_select;
-use expander_compiler::declare_circuit;
-use expander_compiler::frontend::{Config, Define, RootAPI, Variable};
-use gkr::M31ExtConfigSha2RawVanilla;
-use num_bigint::BigInt;
-use std::fmt::{Debug, Formatter, Result};
-use std::str::FromStr;
 
+use expander_compiler::declare_circuit;
+use expander_compiler::frontend::{Config, Define, M31Config, RootAPI, Variable};
+use num_bigint::BigInt;
 const M_COMPRESSED_SMALLEST: u8 = 0b100 << 5;
 const M_COMPRESSED_LARGEST: u8 = 0b101 << 5;
 
@@ -658,8 +658,8 @@ declare_circuit!(G2UncompressCircuit {
     y: [[[Variable; 48]; 2]; 2],
 });
 
-impl Define<M31ExtConfigSha2RawVanilla> for G2UncompressCircuit<Variable> {
-    fn define<Builder: RootAPI<M31ExtConfigSha2RawVanilla>>(&self, builder: &mut Builder) {
+impl Define<M31Config> for G2UncompressCircuit<Variable> {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g2 = G2::new(builder);
         let g2_res = g2.uncompressed(builder, &self.x);
         let expected_g2 = G2AffP::from_vars(
@@ -683,8 +683,8 @@ declare_circuit!(MapToG2Circuit {
     out: [[[Variable; 48]; 2]; 2],
 });
 
-impl Define<M31ExtConfigSha2RawVanilla> for MapToG2Circuit<Variable> {
-    fn define<Builder: RootAPI<M31ExtConfigSha2RawVanilla>>(&self, builder: &mut Builder) {
+impl Define<M31Config> for MapToG2Circuit<Variable> {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g2 = G2::new(builder);
         let in0 = GE2::from_vars(self.in0[0].to_vec(), self.in0[1].to_vec());
         let in1 = GE2::from_vars(self.in1[0].to_vec(), self.in1[1].to_vec());
@@ -706,8 +706,8 @@ declare_circuit!(HashToG2Circuit {
     out: [[[Variable; 48]; 2]; 2],
 });
 
-impl Define<M31ExtConfigSha2RawVanilla> for HashToG2Circuit<Variable> {
-    fn define<Builder: RootAPI<M31ExtConfigSha2RawVanilla>>(&self, builder: &mut Builder) {
+impl Define<M31Config> for HashToG2Circuit<Variable> {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g2 = G2::new(builder);
         let (hm0, hm1) = g2.hash_to_fp(builder, &self.msg);
         let res = g2.map_to_g2(builder, &hm0, &hm1);

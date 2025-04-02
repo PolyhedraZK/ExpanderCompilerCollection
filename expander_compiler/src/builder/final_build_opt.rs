@@ -741,18 +741,15 @@ pub fn process<C: Config>(rc: &InRootCircuit<C>) -> Result<OutRootCircuit<C>, Er
 mod tests {
     use std::vec;
 
-    use gkr::M31ExtConfigSha2RawVanilla as C;
     use mersenne31::M31;
 
     use crate::field::FieldArith;
+    use crate::frontend::M31Config as C;
     use crate::{
-        circuit::{
-            config::Config,
-            ir::{
-                self,
-                common::rand_gen::*,
-                expr::{Expression, Term},
-            },
+        circuit::ir::{
+            self,
+            common::rand_gen::*,
+            expr::{Expression, Term},
         },
         utils::error::Error,
     };

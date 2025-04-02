@@ -242,11 +242,10 @@ impl<C: Config> RootCircuitRelaxed<C> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::circuit::config::Config;
     use crate::circuit::layered::{InputUsize, NormalInputType};
     use crate::field::FieldArith;
+    use crate::frontend::M31Config as C;
 
-    use gkr::M31ExtConfigSha2RawVanilla as C;
     use mersenne31::M31;
     use rand::{RngCore, SeedableRng};
     use serdes::ExpSerde;

@@ -1,5 +1,4 @@
-use gkr::M31ExtConfigSha2RawVanilla;
-
+use crate::frontend::M31Config as C;
 use crate::{
     compile::CompileOptions,
     field::{FieldArith, M31},
@@ -56,8 +55,8 @@ declare_circuit!(Circuit2 {
     x: [Variable; 2],
 });
 
-impl Define<M31ExtConfigSha2RawVanilla> for Circuit2<Variable> {
-    fn define<Builder: RootAPI<M31ExtConfigSha2RawVanilla>>(&self, builder: &mut Builder) {
+impl Define<C> for Circuit2<Variable> {
+    fn define<Builder: RootAPI<C>>(&self, builder: &mut Builder) {
         let sum = builder.add(self.x[0], self.x[1]);
         let sum = builder.add(sum, 123);
         builder.assert_is_equal(sum, self.sum);

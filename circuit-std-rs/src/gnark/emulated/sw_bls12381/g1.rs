@@ -5,11 +5,11 @@ use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::emulated::field_bls12381::e2::CurveF;
 use crate::sha256::m31_utils::{big_less_than, from_binary, to_binary};
 use crate::utils::simple_select;
+use expander_compiler::frontend::M31Config;
 use expander_compiler::{
     declare_circuit,
     frontend::{Config, Define, RootAPI, Variable},
 };
-use gkr::M31ExtConfigSha2RawVanilla;
 use num_bigint::BigInt;
 use std::fmt::{Debug, Formatter, Result};
 
@@ -576,8 +576,8 @@ declare_circuit!(G1AddCircuit {
     r: [[Variable; 48]; 2],
 });
 
-impl Define<M31ExtConfigSha2RawVanilla> for G1AddCircuit<Variable> {
-    fn define<Builder: RootAPI<M31ExtConfigSha2RawVanilla>>(&self, builder: &mut Builder) {
+impl Define<M31Config> for G1AddCircuit<Variable> {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g1 = G1::new(builder);
         let p1_g1 = G1Affine::from_vars(self.p[0].to_vec(), self.p[1].to_vec());
         let p2_g1 = G1Affine::from_vars(self.q[0].to_vec(), self.q[1].to_vec());
@@ -600,8 +600,8 @@ declare_circuit!(G1UncompressCircuit {
     y: [[Variable; 48]; 2],
 });
 
-impl Define<M31ExtConfigSha2RawVanilla> for G1UncompressCircuit<Variable> {
-    fn define<Builder: RootAPI<M31ExtConfigSha2RawVanilla>>(&self, builder: &mut Builder) {
+impl Define<M31Config> for G1UncompressCircuit<Variable> {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g1 = G1::new(builder);
         let public_key = g1.uncompressed(builder, &self.x);
         let expected_g1 = G1Affine::from_vars(self.y[0].to_vec(), self.y[1].to_vec());
@@ -621,8 +621,8 @@ declare_circuit!(HashToG1Circuit {
     out: [[Variable; 48]; 2],
 });
 
-impl Define<M31ExtConfigSha2RawVanilla> for HashToG1Circuit<Variable> {
-    fn define<Builder: RootAPI<M31ExtConfigSha2RawVanilla>>(&self, builder: &mut Builder) {
+impl Define<M31Config> for HashToG1Circuit<Variable> {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g1 = G1::new(builder);
         let (hm0, hm1) = g1.hash_to_fp(builder, &self.msg);
         let res = g1.map_to_g1(builder, &hm0, &hm1);

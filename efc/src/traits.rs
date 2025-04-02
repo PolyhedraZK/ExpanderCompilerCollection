@@ -1,6 +1,8 @@
 use std::fmt::Debug;
 
-use expander_compiler::frontend::{internal::DumpLoadTwoVariables, CircuitField, Config, Define, Variable};
+use expander_compiler::frontend::{
+    internal::DumpLoadTwoVariables, CircuitField, Config, Define, Variable,
+};
 use rand::RngCore;
 
 // All std circuits must implement the following trait

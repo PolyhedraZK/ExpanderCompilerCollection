@@ -239,18 +239,15 @@ pub fn process<'a, C: Config>(
 mod tests {
     use std::vec;
 
-    use gkr::M31ExtConfigSha2RawVanilla as C;
     use mersenne31::M31;
 
     use crate::field::FieldArith;
+    use crate::frontend::M31Config as C;
     use crate::{
-        circuit::{
-            config::Config,
-            ir::{
-                self,
-                common::rand_gen::*,
-                expr::{Expression, Term},
-            },
+        circuit::ir::{
+            self,
+            common::rand_gen::*,
+            expr::{Expression, Term},
         },
         utils::error::Error,
     };

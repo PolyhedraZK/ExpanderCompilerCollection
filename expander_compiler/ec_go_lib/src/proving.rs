@@ -1,18 +1,14 @@
 use std::ptr;
 use std::slice;
 
-use arith::SimdField;
 use expander_compiler::frontend::ChallengeField;
 use expander_compiler::frontend::SIMDField;
-use gkr::{
-    BN254ConfigMIMC5Raw, GF2ExtConfigSha2Raw, GoldilocksExtConfigSha2Raw,
-    M31ExtConfigSha2RawVanilla,
-};
-use gkr_engine::FieldEngine;
+
 use libc::{c_uchar, c_ulong, malloc};
 
 use expander_compiler::circuit::config;
 use expander_compiler::circuit::layered;
+use expander_compiler::frontend::{BN254Config, GF2Config, GoldilocksConfig, M31Config};
 use gkr_engine::MPIConfig;
 use gkr_engine::MPIEngine;
 use serdes::ExpSerde;

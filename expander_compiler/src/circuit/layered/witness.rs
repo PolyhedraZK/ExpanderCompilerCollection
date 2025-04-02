@@ -356,9 +356,8 @@ impl<C: Config> ExpSerde for Witness<C> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::field::M31;
+    use crate::{field::M31, frontend::M31Config};
     use arith::Field;
-    use gkr::M31ExtConfigSha2RawVanilla;
 
     #[test]
     fn basic_simd() {
@@ -369,11 +368,11 @@ mod tests {
         for _ in 0..n * (a + b) {
             v.push(M31::random_unsafe(&mut rand::thread_rng()));
         }
-        let w1: Witness<M31ExtConfigSha2RawVanilla> = Witness {
+        let w1: Witness<M31Config> = Witness {
             num_witnesses: n,
             num_inputs_per_witness: a,
             num_public_inputs_per_witness: b,
-            values: WitnessValues::<M31ExtConfigSha2RawVanilla>::Scalar(v),
+            values: WitnessValues::<M31Config>::Scalar(v),
         };
         let mut w2 = w1.clone();
         w2.convert_to_simd();

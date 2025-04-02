@@ -1,4 +1,3 @@
-use gkr::M31ExtConfigSha2RawVanilla as C;
 use mersenne31::M31;
 use rand::{Rng, RngCore};
 
@@ -7,6 +6,7 @@ use super::{
     Instruction::{self, ConstantLike, LinComb, Mul},
     RootCircuit,
 };
+use crate::frontend::M31Config as C;
 use crate::{
     circuit::{
         config::Config,
