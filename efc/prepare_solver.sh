@@ -19,7 +19,7 @@ done
 # 4. Debug all circuits on a default epoch
 ./efc -d 290001 &
 
-# 5. Clone the repo
+# 5. Clone the EthFullConsensus repo
 cd ../../ || { echo "Failed to enter parent parent directory"; exit 1; }
 rm -rf EthFullConsensus
 git clone https://github.com/PolyhedraZK/EthFullConsensus.git
@@ -29,15 +29,33 @@ cd EthFullConsensus || { echo "Failed to enter EthFullConsensus"; exit 1; }
 sleep 1
 git checkout dev_pcs
 
-# 7. Build the Go program
+# 7. Build the go program
 cd end2end/cmd || { echo "Go cmd dir not found"; exit 1; }
 go build -o cmd || { echo "Go build failed"; exit 1; }
 sleep 10
-# 8. Move the compiled Go program to the original directory
+# 8. Move the compiled go program to the original directory
 mv cmd "$ROOT_DIR/"
 
 # 9. Go back to efc root
 cd "$ROOT_DIR" || exit 1
-# 10. Optional: Wait for all background processes to complete
+
+# 10. Clone the Expander repo
+cd ../../ || { echo "Failed to enter parent parent directory"; exit 1; }
+rm -rf Expander
+git clone https://github.com/PolyhedraZK/Expander.git
+sleep 5
+
+# 11. Enter the repo and checkout the branch
+cd Expander || { echo "Failed to enter Expander"; exit 1; }
+sleep 1
+git checkout main
+
+# 12. Build the rust program
+RUSTFLAGS="-C target-cpu=native" cargo build --release -- all || { echo "Rust build failed"; exit 1; }
+sleep 10
+# 13. Move the compiled rust program to the original directory
+cp target/release/expander-exec "$ROOT_DIR/"
+
+# 14. Optional: Wait for all background processes to complete
 wait
 echo "All background processes finished."
