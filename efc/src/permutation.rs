@@ -567,8 +567,7 @@ impl GenericDefine<M31Config> for PermutationIndicesValidatorHashBitCircuit<Vari
             //0 1 --> previous key + ValidatorCount
             //0 0 --> previous key
             let previous_plus_one = builder.add(sorted_table_key[i - 1], 1);
-            let previous_minus_count_plus_one =
-                builder.sub(previous_plus_one, QUERY_SIZE as u32);
+            let previous_minus_count_plus_one = builder.sub(previous_plus_one, QUERY_SIZE as u32);
             let previous_plus_count = builder.add(sorted_table_key[i - 1], QUERY_SIZE as u32);
             let expected_key = simple_lookup2(
                 builder,
@@ -897,45 +896,80 @@ pub fn end2end_permutation_witnesses_with_beacon_data(
 //         );
 //     });
 // }
-pub fn debug_permutation_query_with_assignments(
+
+pub fn debug_permutation_query_all_assignments(
     assignment_chunks: PermutationQueryAssignmentChunks,
 ) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
         let circuit_name = &format!("permutationquery_{}", QUERY_TABLE_SIZE);
 
         let start_time = std::time::Instant::now();
-        let mut hint_registry = HintRegistry::<M31>::new();
-        register_hint(&mut hint_registry);
-        debug_eval(
-            &PermutationQueryCircuit::default(),
-            &assignment_chunks[0][0],
-            hint_registry,
-        );
+        let handles = assignment_chunks
+            .into_iter()
+            .enumerate()
+            .map(|(i, assignments)| {
+                thread::Builder::new()
+                    .name(format!("large stack thread {}", i))
+                    .stack_size(2 * 1024 * 1024 * 1024)
+                    .spawn(move || {
+                        for assignment in assignments {
+                            let mut hint_registry = HintRegistry::<M31>::new();
+                            register_hint(&mut hint_registry);
+                            debug_eval(
+                                &PermutationQueryCircuit::default(),
+                                &assignment,
+                                hint_registry,
+                            );
+                        }
+                    })
+                    .expect("Failed to spawn thread")
+            })
+            .collect::<Vec<_>>();
+        for handle in handles {
+            handle.join().unwrap();
+        }
         let end_time = std::time::Instant::now();
         log::debug!(
-            "Generate {} witness Time: {:?}",
+            "Debug_eval {} assingments Time: {:?}",
             circuit_name,
             end_time.duration_since(start_time)
         );
     });
 }
-pub fn debug_permutation_hashbit_with_assignments(
+pub fn debug_permutation_hashbit_all_assignments(
     assignment_chunks: PermutationIndicesValidatorHashBitAssignmentChunks,
 ) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
         let circuit_name = &format!("permutationhashbit_{}", VALIDATOR_COUNT);
 
         let start_time = std::time::Instant::now();
-        let mut hint_registry = HintRegistry::<M31>::new();
-        register_hint(&mut hint_registry);
-        debug_eval(
-            &PermutationIndicesValidatorHashBitCircuit::default(),
-            &assignment_chunks[0][0],
-            hint_registry,
-        );
+        let handles = assignment_chunks
+            .into_iter()
+            .enumerate()
+            .map(|(i, assignments)| {
+                thread::Builder::new()
+                    .name(format!("large stack thread {}", i))
+                    .stack_size(2 * 1024 * 1024 * 1024)
+                    .spawn(move || {
+                        for assignment in assignments {
+                            let mut hint_registry = HintRegistry::<M31>::new();
+                            register_hint(&mut hint_registry);
+                            debug_eval(
+                                &PermutationIndicesValidatorHashBitCircuit::default(),
+                                &assignment,
+                                hint_registry,
+                            );
+                        }
+                    })
+                    .expect("Failed to spawn thread")
+            })
+            .collect::<Vec<_>>();
+        for handle in handles {
+            handle.join().unwrap();
+        }
         let end_time = std::time::Instant::now();
         log::debug!(
-            "Generate {} witness Time: {:?}",
+            "Debug_eval {} assingments Time: {:?}",
             circuit_name,
             end_time.duration_since(start_time)
         );

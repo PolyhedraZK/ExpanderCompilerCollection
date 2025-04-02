@@ -1204,22 +1204,34 @@ pub fn end2end_shuffle_witnesses_with_beacon_data_whole(
         );
     });
 }
-pub fn debug_shuffle_with_assignments(
-    assignment_chunks: ShuffleAssignmentChunks,
-) {
+pub fn debug_shuffle_all_assignments(assignment_chunks: ShuffleAssignmentChunks) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
         let circuit_name = &format!("shuffle_{}", VALIDATOR_CHUNK_SIZE);
 
         let start_time = std::time::Instant::now();
-        let mut hint_registry = HintRegistry::<M31>::new();
-        register_hint(&mut hint_registry);
-        debug_eval(&ShuffleCircuit::default(), &assignment_chunks[0][0], hint_registry);
-        // let witness = w_s
-        //             .solve_witnesses_with_hints(&assignment_chunks[0], &mut hint_registry)
-        //             .unwrap();
+        let handles = assignment_chunks
+            .into_iter()
+            .enumerate()
+            .map(|(i, assignments)| {
+                thread::Builder::new()
+                    .name(format!("large stack thread {}", i))
+                    .stack_size(2 * 1024 * 1024 * 1024)
+                    .spawn(move || {
+                        for assignment in assignments {
+                            let mut hint_registry = HintRegistry::<M31>::new();
+                            register_hint(&mut hint_registry);
+                            debug_eval(&ShuffleCircuit::default(), &assignment, hint_registry);
+                        }
+                    })
+                    .expect("Failed to spawn thread")
+            })
+            .collect::<Vec<_>>();
+        for handle in handles {
+            handle.join().unwrap();
+        }
         let end_time = std::time::Instant::now();
         log::debug!(
-            "Generate {} witness Time: {:?}",
+            "Debug_eval {} assingments Time: {:?}",
             circuit_name,
             end_time.duration_since(start_time)
         );

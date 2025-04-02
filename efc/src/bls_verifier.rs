@@ -12,6 +12,7 @@ use circuit_std_rs::gnark::emulated::sw_bls12381::g2::*;
 use circuit_std_rs::gnark::emulated::sw_bls12381::pairing::*;
 use circuit_std_rs::utils::register_hint;
 use expander_compiler::declare_circuit;
+use expander_compiler::frontend::extra::debug_eval;
 use expander_compiler::frontend::GenericDefine;
 use expander_compiler::frontend::HintRegistry;
 use expander_compiler::frontend::M31Config;
@@ -239,8 +240,6 @@ impl GenericDefine<M31Config> for BLSVERIFIERCircuit<Variable> {
         };
         let mut g2 = G2::new(builder);
         // domain
-
-        // domain
         /*
         AttestationDomains[i]: 01000000b5303f2ad2010d699a76c8e62350947421a3e4a979779642cfdb0f66
         attestation.AttestationDomains[i]: [1 0 0 0 181 48 63 42 210 1 13 105 154 118 200 230 35 80 148 116 33 163 228 169 121 119 150 66 207 219 15 102]
@@ -254,7 +253,8 @@ impl GenericDefine<M31Config> for BLSVERIFIERCircuit<Variable> {
         attestation.AttestationDomains[i]: [1 0 0 0 106 149 161 169 103 133 93 103 109 72 190 105 136 59 113 38 7 249 82 213 25 141 15 86 119 86 70 54]
          */
         let domain = [
-            1, 0, 0, 0, 106, 149, 161, 169, 103, 133, 93, 103, 109, 72, 190, 105, 136, 59, 113, 38, 7, 249, 82, 213, 25, 141, 15, 86, 119, 86, 70, 54
+            1, 0, 0, 0, 106, 149, 161, 169, 103, 133, 93, 103, 109, 72, 190, 105, 136, 59, 113, 38,
+            7, 249, 82, 213, 25, 141, 15, 86, 119, 86, 70, 54,
         ];
         let mut domain_var = vec![];
         for domain_byte in domain.iter() {
@@ -489,23 +489,34 @@ pub fn end2end_blsverifier_witnesses_with_beacon_data(
     });
 }
 
-pub fn debug_blsverifier_with_assignments(
-    assignment_chunks: BlsVerifierAssignmentChunks,
-) {
+pub fn debug_blsverifier_all_assignments(assignment_chunks: BlsVerifierAssignmentChunks) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
-        use expander_compiler::frontend::extra::debug_eval;
         let circuit_name = "blsverifier";
 
         let start_time = std::time::Instant::now();
-        let mut hint_registry = HintRegistry::<M31>::new();
-        register_hint(&mut hint_registry);
-        debug_eval(&BLSVERIFIERCircuit::default(), &assignment_chunks[0][0], hint_registry);
-        // let witness = w_s
-        //             .solve_witnesses_with_hints(&assignment_chunks[0], &mut hint_registry)
-        //             .unwrap();
+        let handles = assignment_chunks
+            .into_iter()
+            .enumerate()
+            .map(|(i, assignments)| {
+                thread::Builder::new()
+                    .name(format!("large stack thread {}", i))
+                    .stack_size(2 * 1024 * 1024 * 1024)
+                    .spawn(move || {
+                        for assignment in assignments {
+                            let mut hint_registry = HintRegistry::<M31>::new();
+                            register_hint(&mut hint_registry);
+                            debug_eval(&BLSVERIFIERCircuit::default(), &assignment, hint_registry);
+                        }
+                    })
+                    .expect("Failed to spawn thread")
+            })
+            .collect::<Vec<_>>();
+        for handle in handles {
+            handle.join().unwrap();
+        }
         let end_time = std::time::Instant::now();
         log::debug!(
-            "Generate {} witness Time: {:?}",
+            "Debug_eval {} assingments Time: {:?}",
             circuit_name,
             end_time.duration_since(start_time)
         );

@@ -3,8 +3,7 @@ use expander_compiler::frontend::{M31Config, WitnessSolver};
 use crate::attestation::Attestation;
 use crate::bls_verifier::{
     end2end_blsverifier_witness, end2end_blsverifier_witnesses_with_assignments,
-    end2end_blsverifier_witnesses_with_beacon_data, generate_blsverifier_witnesses,
-    BLSVERIFIERCircuit, PairingEntry,
+    generate_blsverifier_witnesses, BLSVERIFIERCircuit, PairingEntry,
 };
 use crate::hashtable::{
     self, end2end_hashtable_witnesses, end2end_hashtable_witnesses_with_assignments,
@@ -19,8 +18,7 @@ use crate::permutation::{
 };
 use crate::shuffle::{
     self, end2end_shuffle_witnesses, end2end_shuffle_witnesses_with_assignments,
-    end2end_shuffle_witnesses_with_beacon_data, generate_shuffle_witnesses, ShuffleCircuit,
-    ShuffleJson,
+    generate_shuffle_witnesses, ShuffleCircuit, ShuffleJson,
 };
 use crate::utils::{get_solver, read_from_json_file};
 use crate::validator::{
@@ -811,9 +809,7 @@ pub fn end2end_witnesses_streamline_from_beacon_data_single_thread(epoch: u64, s
             get_solver(&witnesses_dir, &circuit_name, circuit)
         });
 
-        let end2end_assignment_handle = thread::spawn(move || {
-            end2end_end_assignments(epoch)
-        });
+        let end2end_assignment_handle = thread::spawn(move || end2end_end_assignments(epoch));
         //get the solver for permutation query
         let circuit_name = "permutationquery";
         let circuit = PermutationQueryCircuit::default();
@@ -951,158 +947,30 @@ pub fn end2end_witnesses_streamline_from_beacon_data_single_thread(epoch: u64, s
         );
     }
 }
-pub fn end2end_witnesses_streamline_from_beacon_data_debug(epoch: u64, stage: &str) {
-    if stage == "end" {
-        log::debug!("end stage");
-        let start_time = std::time::Instant::now();
-        //get the solver for shuffle
-        // let shuffle_handle = thread::spawn(|| {
-        //     let circuit_name = format!("shuffle_{}", shuffle::VALIDATOR_CHUNK_SIZE);
-        //     let circuit = ShuffleCircuit::default();
-        //     let witnesses_dir = format!("./witnesses/{}", circuit_name);
-        //     get_solver(&witnesses_dir, &circuit_name, circuit)
-        // });
-
-        // // //get the solver for hashtable
-        // let hashtable_handle = thread::spawn(|| {
-        //     let circuit_name = format!("hashtable{}", hashtable::HASHTABLESIZE);
-        //     let circuit = HASHTABLECircuit::default();
-        //     let witnesses_dir = format!("./witnesses/{}", circuit_name);
-        //     get_solver(&witnesses_dir, &circuit_name, circuit)
-        // });
-
-        // //get the solver for bls verifier
-        // let blsverifier_handle = thread::spawn(|| {
-        //     let circuit_name = "blsverifier";
-        //     let circuit = BLSVERIFIERCircuit::default();
-        //     let witnesses_dir = format!("./witnesses/{}", circuit_name);
-        //     get_solver(&witnesses_dir, circuit_name, circuit)
-        // });
-
-        // //get the solver for validator subtree
-        // let validator_subtree_handle = thread::spawn(|| {
-        //     let circuit_name = format!("validatorsubtree{}", validator::SUBTREE_SIZE);
-        //     let circuit = ValidatorSubMTCircuit::default();
-        //     let witnesses_dir = format!("./witnesses/{}", circuit_name);
-        //     get_solver(&witnesses_dir, &circuit_name, circuit)
-        // });
-
-        // //get the solver for merkle subtree with limit
-        // let merkle_subtree_with_limit_handle = thread::spawn(|| {
-        //     let circuit_name = format!("merklesubtree{}", validator::SUBTREE_SIZE);
-        //     let circuit = MergeSubMTLimitCircuit::default();
-        //     let witnesses_dir = format!("./witnesses/{}", circuit_name);
-        //     get_solver(&witnesses_dir, &circuit_name, circuit)
-        // });
-
-        // let circuit_name = "permutationquery";
-        // let circuit = PermutationQueryCircuit::default();
-        // let witnesses_dir = format!("./witnesses/{}", circuit_name);
-        // let solver_permutation_query = get_solver(&witnesses_dir, circuit_name, circuit);
-        // //get the solver for permutation hash
-        // let circuit_name = format!("permutationhashbit_{}", permutation::VALIDATOR_COUNT);
-        // let circuit = PermutationIndicesValidatorHashBitCircuit::default();
-        // let witnesses_dir = format!("./witnesses/{}", circuit_name);
-        // let solver_permutation_hash = get_solver(&witnesses_dir, &circuit_name, circuit);
-
-        // let solver_shuffle = shuffle_handle.join().unwrap();
-        // let solver_hashtable = hashtable_handle.join().unwrap();
-        // let solver_blsverifier = blsverifier_handle.join().unwrap();
-        // let solver_validator_subtree = validator_subtree_handle.join().unwrap();
-        // let solver_merkle_subtree_with_limit = merkle_subtree_with_limit_handle.join().unwrap();
-        // let solver_permutation_hash = permutation_hash_handle.join().unwrap();
-        let end2end_assignment_chunks = end2end_end_assignments(epoch);
-        log::debug!("loaded assignments");
-        shuffle::debug_shuffle_with_assignments(
-            end2end_assignment_chunks.shuffle_chunks,
-        );
-        hashtable::debug_hashtable_with_assignments(end2end_assignment_chunks.hashtable_chunks);
-        bls_verifier::debug_blsverifier_with_assignments(end2end_assignment_chunks.blsverifier_chunks);
-        permutation::debug_permutation_query_with_assignments(
-            end2end_assignment_chunks.permutation_query_chunks,
-        );
-        permutation::debug_permutation_hashbit_with_assignments(
-            end2end_assignment_chunks.permutation_hash_chunks,
-        );
-        validator::debug_validator_subtree_with_assignments(
-            end2end_assignment_chunks.convert_validator_subtree_chunks,
-        );
-        validator::debug_merkle_subtree_with_limit_with_assignments(
-            end2end_assignment_chunks.merkle_subtree_with_limit_chunks,
-        );
-        // let shuffle_thread = thread::spawn(move || {
-        //     shuffle::debug_shuffle_with_assignments(
-        //         end2end_assignment_chunks.shuffle_chunks,
-        //     );
-        // });
-
-        // let hash_thread = thread::spawn(move || {
-        //     end2end_hashtable_witnesses_with_assignments(
-        //         solver_hashtable,
-        //         end2end_assignment_chunks.hashtable_chunks,
-        //     );
-        // });
-
-        // let blsverifier_thread = thread::spawn(move || {
-        //     end2end_blsverifier_witnesses_with_assignments(
-        //         solver_blsverifier,
-        //         end2end_assignment_chunks.blsverifier_chunks,
-        //         0,
-        //     );
-        // });
-
-        // let permutation_query_thread = thread::spawn(move || {
-        //     end2end_permutation_query_witnesses_with_assignments(
-        //         solver_permutation_query,
-        //         end2end_assignment_chunks.permutation_query_chunks,
-        //     );
-        // });
-
-        // let permutation_hash_thread = thread::spawn(move || {
-        //     end2end_permutation_hashbit_witnesses_with_assignments(
-        //         solver_permutation_hash,
-        //         end2end_assignment_chunks.permutation_hash_chunks,
-        //     );
-        // });
-
-        // let validator_subtree_thread = thread::spawn(move || {
-        //     validator::end2end_validator_subtree_witnesses_with_assignments(
-        //         solver_validator_subtree,
-        //         end2end_assignment_chunks.convert_validator_subtree_chunks,
-        //     );
-        // });
-
-        // let merkle_subtree_with_limit_thread = thread::spawn(move || {
-        //     validator::end2end_merkle_subtree_with_limit_witnesses_with_assignments(
-        //         solver_merkle_subtree_with_limit,
-        //         end2end_assignment_chunks.merkle_subtree_with_limit_chunks,
-        //     );
-        // });
-
-        // shuffle_thread
-        //     .join()
-        //     .expect("ShufflePairing thread panicked");
-        // hash_thread.join().expect("Hash thread panicked");
-        // blsverifier_thread.join().expect("Pairing thread panicked");
-        // permutation_query_thread
-        //     .join()
-        //     .expect("Permutation query thread panicked");
-        // permutation_hash_thread
-        //     .join()
-        //     .expect("Permutation hash thread panicked");
-        // validator_subtree_thread
-        //     .join()
-        //     .expect("Validator subtree thread panicked");
-        // merkle_subtree_with_limit_thread
-        //     .join()
-        //     .expect("Merkle subtree with limit thread panicked");
-
-        let end_time = std::time::Instant::now();
-        log::debug!(
-            "generate end2end end witness, time: {:?}",
-            end_time.duration_since(start_time)
-        );
-    }
+pub fn debug_eval_all_assignments(epoch: u64) {
+    let start_time = std::time::Instant::now();
+    let end2end_assignment_chunks = end2end_end_assignments(epoch);
+    log::debug!("loaded assignments");
+    shuffle::debug_shuffle_all_assignments(end2end_assignment_chunks.shuffle_chunks);
+    hashtable::debug_hashtable_all_assignments(end2end_assignment_chunks.hashtable_chunks);
+    bls_verifier::debug_blsverifier_all_assignments(end2end_assignment_chunks.blsverifier_chunks);
+    permutation::debug_permutation_query_all_assignments(
+        end2end_assignment_chunks.permutation_query_chunks,
+    );
+    permutation::debug_permutation_hashbit_all_assignments(
+        end2end_assignment_chunks.permutation_hash_chunks,
+    );
+    validator::debug_validator_subtree_all_assignments(
+        end2end_assignment_chunks.convert_validator_subtree_chunks,
+    );
+    validator::debug_merkle_subtree_with_limit_all_assignments(
+        end2end_assignment_chunks.merkle_subtree_with_limit_chunks,
+    );
+    let end_time = std::time::Instant::now();
+    log::debug!(
+        "test all circuits and assignments, time: {:?}",
+        end_time.duration_since(start_time)
+    );
 }
 pub fn end2end_prepare_solver(circuit_name: &str) {
     stacker::grow(256 * 1024 * 1024 * 1024, || match circuit_name {
@@ -1198,13 +1066,12 @@ fn test_end2end_witness_streamline_from_beacon_data_start() {
 }
 
 #[test]
-fn test_end2end_witness_debug_from_beacon_data_end() {
+fn test_debug_eval_all_assignments() {
     let epoch = 290001;
-    let stage = "end";
     env_logger::builder()
         .filter_level(log::LevelFilter::Debug) // set global log level to debug
         .init();
     stacker::grow(16 * 1024 * 1024 * 1024, || {
-        end2end_witnesses_streamline_from_beacon_data_debug(epoch, stage);
+        debug_eval_all_assignments(epoch);
     });
 }
