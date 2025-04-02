@@ -37,12 +37,13 @@ tiny-keccak = { version = "2.0", features = ["keccak"] }
 
 # todo: switch back to main
 arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs" }
-gkr_engine = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs", package = "gkr_engine" }
+crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs"}
 expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs", package = "circuit" }
-gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs" }
+expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs", package = "transcript" }
 gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs" }
+gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs" }
+gkr_engine = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs", package = "gkr_engine" }
+gkr_hashers = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs" }
 goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs" }
 mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs" }
-expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs", package = "transcript" }
-crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs"}
 serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs"}

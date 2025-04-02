@@ -16,6 +16,7 @@ expander_transcript.workspace = true
 gf2.workspace = true
 gkr.workspace = true
 gkr_engine.workspace = true
+gkr_hashers.workspace = true
 goldilocks.workspace = true
 halo2curves.workspace = true
 mersenne31.workspace = true

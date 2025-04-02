@@ -1,4 +1,5 @@
 use expander_compiler::frontend::*;
+use gkr_engine::{MPIConfig, MPIEngine};
 use rand::{Rng, SeedableRng};
 use tiny_keccak::Hasher;
 
@@ -285,8 +286,6 @@ fn keccak_gf2_full() {
     // alternatively, you can specify the particular config like gkr_field_config::GF2ExtConfig
     let mut expander_circuit = layered_circuit.export_to_expander_flatten();
 
-    let config = GF2Config::new_expander_config();
-
     let (simd_input, simd_public_input) = witness.to_simd();
     println!("{} {}", simd_input.len(), simd_public_input.len());
     expander_circuit.layers[0].input_vals = simd_input;
@@ -294,13 +293,14 @@ fn keccak_gf2_full() {
 
     // prove
     expander_circuit.evaluate();
-    let (claimed_v, proof) = gkr::executor::prove(&mut expander_circuit, &config);
+    let mpi_config = MPIConfig::prover_new();
+    let (claimed_v, proof) = gkr::executor::prove::<<GF2Config as Config>::DefaultGKRConfig>(
+        &mut expander_circuit,
+        mpi_config.clone(),
+    );
 
     // verify
-    assert!(gkr::executor::verify(
-        &mut expander_circuit,
-        &config,
-        &proof,
-        &claimed_v
-    ));
+    assert!(gkr::executor::verify::<
+        <GF2Config as Config>::DefaultGKRConfig,
+    >(&mut expander_circuit, mpi_config, &proof, &claimed_v));
 }
