@@ -27,13 +27,13 @@ echo "Running with epoch: $EPOCH"
 
 start1=$(date +%s.%N)
 # 1. Prepare assignment data
-echo "Preparing assignment data, in the streamline mode, this should be done in advance"
-./cmd -epoch "$EPOCH" || { echo "Failed to prepare assignment data"; exit 1; }
+# echo "Preparing assignment data, in the streamline mode, this should be done in advance"
+# ./cmd -epoch "$EPOCH" || { echo "Failed to prepare assignment data"; exit 1; }
 
 start2=$(date +%s.%N)
 # 2. Generate the witnesses for end stage
-echo "Preparing witnesses, in the streamline mode, this should be done in advance"
-./efc -s end -e "$EPOCH" -m "8,8,8,8,2,8" || { echo "Failed to generate witnesses (end stage)"; exit 1; }
+# echo "Preparing witnesses, in the streamline mode, this should be done in advance"
+# ./efc -s end -e "$EPOCH" -m "8,8,8,8,2,8" || { echo "Failed to generate witnesses (end stage)"; exit 1; }
 
 start3=$(date +%s.%N)
 # 3. Run the prover script
@@ -41,6 +41,7 @@ start3=$(date +%s.%N)
 # 4. Generate the witnesses for start stage
 ./efc -s start -e "$EPOCH" -m "8,8,8,8,2,8"|| { echo "Failed to generate witnesses (start stage)"; exit 1; }
 
+wait
 end1=$(date +%s.%N)
 elapsed11=$(echo "$end1 - $start1" | bc)
 elapsed21=$(echo "$end1 - $start2" | bc)

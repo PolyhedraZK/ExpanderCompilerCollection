@@ -178,13 +178,13 @@ N=8
 mkdir ./proofs/${EPOCH}/hashtable256
 
 for i in $(seq 0 11); do
-  WITNESS_FILE="$WITNESS_DIR/witness_${i}.txt"
-  PROOF_FILE="$PROOF_DIR/proof_mpi${N}_${i}"
   if [ "$i" -eq 11 ]; then
     N=2
   else
     N=8
   fi
+  WITNESS_FILE="$WITNESS_DIR/witness_${i}.txt"
+  PROOF_FILE="$PROOF_DIR/proof_mpi${N}_${i}"
   mpiexec -n $N $EXPANDER_CMD prove \
     --circuit-file "$CIRCUIT_FILE" \
     --witness-file "$WITNESS_FILE" \
