@@ -821,7 +821,8 @@ pub fn end2end_permutation_assignments_with_beacon_data(
     let target_len = 128;
     if current_len < target_len {
         if let Some(first) = permutation_query_assignments.first().cloned() {
-            permutation_query_assignments.extend(std::iter::repeat(first).take(target_len - current_len));
+            permutation_query_assignments
+                .extend(std::iter::repeat(first).take(target_len - current_len));
         } else {
             panic!("Cannot pad an empty circuit list");
         }

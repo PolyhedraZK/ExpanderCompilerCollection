@@ -59,12 +59,12 @@ fn main() {
                     } else {
                         default_mpi_config
                     };
-    
+
                     println!(
                         "Running stage: {} at epoch: {}, with mpi_config: {:?}",
                         stage, epoch, mpi_config
                     );
-    
+
                     end2end_witnesses_from_beacon_data(epoch, stage, &mpi_config);
                 }
                 Err(_) => println!("Epoch must be a valid number"),
