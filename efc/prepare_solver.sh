@@ -16,28 +16,29 @@ for circuit in shuffle permutationhash permutationquery hashtable blsverifier va
     sleep 1
 done
 
-# 4. Debug all circuits on a default epoch
-./efc -d 290001 &
-
-# 5. Clone the EthFullConsensus repo
+# 4. Clone the EthFullConsensus repo
 cd ../../ || { echo "Failed to enter parent parent directory"; exit 1; }
 rm -rf EthFullConsensus
 git clone https://github.com/PolyhedraZK/EthFullConsensus.git
 sleep 5
-# 6. Enter the repo and checkout the branch
+# 5. Enter the repo and checkout the branch
 cd EthFullConsensus || { echo "Failed to enter EthFullConsensus"; exit 1; }
 sleep 1
 git checkout dev_pcs
 
-# 7. Build the go program
+# 6. Build the go program
 cd end2end/cmd || { echo "Go cmd dir not found"; exit 1; }
 go build -o cmd || { echo "Go build failed"; exit 1; }
 sleep 10
-# 8. Move the compiled go program to the original directory
+# 7. Move the compiled go program to the original directory
 mv cmd "$ROOT_DIR/"
 
-# 9. Go back to efc root
+# 8. Go back to efc root
 cd "$ROOT_DIR" || exit 1
+
+# 9. Debug all circuits on a default epoch
+./cmd -epoch 290001 || { echo "Failed to run cmd"; exit 1; }
+./efc -d 290001 &
 
 # 10. Clone the Expander repo
 cd ../../ || { echo "Failed to enter parent parent directory"; exit 1; }
