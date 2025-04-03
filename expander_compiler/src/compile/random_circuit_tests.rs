@@ -114,10 +114,10 @@ fn test_gf2() {
     do_tests::<GF2Config, NormalInputType>(3000000);
 }
 
-// #[test]
-// fn test_goldilocks() {
-//     do_tests::<GoldilocksConfig, NormalInputType>(4000000);
-// }
+#[test]
+fn test_goldilocks() {
+    do_tests::<GoldilocksConfig, NormalInputType>(4000000);
+}
 
 #[test]
 fn test_m31_cross() {
@@ -134,10 +134,10 @@ fn test_gf2_cross() {
     do_tests::<GF2Config, CrossLayerInputType>(7000000);
 }
 
-// #[test]
-// fn test_goldilocks_cross() {
-//     do_tests::<GoldilocksConfig, CrossLayerInputType>(8000000);
-// }
+#[test]
+fn test_goldilocks_cross() {
+    do_tests::<GoldilocksConfig, CrossLayerInputType>(8000000);
+}
 
 fn deterministic_<I: InputType>() {
     let mut config = RandomCircuitConfig {
