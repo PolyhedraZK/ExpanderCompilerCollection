@@ -157,15 +157,11 @@ pub fn end2end_permutation_query_witness(
 pub fn end2end_permutation_query_witnesses_with_assignments(
     w_s: WitnessSolver<M31Config>,
     assignment_chunks: PermutationQueryAssignmentChunks,
+    witnesses_dir: String,
 ) {
-    let circuit_name = "permutationquery";
-
-    let witnesses_dir = format!("./witnesses/{}", circuit_name);
-    ensure_directory_exists(&witnesses_dir);
-
     let start_time = std::time::Instant::now();
     //generate witnesses (multi-thread)
-    log::debug!("Start generating  {} witnesses...", circuit_name);
+    log::debug!("Start generating witnesses on {}...", witnesses_dir);
     let witness_solver = Arc::new(w_s);
     let handles = assignment_chunks
         .into_iter()
@@ -192,9 +188,9 @@ pub fn end2end_permutation_query_witnesses_with_assignments(
     }
     let end_time = std::time::Instant::now();
     log::debug!(
-        "Generate {} witness Time: {:?}",
-        circuit_name,
-        end_time.duration_since(start_time)
+        "Generate witness Time: {:?} on {}",
+        end_time.duration_since(start_time),
+        witnesses_dir
     );
 }
 
@@ -722,12 +718,11 @@ pub fn end2end_permutation_hashbit_witness(
 pub fn end2end_permutation_hashbit_witnesses_with_assignments(
     w_s: WitnessSolver<M31Config>,
     assignment_chunks: PermutationIndicesValidatorHashBitAssignmentChunks,
+    witnesses_dir: String,
 ) {
-    let circuit_name = &format!("permutationhashbit_{}", VALIDATOR_COUNT);
-
     let start_time = std::time::Instant::now();
-    let witnesses_dir = format!("./witnesses/{}", circuit_name);
-
+    //generate witnesses (multi-thread)
+    log::debug!("Start generating witnesses on {}...", witnesses_dir);
     let witness_solver = Arc::new(w_s);
     let handles = assignment_chunks
         .into_iter()
@@ -753,8 +748,9 @@ pub fn end2end_permutation_hashbit_witnesses_with_assignments(
     }
     let end_time = std::time::Instant::now();
     log::debug!(
-        "Generate permutationhash witness Time: {:?}",
-        end_time.duration_since(start_time)
+        "Generate witness Time: {:?} on {}",
+        end_time.duration_since(start_time),
+        witnesses_dir
     );
 }
 pub fn end2end_permutation_assignments_with_beacon_data(
@@ -853,62 +849,6 @@ pub fn end2end_permutation_assignments_with_beacon_data(
         permutation_hashbit_assignment_chunks,
     )
 }
-
-pub fn end2end_permutation_witnesses_with_beacon_data(
-    w_s_query: WitnessSolver<M31Config>,
-    w_s_hashbit: WitnessSolver<M31Config>,
-    hashtable_bits: &[Vec<u8>],
-    shuffle_data: &beacon::ShuffleData,
-    valid_validator_list: &[u64],
-    committee_data: &beacon::CommitteeData,
-    padding_size: usize,
-    validator_hashes: &[Vec<u32>],
-    mpi_size1: usize,
-    mpi_size2: usize,
-) {
-    stacker::grow(32 * 1024 * 1024 * 1024, || {
-        let (permutation_query_assignment_chunks, permutation_hashbit_assignment_chunks) =
-            end2end_permutation_assignments_with_beacon_data(
-                hashtable_bits,
-                shuffle_data,
-                valid_validator_list,
-                committee_data,
-                padding_size,
-                validator_hashes,
-                mpi_size1,
-                mpi_size2,
-            );
-        end2end_permutation_hashbit_witnesses_with_assignments(
-            w_s_hashbit,
-            permutation_hashbit_assignment_chunks,
-        );
-        end2end_permutation_query_witnesses_with_assignments(
-            w_s_query,
-            permutation_query_assignment_chunks,
-        );
-    });
-}
-// pub fn debug_shuffle_with_assignments(
-//     assignment_chunks: ShuffleAssignmentChunks,
-// ) {
-//     stacker::grow(32 * 1024 * 1024 * 1024, || {
-//         let circuit_name = &format!("shuffle_{}", VALIDATOR_CHUNK_SIZE);
-
-//         let start_time = std::time::Instant::now();
-//         let mut hint_registry = HintRegistry::<M31>::new();
-//         register_hint(&mut hint_registry);
-//         debug_eval(&ShuffleCircuit::default(), &assignment_chunks[0][0], hint_registry);
-//         // let witness = w_s
-//         //             .solve_witnesses_with_hints(&assignment_chunks[0], &mut hint_registry)
-//         //             .unwrap();
-//         let end_time = std::time::Instant::now();
-//         log::debug!(
-//             "Generate {} witness Time: {:?}",
-//             circuit_name,
-//             end_time.duration_since(start_time)
-//         );
-//     });
-// }
 
 pub fn debug_permutation_query_all_assignments(
     assignment_chunks: PermutationQueryAssignmentChunks,

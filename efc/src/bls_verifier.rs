@@ -409,13 +409,11 @@ pub fn end2end_blsverifier_witnesses_with_assignments(
     w_s: WitnessSolver<M31Config>,
     assignment_chunks: BlsVerifierAssignmentChunks,
     offset: usize,
+    witnesses_dir: String,
 ) {
-    let circuit_name = "blsverifier";
-
-    let witnesses_dir = format!("./witnesses/{}", circuit_name);
     let start_time = std::time::Instant::now();
     //generate witnesses (multi-thread)
-    log::debug!("Start generating  {} witnesses...", circuit_name);
+    log::debug!("Start generating witnesses on {}...", witnesses_dir);
     let witness_solver = Arc::new(w_s);
     let handles = assignment_chunks
         .into_iter()
@@ -442,9 +440,9 @@ pub fn end2end_blsverifier_witnesses_with_assignments(
     }
     let end_time = std::time::Instant::now();
     log::debug!(
-        "Generate {} witness Time: {:?}",
-        circuit_name,
-        end_time.duration_since(start_time)
+        "Generate witness Time: {:?} on {}",
+        end_time.duration_since(start_time),
+        witnesses_dir
     );
 }
 
@@ -452,13 +450,11 @@ pub fn end2end_blsverifier_witnesses_with_assignments_chunk16(
     w_s: WitnessSolver<M31Config>,
     assignment_chunks: BlsVerifierAssignmentChunks,
     offset: usize,
+    witnesses_dir: String,
 ) {
-    let circuit_name = "blsverifier";
-
-    let witnesses_dir = format!("./witnesses/{}", circuit_name);
     let start_time = std::time::Instant::now();
     //generate witnesses (multi-thread)
-    log::debug!("Start generating {} witnesses...", circuit_name);
+    log::debug!("Start generating witnesses on {}...", witnesses_dir);
     let witness_solver = Arc::new(w_s);
     let handles = assignment_chunks
         .into_iter()
@@ -509,9 +505,9 @@ pub fn end2end_blsverifier_witnesses_with_assignments_chunk16(
     }
     let end_time = std::time::Instant::now();
     log::debug!(
-        "Generate {} witness Time: {:?}",
-        circuit_name,
-        end_time.duration_since(start_time)
+        "Generate witness Time: {:?} on {}",
+        end_time.duration_since(start_time),
+        witnesses_dir
     );
 }
 
@@ -537,27 +533,6 @@ pub fn end2end_blsverifier_assignments_with_beacon_data(
     let assignment_chunks: BlsVerifierAssignmentChunks =
         assignments.chunks(16*mpi_size).map(|x| x.to_vec()).collect();
     assignment_chunks
-}
-
-pub fn end2end_blsverifier_witnesses_with_beacon_data(
-    w_s: WitnessSolver<M31Config>,
-    aggregated_pubkeys: Vec<BlsG1Affine>,
-    attestations: Vec<Attestation>,
-    range: [usize; 2],
-    mpi_size: usize,
-) {
-    stacker::grow(32 * 1024 * 1024 * 1024, || {
-        //get assignments
-        let assignment_chunks = end2end_blsverifier_assignments_with_beacon_data(
-            aggregated_pubkeys,
-            attestations,
-            range,
-            mpi_size,
-        );
-
-        //generate witnesses (multi-thread)
-        end2end_blsverifier_witnesses_with_assignments(w_s, assignment_chunks, range[0] * 16);
-    });
 }
 
 pub fn debug_blsverifier_all_assignments(assignment_chunks: BlsVerifierAssignmentChunks) {

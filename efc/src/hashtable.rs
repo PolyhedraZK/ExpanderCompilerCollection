@@ -259,13 +259,11 @@ pub fn end2end_hashtable_witnesses(
 pub fn end2end_hashtable_witnesses_with_assignments(
     w_s: WitnessSolver<M31Config>,
     assignment_chunks: HashtableAssignmentChunks,
+    witnesses_dir: String,
 ) {
-    let circuit_name = &format!("hashtable{}", HASHTABLESIZE);
-
-    let witnesses_dir = format!("./witnesses/{}", circuit_name);
     let start_time = std::time::Instant::now();
     //generate witnesses (multi-thread)
-    log::debug!("Start generating witnesses...");
+    log::debug!("Start generating witnesses on {}...", witnesses_dir);
     let witness_solver = Arc::new(w_s);
     let handles = assignment_chunks
         .into_iter()
@@ -291,22 +289,20 @@ pub fn end2end_hashtable_witnesses_with_assignments(
     }
     let end_time = std::time::Instant::now();
     log::debug!(
-        "Generate {} witness Time: {:?}",
-        circuit_name,
-        end_time.duration_since(start_time)
+        "Generate witness Time: {:?} on {}",
+        end_time.duration_since(start_time),
+        witnesses_dir
     );
 }
 
 pub fn end2end_hashtable_witnesses_with_assignments_chunk16(
     w_s: WitnessSolver<M31Config>,
     assignment_chunks: HashtableAssignmentChunks,
+    witnesses_dir: String,
 ) {
-    let circuit_name = &format!("hashtable{}", HASHTABLESIZE);
-
-    let witnesses_dir = format!("./witnesses/{}", circuit_name);
     let start_time = std::time::Instant::now();
     //generate witnesses (multi-thread)
-    log::debug!("Start generating witnesses...");
+    log::debug!("Start generating witnesses on {}...", witnesses_dir);
     let witness_solver = Arc::new(w_s);
     let handles = assignment_chunks
         .into_iter()
@@ -357,52 +353,9 @@ pub fn end2end_hashtable_witnesses_with_assignments_chunk16(
     }
     let end_time = std::time::Instant::now();
     log::debug!(
-        "Generate {} witness Time: {:?}",
-        circuit_name,
-        end_time.duration_since(start_time)
-    );
-}
-
-pub fn end2end_hashtable_witnesses_with_assignments_mpi(
-    w_s: WitnessSolver<M31Config>,
-    assignment_chunks: HashtableAssignmentChunks,
-    mpi_size: usize,
-) {
-    let circuit_name = &format!("hashtable{}", HASHTABLESIZE);
-
-    let witnesses_dir = format!("./witnesses/{}", circuit_name);
-    let start_time = std::time::Instant::now();
-    let new_assignment_chunks: Vec<Vec<HASHTABLECircuit<M31>>> = assignment_chunks.chunks(mpi_size).map(|chunk| chunk.concat()).collect();
-    //generate witnesses (multi-thread)
-    log::debug!("Start generating witnesses...");
-    let witness_solver = Arc::new(w_s);
-    let handles = new_assignment_chunks
-        .into_iter()
-        .enumerate()
-        .map(|(i, assignments)| {
-            let witness_solver = Arc::clone(&witness_solver);
-            let witnesses_dir_clone = witnesses_dir.clone();
-            thread::spawn(move || {
-                let mut hint_registry = HintRegistry::<M31>::new();
-                register_hint(&mut hint_registry);
-                let witness = witness_solver
-                    .solve_witnesses_with_hints(&assignments, &mut hint_registry)
-                    .unwrap();
-                write_witness_to_file(
-                    &format!("{}/witness_{}.txt", witnesses_dir_clone, i),
-                    witness,
-                )
-            })
-        })
-        .collect::<Vec<_>>();
-    for handle in handles {
-        handle.join().unwrap();
-    }
-    let end_time = std::time::Instant::now();
-    log::debug!(
-        "Generate {} witness Time: {:?}",
-        circuit_name,
-        end_time.duration_since(start_time)
+        "Generate witness Time: {:?} on {}",
+        end_time.duration_since(start_time),
+        witnesses_dir
     );
 }
 
@@ -424,17 +377,6 @@ pub fn end2end_hashtable_assignments_with_beacon_data(
     let assignment_chunks: HashtableAssignmentChunks =
         assignments.chunks(16*mpi_size).map(|x| x.to_vec()).collect();
     assignment_chunks
-}
-pub fn end2end_hashtable_witnesses_with_beacon_data(
-    w_s: WitnessSolver<M31Config>,
-    seed: &[u8],
-    hash_bytes: Vec<[u8; 32]>,
-    mpi_size: usize,
-) {
-    stacker::grow(32 * 1024 * 1024 * 1024, || {
-        let assignment_chunks = end2end_hashtable_assignments_with_beacon_data(seed, hash_bytes, mpi_size);
-        end2end_hashtable_witnesses_with_assignments(w_s, assignment_chunks);
-    });
 }
 
 pub fn debug_hashtable_all_assignments(assignment_chunks: HashtableAssignmentChunks) {

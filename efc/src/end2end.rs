@@ -5,7 +5,7 @@ use crate::bls_verifier::{
     end2end_blsverifier_witness, end2end_blsverifier_witnesses_with_assignments, end2end_blsverifier_witnesses_with_assignments_chunk16, generate_blsverifier_witnesses, BLSVERIFIERCircuit, PairingEntry
 };
 use crate::hashtable::{
-    self, end2end_hashtable_witnesses, end2end_hashtable_witnesses_with_assignments, end2end_hashtable_witnesses_with_assignments_chunk16, end2end_hashtable_witnesses_with_assignments_mpi, generate_hash_witnesses, HASHTABLECircuit, HashTableJson
+    self, end2end_hashtable_witnesses, end2end_hashtable_witnesses_with_assignments, end2end_hashtable_witnesses_with_assignments_chunk16, generate_hash_witnesses, HASHTABLECircuit, HashTableJson
 };
 use crate::permutation::{
     self, end2end_permutation_hashbit_witness,
@@ -784,8 +784,8 @@ pub fn end2end_witnesses_from_beacon_data(epoch: u64, stage: &str, mpi_size: &[u
         .spawn(move || {
             let circuit_name = format!("shuffle_{}", shuffle::VALIDATOR_CHUNK_SIZE);
             let circuit = ShuffleCircuit::default();
-            let witnesses_dir = format!("./witnesses/{}", circuit_name);
-            get_solver(&witnesses_dir, &circuit_name, circuit)
+            let witnesses_dir = format!("./witnesses/{}/{}", epoch, circuit_name);
+            (get_solver(&witnesses_dir, &circuit_name, circuit), witnesses_dir)
         })
         .expect("Shuffle thread panicked");
     
@@ -796,8 +796,8 @@ pub fn end2end_witnesses_from_beacon_data(epoch: u64, stage: &str, mpi_size: &[u
         .spawn(move || {
             let circuit_name = format!("hashtable{}", hashtable::HASHTABLESIZE);
             let circuit = HASHTABLECircuit::default();
-            let witnesses_dir = format!("./witnesses/{}", circuit_name);
-            get_solver(&witnesses_dir, &circuit_name, circuit)
+            let witnesses_dir = format!("./witnesses/{}/{}", epoch, circuit_name);
+            (get_solver(&witnesses_dir, &circuit_name, circuit), witnesses_dir)
         })
         .expect("Hashtable thread panicked");
 
@@ -807,8 +807,8 @@ pub fn end2end_witnesses_from_beacon_data(epoch: u64, stage: &str, mpi_size: &[u
         .spawn(move || {
             let circuit_name = "blsverifier";
             let circuit = BLSVERIFIERCircuit::default();
-            let witnesses_dir = format!("./witnesses/{}", circuit_name);
-            get_solver(&witnesses_dir, circuit_name, circuit)
+            let witnesses_dir = format!("./witnesses/{}/{}", epoch, circuit_name);
+            (get_solver(&witnesses_dir, &circuit_name, circuit), witnesses_dir)
         })
         .expect("BLS Verifier thread panicked");
 
@@ -818,8 +818,8 @@ pub fn end2end_witnesses_from_beacon_data(epoch: u64, stage: &str, mpi_size: &[u
         .spawn(move || {
             let circuit_name = format!("validatorsubtree{}", validator::SUBTREE_SIZE);
             let circuit = ValidatorSubMTCircuit::default();
-            let witnesses_dir = format!("./witnesses/{}", circuit_name);
-            get_solver(&witnesses_dir, &circuit_name, circuit)
+            let witnesses_dir = format!("./witnesses/{}/{}", epoch, circuit_name);
+            (get_solver(&witnesses_dir, &circuit_name, circuit), witnesses_dir)
         })
         .expect("Validator Subtree thread panicked");
 
@@ -829,8 +829,8 @@ pub fn end2end_witnesses_from_beacon_data(epoch: u64, stage: &str, mpi_size: &[u
         .spawn(move || {
             let circuit_name = format!("merklesubtree{}", validator::SUBTREE_SIZE);
             let circuit = MergeSubMTLimitCircuit::default();
-            let witnesses_dir = format!("./witnesses/{}", circuit_name);
-            get_solver(&witnesses_dir, &circuit_name, circuit)
+            let witnesses_dir = format!("./witnesses/{}/{}", epoch, circuit_name);
+            (get_solver(&witnesses_dir, &circuit_name, circuit), witnesses_dir)
         })
         .expect("MTsubtree thread panicked");
 
@@ -845,8 +845,8 @@ pub fn end2end_witnesses_from_beacon_data(epoch: u64, stage: &str, mpi_size: &[u
         .spawn(move || {
             let circuit_name = "permutationquery";
             let circuit = PermutationQueryCircuit::default();
-            let witnesses_dir = format!("./witnesses/{}", circuit_name);
-            get_solver(&witnesses_dir, circuit_name, circuit)
+            let witnesses_dir = format!("./witnesses/{}/{}", epoch, circuit_name);
+            (get_solver(&witnesses_dir, &circuit_name, circuit), witnesses_dir)
         })
         .expect("Permutation Query thread panicked");
 
@@ -856,19 +856,23 @@ pub fn end2end_witnesses_from_beacon_data(epoch: u64, stage: &str, mpi_size: &[u
         .spawn(move || {
             let circuit_name = format!("permutationhashbit_{}", permutation::VALIDATOR_COUNT);
             let circuit = PermutationIndicesValidatorHashBitCircuit::default();
-            let witnesses_dir = format!("./witnesses/{}", circuit_name);
-            get_solver(&witnesses_dir, &circuit_name, circuit)
+            let witnesses_dir = format!("./witnesses/{}/{}", epoch, circuit_name);
+            (get_solver(&witnesses_dir, &circuit_name, circuit), witnesses_dir)
         })
         .expect("Permutation Hashbit thread panicked");
 
-        let solver_shuffle = shuffle_handle.join().unwrap();
-        let solver_hashtable = hashtable_handle.join().unwrap();
-        let solver_blsverifier = blsverifier_handle.join().unwrap();
-        let solver_validator_subtree = validator_subtree_handle.join().unwrap();
-        let solver_merkle_subtree_with_limit = merkle_subtree_with_limit_handle.join().unwrap();
+        let (solver_shuffle, witnesses_dir_shuffle) = shuffle_handle.join().unwrap();
+        let (solver_hashtable, witnesses_dir_hashtable) = hashtable_handle.join().unwrap();
+        let (solver_blsverifier, witnesses_dir_blsverifier) = blsverifier_handle.join().unwrap();
+        let (solver_validator_subtree, witnesses_dir_validator_subtree) =
+            validator_subtree_handle.join().unwrap();
+        let (solver_merkle_subtree_with_limit, witnesses_dir_merkle_subtree_with_limit) =
+            merkle_subtree_with_limit_handle.join().unwrap();
+        let (solver_permutation_query, witnesses_dir_permutation_query) =
+            permutation_query_handle.join().unwrap();
+        let (solver_permutation_hash, witnesses_dir_permutation_hash) =
+            permutation_hash_handle.join().unwrap();
         let end2end_assignment_chunks = end2end_assignment_handle.join().unwrap();
-        let solver_permutation_query = permutation_query_handle.join().unwrap();
-        let solver_permutation_hash = permutation_hash_handle.join().unwrap();
         log::debug!("loaded assignments");
         let shuffle_thread = thread::Builder::new()
         .stack_size(2 * 1024 * 1024 * 1024)
@@ -877,6 +881,7 @@ pub fn end2end_witnesses_from_beacon_data(epoch: u64, stage: &str, mpi_size: &[u
                 solver_shuffle,
                 end2end_assignment_chunks.shuffle_chunks,
                 0,
+                witnesses_dir_shuffle,
             );
         })
         .expect("Initial Shuffle Witness Solver thread panicked");
@@ -888,6 +893,7 @@ pub fn end2end_witnesses_from_beacon_data(epoch: u64, stage: &str, mpi_size: &[u
             end2end_hashtable_witnesses_with_assignments_chunk16(
                 solver_hashtable,
                 end2end_assignment_chunks.hashtable_chunks,
+                witnesses_dir_hashtable,
             );
         })
         .expect("Initial Hashtable Witness Solver thread panicked");
@@ -899,6 +905,7 @@ pub fn end2end_witnesses_from_beacon_data(epoch: u64, stage: &str, mpi_size: &[u
                 solver_blsverifier,
                 end2end_assignment_chunks.blsverifier_chunks,
                 0,
+                witnesses_dir_blsverifier,
             );
         })
         .expect("Initial BLS Verifier Witness Solver thread panicked");
@@ -909,6 +916,7 @@ pub fn end2end_witnesses_from_beacon_data(epoch: u64, stage: &str, mpi_size: &[u
             end2end_permutation_query_witnesses_with_assignments(
                 solver_permutation_query,
                 end2end_assignment_chunks.permutation_query_chunks,
+                witnesses_dir_permutation_query,
             );
         })
         .expect("Initial Permutation Query Witness Solver thread panicked");
@@ -919,6 +927,7 @@ pub fn end2end_witnesses_from_beacon_data(epoch: u64, stage: &str, mpi_size: &[u
             end2end_permutation_hashbit_witnesses_with_assignments(
                 solver_permutation_hash,
                 end2end_assignment_chunks.permutation_hash_chunks,
+                witnesses_dir_permutation_hash,
             );
         })
         .expect("Initial Permutation Hashbit Witness Solver thread panicked");
@@ -929,6 +938,7 @@ pub fn end2end_witnesses_from_beacon_data(epoch: u64, stage: &str, mpi_size: &[u
             validator::end2end_validator_subtree_witnesses_with_assignments(
                 solver_validator_subtree,
                 end2end_assignment_chunks.convert_validator_subtree_chunks,
+                witnesses_dir_validator_subtree,
             );
         })
         .expect("Initial Validator Subtree Witness Solver thread panicked");
@@ -939,6 +949,7 @@ pub fn end2end_witnesses_from_beacon_data(epoch: u64, stage: &str, mpi_size: &[u
             validator::end2end_merkle_subtree_with_limit_witnesses_with_assignments(
                 solver_merkle_subtree_with_limit,
                 end2end_assignment_chunks.merkle_subtree_with_limit_chunks,
+                witnesses_dir_merkle_subtree_with_limit,
             );
         })
         .expect("Initial MTSubtree Witness Solver thread panicked");
@@ -973,14 +984,14 @@ pub fn end2end_witnesses_from_beacon_data(epoch: u64, stage: &str, mpi_size: &[u
         //get the solver for shuffle
         let circuit_name = &format!("shuffle_{}", shuffle::VALIDATOR_CHUNK_SIZE);
         let circuit = ShuffleCircuit::default();
-        let witnesses_dir = &format!("./witnesses/{}", circuit_name);
-        let solver_shuffle = get_solver(witnesses_dir, circuit_name, circuit);
+        let witnesses_dir_shuffle = format!("./witnesses/{}", circuit_name);
+        let solver_shuffle = get_solver(&witnesses_dir_shuffle, circuit_name, circuit);
 
         //get the solver for bls verifier
         let circuit_name = "blsverifier";
         let circuit = BLSVERIFIERCircuit::default();
-        let witnesses_dir = &format!("./witnesses/{}", circuit_name);
-        let solver_blsverifier = get_solver(witnesses_dir, circuit_name, circuit);
+        let witnesses_dir_blsverifier = format!("./witnesses/{}", circuit_name);
+        let solver_blsverifier = get_solver(&witnesses_dir_blsverifier, circuit_name, circuit);
 
         let (shuffle_assignments, bls_verifier_assignments) = end2end_start_assignments(epoch, &mpi_size);
 
@@ -990,6 +1001,7 @@ pub fn end2end_witnesses_from_beacon_data(epoch: u64, stage: &str, mpi_size: &[u
                 solver_shuffle,
                 shuffle_assignments,
                 16 * 64 / 16 / shuffle_mpi_size,
+                witnesses_dir_shuffle,
             );
         });
 
@@ -999,6 +1011,7 @@ pub fn end2end_witnesses_from_beacon_data(epoch: u64, stage: &str, mpi_size: &[u
                 solver_blsverifier,
                 bls_verifier_assignments,
                 16 * 64 / 16 / blsverifier_mpi_size,
+                witnesses_dir_blsverifier,
             );
         });
 

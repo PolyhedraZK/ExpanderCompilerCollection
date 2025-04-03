@@ -6,6 +6,7 @@ use circuit_std_rs::poseidon::utils::*;
 use circuit_std_rs::sha256;
 use circuit_std_rs::utils::register_hint;
 use circuit_std_rs::utils::simple_select;
+use expander_compiler::circuit::layered::witness;
 use expander_compiler::frontend::extra::debug_eval;
 use expander_compiler::frontend::*;
 use serde::Deserialize;
@@ -717,15 +718,11 @@ pub fn end2end_validator_subtree_witnesses(
 pub fn end2end_validator_subtree_witnesses_with_assignments(
     w_s: WitnessSolver<M31Config>,
     assignment_chunks: Vec<Vec<ValidatorSubMTCircuit<M31>>>,
+    witnesses_dir: String,
 ) {
-    let circuit_name = &format!("validatorsubtree{}", SUBTREE_SIZE);
-
-    log::debug!("preparing {} solver...", circuit_name);
-    let witnesses_dir = format!("./witnesses/{}", circuit_name);
-
     let start_time = std::time::Instant::now();
     //generate witnesses (multi-thread)
-    log::debug!("Start generating witnesses...");
+    log::debug!("Start generating witnesses on {}...", witnesses_dir);
     let witness_solver = Arc::new(w_s);
     let handles = assignment_chunks
         .into_iter()
@@ -751,9 +748,9 @@ pub fn end2end_validator_subtree_witnesses_with_assignments(
     }
     let end_time = std::time::Instant::now();
     log::debug!(
-        "Generate {} witness Time: {:?}",
-        circuit_name,
-        end_time.duration_since(start_time)
+        "Generate witness Time: {:?} on {}",
+        end_time.duration_since(start_time),
+        witnesses_dir
     );
 }
 
@@ -889,15 +886,11 @@ impl MergeSubMTLimitCircuit<M31> {
 pub fn end2end_merkle_subtree_with_limit_witnesses_with_assignments(
     w_s: WitnessSolver<M31Config>,
     assignment_chunks: Vec<Vec<MergeSubMTLimitCircuit<M31>>>,
+    witnesses_dir: String,
 ) {
-    let circuit_name = &format!("merklesubtree{}", SUBTREE_SIZE);
-
-    log::debug!("preparing {} solver...", circuit_name);
-    let witnesses_dir = format!("./witnesses/{}", circuit_name);
-
     let start_time = std::time::Instant::now();
     //generate witnesses (multi-thread)
-    log::debug!("Start generating witnesses...");
+    log::debug!("Start generating witnesses on {}...", witnesses_dir);
     let witness_solver = Arc::new(w_s);
     let handles = assignment_chunks
         .into_iter()
@@ -923,9 +916,9 @@ pub fn end2end_merkle_subtree_with_limit_witnesses_with_assignments(
     }
     let end_time = std::time::Instant::now();
     log::debug!(
-        "Generate {} witness Time: {:?}",
-        circuit_name,
-        end_time.duration_since(start_time)
+        "Generate witness Time: {:?} on {}",
+        end_time.duration_since(start_time),
+        witnesses_dir
     );
 }
 pub fn end2end_validator_tree_assignments_with_beacon_data(
@@ -967,6 +960,7 @@ pub fn end2end_validator_tree_witnesses_with_beacon_data(
     validator_tree: &[Vec<Vec<u32>>],
     real_validator_count: u64,
     mpi_size: usize,
+    witness_dirs: Vec<String>,
 ) {
     stacker::grow(32 * 1024 * 1024 * 1024, || {
         let (
@@ -981,10 +975,12 @@ pub fn end2end_validator_tree_witnesses_with_beacon_data(
         end2end_validator_subtree_witnesses_with_assignments(
             w_s_subtree,
             convert_validator_list_to_merkle_tree_assignments_chunks,
+            witness_dirs[0].clone(),
         );
         end2end_merkle_subtree_with_limit_witnesses_with_assignments(
             w_s_merkle,
             merkle_subtree_with_limit_assignment_chunks,
+            witness_dirs[1].clone(),
         );
     });
 }
