@@ -33,13 +33,13 @@ echo "Preparing assignment data, in the streamline mode, this should be done in 
 start2=$(date +%s.%N)
 # 2. Generate the witnesses for end stage
 echo "Preparing witnesses, in the streamline mode, this should be done in advance"
-./efc -s end -e "$EPOCH" -m "8,8,8,8,2,8" || { echo "Failed to generate witnesses"; exit 1; }
+./efc -s end -e "$EPOCH" -m "8,8,8,8,2,8" || { echo "Failed to generate witnesses (end stage)"; exit 1; }
 
 start3=$(date +%s.%N)
 # 3. Run the prover script
-./end2end_prover.sh --epoch "$EPOCH" & || { echo "Failed to run prover script"; exit 1; }
+( ./end2end_prover.sh --epoch "$EPOCH" || { echo "Failed to run prover script"; exit 1; } ) &
 # 4. Generate the witnesses for start stage
-./efc -s start -e "$EPOCH" || { echo "Failed to generate witnesses"; exit 1; }
+./efc -s start -e "$EPOCH" -m "8,8,8,8,2,8"|| { echo "Failed to generate witnesses (start stage)"; exit 1; }
 
 end1=$(date +%s.%N)
 elapsed11=$(echo "$end1 - $start1" | bc)

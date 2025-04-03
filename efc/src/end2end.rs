@@ -601,8 +601,8 @@ pub fn end2end_witnesses_from_beacon_data(epoch: u64, stage: &str, mpi_size: &[u
             .stack_size(2 * 1024 * 1024 * 1024)
             .spawn(move || end2end_end_assignments(epoch, &mpi_size))
             .expect("End2end_assignment thread panicked");
-        // get the solver for permutation query
 
+        // get the solver for permutation query
         let permutation_query_handle = thread::Builder::new()
             .stack_size(2 * 1024 * 1024 * 1024)
             .spawn(move || {
