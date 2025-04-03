@@ -191,7 +191,7 @@ for i in $(seq 0 11); do
     --output-proof-file "$PROOF_FILE" &
 done
 
-#wait for the second round of shuffle
+#wait for other processes
 MAX_PROC=80
 INTERVAL=5
 while true; do

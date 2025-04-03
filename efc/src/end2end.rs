@@ -756,13 +756,13 @@ pub fn end2end_witnesses_from_beacon_data(epoch: u64, stage: &str, mpi_size: &[u
         //get the solver for shuffle
         let circuit_name = &format!("shuffle_{}", shuffle::VALIDATOR_CHUNK_SIZE);
         let circuit = ShuffleCircuit::default();
-        let witnesses_dir_shuffle = format!("./witnesses/{}", circuit_name);
+        let witnesses_dir_shuffle = format!("./witnesses/{}/{}", epoch, circuit_name);
         let solver_shuffle = get_solver(&witnesses_dir_shuffle, circuit_name, circuit);
 
         //get the solver for bls verifier
         let circuit_name = "blsverifier";
         let circuit = BLSVERIFIERCircuit::default();
-        let witnesses_dir_blsverifier = format!("./witnesses/{}", circuit_name);
+        let witnesses_dir_blsverifier = format!("./witnesses/{}/{}", epoch, circuit_name);
         let solver_blsverifier = get_solver(&witnesses_dir_blsverifier, circuit_name, circuit);
 
         let (shuffle_assignments, bls_verifier_assignments) =
