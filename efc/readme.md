@@ -7,10 +7,8 @@ EthFullConsensus is a circuit library containing a series of circuits to realize
 Realizing Ethereum full consensus using SNARKs can be costly. Our design is based on the concepts on [beacon-chain-validator](./spec/beacon-chain-validator.md).
 
 ### Workflow
-
-1. Provide the assignment data files, and run the API to generate circuit.txt and witness.txt files
-```RUSTFLAGS="-C target-cpu=native" cargo run --bin efc --release -- -d <dir:assignment_data_dir>```
-For example, if the assignment data files are on the "~/ExpanderCompilerCollection/efc/data", then run 
-```RUSTFLAGS="-C target-cpu=native" cargo run --bin efc --release -- -d ~/ExpanderCompilerCollection/efc/data```
-By default, the witness files are saved on the "~/ExpanderCompilerCollection/efc/witnesses".
-2. Using Expander to provide the proofs, and verify them
+0. Enter efc directory
+1. Prepare required programs, solvers, and circuits (may take a hour)
+```./prepare_solver.sh```
+2. Start end-to-end prove and verify
+```./efc_end2end.sh --epoch <number>```
