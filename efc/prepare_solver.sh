@@ -20,7 +20,7 @@ done
 cd ../../ || { echo "Failed to enter parent parent directory"; exit 1; }
 rm -rf EthFullConsensus
 git clone https://github.com/PolyhedraZK/EthFullConsensus.git
-sleep 5
+sleep 2
 # 5. Enter the repo and checkout the branch
 cd EthFullConsensus || { echo "Failed to enter EthFullConsensus"; exit 1; }
 sleep 1
@@ -29,7 +29,7 @@ git checkout dev_pcs
 # 6. Build the go program
 cd end2end/cmd || { echo "Go cmd dir not found"; exit 1; }
 go build -o cmd || { echo "Go build failed"; exit 1; }
-sleep 10
+sleep 2
 # 7. Move the compiled go program to the original directory
 mv cmd "$ROOT_DIR/"
 
@@ -44,7 +44,7 @@ cd "$ROOT_DIR" || exit 1
 cd ../../ || { echo "Failed to enter parent parent directory"; exit 1; }
 rm -rf Expander
 git clone https://github.com/PolyhedraZK/Expander.git
-sleep 5
+sleep 2
 
 # 11. Enter the repo and checkout the branch
 cd Expander || { echo "Failed to enter Expander"; exit 1; }
@@ -52,8 +52,8 @@ sleep 1
 git checkout main
 
 # 12. Build the rust program
-RUSTFLAGS="-C target-cpu=native" cargo build --release -- all || { echo "Rust build failed"; exit 1; }
-sleep 10
+RUSTFLAGS="-C target-cpu=native" cargo build --release --all || { echo "Rust build failed"; exit 1; }
+sleep 2
 # 13. Move the compiled rust program to the original directory
 cp target/release/expander-exec "$ROOT_DIR/"
 
