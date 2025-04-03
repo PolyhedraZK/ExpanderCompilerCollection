@@ -25,6 +25,7 @@ fi
 
 echo "Running Prover on epoch: $EPOCH"
 mkdir ./proofs
+mkdir ./proofs/${EPOCH}
 
 
 
@@ -33,10 +34,10 @@ EXPANDER_CMD="./expander-exec --fiat-shamir-hash SHA256 --poly-commitment-scheme
 
 # Run the prover for permutationhashbit
 CIRCUIT_FILE="./circuit_permutationhashbit_2097152.txt"
-WITNESS_DIR="./witnesses/permutationhashbit_2097152"
-PROOF_DIR="./proofs/permutationhashbit_2097152"
+WITNESS_DIR="./witnesses/${EPOCH}/permutationhashbit_2097152"
+PROOF_DIR="./proofs/${EPOCH}/permutationhashbit_2097152"
 N=2
-mkdir ./proofs/permutationhashbit_2097152
+mkdir ./proofs/${EPOCH}/permutationhashbit_2097152
 
 for i in $(seq 0 0); do
   WITNESS_FILE="$WITNESS_DIR/witness_${i}.txt"
@@ -49,10 +50,10 @@ done
 
 # Run the prover for blsverifier (round1)
 CIRCUIT_FILE="./circuit_blsverifier.txt"
-WITNESS_DIR="./witnesses/blsverifier"
-PROOF_DIR="./proofs/blsverifier"
+WITNESS_DIR="./witnesses/${EPOCH}/blsverifier"
+PROOF_DIR="./proofs/${EPOCH}/blsverifier"
 N=8
-mkdir ./proofs/blsverifier
+mkdir ./proofs/${EPOCH}/blsverifier
 
 for i in $(seq 0 7); do
   WITNESS_FILE="$WITNESS_DIR/witness_${i}.txt"
@@ -67,10 +68,10 @@ sleep 60 # wait for the permutationhashbit and blsverifier prover to load circui
 
 # Run the prover for shuffle (round1)
 CIRCUIT_FILE="./circuit_shuffle_512.txt"
-WITNESS_DIR="./witnesses/shuffle_512"
-PROOF_DIR="./proofs/shuffle_512"
+WITNESS_DIR="./witnesses/${EPOCH}/shuffle_512"
+PROOF_DIR="./proofs/${EPOCH}/shuffle_512"
 N=8
-mkdir ./proofs/shuffle_512
+mkdir ./proofs/${EPOCH}/shuffle_512
 
 for i in $(seq 0 7); do
   WITNESS_FILE="$WITNESS_DIR/witness_${i}.txt"
@@ -97,10 +98,10 @@ done
 
 # Run the prover for shuffle (round2)
 CIRCUIT_FILE="./circuit_shuffle_512.txt"
-WITNESS_DIR="./witnesses/shuffle_512"
-PROOF_DIR="./proofs/shuffle_512"
+WITNESS_DIR="./witnesses/${EPOCH}/shuffle_512"
+PROOF_DIR="./proofs/${EPOCH}/shuffle_512"
 N=8
-mkdir ./proofs/shuffle_512
+mkdir ./proofs/${EPOCH}/shuffle_512
 
 for i in $(seq 8 15); do
   WITNESS_FILE="$WITNESS_DIR/witness_${i}.txt"
@@ -125,6 +126,11 @@ while true; do
     sleep 5
 done
 # Run the prover for blsverifier (round2)
+CIRCUIT_FILE="./circuit_blsverifier.txt"
+WITNESS_DIR="./witnesses/${EPOCH}/blsverifier"
+PROOF_DIR="./proofs/${EPOCH}/blsverifier"
+N=8
+mkdir ./proofs/${EPOCH}/blsverifier
 for i in $(seq 8 15); do
   WITNESS_FILE="$WITNESS_DIR/witness_${i}.txt"
   PROOF_FILE="$PROOF_DIR/proof_mpi${N}_${i}"
@@ -150,10 +156,10 @@ done
 
 # Run the prover for permutationquery
 CIRCUIT_FILE="./circuit_permutationquery.txt"
-WITNESS_DIR="./witnesses/permutationquery"
-PROOF_DIR="./proofs/permutationquery"
+WITNESS_DIR="./witnesses/${EPOCH}/permutationquery"
+PROOF_DIR="./proofs/${EPOCH}/permutationquery"
 N=8
-mkdir ./proofs/permutationquery
+mkdir ./proofs/${EPOCH}/permutationquery
 
 for i in $(seq 0 0); do
   WITNESS_FILE="$WITNESS_DIR/witness_${i}.txt"
@@ -166,10 +172,10 @@ done
 
 # Run the prover for hashtable
 CIRCUIT_FILE="./circuit_hashtable256.txt"
-WITNESS_DIR="./witnesses/hashtable256"
-PROOF_DIR="./proofs/hashtable256"
+WITNESS_DIR="./witnesses/${EPOCH}/hashtable256"
+PROOF_DIR="./proofs/${EPOCH}/hashtable256"
 N=8
-mkdir ./proofs/hashtable256
+mkdir ./proofs/${EPOCH}/hashtable256
 
 for i in $(seq 0 11); do
   WITNESS_FILE="$WITNESS_DIR/witness_${i}.txt"
@@ -200,10 +206,10 @@ while true; do
 done
 # Run the prover for validatorsubtree
 CIRCUIT_FILE="./circuit_validatorsubtree1024.txt"
-WITNESS_DIR="./witnesses/validatorsubtree1024"
-PROOF_DIR="./proofs/validatorsubtree1024"
+WITNESS_DIR="./witnesses/${EPOCH}/validatorsubtree1024"
+PROOF_DIR="./proofs/${EPOCH}/validatorsubtree1024"
 N=8
-mkdir ./proofs/validatorsubtree1024
+mkdir ./proofs/${EPOCH}/validatorsubtree1024
 
 for i in $(seq 0 15); do
   WITNESS_FILE="$WITNESS_DIR/witness_${i}.txt"
@@ -217,10 +223,10 @@ done
 
 # Run the prover for merklesubtree1024
 CIRCUIT_FILE="./circuit_merklesubtree1024.txt"
-WITNESS_DIR="./witnesses/merklesubtree1024"
-PROOF_DIR="./proofs/merklesubtree1024"
+WITNESS_DIR="./witnesses/${EPOCH}/merklesubtree1024"
+PROOF_DIR="./proofs/${EPOCH}/merklesubtree1024"
 N=1
-mkdir ./proofs/merklesubtree1024
+mkdir ./proofs/${EPOCH}/merklesubtree1024
 
 for i in $(seq 0 0); do
   WITNESS_FILE="$WITNESS_DIR/witness_${i}.txt"

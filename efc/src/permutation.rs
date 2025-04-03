@@ -820,7 +820,7 @@ pub fn end2end_permutation_assignments_with_beacon_data(
 
     let permutation_query_assignment_chunks: PermutationQueryAssignmentChunks =
         permutation_query_assignments
-            .chunks(16*mpi_size1)
+            .chunks(16 * mpi_size1)
             .map(|x| x.to_vec())
             .collect();
 
@@ -836,7 +836,8 @@ pub fn end2end_permutation_assignments_with_beacon_data(
     > = vec![permutation_hashbit_assignments.clone(); 1];
     permutation_hashbit_assignment_chunks[0].extend(permutation_hashbit_assignments.clone());
     if mpi_size2 == 1 {
-        permutation_hashbit_assignment_chunks.push(permutation_hashbit_assignment_chunks[0].clone());
+        permutation_hashbit_assignment_chunks
+            .push(permutation_hashbit_assignment_chunks[0].clone());
     } else if mpi_size2 == 2 {
         permutation_hashbit_assignment_chunks[0].extend(permutation_hashbit_assignments.clone());
         permutation_hashbit_assignment_chunks[0].extend(permutation_hashbit_assignments.clone());

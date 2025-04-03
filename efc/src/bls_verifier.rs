@@ -463,7 +463,8 @@ pub fn end2end_blsverifier_witnesses_with_assignments_chunk16(
             let witness_solver = Arc::clone(&witness_solver);
             let witnesses_dir_clone = witnesses_dir.clone();
             thread::spawn(move || {
-                let assignment_chunks: Vec<Vec<BLSVERIFIERCircuit<M31>>> = assignments.chunks(16).map(|x| x.to_vec()).collect();
+                let assignment_chunks: Vec<Vec<BLSVERIFIERCircuit<M31>>> =
+                    assignments.chunks(16).map(|x| x.to_vec()).collect();
                 let handles = assignment_chunks
                     .into_iter()
                     .enumerate()
@@ -472,11 +473,13 @@ pub fn end2end_blsverifier_witnesses_with_assignments_chunk16(
                         thread::spawn(move || {
                             let mut hint_registry = HintRegistry::<M31>::new();
                             register_hint(&mut hint_registry);
-                            (j, witness_solver
-                                .solve_witnesses_with_hints(&assignments, &mut hint_registry)
-                                .unwrap())
-                        }
-                        )
+                            (
+                                j,
+                                witness_solver
+                                    .solve_witnesses_with_hints(&assignments, &mut hint_registry)
+                                    .unwrap(),
+                            )
+                        })
                     })
                     .collect::<Vec<_>>();
                 let mut results = Vec::new();
@@ -486,12 +489,16 @@ pub fn end2end_blsverifier_witnesses_with_assignments_chunk16(
                 let num_inputs_per_witness = results[0].1.num_inputs_per_witness;
                 let num_public_inputs_per_witness = results[0].1.num_public_inputs_per_witness;
                 results.sort_by_key(|(j, _)| *j);
-                let new_values = results.into_iter().map(|(_, witness)| witness.values).flatten().collect::<Vec<M31>>();
+                let new_values = results
+                    .into_iter()
+                    .map(|(_, witness)| witness.values)
+                    .flatten()
+                    .collect::<Vec<M31>>();
                 let new_witness: Witness<M31Config> = Witness::<M31Config> {
                     num_witnesses: assignments.len(),
                     num_inputs_per_witness,
                     num_public_inputs_per_witness,
-                    values: new_values
+                    values: new_values,
                 };
                 write_witness_to_file(
                     &format!("{}/witness_{}.txt", witnesses_dir_clone, i + offset),
@@ -530,8 +537,10 @@ pub fn end2end_blsverifier_assignments_with_beacon_data(
         "assigned bls_verifier assignments time: {:?}",
         end_time.duration_since(start_time)
     );
-    let assignment_chunks: BlsVerifierAssignmentChunks =
-        assignments.chunks(16*mpi_size).map(|x| x.to_vec()).collect();
+    let assignment_chunks: BlsVerifierAssignmentChunks = assignments
+        .chunks(16 * mpi_size)
+        .map(|x| x.to_vec())
+        .collect();
     assignment_chunks
 }
 

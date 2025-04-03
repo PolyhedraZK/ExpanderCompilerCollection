@@ -6,7 +6,6 @@ use circuit_std_rs::poseidon::utils::*;
 use circuit_std_rs::sha256;
 use circuit_std_rs::utils::register_hint;
 use circuit_std_rs::utils::simple_select;
-use expander_compiler::circuit::layered::witness;
 use expander_compiler::frontend::extra::debug_eval;
 use expander_compiler::frontend::*;
 use serde::Deserialize;
@@ -940,7 +939,7 @@ pub fn end2end_validator_tree_assignments_with_beacon_data(
     let convert_validator_list_to_merkle_tree_assignments_chunks: Vec<
         Vec<ValidatorSubMTCircuit<M31>>,
     > = convert_validator_list_to_merkle_tree_assignment
-        .chunks(16*mpi_size)
+        .chunks(16 * mpi_size)
         .map(|x| x.to_vec())
         .collect();
     let end_time = std::time::Instant::now();
