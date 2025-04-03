@@ -37,34 +37,39 @@ fn main() {
             return;
         }
     }
-    if let (Some(s_index), Some(e_index), Some(m_index)) = (
+    if let (Some(s_index), Some(e_index)) = (
         args.iter().position(|x| x == "-s"),
         args.iter().position(|x| x == "-e"),
-        args.iter().position(|x| x == "-m"),
     ) {
-        match (
-            args.get(s_index + 1),
-            args.get(e_index + 1),
-            args.get(m_index + 1),
-        ) {
-            (Some(stage), Some(epoch_str), Some(mpi_config_str)) => {
-                match epoch_str.parse::<u64>() {
-                    Ok(epoch) => {
-                        println!(
-                            "Running stage: {} at epoch: {}, with mpi_config: {}",
-                            stage, epoch, mpi_config_str
-                        );
-                        let mpi_config: Vec<usize> = mpi_config_str
-                            .split(',')
-                            .filter_map(|x| x.parse().ok())
-                            .collect();
-
-                        end2end_witnesses_from_beacon_data(epoch, stage, &mpi_config);
-                    }
-                    Err(_) => println!("Epoch must be a valid number"),
+        let default_mpi_config = [8, 8, 8, 8, 2, 8].to_vec();
+        match (args.get(s_index + 1), args.get(e_index + 1)) {
+            (Some(stage), Some(epoch_str)) => match epoch_str.parse::<u64>() {
+                Ok(epoch) => {
+                    // check mpi_config arg
+                    let mpi_config = if let Some(m_index) = args.iter().position(|x| x == "-m") {
+                        if let Some(mpi_config_str) = args.get(m_index + 1) {
+                            mpi_config_str
+                                .split(',')
+                                .filter_map(|x| x.parse::<usize>().ok())
+                                .collect::<Vec<usize>>()
+                        } else {
+                            println!("Missing value for -m, using default mpi_config.");
+                            default_mpi_config
+                        }
+                    } else {
+                        default_mpi_config
+                    };
+    
+                    println!(
+                        "Running stage: {} at epoch: {}, with mpi_config: {:?}",
+                        stage, epoch, mpi_config
+                    );
+    
+                    end2end_witnesses_from_beacon_data(epoch, stage, &mpi_config);
                 }
-            }
-            _ => println!("Missing value for -s or -e or -m"),
+                Err(_) => println!("Epoch must be a valid number"),
+            },
+            _ => println!("Missing value for -s or -e"),
         }
     } else {
         println!("Missing -s or -e argument");
