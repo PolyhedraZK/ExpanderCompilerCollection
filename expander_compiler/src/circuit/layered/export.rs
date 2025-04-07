@@ -72,7 +72,9 @@ impl<C: Config> Circuit<C, NormalInputType> {
         &self,
     ) -> expander_circuit::Circuit<C::DefaultGKRFieldConfig> {
         let circuit = self.export_to_expander::<C::DefaultGKRFieldConfig>();
-        circuit.flatten::<C::DefaultGKRConfig>()
+        let mut flattened = circuit.flatten::<C::DefaultGKRConfig>();
+        flattened.pre_process_gkr::<C::DefaultGKRConfig>();
+        flattened
     }
 }
 
