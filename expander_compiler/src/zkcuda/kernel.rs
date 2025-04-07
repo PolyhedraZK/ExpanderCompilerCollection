@@ -2,7 +2,7 @@ use crate::compile::{
     compile_step_1, compile_step_2, compile_step_3, compile_step_4, print_ir_stats,
     print_layered_circuit_stats,
 };
-use crate::frontend::*;
+use crate::frontend::{extra, BasicAPI, CompileOptions, Error, RootAPI, Variable, API};
 use crate::utils::pool::Pool;
 use crate::{
     circuit::{
@@ -412,6 +412,7 @@ fn add_duplicate(st: usize, a: &mut Vec<usize>, b: &[usize]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::circuit::config::M31Config;
 
     fn example_kernel_1<C: Config>(api: &mut API<C>, a: &mut Vec<Vec<Variable>>) {
         let x = a[1][1];
