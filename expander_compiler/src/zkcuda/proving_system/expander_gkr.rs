@@ -4,7 +4,7 @@ use std::io::{Cursor, Read};
 use crate::circuit::config::Config;
 
 use super::super::kernel::Kernel;
-use super::{check_inputs, prepare_inputs, Commitment, ProvingSystem};
+use super::{check_inputs, prepare_inputs, Commitment, Proof, ProvingSystem};
 
 use arith::Field;
 use expander_circuit::Circuit;
@@ -53,6 +53,25 @@ impl<C: Config> Clone for ExpanderGKRCommitment<C> {
             vals_len: self.vals_len,
             commitment: self.commitment.clone(),
         }
+    }
+}
+
+impl<C: Config> ExpSerde for ExpanderGKRCommitment<C> {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
+        self.vals_len.serialize_into(&mut writer)?;
+        self.commitment.serialize_into(&mut writer)
+    }
+    fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
+        let vals_len = usize::deserialize_from(&mut reader)?;
+        let commitment =
+            <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::Commitment::deserialize_from(
+                &mut reader,
+            )?;
+        Ok(ExpanderGKRCommitment {
+            vals_len,
+            commitment,
+        })
     }
 }
 
@@ -106,6 +125,19 @@ impl<C: Config> Clone for ExpanderGKRVerifierSetup<C> {
 pub struct ExpanderGKRProof {
     data: Vec<ExpanderProof>,
 }
+
+impl ExpSerde for ExpanderGKRProof {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
+        self.data.serialize_into(&mut writer)
+    }
+    fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
+        let data = Vec::<ExpanderProof>::deserialize_from(&mut reader)?;
+        Ok(ExpanderGKRProof { data })
+    }
+}
+
+impl Proof for ExpanderGKRProof {}
 
 pub struct ExpanderGKRProvingSystem<C: Config> {
     _config: std::marker::PhantomData<C>,

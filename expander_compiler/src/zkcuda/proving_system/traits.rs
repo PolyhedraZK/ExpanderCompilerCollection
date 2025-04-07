@@ -1,15 +1,19 @@
+use serdes::ExpSerde;
+
 use super::super::{kernel::Kernel, proof::ComputationGraph};
 
 use crate::circuit::config::Config;
 
-pub trait Commitment<C: Config>: Clone {
+pub trait Commitment<C: Config>: Clone + ExpSerde {
     fn vals_len(&self) -> usize;
 }
+
+pub trait Proof: Clone + ExpSerde {}
 
 pub trait ProvingSystem<C: Config> {
     type ProverSetup: Clone;
     type VerifierSetup: Clone;
-    type Proof: Clone;
+    type Proof: Proof;
     type Commitment: Commitment<C>;
     type CommitmentExtraInfo: Clone;
 
