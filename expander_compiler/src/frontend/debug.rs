@@ -456,7 +456,7 @@ impl<C: Config, H: HintCaller<C::CircuitField>> RootAPI<C> for DebugBuilder<C, H
             .unwrap()
             .clone()
     }
-    
+
     fn set_outputs(&mut self, outputs: Vec<Variable>) {
         ensure_variables_valid(&outputs);
         self.outputs = outputs;
