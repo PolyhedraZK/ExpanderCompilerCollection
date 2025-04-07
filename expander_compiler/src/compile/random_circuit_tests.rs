@@ -1,6 +1,6 @@
 use crate::{
     circuit::{
-        config::{BN254Config, Config, GF2Config, M31Config},
+        config::{BN254Config, Config, GF2Config, GoldilocksConfig, M31Config},
         ir::{
             common::rand_gen::{RandomCircuitConfig, RandomRange},
             source::RootCircuit as IrSourceRoot,
@@ -9,7 +9,6 @@ use crate::{
     },
     compile::compile,
     field::FieldArith,
-    frontend::GoldilocksConfig,
     utils::error::Error,
 };
 
