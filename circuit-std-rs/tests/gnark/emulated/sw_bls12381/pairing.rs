@@ -1,11 +1,9 @@
 use ark_bls12_381::{
     Fr, G1Affine as BlsG1Affine, G1Projective, G2Affine as BlsG2Affine, G2Projective,
 };
-use expander_compiler::{
-    declare_circuit,
-    frontend::{extra::debug_eval, Define, HintRegistry, M31Config, RootAPI, Variable, M31},
-};
-
+use ark_ec::Group;
+use ark_ff::UniformRand;
+use ark_serialize::CanonicalSerialize;
 use circuit_std_rs::{
     gnark::{
         element::Element,
@@ -17,11 +15,12 @@ use circuit_std_rs::{
     utils::register_hint,
     StdCircuit,
 };
-
-use ark_ff::{AdditiveGroup, UniformRand};
+use expander_compiler::{
+    declare_circuit,
+    frontend::{extra::debug_eval, Define, HintRegistry, M31Config, RootAPI, Variable, M31},
+};
 
 use crate::common::circuit_test_helper_with_hint;
-use ark_serialize::CanonicalSerialize;
 use std::ops::{Mul, Neg};
 
 // this param is just for StdCircuit to compile, the data is not used actually. can see the test 'pairing_random_test' below

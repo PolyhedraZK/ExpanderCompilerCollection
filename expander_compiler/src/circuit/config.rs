@@ -38,7 +38,7 @@ impl Config for M31Config {
 
     type DefaultSimdField = mersenne31::M31x16;
     type DefaultGKRFieldConfig = gkr_field_config::M31ExtConfig;
-    type DefaultGKRConfig = gkr::gkr_configs::M31ExtConfigSha2Raw; //TODO: compare with M31ExtConfigSha2Orion
+    type DefaultGKRConfig = expander_config::M31ExtConfigSha2Raw; //TODO: compare with M31ExtConfigSha2Orion
 
     const CONFIG_ID: usize = 1;
 }
@@ -47,11 +47,11 @@ impl Config for M31Config {
 pub struct BN254Config {}
 
 impl Config for BN254Config {
-    type CircuitField = crate::field::BN254;
+    type CircuitField = crate::field::BN254Fr;
 
-    type DefaultSimdField = crate::field::BN254;
+    type DefaultSimdField = crate::field::BN254Fr;
     type DefaultGKRFieldConfig = gkr_field_config::BN254Config;
-    type DefaultGKRConfig = gkr::gkr_configs::BN254ConfigMIMC5Raw; // TODO: compare with BN254ConfigSha2Raw
+    type DefaultGKRConfig = expander_config::BN254ConfigMIMC5Raw; // TODO: compare with BN254ConfigSha2Raw
 
     const CONFIG_ID: usize = 2;
 }
@@ -64,7 +64,7 @@ impl Config for GF2Config {
 
     type DefaultSimdField = gf2::GF2x8;
     type DefaultGKRFieldConfig = gkr_field_config::GF2ExtConfig;
-    type DefaultGKRConfig = gkr::gkr_configs::GF2ExtConfigSha2Raw; // TODO: compare with GF2ExtConfigSha2Orion
+    type DefaultGKRConfig = expander_config::GF2ExtConfigSha2Raw; // TODO: compare with GF2ExtConfigSha2Orion
 
     const CONFIG_ID: usize = 3;
 
@@ -73,4 +73,16 @@ impl Config for GF2Config {
     const COST_MUL: usize = 200;
 
     const ENABLE_RANDOM_COMBINATION: bool = false;
+}
+
+#[derive(Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub struct GoldilocksConfig {}
+
+impl Config for GoldilocksConfig {
+    type CircuitField = crate::field::Goldilocks;
+
+    type DefaultSimdField = goldilocks::Goldilocksx8;
+    type DefaultGKRFieldConfig = gkr_field_config::GoldilocksExtConfig;
+    type DefaultGKRConfig = expander_config::GoldilocksExtConfigSha2Raw;
+    const CONFIG_ID: usize = 4;
 }

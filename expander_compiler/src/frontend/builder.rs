@@ -526,6 +526,7 @@ pub struct RootBuilder<C: Config> {
     sub_circuits: HashMap<usize, source::Circuit<C>>,
     sub_circuit_output_structure: HashMap<usize, Vec<usize>>,
     full_hash_id: HashMap<usize, [u8; 32]>,
+    outputs: Vec<Variable>,
 }
 
 macro_rules! root_binary_op {
@@ -671,6 +672,11 @@ impl<C: Config> RootAPI<C> for RootBuilder<C> {
             .unwrap()
             .clone()
     }
+
+    fn set_outputs(&mut self, outputs: Vec<Variable>) {
+        ensure_variables_valid(&outputs);
+        self.outputs = outputs;
+    }
 }
 
 impl<C: Config> RootBuilder<C> {
@@ -692,6 +698,7 @@ impl<C: Config> RootBuilder<C> {
                 sub_circuits: HashMap::new(),
                 full_hash_id: HashMap::new(),
                 sub_circuit_output_structure: HashMap::new(),
+                outputs: Vec::new(),
             },
             inputs,
             public_inputs,
@@ -702,7 +709,7 @@ impl<C: Config> RootBuilder<C> {
         let mut circuits = self.sub_circuits;
         assert_eq!(self.current_builders.len(), 1);
         for (circuit_id, builder) in self.current_builders {
-            circuits.insert(circuit_id, builder.build(&[]));
+            circuits.insert(circuit_id, builder.build(&self.outputs));
         }
         source::RootCircuit {
             circuits,

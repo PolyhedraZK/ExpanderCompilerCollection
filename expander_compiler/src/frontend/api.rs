@@ -108,4 +108,5 @@ pub trait RootAPI<C: Config>: Sized + BasicAPI<C> + UnconstrainedAPI<C> + 'stati
     fn register_sub_circuit_output_structure(&mut self, circuit_id: usize, structure: Vec<usize>);
     // This function should only be called in proc macro generated code
     fn get_sub_circuit_output_structure(&self, circuit_id: usize) -> Vec<usize>;
+    fn set_outputs(&mut self, outputs: Vec<Variable>);
 }
