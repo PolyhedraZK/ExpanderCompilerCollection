@@ -86,45 +86,47 @@ fn zkcuda_1() {
     let mut ctx: Context<M31Config, DummyProvingSystem<M31Config>> = Context::default();
     let mut a = vec![];
     for i in 0..32 {
-        a.push(M31::from(i + 1 as u32));
+        a.push(M31::from(i + 1_u32));
     }
     let a = ctx.copy_raw_to_device(&a);
     let mut io = vec![a, None];
-    ctx.call_kernel_raw(&kernel_add_2, &mut io, 16, &vec![false, false]);
+    ctx.call_kernel_raw(&kernel_add_2, &mut io, 16, &[false, false]);
     let b = io[1].clone();
     let mut io = vec![b, None];
-    ctx.call_kernel_raw(&kernel_add_16, &mut io, 1, &vec![false, false]);
+    ctx.call_kernel_raw(&kernel_add_16, &mut io, 1, &[false, false]);
     let c = io[1].clone();
     let result = ctx.copy_raw_to_host(c);
     assert_eq!(result, vec![M31::from(32 * 33 / 2)]);
 
     let computation_graph = ctx.to_computation_graph();
-    let proof = ctx.to_proof();
-    assert!(computation_graph.verify(&proof));
+    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
+    let proof = ctx.to_proof(&prover_setup);
+    assert!(computation_graph.verify(&proof, &verifier_setup));
 
     let mut ctx: Context<M31Config, DummyProvingSystem<M31Config>> = Context::default();
     let mut a = vec![];
     let mut b = vec![];
     for i in 0..16 {
-        a.push(M31::from((i + 1) * (i % 8 + 1) as u32));
+        a.push(M31::from((i + 1) * (i % 8 + 1)));
     }
     for i in 0..8 {
-        b.push(M31::from(i + 1 as u32));
+        b.push(M31::from(i + 1_u32));
     }
     let a = ctx.copy_raw_to_device(&a);
     let b = ctx.copy_raw_to_device(&b);
     let mut io = vec![a, b, None];
-    ctx.call_kernel_raw(&kernel_div_2x8, &mut io, 2, &vec![false, true, false]);
+    ctx.call_kernel_raw(&kernel_div_2x8, &mut io, 2, &[false, true, false]);
     let c = io[2].clone();
     let mut io = vec![c, None];
-    ctx.call_kernel_raw(&kernel_add_16, &mut io, 1, &vec![false, false]);
+    ctx.call_kernel_raw(&kernel_add_16, &mut io, 1, &[false, false]);
     let c = io[1].clone();
     let result = ctx.copy_raw_to_host(c);
     assert_eq!(result, vec![M31::from(16 * 17 / 2)]);
 
     let computation_graph = ctx.to_computation_graph();
-    let proof = ctx.to_proof();
-    assert!(computation_graph.verify(&proof));
+    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
+    let proof = ctx.to_proof(&prover_setup);
+    assert!(computation_graph.verify(&proof, &verifier_setup));
 }
 
 fn div_2x5<C: Config>(api: &mut API<C>, inputs: &mut Vec<Vec<Variable>>) {
@@ -189,40 +191,41 @@ fn zkcuda_2() {
     let mut ctx: Context<M31Config, DummyProvingSystem<M31Config>> = Context::default();
     let mut a = vec![];
     let mut b = vec![];
-    for j in 0..5 {
+    for j in 0..8 {
         for i in j * 5..j * 5 + 5 {
-            a.push(M31::from((i + 1) * (i % 5 + 1) as u32));
+            a.push(M31::from((i + 1) * (i % 5 + 1)));
         }
         for _ in 0..3 {
             a.push(M31::from(0));
         }
     }
-    for _ in 0..24 {
+    /*for _ in 0..24 {
         a.push(M31::from(0));
+    }*/
+    for i in 0..8 {
+        b.push(M31::from(i + 1_u32));
     }
-    for i in 0..5 {
-        b.push(M31::from(i + 1 as u32));
-    }
-    for _ in 0..3 {
+    /*for _ in 0..3 {
         b.push(M31::from(0));
-    }
+    }*/
     let a = ctx.copy_raw_to_device(&a);
     let b = ctx.copy_raw_to_device(&b);
     let mut io = vec![a, b, None];
-    ctx.call_kernel_raw(&kernel_div_2x5, &mut io, 5, &vec![false, true, false]);
+    ctx.call_kernel_raw(&kernel_div_2x5, &mut io, 8, &[false, true, false]);
     let c = io[2].clone();
     let mut io = vec![c, None];
-    ctx.call_kernel_raw(&kernel_add_5, &mut io, 5, &vec![false, false]);
+    ctx.call_kernel_raw(&kernel_add_5, &mut io, 8, &[false, false]);
     let c = io[1].clone();
     let mut io = vec![c, None];
-    ctx.call_kernel_raw(&kernel_add_5, &mut io, 1, &vec![false, false]);
+    ctx.call_kernel_raw(&kernel_add_5, &mut io, 1, &[false, false]);
     let c = io[1].clone();
     let result = ctx.copy_raw_to_host(c);
     assert_eq!(result, vec![M31::from(25 * 26 / 2)]);
 
     let computation_graph = ctx.to_computation_graph();
-    let proof = ctx.to_proof();
-    assert!(computation_graph.verify(&proof));
+    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
+    let proof = ctx.to_proof(&prover_setup);
+    assert!(computation_graph.verify(&proof, &verifier_setup));
 }
 
 #[kernel]

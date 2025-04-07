@@ -11,11 +11,11 @@ use expander_compiler::field::Field;
 use expander_compiler::frontend::{
     compile, BN254Config, CompileResult, Define, M31Config, RootAPI,
 };
-use expander_compiler::utils::serde::Serde;
 use expander_compiler::{
     declare_circuit,
     frontend::{Config, Variable},
 };
+use serdes::ExpSerde;
 
 /// Arguments for the command line
 /// - field: field identifier

@@ -1,7 +1,7 @@
 use crate::circuit::config::Config;
 
 use super::super::kernel::Kernel;
-use super::{check_inputs, prepare_inputs, Commitment, Proof, ProvingSystem};
+use super::{check_inputs, prepare_inputs, Commitment, ProvingSystem};
 
 // dummy implementation of these traits
 
@@ -11,8 +11,8 @@ pub struct DummyCommitment<C: Config> {
 }
 
 impl<C: Config> Commitment<C> for DummyCommitment<C> {
-    fn vals_ref(&self) -> &[C::DefaultSimdField] {
-        &self.vals
+    fn vals_len(&self) -> usize {
+        self.vals.len()
     }
 }
 
@@ -20,8 +20,6 @@ impl<C: Config> Commitment<C> for DummyCommitment<C> {
 pub struct DummyProof {
     cond: Vec<Vec<bool>>,
 }
-
-impl Proof for DummyProof {}
 
 #[deprecated(
     note = "DummyProvingSystem is a dummy implementation for testing purposes. Please use ExpanderGKRProvingSystem."
@@ -32,41 +30,75 @@ pub struct DummyProvingSystem<C: Config> {
 
 #[allow(deprecated)]
 impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
+    type ProverSetup = ();
+    type VerifierSetup = ();
     type Proof = DummyProof;
     type Commitment = DummyCommitment<C>;
-    fn commit(vals: &[C::DefaultSimdField]) -> Self::Commitment {
-        assert!(vals.len() & (vals.len() - 1) == 0);
-        DummyCommitment {
-            vals: vals.to_vec(),
-        }
+    type CommitmentExtraInfo = ();
+
+    fn setup(
+        computation_graph: &crate::zkcuda::proof::ComputationGraph<C>,
+    ) -> (Self::ProverSetup, Self::VerifierSetup) {
+        // let _ = computation_graph;
+        computation_graph
+            .commitments_lens
+            .iter()
+            .for_each(|&x| println!("Setup length {}", x));
+
+        ((), ())
     }
+
+    fn commit(
+        _prover_setup: &Self::ProverSetup,
+        vals: &Vec<<C as Config>::DefaultSimdField>,
+    ) -> (Self::Commitment, Self::CommitmentExtraInfo) {
+        println!("Real Commit to {} values", vals.len());
+        assert!(vals.len() & (vals.len() - 1) == 0);
+        (
+            DummyCommitment {
+                vals: vals.to_vec(),
+            },
+            (),
+        )
+    }
+
     fn prove(
+        _prover_setup: &Self::ProverSetup,
         kernel: &Kernel<C>,
-        commitments: &[&Self::Commitment],
+        _commitments: &[&Self::Commitment],
+        _commitments_extra_info: &[&Self::CommitmentExtraInfo],
+        commitments_values: &[&[C::DefaultSimdField]],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> DummyProof {
-        check_inputs(kernel, commitments, parallel_count, is_broadcast);
+        check_inputs(kernel, commitments_values, parallel_count, is_broadcast);
         let mut res = vec![];
         for i in 0..parallel_count {
-            let lc_input = prepare_inputs(kernel, commitments, is_broadcast, i);
+            let lc_input = prepare_inputs(kernel, commitments_values, is_broadcast, i);
             let (_, cond) = kernel
                 .layered_circuit
                 .eval_with_public_inputs_simd(lc_input, &[]);
+            for x in cond.iter() {
+                if !*x {
+                    panic!("constraints not satisfied");
+                }
+            }
             res.push(cond);
         }
         DummyProof { cond: res }
     }
     fn verify(
+        _verifier_setup: &Self::VerifierSetup,
         kernel: &Kernel<C>,
         proof: &Self::Proof,
         commitments: &[&Self::Commitment],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> bool {
-        check_inputs(kernel, commitments, parallel_count, is_broadcast);
+        let values = commitments.iter().map(|c| &c.vals[..]).collect::<Vec<_>>();
+        check_inputs(kernel, &values, parallel_count, is_broadcast);
         for i in 0..parallel_count {
-            let lc_input = prepare_inputs(kernel, commitments, is_broadcast, i);
+            let lc_input = prepare_inputs(kernel, &values, is_broadcast, i);
             let (_, cond) = kernel
                 .layered_circuit
                 .eval_with_public_inputs_simd(lc_input, &[]);

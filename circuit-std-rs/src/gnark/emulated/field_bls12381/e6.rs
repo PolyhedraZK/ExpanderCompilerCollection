@@ -2,7 +2,7 @@ use crate::gnark::{element::Element, emparam::Bls12381Fp};
 use expander_compiler::frontend::{Config, RootAPI, Variable};
 use num_bigint::BigInt;
 
-use super::e2::*;
+use super::e2::{Ext2, GE2};
 #[derive(Default, Clone)]
 pub struct GE6 {
     pub b0: GE2,
