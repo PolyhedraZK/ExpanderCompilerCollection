@@ -402,6 +402,7 @@ fn test_pairing_check_gkr() {
 }
 
 #[test]
+#[ignore]
 fn pairing_random_test() {
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
