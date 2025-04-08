@@ -59,12 +59,15 @@ fn rangeproof_logup_test() {
     assert_eq!(output, vec![true]);
 }
 
-declare_circuit!(RangeproofCircuit { place_holder: Variable });
+declare_circuit!(RangeproofCircuit {
+    place_holder: Variable
+});
 impl Define<GoldilocksConfig> for RangeproofCircuit<Variable> {
     fn define<Builder: RootAPI<GoldilocksConfig>>(&self, builder: &mut Builder) {
         let mut table = LogUpRangeProofTable::new(16);
         table.initial(builder);
-    
+
+        // < 2^24 value
         let key = builder.constant(2012340986);
         table.rangeproof(builder, key, 24);
 
@@ -78,17 +81,14 @@ fn rangeproof_goldilocks_test() {
     hint_registry.register("myhint.querycounthint", query_count_hint);
     hint_registry.register("myhint.rangeproofhint", rangeproof_hint);
     //compile and test
-    let compile_result = compile(
-        &RangeproofCircuit::default(),
-        CompileOptions::default(),
-    )
-    .unwrap();
-    let assignment = RangeproofCircuit { place_holder: Goldilocks::one() };
+    let compile_result = compile(&RangeproofCircuit::default(), CompileOptions::default()).unwrap();
+    let assignment = RangeproofCircuit {
+        place_holder: Goldilocks::one(),
+    };
     let witness = compile_result
         .witness_solver
         .solve_witness_with_hints(&assignment, &mut hint_registry)
         .unwrap();
     let output = compile_result.layered_circuit.run(&witness);
     assert_eq!(output, vec![true]);
-
 }
