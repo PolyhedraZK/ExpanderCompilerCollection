@@ -387,34 +387,30 @@ fn prove_input_claim<C: Config>(
     parallel_count: usize,
     transcript: &mut transcript!(C),
 ) {
-    for (((input, commitment_val), extra_info), ib) in kernel
-        .layered_circuit_input
+    for ((commitment_val, extra_info), ib) in commitments_values
         .iter()
-        .zip(commitments_values)
         .zip(commitments_extra_info)
         .zip(is_broadcast)
     {
-        let nb_challenge_vars = input.len.trailing_zeros() as usize;
-        let mut challenge_vars = x[..nb_challenge_vars].to_vec();
-        
+        let val_len = if *ib { commitment_val.len() } else { commitment_val.len() / parallel_count };
         let vals_to_open = if *ib {
-            vec![*commitment_val]
+            *commitment_val
         } else {
-            commitment_val
-                .chunks(commitment_val.len() / parallel_count)
-                .map(|chunk| chunk)
-                .collect::<Vec<_>>()
+            &commitment_val[val_len * parallel_index..val_len * (parallel_index + 1)]
         };
+        
+        let nb_challenge_vars = val_len.ilog2() as usize;
+        let challenge_vars = x[..nb_challenge_vars].to_vec();
 
         let params = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::gen_params(
-            vals.len().ilog2() as usize,
+            val_len,
         );
-        let p_key = p_keys.p_keys.get(&vals.len()).unwrap();
+        let p_key = p_keys.p_keys.get(&val_len).unwrap();
 
         // TODO: Remove unnecessary `to_vec` clone
-        let poly = MultiLinearPoly::new(vals.to_vec());
+        let poly = MultiLinearPoly::new(vals_to_open.to_vec());
         let v = MultiLinearPolyExpander::<field!(C)>::single_core_eval_circuit_vals_at_expander_challenge(
-            vals,
+            vals_to_open,
             &challenge_vars,
             x_simd,
             &[],
@@ -433,7 +429,7 @@ fn prove_input_claim<C: Config>(
                 x_mpi: vec![],
             },
             transcript,
-            &extra_info.scratch,
+            &extra_info.scratch[parallel_index],
         )
         .unwrap();
         transcript.unlock_proof();
@@ -467,23 +463,10 @@ fn verify_input_claim<C: Config>(
         .zip(commitments)
         .zip(is_broadcast)
     {
-        let nb_challenge_vars = input.len.trailing_zeros() as usize;
-        let mut challenge_vars = x[..nb_challenge_vars].to_vec();
-        let n_bits_for_parallel_index = parallel_count.ilog2() as usize;
-        let parallel_index_as_bits = if *ib {
-            vec![]
-        } else {
-            (0..n_bits_for_parallel_index)
-                .map(|i| {
-                    <field!(C) as GKRFieldConfig>::ChallengeField::from(
-                        ((parallel_index >> i) & 1) as u32,
-                    )
-                })
-                .collect::<Vec<_>>()
-        };
-        challenge_vars.extend_from_slice(&parallel_index_as_bits);
-
         let commitment_len = commitment.vals_len();
+        let nb_challenge_vars = commitment_len.ilog2() as usize;
+        let challenge_vars = x[..nb_challenge_vars].to_vec();   
+
         let params = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::gen_params(
             commitment_len.ilog2() as usize,
         );
@@ -504,7 +487,7 @@ fn verify_input_claim<C: Config>(
         let verified = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::verify(
             &params,
             v_key,
-            &commitment.commitment,
+            &commitment.commitment[parallel_index],
             &ExpanderGKRChallenge::<C::DefaultGKRFieldConfig> {
                 x: challenge_vars,
                 x_simd: x_simd.to_vec(),
