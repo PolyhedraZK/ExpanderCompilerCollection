@@ -396,21 +396,16 @@ fn prove_input_claim<C: Config>(
     {
         let nb_challenge_vars = input.len.trailing_zeros() as usize;
         let mut challenge_vars = x[..nb_challenge_vars].to_vec();
-        let parallel_index_as_bits = if *ib {
-            vec![]
+        
+        let vals_to_open = if *ib {
+            vec![*commitment_val]
         } else {
-            let n_bits_for_parallel_index = parallel_count.ilog2() as usize;
-            (0..n_bits_for_parallel_index)
-                .map(|i| {
-                    <field!(C) as GKRFieldConfig>::ChallengeField::from(
-                        ((parallel_index >> i) & 1) as u32,
-                    )
-                })
+            commitment_val
+                .chunks(commitment_val.len() / parallel_count)
+                .map(|chunk| chunk)
                 .collect::<Vec<_>>()
         };
-        challenge_vars.extend_from_slice(&parallel_index_as_bits);
 
-        let vals = commitment_val;
         let params = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::gen_params(
             vals.len().ilog2() as usize,
         );
