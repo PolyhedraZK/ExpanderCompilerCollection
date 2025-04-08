@@ -16,9 +16,10 @@ fn prove_circuit_file_inner<C: config::Config>(
         expander_config::GKRScheme::Vanilla,
         mpi_config::MPIConfig::new(),
     );
-    let mut circuit = expander_circuit::Circuit::<C::DefaultGKRFieldConfig>::load_circuit::<
-        C::DefaultGKRConfig,
-    >(circuit_filename);
+    let mut circuit =
+        expander_circuit::Circuit::<C::DefaultGKRFieldConfig>::single_thread_prover_load_circuit::<
+            C::DefaultGKRConfig,
+        >(circuit_filename);
     let witness =
         layered::witness::Witness::<C>::deserialize_from(witness).map_err(|e| e.to_string())?;
     let (simd_input, simd_public_input) = witness.to_simd::<C::DefaultSimdField>();
@@ -38,7 +39,7 @@ fn verify_circuit_file_inner<C: config::Config>(
         expander_config::GKRScheme::Vanilla,
         mpi_config::MPIConfig::new(),
     );
-    let mut circuit = expander_circuit::Circuit::<C::DefaultGKRFieldConfig>::load_circuit::<
+    let mut circuit = expander_circuit::Circuit::<C::DefaultGKRFieldConfig>::verifier_load_circuit::<
         C::DefaultGKRConfig,
     >(circuit_filename);
     let witness =
