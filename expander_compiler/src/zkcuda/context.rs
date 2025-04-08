@@ -557,11 +557,10 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
     }
 
     pub fn to_proof(self, prover_setup: &P::ProverSetup) -> CombinedProof<C, P> {
-        let proofs = self
-            .proof_templates
+        let commitments = self.proof_templates
             .iter()
             .map(|template| {
-                let commitments = template
+                template
                     .commitment_indices
                     .iter()
                     .zip(template.is_broadcast.iter())
@@ -573,9 +572,16 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
                             *is_broadcast,
                         )
                     })
-                    .collect::<Vec<_>>();
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
 
-                P::prove(
+        let proofs: (Vec<P::Commitment>, Vec<P::Proof>) = self
+            .proof_templates
+            .iter()
+            .zip(commitments.iter())
+            .map(|(template, commitment)| {
+                let proof = P::prove(
                     prover_setup,
                     self.kernels.get(template.kernel_id),
                     &template
@@ -595,9 +601,11 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
                         .collect::<Vec<_>>(),
                     next_power_of_two(template.parallel_count),
                     &template.is_broadcast,
-                )
+                );
+                (commitments, proof)
             })
-            .collect::<Vec<_>>();
+            .unzip();
+        
         CombinedProof {
             commitments: commitments.into_iter().map(|x| x.0).collect(),
             proofs,
