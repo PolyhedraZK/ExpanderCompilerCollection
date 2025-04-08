@@ -44,7 +44,7 @@ macro_rules! pcs {
 
 pub struct ExpanderGKRCommitment<C: Config> {
     vals_len: usize,
-    commitment: <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::Commitment,
+    commitment: Vec<<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::Commitment>,
 }
 
 impl<C: Config> Clone for ExpanderGKRCommitment<C> {
@@ -63,7 +63,7 @@ impl<C: Config> Commitment<C> for ExpanderGKRCommitment<C> {
 }
 
 pub struct ExpanderGKRCommitmentExtraInfo<C: Config> {
-    scratch: <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::ScratchPad,
+    scratch: Vec<<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::ScratchPad>,
 }
 
 impl<C: Config> Clone for ExpanderGKRCommitmentExtraInfo<C> {
@@ -123,16 +123,24 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
         let mut p_keys = HashMap::new();
         let mut v_keys = HashMap::new();
-        for commitment_len in computation_graph.commitments_lens.iter() {
-            if p_keys.contains_key(commitment_len) {
-                continue;
+        for template in computation_graph.proof_templates.iter() {
+            for (x, is_broadcast) in template.commitment_indices.iter().zip(template.is_broadcast.iter()) {
+                let val_total_len = computation_graph.commitments_lens[*x];
+                let val_actual_len = if *is_broadcast {
+                    val_total_len
+                } else {
+                    val_total_len / template.parallel_count
+                };
+                if p_keys.contains_key(&val_actual_len) {
+                    continue;
+                }
+                let (_params, p_key, v_key, _scratch) =
+                pcs_testing_setup_fixed_seed::<field!(C), transcript!(C), pcs!(C)>(val_actual_len);
+                p_keys.insert(val_actual_len, p_key);
+                v_keys.insert(val_actual_len, v_key);
             }
-
-            let (_params, p_key, v_key, _scratch) =
-                pcs_testing_setup_fixed_seed::<field!(C), transcript!(C), pcs!(C)>(*commitment_len);
-            p_keys.insert(*commitment_len, p_key);
-            v_keys.insert(*commitment_len, v_key);
         }
+
         (
             ExpanderGKRProverSetup { p_keys },
             ExpanderGKRVerifierSetup { v_keys },
@@ -142,27 +150,45 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
     fn commit(
         prover_setup: &Self::ProverSetup,
         vals: &Vec<<C as Config>::DefaultSimdField>,
+        parallel_count: usize,
+        is_broadcast: bool,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo) {
-        let n_vars = vals.len().ilog2() as usize;
-        let params = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::gen_params(n_vars);
-        let p_key = prover_setup.p_keys.get(&vals.len()).unwrap();
-        let mut scratch =
-            <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::init_scratch_pad(
-                &params,
-                &MPIConfig::default(),
-            );
+        let vals_to_commit = if is_broadcast {
+            vec![vals.as_slice()]
+        } else {
+            vals.chunks(vals.len() / parallel_count)
+                .map(|chunk| chunk)
+                .collect::<Vec<_>>()
+        };
 
-        let commitment = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::commit(
-            &params,
-            &MPIConfig::default(),
-            p_key,
-            &RefMultiLinearPoly::from_ref(vals),
-            &mut scratch,
-        )
-        .unwrap();
+        let n_vars = vals_to_commit[0].len().ilog2() as usize;
+        let params = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::gen_params(n_vars);
+        let p_key = prover_setup.p_keys.get(&(1 << n_vars)).unwrap();
+
+        let (commitment, scratch) = vals_to_commit
+            .into_iter()
+            .map(|vals| {
+                let mut scratch =
+                    <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::init_scratch_pad(
+                        &params,
+                        &MPIConfig::default(),
+                    );
+
+                let commitment = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::commit(
+                    &params,
+                    &MPIConfig::default(),
+                    p_key,
+                    &MultiLinearPoly::new(vals.to_vec()),
+                    &mut scratch,
+                )
+                .unwrap();
+                (commitment, scratch)    
+            })
+            .unzip::<_, _, Vec<_>, Vec<_>>();
+
         (
             Self::Commitment {
-                vals_len: vals.len(),
+                vals_len: 1 << n_vars,
                 commitment,
             },
             Self::CommitmentExtraInfo { scratch },

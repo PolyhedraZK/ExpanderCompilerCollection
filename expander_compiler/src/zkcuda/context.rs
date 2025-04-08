@@ -557,15 +557,24 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
     }
 
     pub fn to_proof(self, prover_setup: &P::ProverSetup) -> CombinedProof<C, P> {
-        let commitments = self
-            .device_memories
-            .iter()
-            .map(|x| P::commit(prover_setup, &x.values))
-            .collect::<Vec<_>>();
         let proofs = self
             .proof_templates
             .iter()
             .map(|template| {
+                let commitments = template
+                    .commitment_indices
+                    .iter()
+                    .zip(template.is_broadcast.iter())
+                    .map(|(x, is_broadcast)| {
+                        P::commit(
+                            prover_setup,
+                            &self.device_memories[*x].values,
+                            next_power_of_two(template.parallel_count),
+                            *is_broadcast,
+                        )
+                    })
+                    .collect::<Vec<_>>();
+
                 P::prove(
                     prover_setup,
                     self.kernels.get(template.kernel_id),

@@ -51,8 +51,9 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
     fn commit(
         _prover_setup: &Self::ProverSetup,
         vals: &Vec<<C as Config>::DefaultSimdField>,
+        _parallel_count: usize,
+        _is_broadcast: bool,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo) {
-        println!("Real Commit to {} values", vals.len());
         assert!(vals.len() & (vals.len() - 1) == 0);
         (
             DummyCommitment {

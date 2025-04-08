@@ -19,6 +19,8 @@ pub trait ProvingSystem<C: Config> {
     fn commit(
         prover_setup: &Self::ProverSetup,
         vals: &Vec<C::DefaultSimdField>,
+        parallel_count: usize,
+        is_broadcast: bool,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo);
 
     fn prove(
