@@ -68,7 +68,7 @@ impl Define<GoldilocksConfig> for RangeproofCircuit<Variable> {
         table.initial(builder);
 
         // < 2^24 value
-        let key = builder.constant(2012340986);
+        let key = builder.constant(16777215);
         table.rangeproof(builder, key, 24);
 
         table.final_check(builder);
