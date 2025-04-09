@@ -1,13 +1,26 @@
+use serdes::ExpSerde;
+
 use crate::circuit::config::Config;
 
 use super::super::kernel::Kernel;
-use super::{check_inputs, prepare_inputs, Commitment, ProvingSystem};
+use super::{check_inputs, prepare_inputs, Commitment, Proof, ProvingSystem};
 
 // dummy implementation of these traits
 
 #[derive(Clone)]
 pub struct DummyCommitment<C: Config> {
     vals: Vec<C::DefaultSimdField>,
+}
+
+impl<C: Config> ExpSerde for DummyCommitment<C> {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
+        self.vals.serialize_into(&mut writer)
+    }
+    fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
+        let vals = Vec::<C::DefaultSimdField>::deserialize_from(&mut reader)?;
+        Ok(DummyCommitment { vals })
+    }
 }
 
 impl<C: Config> Commitment<C> for DummyCommitment<C> {
@@ -20,6 +33,19 @@ impl<C: Config> Commitment<C> for DummyCommitment<C> {
 pub struct DummyProof {
     cond: Vec<Vec<bool>>,
 }
+
+impl ExpSerde for DummyProof {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
+        self.cond.serialize_into(&mut writer)
+    }
+    fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
+        let cond = Vec::<Vec<bool>>::deserialize_from(&mut reader)?;
+        Ok(DummyProof { cond })
+    }
+}
+
+impl Proof for DummyProof {}
 
 #[deprecated(
     note = "DummyProvingSystem is a dummy implementation for testing purposes. Please use ExpanderGKRProvingSystem."
