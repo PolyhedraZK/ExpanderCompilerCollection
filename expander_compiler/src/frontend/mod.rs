@@ -7,6 +7,7 @@ mod api;
 mod builder;
 mod circuit;
 mod debug;
+mod sub_circuit;
 mod variables;
 mod witness;
 
@@ -20,6 +21,7 @@ pub use crate::utils::error::Error;
 pub use api::{BasicAPI, RootAPI};
 pub use builder::Variable;
 pub use circuit::Define;
+pub use macros::memorized;
 pub use witness::WitnessSolver;
 
 pub mod internal {
@@ -34,6 +36,9 @@ pub mod extra {
 
     pub use super::api::UnconstrainedAPI;
     pub use super::debug::DebugBuilder;
+    pub use super::sub_circuit::{
+        HashStructureAndPrimitive, JoinVecVariables, RebuildVecVariables,
+    };
     pub use crate::hints::registry::{EmptyHintCaller, HintCaller, HintRegistry};
 
     use super::{internal, CircuitField, Config, Define, Variable};
