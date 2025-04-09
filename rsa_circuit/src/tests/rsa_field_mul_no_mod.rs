@@ -169,7 +169,7 @@ fn test_mul_without_mod() {
         .unwrap();
     let output = compile_result.layered_circuit.run(&witness);
 
-    debug_eval(&MulNoModCircuit::default(), &assignment);
+    debug_eval(&MulNoModCircuit::default(), &assignment, EmptyHintCaller);
 
     assert_eq!(output, vec![true]);
 }

@@ -2,7 +2,11 @@ use std::{fmt, hash::Hash};
 
 use arith::FieldForECC;
 
-use crate::{field::FieldArith, hints, utils::error::Error};
+use crate::{
+    field::FieldArith,
+    hints,
+    utils::{error::Error, serde::Serde},
+};
 
 use super::config::Config;
 
@@ -109,78 +113,263 @@ impl<C: Config> Coef<C> {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CrossLayerInput {
+    // the actual layer of the input is (output_layer-1-layer)
+    pub layer: usize,
+    pub offset: usize,
+}
+
+#[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct NormalInput {
+    pub offset: usize,
+}
+
+pub trait Input:
+    std::fmt::Debug
+    + std::fmt::Display
+    + Clone
+    + Copy
+    + Default
+    + Hash
+    + PartialEq
+    + Eq
+    + PartialOrd
+    + Ord
+    + Serde
+{
+    fn layer(&self) -> usize;
+    fn offset(&self) -> usize;
+    fn set_offset(&mut self, offset: usize);
+    fn new(layer: usize, offset: usize) -> Self;
+}
+
+impl Input for CrossLayerInput {
+    fn layer(&self) -> usize {
+        self.layer
+    }
+    fn offset(&self) -> usize {
+        self.offset
+    }
+    fn set_offset(&mut self, offset: usize) {
+        self.offset = offset;
+    }
+    fn new(layer: usize, offset: usize) -> Self {
+        CrossLayerInput { layer, offset }
+    }
+}
+
+impl Input for NormalInput {
+    fn layer(&self) -> usize {
+        0
+    }
+    fn offset(&self) -> usize {
+        self.offset
+    }
+    fn set_offset(&mut self, offset: usize) {
+        self.offset = offset;
+    }
+    fn new(layer: usize, offset: usize) -> Self {
+        if layer != 0 {
+            panic!("new called on non-zero layer");
+        }
+        NormalInput { offset }
+    }
+}
+
+#[derive(Debug, Default, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CrossLayerInputUsize {
+    v: Vec<usize>,
+}
+
+#[derive(Debug, Default, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct NormalInputUsize {
+    v: usize,
+}
+
+pub trait InputUsize:
+    std::fmt::Debug + Default + Clone + Hash + PartialEq + Eq + PartialOrd + Ord + Serde
+{
+    type Iter<'a>: Iterator<Item = usize>
+    where
+        Self: 'a;
+    fn len(&self) -> usize;
+    fn iter(&self) -> Self::Iter<'_>;
+    fn get(&self, i: usize) -> usize {
+        self.iter().nth(i).unwrap()
+    }
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+    fn from_vec(v: Vec<usize>) -> Self;
+    fn to_vec(&self) -> Vec<usize> {
+        self.iter().collect()
+    }
+}
+
+impl InputUsize for CrossLayerInputUsize {
+    type Iter<'a> = std::iter::Copied<std::slice::Iter<'a, usize>>;
+    fn len(&self) -> usize {
+        self.v.len()
+    }
+    fn iter(&self) -> Self::Iter<'_> {
+        self.v.iter().copied()
+    }
+    fn from_vec(v: Vec<usize>) -> Self {
+        CrossLayerInputUsize { v }
+    }
+}
+
+impl InputUsize for NormalInputUsize {
+    type Iter<'a> = std::iter::Once<usize>;
+    fn len(&self) -> usize {
+        1
+    }
+    fn iter(&self) -> Self::Iter<'_> {
+        std::iter::once(self.v)
+    }
+    fn from_vec(v: Vec<usize>) -> Self {
+        if v.len() != 1 {
+            panic!("from_vec called on non-singleton vec");
+        }
+        NormalInputUsize { v: v[0] }
+    }
+}
+
+pub trait InputType:
+    std::fmt::Debug + Default + Clone + Hash + PartialEq + Eq + PartialOrd + Ord
+{
+    type Input: Input;
+    type InputUsize: InputUsize;
+    const CROSS_LAYER_RELAY: bool;
+}
+
+#[derive(Debug, Default, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CrossLayerInputType;
+
+impl InputType for CrossLayerInputType {
+    type Input = CrossLayerInput;
+    type InputUsize = CrossLayerInputUsize;
+    const CROSS_LAYER_RELAY: bool = true;
+}
+
+#[derive(Debug, Default, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct NormalInputType;
+
+impl InputType for NormalInputType {
+    type Input = NormalInput;
+    type InputUsize = NormalInputUsize;
+    const CROSS_LAYER_RELAY: bool = false;
+}
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct Gate<C: Config, const INPUT_NUM: usize> {
-    pub inputs: [usize; INPUT_NUM],
+pub struct Gate<C: Config, I: InputType, const INPUT_NUM: usize> {
+    pub inputs: [I::Input; INPUT_NUM],
     pub output: usize,
     pub coef: Coef<C>,
 }
 
-impl<C: Config, const INPUT_NUM: usize> Gate<C, INPUT_NUM> {
+impl<C: Config, const INPUT_NUM: usize> Gate<C, NormalInputType, INPUT_NUM> {
     pub fn export_to_expander<
-        DestConfig: expander_config::GKRConfig<CircuitField = C::CircuitField>,
+        DestConfig: gkr_field_config::GKRFieldConfig<CircuitField = C::CircuitField>,
     >(
         &self,
     ) -> expander_circuit::Gate<DestConfig, INPUT_NUM> {
         let (c, r) = self.coef.export_to_expander();
+        let mut i_ids: [usize; INPUT_NUM] = [0; INPUT_NUM];
+        for (x, y) in self.inputs.iter().zip(i_ids.iter_mut()) {
+            *y = x.offset();
+        }
         expander_circuit::Gate {
-            i_ids: self.inputs,
+            i_ids,
             o_id: self.output,
             coef: c,
             coef_type: r,
-            gate_type: 2 - INPUT_NUM, // TODO: check this
+            gate_type: 2 - INPUT_NUM,
         }
     }
 }
 
-pub type GateMul<C> = Gate<C, 2>;
-pub type GateAdd<C> = Gate<C, 1>;
-pub type GateConst<C> = Gate<C, 0>;
+impl<C: Config, const INPUT_NUM: usize> Gate<C, CrossLayerInputType, INPUT_NUM> {
+    pub fn export_to_crosslayer_simple<
+        DestConfig: gkr_field_config::GKRFieldConfig<CircuitField = C::CircuitField>,
+    >(
+        &self,
+    ) -> crosslayer_prototype::SimpleGate<DestConfig, INPUT_NUM> {
+        let (c, r) = self.coef.export_to_expander();
+        let mut i_ids: [usize; INPUT_NUM] = [0; INPUT_NUM];
+        for (x, y) in self.inputs.iter().zip(i_ids.iter_mut()) {
+            assert_eq!(x.layer(), 0);
+            *y = x.offset();
+        }
+        crosslayer_prototype::SimpleGate {
+            i_ids,
+            o_id: self.output,
+            coef: c,
+            coef_type: match r {
+                expander_circuit::CoefType::Constant => crosslayer_prototype::CoefType::Constant,
+                expander_circuit::CoefType::Random => crosslayer_prototype::CoefType::Random,
+                expander_circuit::CoefType::PublicInput(x) => {
+                    crosslayer_prototype::CoefType::PublicInput(x)
+                }
+            },
+        }
+    }
+}
+
+pub type GateMul<C, I> = Gate<C, I, 2>;
+pub type GateAdd<C, I> = Gate<C, I, 1>;
+pub type GateConst<C, I> = Gate<C, I, 0>;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct GateCustom<C: Config> {
+pub struct GateCustom<C: Config, I: InputType> {
     pub gate_type: usize,
-    pub inputs: Vec<usize>,
+    pub inputs: Vec<I::Input>,
     pub output: usize,
     pub coef: Coef<C>,
 }
 
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
-pub struct Allocation {
-    pub input_offset: usize,
+pub struct Allocation<I: InputType> {
+    pub input_offset: I::InputUsize,
     pub output_offset: usize,
 }
 
-pub type ChildSpec = (usize, Vec<Allocation>);
+pub type ChildSpec<I> = (usize, Vec<Allocation<I>>);
 
 #[derive(Default, Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
-pub struct Segment<C: Config> {
-    pub num_inputs: usize,
+pub struct Segment<C: Config, I: InputType> {
+    pub num_inputs: I::InputUsize,
     pub num_outputs: usize,
-    pub child_segs: Vec<ChildSpec>,
-    pub gate_muls: Vec<GateMul<C>>,
-    pub gate_adds: Vec<GateAdd<C>>,
-    pub gate_consts: Vec<GateConst<C>>,
-    pub gate_customs: Vec<GateCustom<C>>,
+    pub child_segs: Vec<ChildSpec<I>>,
+    pub gate_muls: Vec<GateMul<C, I>>,
+    pub gate_adds: Vec<GateAdd<C, I>>,
+    pub gate_consts: Vec<GateConst<C, I>>,
+    pub gate_customs: Vec<GateCustom<C, I>>,
 }
 
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
-pub struct Circuit<C: Config> {
+pub struct Circuit<C: Config, I: InputType> {
     pub num_public_inputs: usize,
     pub num_actual_outputs: usize,
     pub expected_num_output_zeroes: usize,
-    pub segments: Vec<Segment<C>>,
+    pub segments: Vec<Segment<C, I>>,
     pub layer_ids: Vec<usize>,
 }
 
-impl<C: Config> Circuit<C> {
+impl<C: Config, I: InputType> Circuit<C, I> {
     pub fn validate(&self) -> Result<(), Error> {
         for (i, seg) in self.segments.iter().enumerate() {
-            if seg.num_inputs == 0 || (seg.num_inputs & (seg.num_inputs - 1)) != 0 {
-                return Err(Error::InternalError(format!(
-                    "segment {} inputlen {} not power of 2",
-                    i, seg.num_inputs
-                )));
+            for (j, x) in seg.num_inputs.iter().enumerate() {
+                if x == 0 || (x & (x - 1)) != 0 {
+                    return Err(Error::InternalError(format!(
+                        "segment {} input {} len {} not power of 2",
+                        i, j, x
+                    )));
+                }
+            }
+            if seg.num_inputs.len() == 0 {
+                return Err(Error::InternalError(format!("segment {} inputlen 0", i)));
             }
             if seg.num_outputs == 0 || (seg.num_outputs & (seg.num_outputs - 1)) != 0 {
                 return Err(Error::InternalError(format!(
@@ -189,20 +378,53 @@ impl<C: Config> Circuit<C> {
                 )));
             }
             for m in seg.gate_muls.iter() {
-                if m.inputs[0] >= seg.num_inputs
-                    || m.inputs[1] >= seg.num_inputs
-                    || m.output >= seg.num_outputs
-                {
+                if m.inputs[0].layer() >= self.layer_ids.len() {
                     return Err(Error::InternalError(format!(
-                        "segment {} mul gate ({}, {}, {}) out of range",
+                        "segment {} mul gate ({:?}, {:?}, {}) input 0 layer out of range",
+                        i, m.inputs[0], m.inputs[1], m.output
+                    )));
+                }
+                if m.inputs[1].layer() >= self.layer_ids.len() {
+                    return Err(Error::InternalError(format!(
+                        "segment {} mul gate ({:?}, {:?}, {}) input 1 layer out of range",
+                        i, m.inputs[0], m.inputs[1], m.output
+                    )));
+                }
+                if m.inputs[0].offset() >= seg.num_inputs.get(m.inputs[0].layer()) {
+                    return Err(Error::InternalError(format!(
+                        "segment {} mul gate ({:?}, {:?}, {}) input 0 out of range",
+                        i, m.inputs[0], m.inputs[1], m.output
+                    )));
+                }
+                if m.inputs[1].offset() >= seg.num_inputs.get(m.inputs[1].layer()) {
+                    return Err(Error::InternalError(format!(
+                        "segment {} mul gate ({:?}, {:?}, {}) input 1 out of range",
+                        i, m.inputs[0], m.inputs[1], m.output
+                    )));
+                }
+                if m.output >= seg.num_outputs {
+                    return Err(Error::InternalError(format!(
+                        "segment {} mul gate ({:?}, {:?}, {}) out of range",
                         i, m.inputs[0], m.inputs[1], m.output
                     )));
                 }
             }
             for a in seg.gate_adds.iter() {
-                if a.inputs[0] >= seg.num_inputs || a.output >= seg.num_outputs {
+                if a.inputs[0].layer() >= self.layer_ids.len() {
                     return Err(Error::InternalError(format!(
-                        "segment {} add gate ({}, {}) out of range",
+                        "segment {} add gate ({:?}, {}) input layer out of range",
+                        i, a.inputs[0], a.output
+                    )));
+                }
+                if a.inputs[0].offset() >= seg.num_inputs.get(a.inputs[0].layer()) {
+                    return Err(Error::InternalError(format!(
+                        "segment {} add gate ({:?}, {}) input out of range",
+                        i, a.inputs[0], a.output
+                    )));
+                }
+                if a.output >= seg.num_outputs {
+                    return Err(Error::InternalError(format!(
+                        "segment {} add gate ({:?}, {}) out of range",
                         i, a.inputs[0], a.output
                     )));
                 }
@@ -216,11 +438,17 @@ impl<C: Config> Circuit<C> {
                 }
             }
             for cu in seg.gate_customs.iter() {
-                for &input in cu.inputs.iter() {
-                    if input >= seg.num_inputs {
+                for input in cu.inputs.iter() {
+                    if input.layer() >= self.layer_ids.len() {
+                        return Err(Error::InternalError(format!(
+                            "segment {} custom gate {} input layer out of range",
+                            i, cu.output
+                        )));
+                    }
+                    if input.offset() >= seg.num_inputs.get(input.layer()) {
                         return Err(Error::InternalError(format!(
                             "segment {} custom gate {} input out of range",
-                            i, input
+                            i, cu.output
                         )));
                     }
                 }
@@ -239,18 +467,43 @@ impl<C: Config> Circuit<C> {
                     )));
                 }
                 let subc = &self.segments[*sub_id];
+                if subc.num_inputs.len() > seg.num_inputs.len() {
+                    return Err(Error::InternalError(format!(
+                        "segment {} subcircuit {} input length {} larger than {}",
+                        i,
+                        sub_id,
+                        subc.num_inputs.len(),
+                        seg.num_inputs.len()
+                    )));
+                }
                 for a in allocs.iter() {
-                    if a.input_offset % subc.num_inputs != 0 {
+                    if a.input_offset.len() != subc.num_inputs.len() {
                         return Err(Error::InternalError(format!(
-                            "segment {} subcircuit {} input offset {} not aligned to {}",
-                            i, sub_id, a.input_offset, subc.num_inputs
+                            "segment {} subcircuit {} input offset {:?} length not equal to {}",
+                            i,
+                            sub_id,
+                            a.input_offset,
+                            subc.num_inputs.len()
                         )));
                     }
-                    if a.input_offset + subc.num_inputs > seg.num_inputs {
-                        return Err(Error::InternalError(format!(
-                            "segment {} subcircuit {} input offset {} out of range",
-                            i, sub_id, a.input_offset
-                        )));
+                    for ((x, y), z) in a
+                        .input_offset
+                        .iter()
+                        .zip(subc.num_inputs.iter())
+                        .zip(seg.num_inputs.iter())
+                    {
+                        if x % y != 0 {
+                            return Err(Error::InternalError(format!(
+                                "segment {} subcircuit {} input offset {} not aligned to {}",
+                                i, sub_id, x, y
+                            )));
+                        }
+                        if x + y > z {
+                            return Err(Error::InternalError(format!(
+                                "segment {} subcircuit {} input offset {} out of range",
+                                i, sub_id, x
+                            )));
+                        }
                     }
                     if a.output_offset % subc.num_outputs != 0 {
                         return Err(Error::InternalError(format!(
@@ -275,65 +528,101 @@ impl<C: Config> Circuit<C> {
         if self.layer_ids.is_empty() {
             return Err(Error::InternalError("empty layer".to_string()));
         }
-        for i in 1..self.layer_ids.len() {
-            let cur = &self.segments[self.layer_ids[i]];
-            let prev = &self.segments[self.layer_ids[i - 1]];
-            if cur.num_inputs != prev.num_outputs {
+        let mut layer_sizes = Vec::with_capacity(self.layer_ids.len() + 1);
+        layer_sizes.push(self.segments[self.layer_ids[0]].num_inputs.get(0));
+        for l in self.layer_ids.iter() {
+            layer_sizes.push(self.segments[*l].num_outputs);
+        }
+        for (i, l) in self.layer_ids.iter().enumerate() {
+            let cur = &self.segments[*l];
+            if cur.num_inputs.len() > i + 1 {
                 return Err(Error::InternalError(format!(
-                    "segment {} inputlen {} not equal to segment {} outputlen {}",
-                    self.layer_ids[i],
-                    cur.num_inputs,
-                    self.layer_ids[i - 1],
-                    prev.num_outputs
+                    "layer {} input length {} larger than {}",
+                    i,
+                    cur.num_inputs.len(),
+                    i + 1
                 )));
+            }
+            for (j, x) in cur.num_inputs.iter().enumerate() {
+                if x != layer_sizes[i - j] {
+                    return Err(Error::InternalError(format!(
+                        "layer {} input {} length {} not equal to {}",
+                        i,
+                        j,
+                        x,
+                        layer_sizes[i - j]
+                    )));
+                }
             }
         }
         let (input_mask, output_mask) = self.compute_masks();
         for i in 1..self.layer_ids.len() {
-            for j in 0..self.segments[self.layer_ids[i]].num_inputs {
-                if input_mask[self.layer_ids[i]][j] && !output_mask[self.layer_ids[i - 1]][j] {
-                    return Err(Error::InternalError(format!(
-                        "circuit {} input {} not initialized by circuit {} output",
-                        self.layer_ids[i],
-                        j,
-                        self.layer_ids[i - 1]
-                    )));
+            for (l, len) in self.segments[self.layer_ids[i]]
+                .num_inputs
+                .iter()
+                .enumerate()
+            {
+                if i == l {
+                    // if this is also the global input, it's always initialized
+                    continue;
+                }
+                for j in 0..len {
+                    if input_mask[self.layer_ids[i]][l][j]
+                        && !output_mask[self.layer_ids[i - 1 - l]][j]
+                    {
+                        return Err(Error::InternalError(format!(
+                            "circuit {} (layer {}) input {} not initialized by circuit {} (layer {}) output",
+                            self.layer_ids[i],
+                            i,
+                            j,
+                            self.layer_ids[i - 1 - l],
+                            i - 1 - l
+                        )));
+                    }
                 }
             }
         }
         Ok(())
     }
 
-    fn compute_masks(&self) -> (Vec<Vec<bool>>, Vec<Vec<bool>>) {
-        let mut input_mask: Vec<Vec<bool>> = Vec::with_capacity(self.segments.len());
+    fn compute_masks(&self) -> (Vec<Vec<Vec<bool>>>, Vec<Vec<bool>>) {
+        let mut input_mask: Vec<Vec<Vec<bool>>> = Vec::with_capacity(self.segments.len());
         let mut output_mask: Vec<Vec<bool>> = Vec::with_capacity(self.segments.len());
         for seg in self.segments.iter() {
-            let mut input_mask_seg = vec![false; seg.num_inputs];
+            let mut input_mask_seg: Vec<Vec<bool>> =
+                seg.num_inputs.iter().map(|x| vec![false; x]).collect();
             let mut output_mask_seg = vec![false; seg.num_outputs];
             for m in seg.gate_muls.iter() {
-                input_mask_seg[m.inputs[0]] = true;
-                input_mask_seg[m.inputs[1]] = true;
+                input_mask_seg[m.inputs[0].layer()][m.inputs[0].offset()] = true;
+                input_mask_seg[m.inputs[1].layer()][m.inputs[1].offset()] = true;
                 output_mask_seg[m.output] = true;
             }
             for a in seg.gate_adds.iter() {
-                input_mask_seg[a.inputs[0]] = true;
+                input_mask_seg[a.inputs[0].layer()][a.inputs[0].offset()] = true;
                 output_mask_seg[a.output] = true;
             }
             for cs in seg.gate_consts.iter() {
                 output_mask_seg[cs.output] = true;
             }
             for cu in seg.gate_customs.iter() {
-                for &input in cu.inputs.iter() {
-                    input_mask_seg[input] = true;
+                for input in cu.inputs.iter() {
+                    input_mask_seg[input.layer()][input.offset()] = true;
                 }
                 output_mask_seg[cu.output] = true;
             }
             for (sub_id, allocs) in seg.child_segs.iter() {
                 let subc = &self.segments[*sub_id];
                 for a in allocs.iter() {
-                    for j in 0..subc.num_inputs {
-                        input_mask_seg[a.input_offset + j] =
-                            input_mask_seg[a.input_offset + j] || input_mask[*sub_id][j];
+                    for (l, (off, len)) in a
+                        .input_offset
+                        .iter()
+                        .zip(subc.num_inputs.iter())
+                        .enumerate()
+                    {
+                        for i in 0..len {
+                            input_mask_seg[l][off + i] =
+                                input_mask_seg[l][off + i] || input_mask[*sub_id][l][i];
+                        }
                     }
                     for j in 0..subc.num_outputs {
                         output_mask_seg[a.output_offset + j] =
@@ -348,19 +637,24 @@ impl<C: Config> Circuit<C> {
     }
 
     pub fn input_size(&self) -> usize {
-        self.segments[self.layer_ids[0]].num_inputs
+        self.segments[self.layer_ids[0]].num_inputs.get(0)
     }
 
     pub fn eval_unsafe(&self, inputs: Vec<C::CircuitField>) -> (Vec<C::CircuitField>, bool) {
         if inputs.len() != self.input_size() {
             panic!("input length mismatch");
         }
-        let mut cur = inputs;
-        for &id in self.layer_ids.iter() {
-            let mut next = vec![C::CircuitField::zero(); self.segments[id].num_outputs];
-            self.apply_segment_unsafe(&self.segments[id], &cur, &mut next);
-            cur = next;
+        let mut cur = vec![inputs];
+        for id in self.layer_ids.iter() {
+            let mut next = vec![C::CircuitField::zero(); self.segments[*id].num_outputs];
+            let mut inputs: Vec<&[C::CircuitField]> = Vec::new();
+            for i in 0..self.segments[*id].num_inputs.len() {
+                inputs.push(&cur[cur.len() - i - 1]);
+            }
+            self.apply_segment_unsafe(&self.segments[*id], &inputs, &mut next);
+            cur.push(next);
         }
+        let cur = cur.last().unwrap();
         let mut constraints_satisfied = true;
         for out in cur.iter().take(self.expected_num_output_zeroes) {
             if !out.is_zero() {
@@ -376,35 +670,45 @@ impl<C: Config> Circuit<C> {
 
     fn apply_segment_unsafe(
         &self,
-        seg: &Segment<C>,
-        cur: &[C::CircuitField],
+        seg: &Segment<C, I>,
+        cur: &[&[C::CircuitField]],
         nxt: &mut [C::CircuitField],
     ) {
         for m in seg.gate_muls.iter() {
-            nxt[m.output] += cur[m.inputs[0]] * cur[m.inputs[1]] * m.coef.get_value_unsafe();
+            nxt[m.output] += cur[m.inputs[0].layer()][m.inputs[0].offset()]
+                * cur[m.inputs[1].layer()][m.inputs[1].offset()]
+                * m.coef.get_value_unsafe();
         }
         for a in seg.gate_adds.iter() {
-            nxt[a.output] += cur[a.inputs[0]] * a.coef.get_value_unsafe();
+            nxt[a.output] +=
+                cur[a.inputs[0].layer()][a.inputs[0].offset()] * a.coef.get_value_unsafe();
         }
         for cs in seg.gate_consts.iter() {
             nxt[cs.output] += cs.coef.get_value_unsafe();
         }
         for cu in seg.gate_customs.iter() {
             let mut inputs = Vec::with_capacity(cu.inputs.len());
-            for &input in cu.inputs.iter() {
-                inputs.push(cur[input]);
+            for input in cu.inputs.iter() {
+                inputs.push(cur[input.layer()][input.offset()]);
             }
             let outputs = hints::stub_impl(cu.gate_type, &inputs, 1);
-            for (i, &output) in outputs.iter().enumerate() {
-                nxt[cu.output + i] += output * cu.coef.get_value_unsafe();
+            for (i, output) in outputs.iter().enumerate() {
+                nxt[cu.output + i] += *output * cu.coef.get_value_unsafe();
             }
         }
         for (sub_id, allocs) in seg.child_segs.iter() {
             let subc = &self.segments[*sub_id];
             for a in allocs.iter() {
+                let inputs = a
+                    .input_offset
+                    .iter()
+                    .zip(subc.num_inputs.iter())
+                    .enumerate()
+                    .map(|(l, (off, len))| &cur[l][off..off + len])
+                    .collect::<Vec<_>>();
                 self.apply_segment_unsafe(
                     subc,
-                    &cur[a.input_offset..a.input_offset + subc.num_inputs],
+                    &inputs,
                     &mut nxt[a.output_offset..a.output_offset + subc.num_outputs],
                 );
             }
@@ -419,17 +723,22 @@ impl<C: Config> Circuit<C> {
         if inputs.len() != self.input_size() {
             panic!("input length mismatch");
         }
-        let mut cur = inputs;
-        for &id in self.layer_ids.iter() {
-            let mut next = vec![C::CircuitField::zero(); self.segments[id].num_outputs];
+        let mut cur = vec![inputs];
+        for id in self.layer_ids.iter() {
+            let mut next = vec![C::CircuitField::zero(); self.segments[*id].num_outputs];
+            let mut inputs: Vec<&[C::CircuitField]> = Vec::new();
+            for i in 0..self.segments[*id].num_inputs.len() {
+                inputs.push(&cur[cur.len() - i - 1]);
+            }
             self.apply_segment_with_public_inputs(
-                &self.segments[id],
-                &cur,
+                &self.segments[*id],
+                &inputs,
                 &mut next,
                 public_inputs,
             );
-            cur = next;
+            cur.push(next);
         }
+        let cur = cur.last().unwrap();
         let mut constraints_satisfied = true;
         for out in cur.iter().take(self.expected_num_output_zeroes) {
             if !out.is_zero() {
@@ -445,38 +754,46 @@ impl<C: Config> Circuit<C> {
 
     fn apply_segment_with_public_inputs(
         &self,
-        seg: &Segment<C>,
-        cur: &[C::CircuitField],
+        seg: &Segment<C, I>,
+        cur: &[&[C::CircuitField]],
         nxt: &mut [C::CircuitField],
         public_inputs: &[C::CircuitField],
     ) {
         for m in seg.gate_muls.iter() {
-            nxt[m.output] += cur[m.inputs[0]]
-                * cur[m.inputs[1]]
+            nxt[m.output] += cur[m.inputs[0].layer()][m.inputs[0].offset()]
+                * cur[m.inputs[1].layer()][m.inputs[1].offset()]
                 * m.coef.get_value_with_public_inputs(public_inputs);
         }
         for a in seg.gate_adds.iter() {
-            nxt[a.output] += cur[a.inputs[0]] * a.coef.get_value_with_public_inputs(public_inputs);
+            nxt[a.output] += cur[a.inputs[0].layer()][a.inputs[0].offset()]
+                * a.coef.get_value_with_public_inputs(public_inputs);
         }
         for cs in seg.gate_consts.iter() {
             nxt[cs.output] += cs.coef.get_value_with_public_inputs(public_inputs);
         }
         for cu in seg.gate_customs.iter() {
             let mut inputs = Vec::with_capacity(cu.inputs.len());
-            for &input in cu.inputs.iter() {
-                inputs.push(cur[input]);
+            for input in cu.inputs.iter() {
+                inputs.push(cur[input.layer()][input.offset()]);
             }
             let outputs = hints::stub_impl(cu.gate_type, &inputs, 1);
-            for (i, &output) in outputs.iter().enumerate() {
-                nxt[cu.output + i] += output * cu.coef.get_value_unsafe();
+            for (i, output) in outputs.iter().enumerate() {
+                nxt[cu.output + i] += *output * cu.coef.get_value_with_public_inputs(public_inputs);
             }
         }
         for (sub_id, allocs) in seg.child_segs.iter() {
             let subc = &self.segments[*sub_id];
             for a in allocs.iter() {
+                let inputs = a
+                    .input_offset
+                    .iter()
+                    .zip(subc.num_inputs.iter())
+                    .enumerate()
+                    .map(|(l, (off, len))| &cur[l][off..off + len])
+                    .collect::<Vec<_>>();
                 self.apply_segment_with_public_inputs(
                     subc,
-                    &cur[a.input_offset..a.input_offset + subc.num_inputs],
+                    &inputs,
                     &mut nxt[a.output_offset..a.output_offset + subc.num_outputs],
                     public_inputs,
                 );
@@ -505,15 +822,27 @@ impl<C: Config> fmt::Display for Coef<C> {
     }
 }
 
-impl<C: Config> fmt::Display for Segment<C> {
+impl fmt::Display for CrossLayerInput {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "input={} output={}", self.num_inputs, self.num_outputs)?;
+        write!(f, "(layer={}, offset={})", self.layer, self.offset)
+    }
+}
+
+impl fmt::Display for NormalInput {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.offset)
+    }
+}
+
+impl<C: Config, I: InputType> fmt::Display for Segment<C, I> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "input={:?} output={}", self.num_inputs, self.num_outputs)?;
         for (sub_id, allocs) in self.child_segs.iter() {
             writeln!(f, "apply circuit {} at:", sub_id)?;
             for a in allocs.iter() {
                 writeln!(
                     f,
-                    "    input_offset={} output_offset={}",
+                    "    input_offset={:?} output_offset={}",
                     a.input_offset, a.output_offset
                 )?;
             }
@@ -545,7 +874,7 @@ impl<C: Config> fmt::Display for Segment<C> {
     }
 }
 
-impl<C: Config> fmt::Display for Circuit<C> {
+impl<C: Config, I: InputType> fmt::Display for Circuit<C, I> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, seg) in self.segments.iter().enumerate() {
             write!(f, "Circuit {}: {}", i, seg)?;

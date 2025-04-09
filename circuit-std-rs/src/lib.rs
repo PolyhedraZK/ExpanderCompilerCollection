@@ -13,5 +13,7 @@ pub use non_native::*;
 pub mod sha2;
 pub use sha2::*;
 
+pub mod big_int;
+pub mod sha2_m31;
 #[cfg(test)]
 mod tests;
