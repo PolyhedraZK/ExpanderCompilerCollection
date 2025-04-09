@@ -1,5 +1,5 @@
 use expander_compiler::frontend::*;
-use rand::{thread_rng, Rng};
+use rand::{Rng, SeedableRng};
 use tiny_keccak::Hasher;
 
 const N_HASHES: usize = 1;
@@ -232,10 +232,11 @@ fn keccak_gf2_full() {
     } = compile_result;
 
     let mut assignment = Keccak256Circuit::<GF2>::default();
+    let mut rng = rand::rngs::StdRng::seed_from_u64(1235);
     for k in 0..N_HASHES {
         let mut data = vec![0u8; 64];
         for i in 0..64 {
-            data[i] = thread_rng().gen();
+            data[i] = rng.gen();
         }
         let mut hash = tiny_keccak::Keccak::v256();
         hash.update(&data);
