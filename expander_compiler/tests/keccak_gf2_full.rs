@@ -286,6 +286,10 @@ fn keccak_gf2_full() {
     let mut expander_circuit = layered_circuit
         .export_to_expander::<<GF2Config as Config>::DefaultGKRFieldConfig>()
         .flatten();
+    // TODO: add a unified function to prepare the circuit in Expander
+    expander_circuit.identify_rnd_coefs();
+    expander_circuit.identify_structure_info();
+
     let config = expander_config::Config::<<GF2Config as Config>::DefaultGKRConfig>::new(
         expander_config::GKRScheme::Vanilla,
         mpi_config::MPIConfig::new(),
