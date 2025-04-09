@@ -1,10 +1,10 @@
-use crate::{
+mod common;
+
+use circuit_std_rs::{
     logup::{query_count_hint, rangeproof_hint, LogUpRangeProofTable},
     LogUpCircuit, LogUpParams,
 };
 use expander_compiler::{field::Goldilocks, frontend::*};
-
-use super::common;
 
 #[test]
 fn logup_test() {

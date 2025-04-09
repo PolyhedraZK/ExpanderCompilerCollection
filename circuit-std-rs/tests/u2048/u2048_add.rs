@@ -1,8 +1,8 @@
 use expander_compiler::frontend::*;
 use halo2curves::bn256::Fr;
 
-use crate::u2048::U2048Variable;
-use crate::{BN_TWO_TO_120, N_LIMBS};
+use circuit_std_rs::u2048::U2048Variable;
+use circuit_std_rs::{BN_TWO_TO_120, N_LIMBS};
 
 declare_circuit!(AddModCircuit {
     x: [Variable; N_LIMBS],

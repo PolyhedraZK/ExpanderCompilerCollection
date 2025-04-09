@@ -6,23 +6,24 @@ edition = "2021"
 
 [dependencies]
 expander_compiler = { path = "../expander_compiler"}
+
 arith.workspace = true
+ark-bls12-381.workspace = true
+ark-ec.workspace = true
+ark-ff.workspace = true
 ark-std.workspace = true
-expander_config.workspace = true
+big-int.workspace = true
 expander_circuit.workspace = true
+expander_config.workspace = true
 gf2.workspace = true
 gkr.workspace = true
 halo2curves.workspace = true
 mersenne31.workspace = true
-rand.workspace = true
-sha2.workspace = true
-ark-bls12-381.workspace = true
-ark-ec.workspace = true
-ark-ff.workspace = true
-big-int.workspace = true
 num-bigint.workspace = true
 num-traits.workspace = true
+rand.workspace = true
 serdes.workspace = true
+sha2.workspace = true
 tiny-keccak.workspace = true
 
 [dev-dependencies]
