@@ -259,6 +259,11 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                 gate_type: *gate_type,
                 inputs: inputs.clone(),
             },
+            ToBinary { x, num_bits } => InsnOut::Hint {
+                hint_id: BuiltinHintIds::ToBinary as u64 as usize,
+                inputs: vec![*x],
+                num_outputs: *num_bits,
+            },
         })
     }
 
@@ -410,9 +415,11 @@ mod tests {
                             .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
                             .collect();
                         let e1 = root.eval_unsafe_with_errors(inputs.clone());
-                        let e2 = root_processed.eval_unsafe_with_errors(inputs);
                         if e1.is_ok() {
+                            let e2 = root_processed.eval_unsafe_with_errors(inputs);
                             assert_eq!(e2, e1);
+                        } else if e1.as_ref().err().unwrap().is_internal() {
+                            panic!("{:?}", e1);
                         }
                     }
                 }
@@ -451,9 +458,11 @@ mod tests {
                             .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
                             .collect();
                         let e1 = root.eval_unsafe_with_errors(inputs.clone());
-                        let e2 = root_processed.eval_unsafe_with_errors(inputs);
                         if e1.is_ok() {
+                            let e2 = root_processed.eval_unsafe_with_errors(inputs);
                             assert_eq!(e2, e1);
+                        } else if e1.as_ref().err().unwrap().is_internal() {
+                            panic!("{:?}", e1);
                         }
                     }
                 }

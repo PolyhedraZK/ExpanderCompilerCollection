@@ -51,7 +51,7 @@ impl<C: Config> RandomInstruction for Instruction<C> {
                     num_terms.random(&mut rnd).max(1),
                 )
             };
-            if rnd.gen::<f64>() < 0.8 {
+            if rnd.gen::<f64>() < 0.8 || num_outputs != 1 {
                 super::Instruction::Hint {
                     hint_id,
                     inputs: (0..num_inputs)
@@ -94,13 +94,13 @@ impl<C: Config> RandomInstruction for Instruction<C> {
                 y: rnd.next_u64() as usize % num_vars + 1,
                 op,
             }
-        } else if prob1 < 0.92 {
+        } else if prob1 < 0.91 {
             super::Instruction::UnconstrainedBinOp {
                 x: rnd.next_u64() as usize % num_vars + 1,
                 y: rnd.next_u64() as usize % num_vars + 1,
                 op: super::UnconstrainedBinOpType::Div,
             }
-        } else {
+        } else if prob1 < 0.98 {
             let op = match rnd.next_u64() % 3 {
                 0 => super::UnconstrainedBinOpType::BitAnd,
                 1 => super::UnconstrainedBinOpType::BitOr,
@@ -111,6 +111,12 @@ impl<C: Config> RandomInstruction for Instruction<C> {
                 x: rnd.next_u64() as usize % num_vars + 1,
                 y: rnd.next_u64() as usize % num_vars + 1,
                 op,
+            }
+        } else {
+            super::Instruction::ToBinary {
+                x: rnd.next_u64() as usize % num_vars + 1,
+                num_bits: [1, 3, 66, 266, 267, 268, 270, 300, 300, 300]
+                    [rnd.next_u64() as usize % 10],
             }
         }
     }
