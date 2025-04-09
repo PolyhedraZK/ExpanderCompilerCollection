@@ -1,5 +1,4 @@
-use expander_compiler::frontend::*;
-use expander_compiler::frontend::{BN254Config, Variable};
+use expander_compiler::frontend::{BN254Config, RootAPI, Variable};
 use halo2curves::bn256::Fr;
 
 pub(crate) fn unconstrained_byte_decomposition<Builder: RootAPI<BN254Config>>(

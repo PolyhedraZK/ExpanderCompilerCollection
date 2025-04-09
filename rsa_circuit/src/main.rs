@@ -8,7 +8,9 @@ use ark_std::test_rng;
 use circuit_std_rs::{
     LogUpCircuit, LogUpParams, StdCircuit, U2048Variable, BN_TWO_TO_120, N_LIMBS,
 };
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{
+    compile, declare_circuit, BN254Config, CompileOptions, Define, RootAPI, Variable,
+};
 use halo2curves::bn256::Fr;
 use native::RSAFieldElement;
 use num_bigint::BigUint;
@@ -85,7 +87,7 @@ fn build_hash_outputs(hash_inputs: &[u8]) -> [u8; HASH_OUTPUT_LEN] {
     for i in 0..46 {
         let mut hasher = sha2::Sha256::default();
         hasher.update(&hash_input);
-        let hash_output: [u8; 32] = hasher.finalize().try_into().unwrap();
+        let hash_output: [u8; 32] = hasher.finalize().into();
         hash_outputs.extend_from_slice(&hash_output);
         hash_input = [
             hash_inputs[(i + 2) * 32..(i + 3) * 32].as_ref(),
