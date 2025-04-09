@@ -271,11 +271,11 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                 });
                 let mut sum = self.push_const(C::CircuitField::zero());
                 let mut coef = C::CircuitField::one();
-                for i in 0..*num_bits {
-                    self.assert_bool(bits[i]);
+                for &bit in bits.iter() {
+                    self.assert_bool(bit);
                     let bit = self
                         .push_insn(InsnOut::LinComb(expr::LinComb {
-                            terms: vec![LinCombTerm { coef, var: bits[i] }],
+                            terms: vec![LinCombTerm { coef, var: bit }],
                             constant: C::CircuitField::zero(),
                         }))
                         .unwrap();
