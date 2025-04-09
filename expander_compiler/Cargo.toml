@@ -10,6 +10,7 @@ ark-std.workspace = true
 chrono.workspace = true
 clap.workspace = true
 crosslayer_prototype.workspace = true
+macros = { path = "./macros" }
 ethnum.workspace = true
 expander_circuit.workspace = true
 expander_config.workspace = true
