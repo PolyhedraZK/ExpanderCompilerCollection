@@ -21,7 +21,7 @@ declare_circuit!(_LogUpCircuit {
     query_keys: [[Variable]],
     query_results: [[Variable]],
 
-    // counting the number of occurences for each row of the table
+    // counting the number of occurrences for each row of the table
     query_count: [Variable],
 });
 
