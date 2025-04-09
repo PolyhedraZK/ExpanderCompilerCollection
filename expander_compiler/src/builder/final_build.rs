@@ -9,7 +9,7 @@ use crate::utils::error::Error;
 
 use super::basic::{
     process_circuit, to_really_single, try_get_really_single_id, ConstraintStatus,
-    InsnTransformAndExecute, RootBuilder,
+    InsnTransformAndExecute, InsnTransformResult, RootBuilder,
 };
 
 type IrcIn<C> = ir::hint_less::Irc<C>;
@@ -19,8 +19,8 @@ type InsnOut<C> = ir::hint_less::Instruction<C>;
 type Builder<'a, C> = super::basic::Builder<'a, C, IrcIn<C>, IrcOut<C>>;
 
 impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Builder<'a, C> {
-    fn transform_in_to_out(&mut self, in_insn: &InsnIn<C>) -> Result<InsnOut<C>, Error> {
-        Ok(in_insn.clone())
+    fn transform_in_to_out(&mut self, in_insn: &InsnIn<C>) -> InsnTransformResult<C, IrcOut<C>> {
+        InsnTransformResult::Insn(in_insn.clone())
     }
 
     fn transform_in_con_to_out(&mut self, in_con: &RawConstraint) -> Result<RawConstraint, Error> {
