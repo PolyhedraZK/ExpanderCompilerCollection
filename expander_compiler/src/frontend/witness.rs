@@ -4,20 +4,20 @@ use crate::{
     hints::registry::{EmptyHintCaller, HintCaller},
 };
 
-use super::{internal, Config, Error};
+use super::{internal, CircuitField, Config, Error};
 
 impl<C: Config> WitnessSolver<C> {
-    pub fn solve_witness<Cir: internal::DumpLoadTwoVariables<C::CircuitField>>(
+    pub fn solve_witness<Cir: internal::DumpLoadTwoVariables<CircuitField<C>>>(
         &self,
         assignment: &Cir,
     ) -> Result<Witness<C>, Error> {
         self.solve_witness_with_hints(assignment, &mut EmptyHintCaller)
     }
 
-    pub fn solve_witness_with_hints<Cir: internal::DumpLoadTwoVariables<C::CircuitField>>(
+    pub fn solve_witness_with_hints<Cir: internal::DumpLoadTwoVariables<CircuitField<C>>>(
         &self,
         assignment: &Cir,
-        hint_caller: &mut impl HintCaller<C::CircuitField>,
+        hint_caller: &mut impl HintCaller<CircuitField<C>>,
     ) -> Result<Witness<C>, Error> {
         let mut vars = Vec::new();
         let mut public_vars = Vec::new();
@@ -25,17 +25,17 @@ impl<C: Config> WitnessSolver<C> {
         self.solve_witness_from_raw_inputs(vars, public_vars, hint_caller)
     }
 
-    pub fn solve_witnesses<Cir: internal::DumpLoadTwoVariables<C::CircuitField>>(
+    pub fn solve_witnesses<Cir: internal::DumpLoadTwoVariables<CircuitField<C>>>(
         &self,
         assignments: &[Cir],
     ) -> Result<Witness<C>, Error> {
         self.solve_witnesses_with_hints(assignments, &mut EmptyHintCaller)
     }
 
-    pub fn solve_witnesses_with_hints<Cir: internal::DumpLoadTwoVariables<C::CircuitField>>(
+    pub fn solve_witnesses_with_hints<Cir: internal::DumpLoadTwoVariables<CircuitField<C>>>(
         &self,
         assignments: &[Cir],
-        hint_caller: &mut impl HintCaller<C::CircuitField>,
+        hint_caller: &mut impl HintCaller<CircuitField<C>>,
     ) -> Result<Witness<C>, Error> {
         self.solve_witnesses_from_raw_inputs(
             assignments.len(),

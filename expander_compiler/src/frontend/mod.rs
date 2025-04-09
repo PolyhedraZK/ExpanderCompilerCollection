@@ -30,30 +30,29 @@ pub mod internal {
         declare_circuit_load_from, declare_circuit_num_vars,
     };
     pub use super::variables::{DumpLoadTwoVariables, DumpLoadVariables};
-    // pub use crate::utils::serde::Serde;
 }
 
 pub mod extra {
+
     pub use super::api::UnconstrainedAPI;
     pub use super::debug::DebugBuilder;
     pub use super::sub_circuit::{
         HashStructureAndPrimitive, JoinVecVariables, RebuildVecVariables,
     };
     pub use crate::hints::registry::{EmptyHintCaller, HintCaller, HintRegistry};
-    // pub use crate::utils::serde::Serde;
 
-    use super::{internal, Config, Define, Variable};
+    use super::{internal, CircuitField, Config, Define, Variable};
 
     pub fn debug_eval<
         C: Config,
         Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone,
-        CA: internal::DumpLoadTwoVariables<C::CircuitField>,
-        H: HintCaller<C::CircuitField>,
+        CA: internal::DumpLoadTwoVariables<CircuitField<C>>,
+        H: HintCaller<CircuitField<C>>,
     >(
         circuit: &Cir,
         assignment: &CA,
         hint_caller: H,
-    ) -> Vec<C::CircuitField> {
+    ) -> Vec<CircuitField<C>> {
         let (num_inputs, num_public_inputs) = circuit.num_vars();
         let (a_num_inputs, a_num_public_inputs) = assignment.num_vars();
         assert_eq!(num_inputs, a_num_inputs);

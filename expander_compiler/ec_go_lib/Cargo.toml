@@ -9,11 +9,9 @@ crate-type = ["dylib"]
 [dependencies]
 arith.workspace = true
 expander_circuit.workspace = true
-expander_config.workspace = true
 expander_transcript.workspace = true
 gkr.workspace = true
-gkr_field_config.workspace = true
-mpi_config.workspace = true
+gkr_engine.workspace = true
 rand.workspace = true
 serdes.workspace = true
 

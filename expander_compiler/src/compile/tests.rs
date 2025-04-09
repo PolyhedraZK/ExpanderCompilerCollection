@@ -1,10 +1,9 @@
-use crate::circuit::{
-    config::{Config, M31Config as C},
-    ir,
-    layered::NormalInputType,
-};
+use mersenne31::M31;
 
-type CField = <C as Config>::CircuitField;
+use crate::circuit::{ir, layered::NormalInputType};
+use crate::frontend::M31Config as C;
+
+type CField = M31;
 
 #[test]
 fn simple_div() {

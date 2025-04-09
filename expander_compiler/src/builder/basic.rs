@@ -10,6 +10,7 @@ use crate::{
         },
     },
     field::FieldArith,
+    frontend::CircuitField,
     utils::{error::Error, pool::Pool},
 };
 
@@ -64,8 +65,8 @@ pub struct Builder<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct OutVarRef<C: Config> {
     pub x: usize,
-    pub k: C::CircuitField,
-    pub b: C::CircuitField,
+    pub k: CircuitField<C>,
+    pub b: CircuitField<C>,
 }
 
 #[derive(Debug, Clone)]
@@ -143,7 +144,7 @@ impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
         res
     }
 
-    pub fn constant_value(&self, out_var_id: usize) -> Option<C::CircuitField> {
+    pub fn constant_value(&self, out_var_id: usize) -> Option<CircuitField<C>> {
         self.out_var_exprs[out_var_id].constant_value()
     }
 
@@ -151,7 +152,7 @@ impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
         let id = self.mid_vars.len();
         assert_eq!(
             self.mid_vars
-                .add(&Expression::new_linear(C::CircuitField::one(), id)),
+                .add(&Expression::new_linear(CircuitField::<C>::one(), id)),
             id
         );
         id
@@ -162,7 +163,7 @@ impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
         for i in 0..n {
             self.new_var();
             self.out_var_exprs
-                .push(Expression::new_linear(C::CircuitField::one(), start + i));
+                .push(Expression::new_linear(CircuitField::<C>::one(), start + i));
         }
         self.fix_mid_to_out(n);
     }
@@ -183,7 +184,7 @@ impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
                 if i < lcs.terms.len() {
                     lcs.terms[i].coef
                 } else {
-                    C::CircuitField::one()
+                    CircuitField::<C>::one()
                 }
             },
             &mut self.mid_vars,
@@ -207,7 +208,7 @@ impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
         self.fix_mid_to_out(1);
     }
 
-    pub fn add_const(&mut self, c: C::CircuitField) {
+    pub fn add_const(&mut self, c: CircuitField<C>) {
         self.out_var_exprs.push(Expression::new_const(c));
         self.fix_mid_to_out(1);
     }
@@ -259,7 +260,7 @@ impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
                 assert_eq!(n, 1);
                 assert!(coef.is_zero());
                 *self.out_insns.last_mut().unwrap() =
-                    IrcOut::Instruction::from_kx_plus_b(0, C::CircuitField::zero(), constant);
+                    IrcOut::Instruction::from_kx_plus_b(0, CircuitField::<C>::zero(), constant);
                 return;
             }
             match &self.mid_to_out[eid] {
@@ -364,7 +365,7 @@ fn to_single<C: Config>(mid_vars: &mut Pool<Expression<C>>, expr: &Expression<C>
 fn to_single_stripped<C: Config>(
     mid_vars: &mut Pool<Expression<C>>,
     expr: &Expression<C>,
-) -> (usize, C::CircuitField, C::CircuitField) {
+) -> (usize, CircuitField<C>, CircuitField<C>) {
     let (e, coef, constant) = strip_constants(expr);
     if e.degree() == 0 {
         return (0, coef, constant);
@@ -377,18 +378,18 @@ pub fn to_really_single<C: Config>(
     mid_vars: &mut Pool<Expression<C>>,
     e: &Expression<C>,
 ) -> Expression<C> {
-    if e.len() == 1 && e.degree() == 1 && e[0].coef == C::CircuitField::one() {
+    if e.len() == 1 && e.degree() == 1 && e[0].coef == CircuitField::<C>::one() {
         return e.clone();
     }
     let idx = mid_vars.add(e);
-    Expression::from_terms_sorted(vec![Term::new_linear(C::CircuitField::one(), idx)])
+    Expression::from_terms_sorted(vec![Term::new_linear(CircuitField::<C>::one(), idx)])
 }
 
 pub fn try_get_really_single_id<C: Config>(
     mid_vars: &Pool<Expression<C>>,
     e: &Expression<C>,
 ) -> Option<usize> {
-    if e.len() == 1 && e.degree() == 1 && e[0].coef == C::CircuitField::one() {
+    if e.len() == 1 && e.degree() == 1 && e[0].coef == CircuitField::<C>::one() {
         let t: Vec<usize> = e.get_vars();
         return Some(t[0]);
     }
@@ -397,9 +398,9 @@ pub fn try_get_really_single_id<C: Config>(
 
 fn strip_constants<C: Config>(
     expr: &Expression<C>,
-) -> (Expression<C>, C::CircuitField, C::CircuitField) {
+) -> (Expression<C>, CircuitField<C>, CircuitField<C>) {
     let mut e = Vec::new();
-    let mut cst = C::CircuitField::zero();
+    let mut cst = CircuitField::<C>::zero();
     for term in expr.iter() {
         if term.vars == VarSpec::Const {
             cst = term.coef;
@@ -408,7 +409,7 @@ fn strip_constants<C: Config>(
         }
     }
     if e.is_empty() {
-        return (Expression::default(), C::CircuitField::zero(), cst);
+        return (Expression::default(), CircuitField::<C>::zero(), cst);
     }
     let v = e[0].coef;
     let vi = v.inv().unwrap();
@@ -420,8 +421,8 @@ fn strip_constants<C: Config>(
 
 fn unstrip_constants_single<C: Config>(
     vid: usize,
-    coef: C::CircuitField,
-    constant: C::CircuitField,
+    coef: CircuitField<C>,
+    constant: CircuitField<C>,
 ) -> Expression<C> {
     assert_ne!(vid, 0);
     let mut e = vec![Term::new_linear(coef, vid)];
@@ -434,7 +435,7 @@ fn unstrip_constants_single<C: Config>(
 const COMPRESS_THRESHOLD_ADD: usize = 10;
 const COMPRESS_THRESHOLD_MUL: usize = 40;
 
-fn lin_comb_inner<C: Config, F: Fn(usize) -> C::CircuitField>(
+fn lin_comb_inner<C: Config, F: Fn(usize) -> CircuitField<C>>(
     vars: Vec<&Expression<C>>,
     var_coef: F,
     mid_vars: &mut Pool<Expression<C>>,
@@ -554,7 +555,11 @@ fn mul_two_expr<C: Config>(
             v2.iter().map(|x2| x1.mul(x2)).collect(),
         ));
     }
-    lin_comb_inner(vars.iter().collect(), |_| C::CircuitField::one(), mid_vars)
+    lin_comb_inner(
+        vars.iter().collect(),
+        |_| CircuitField::<C>::one(),
+        mid_vars,
+    )
 }
 
 pub type ProcessOk<'a, C, IrcIn, IrcOut> =

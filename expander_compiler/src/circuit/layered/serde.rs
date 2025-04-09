@@ -3,6 +3,8 @@ use std::io::{Error as IoError, Read, Write};
 use arith::Field;
 use serdes::{ExpSerde, SerdeResult};
 
+use crate::frontend::CircuitField;
+
 use super::{
     Allocation, ChildSpec, Circuit, Coef, Config, CrossLayerInput, CrossLayerInputUsize, Gate,
     GateAdd, GateConst, GateCustom, GateMul, InputType, NormalInput, NormalInputUsize, Segment,
@@ -32,7 +34,7 @@ impl<C: Config> ExpSerde for Coef<C> {
         let typ = u8::deserialize_from(&mut reader)?;
         match typ {
             1 => {
-                let c = C::CircuitField::deserialize_from(&mut reader)?;
+                let c = CircuitField::<C>::deserialize_from(&mut reader)?;
                 Ok(Coef::Constant(c))
             }
             2 => Ok(Coef::Random),
@@ -214,7 +216,7 @@ impl<C: Config, I: InputType> ExpSerde for Circuit<C, I> {
 
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         MAGIC.serialize_into(&mut writer)?;
-        C::CircuitField::MODULUS.serialize_into(&mut writer)?;
+        CircuitField::<C>::MODULUS.serialize_into(&mut writer)?;
         self.num_public_inputs.serialize_into(&mut writer)?;
         self.num_actual_outputs.serialize_into(&mut writer)?;
         self.expected_num_output_zeroes
@@ -232,7 +234,7 @@ impl<C: Config, I: InputType> ExpSerde for Circuit<C, I> {
             ))?;
         }
         let modulus = ethnum::U256::deserialize_from(&mut reader)?;
-        if modulus != C::CircuitField::MODULUS {
+        if modulus != CircuitField::<C>::MODULUS {
             return Err(IoError::new(
                 std::io::ErrorKind::InvalidData,
                 "invalid modulus",
@@ -255,11 +257,14 @@ impl<C: Config, I: InputType> ExpSerde for Circuit<C, I> {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
-    use crate::circuit::{
-        config::*,
-        ir::{common::rand_gen::*, dest::RootCircuit},
-        layered::{CrossLayerInputType, NormalInputType},
+    use crate::{
+        circuit::{
+            ir::{common::rand_gen::*, dest::RootCircuit},
+            layered::{CrossLayerInputType, NormalInputType},
+        },
+        frontend::{BN254Config, GF2Config, GoldilocksConfig, M31Config},
     };
 
     fn test_serde_for_field<C: Config, I: InputType>() {
@@ -291,8 +296,11 @@ mod tests {
         test_serde_for_field::<M31Config, NormalInputType>();
         test_serde_for_field::<GF2Config, NormalInputType>();
         test_serde_for_field::<BN254Config, NormalInputType>();
+        test_serde_for_field::<GoldilocksConfig, NormalInputType>();
+
         test_serde_for_field::<M31Config, CrossLayerInputType>();
         test_serde_for_field::<GF2Config, CrossLayerInputType>();
         test_serde_for_field::<BN254Config, CrossLayerInputType>();
+        test_serde_for_field::<GoldilocksConfig, CrossLayerInputType>();
     }
 }

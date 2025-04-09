@@ -11,6 +11,7 @@ use crate::{
         },
     },
     field::FieldArith,
+    frontend::CircuitField,
     utils::pool::Pool,
 };
 
@@ -365,7 +366,7 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
                         res.gate_adds.push(GateAdd {
                             inputs: [I::Input::new(next_layer - cur_layer - 1, aq.var_pos[&x])],
                             output: pos,
-                            coef: Coef::Constant(C::CircuitField::one()),
+                            coef: Coef::Constant(CircuitField::<C>::one()),
                         });
                     }
                 }
@@ -385,7 +386,7 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
                         res.gate_adds.push(GateAdd {
                             inputs: [I::Input::new(0, aq.var_pos[&x])],
                             output: pos,
-                            coef: Coef::Constant(C::CircuitField::one()),
+                            coef: Coef::Constant(CircuitField::<C>::one()),
                         });
                     }
                 }
@@ -406,7 +407,7 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
                 let pos = bq.var_pos[&cc.id];
                 for v in cc.variables.iter() {
                     let coef = if *v >= ic.num_var {
-                        Coef::Constant(C::CircuitField::one())
+                        Coef::Constant(CircuitField::<C>::one())
                     } else {
                         Coef::Random
                     };
@@ -446,7 +447,7 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
                             sub_layouts_of_layer[cur_layer][&insn_id].offset + spos,
                         )],
                         output: pos,
-                        coef: Coef::Constant(C::CircuitField::one()),
+                        coef: Coef::Constant(CircuitField::<C>::one()),
                     });
                 }
             }

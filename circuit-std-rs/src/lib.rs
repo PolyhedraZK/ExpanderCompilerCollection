@@ -1,3 +1,5 @@
+#![allow(clippy::manual_div_ceil)]
+
 pub mod traits;
 pub use traits::StdCircuit;
 
