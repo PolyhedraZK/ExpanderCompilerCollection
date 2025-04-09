@@ -42,14 +42,15 @@ tiny-keccak = { version = "2.0", features = ["keccak"] }
 
 
 # todo: switch back to main
-arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs" }
-crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs"}
-expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs", package = "circuit" }
-expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs", package = "transcript" }
-gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs" }
-gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs" }
-gkr_engine = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs", package = "gkr_engine" }
-gkr_hashers = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs" }
-goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs" }
-mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs" }
-serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/refactor_configs"}
+arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear" }
+babybear = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear" }
+crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear"}
+expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear", package = "circuit" }
+expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear", package = "transcript" }
+gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear" }
+gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear" }
+gkr_engine = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear", package = "gkr_engine" }
+gkr_hashers = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear" }
+goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear" }
+mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear" }
+serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "zz/impl_babybear"}
