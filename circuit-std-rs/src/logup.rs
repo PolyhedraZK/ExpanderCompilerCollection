@@ -107,6 +107,7 @@ fn get_column_randomness<C: Config, B: RootAPI<C>>(
     }
     randomness
 }
+
 fn combine_columns<C: Config, B: RootAPI<C>>(
     builder: &mut B,
     vec_2d: &[Vec<Variable>],
@@ -243,6 +244,7 @@ pub struct LogUpSingleKeyTable {
     pub query_keys: Vec<Variable>,
     pub query_results: Vec<Vec<Variable>>,
 }
+
 impl LogUpSingleKeyTable {
     pub fn new(_nb_bits: usize) -> Self {
         Self {
@@ -251,6 +253,7 @@ impl LogUpSingleKeyTable {
             query_results: vec![],
         }
     }
+
     pub fn new_table(&mut self, key: Vec<Variable>, value: Vec<Vec<Variable>>) {
         if key.len() != value.len() {
             panic!("key and value should have the same length");
@@ -264,25 +267,30 @@ impl LogUpSingleKeyTable {
             self.table.push(entry);
         }
     }
+
     pub fn add_table_row(&mut self, key: Variable, value: Vec<Variable>) {
         let mut entry = vec![key];
         entry.extend(value.clone());
         self.table.push(entry);
     }
+
     fn add_query(&mut self, key: Variable, value: Vec<Variable>) {
         let mut entry = vec![key];
         entry.extend(value.clone());
         self.query_keys.push(key);
         self.query_results.push(entry);
     }
+
     pub fn query(&mut self, key: Variable, value: Vec<Variable>) {
         self.add_query(key, value);
     }
+
     pub fn batch_query(&mut self, keys: Vec<Variable>, values: Vec<Vec<Variable>>) {
         for i in 0..keys.len() {
             self.add_query(keys[i], values[i].clone());
         }
     }
+
     pub fn final_check<C: Config, B: RootAPI<C>>(&mut self, builder: &mut B) {
         if self.table.is_empty() || self.query_keys.is_empty() {
             panic!("empty table or empty query");
@@ -324,6 +332,7 @@ pub struct LogUpRangeProofTable {
     pub query_keys: Vec<Variable>,
     pub rangeproof_bits: usize,
 }
+
 impl LogUpRangeProofTable {
     pub fn new(nb_bits: usize) -> Self {
         Self {
@@ -332,18 +341,22 @@ impl LogUpRangeProofTable {
             rangeproof_bits: nb_bits,
         }
     }
+
     pub fn initial<C: Config, B: RootAPI<C>>(&mut self, builder: &mut B) {
         for i in 0..1 << self.rangeproof_bits {
             let key = builder.constant(i as u32);
             self.add_table_row(key);
         }
     }
+
     pub fn add_table_row(&mut self, key: Variable) {
         self.table_keys.push(key);
     }
+
     pub fn add_query(&mut self, key: Variable) {
         self.query_keys.push(key);
     }
+
     pub fn rangeproof<C: Config, B: RootAPI<C>>(&mut self, builder: &mut B, a: Variable, n: usize) {
         //add a shift value
         let mut n = n;
@@ -381,6 +394,7 @@ impl LogUpRangeProofTable {
             self.query_range(*witness);
         }
     }
+
     pub fn rangeproof_onechunk<C: Config, B: RootAPI<C>>(
         &mut self,
         builder: &mut B,
@@ -404,9 +418,11 @@ impl LogUpRangeProofTable {
         }
         self.query_range(new_a);
     }
+
     pub fn query_range(&mut self, key: Variable) {
         self.query_keys.push(key);
     }
+
     pub fn final_check<C: Config, B: RootAPI<C>>(&mut self, builder: &mut B) {
         let alpha = builder.get_random_value();
         let inputs = self.query_keys.clone();
@@ -423,6 +439,7 @@ impl LogUpRangeProofTable {
         assert_eq_rational(builder, &v_table, &v_query);
     }
 }
+
 pub fn query_count_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     let mut count = vec![0; outputs.len()];
     for input in inputs {
@@ -434,6 +451,7 @@ pub fn query_count_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error
     }
     Ok(())
 }
+
 pub fn query_count_by_key_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     let mut outputs_u32 = vec![0; outputs.len()];
 
@@ -458,6 +476,7 @@ pub fn query_count_by_key_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<()
 
     Ok(())
 }
+
 pub fn rangeproof_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     let n = inputs[0].to_u256().as_i64();
     let m = inputs[1].to_u256().as_i64();

@@ -16,9 +16,7 @@ pub trait RandomConstraintType {
 }
 
 impl RandomConstraintType for RawConstraintType {
-    fn random(_r: impl RngCore) -> Self {
-        ()
-    }
+    fn random(_r: impl RngCore) -> Self {}
 }
 
 pub struct RandomRange {

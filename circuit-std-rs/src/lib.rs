@@ -10,7 +10,10 @@ pub use logup::{LogUpCircuit, LogUpParams};
 pub mod non_native;
 pub use non_native::*;
 
-pub mod big_int;
-pub mod sha2_m31;
+pub mod gnark;
+pub mod poseidon_m31;
+pub mod sha256;
+pub mod utils;
+
 #[cfg(test)]
 mod tests;
