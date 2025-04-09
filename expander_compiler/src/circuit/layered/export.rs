@@ -1,4 +1,4 @@
-use super::*;
+use super::{Circuit, Config, CrossLayerInputType, Input, InputUsize, NormalInputType};
 
 impl<C: Config> Circuit<C, NormalInputType> {
     pub fn export_to_expander<
@@ -66,6 +66,15 @@ impl<C: Config> Circuit<C, NormalInputType> {
             num_public_inputs: self.num_public_inputs,
             expected_num_output_zeros: self.expected_num_output_zeroes,
         }
+    }
+
+    pub fn export_to_expander_flatten(
+        &self,
+    ) -> expander_circuit::Circuit<C::DefaultGKRFieldConfig> {
+        let circuit = self.export_to_expander::<C::DefaultGKRFieldConfig>();
+        let mut flattened = circuit.flatten::<C::DefaultGKRConfig>();
+        flattened.pre_process_gkr::<C::DefaultGKRConfig>();
+        flattened
     }
 }
 

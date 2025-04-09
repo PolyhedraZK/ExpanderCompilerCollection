@@ -1,4 +1,4 @@
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{Config, RootAPI, Variable};
 
 pub type Sha256Word = [Variable; 32];
 

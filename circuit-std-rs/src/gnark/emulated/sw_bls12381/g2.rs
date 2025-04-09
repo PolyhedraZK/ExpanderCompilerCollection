@@ -1,18 +1,19 @@
-use crate::gnark::element::*;
+use crate::gnark::element::{value_of, Element};
 use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::emulated::field_bls12381::e2::Ext2;
 use crate::gnark::emulated::field_bls12381::e2::GE2;
-use crate::sha256::m31_utils::*;
+use crate::sha256::m31_utils::{big_less_than, from_binary, to_binary};
 use crate::utils::simple_select;
 use expander_compiler::declare_circuit;
 use expander_compiler::frontend::{Config, Define, M31Config, RootAPI, Variable};
 use num_bigint::BigInt;
+use std::fmt::{Debug, Formatter, Result};
 use std::str::FromStr;
 
 const M_COMPRESSED_SMALLEST: u8 = 0b100 << 5;
 const M_COMPRESSED_LARGEST: u8 = 0b101 << 5;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct G2AffP {
     pub x: GE2,
     pub y: GE2,
@@ -35,7 +36,7 @@ impl G2AffP {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Debug)]
 pub struct LineEvaluation {
     pub r0: GE2,
     pub r1: GE2,
@@ -43,6 +44,7 @@ pub struct LineEvaluation {
 
 type LineEvaluationArray = [[Option<Box<LineEvaluation>>; 63]; 2];
 
+#[derive(Clone, Debug)]
 pub struct LineEvaluations(pub LineEvaluationArray);
 
 impl Default for LineEvaluations {
@@ -57,6 +59,8 @@ impl LineEvaluations {
             .all(|row| row.iter().all(|cell| cell.is_none()))
     }
 }
+
+#[derive(Clone)]
 pub struct G2Affine {
     pub p: G2AffP,
     pub lines: LineEvaluations,
@@ -83,7 +87,7 @@ impl G2 {
     }
     pub fn neg<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, p: &G2AffP) -> G2AffP {
         let yr = self.ext2.neg(native, &p.y);
-        G2AffP::new(p.x.my_clone(), yr)
+        G2AffP::new(p.x.clone(), yr)
     }
     pub fn copy_g2_aff_p<C: Config, B: RootAPI<C>>(
         &mut self,
@@ -97,7 +101,7 @@ impl G2 {
             y: copy_q_acc_y,
         }
     }
-    pub fn g2_double<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, p: &G2AffP) -> G2AffP {
+    pub fn double<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, p: &G2AffP) -> G2AffP {
         let xx3a = self.ext2.square(native, &p.x);
         let xx3a = self
             .ext2
@@ -115,6 +119,88 @@ impl G2 {
 
         G2AffP::new(xr, yr)
     }
+
+    pub fn double_and_add<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        p: &G2AffP,
+        q: &G2AffP,
+    ) -> G2AffP {
+        // compute λ1 = (q.y-p.y)/(q.x-p.x)
+        let yqyp = self.ext2.sub(native, &q.y, &p.y);
+        let xqxp = self.ext2.sub(native, &q.x, &p.x);
+        let λ1 = self.ext2.div(native, &yqyp, &xqxp);
+
+        // compute x2 = λ1²-p.x-q.x
+        let λ1λ1 = self.ext2.square(native, &λ1);
+        let xqxp = self.ext2.add(native, &p.x, &q.x);
+        let x2 = self.ext2.sub(native, &λ1λ1, &xqxp);
+        // omit y2 computation
+        // compute λ2 = -λ1-2*p.y/(x2-p.x)
+        let pypy = self.ext2.add(native, &p.y, &p.y);
+        let x2xp = self.ext2.sub(native, &x2, &p.x);
+        let mut λ2 = self.ext2.div(native, &pypy, &x2xp);
+        λ2 = self.ext2.add(native, &λ1, &λ2);
+        λ2 = self.ext2.neg(native, &λ2);
+
+        // compute x3 =λ2²-p.x-x3
+        let λ2λ2 = self.ext2.square(native, &λ2);
+        let mut x3 = self.ext2.sub(native, &λ2λ2, &p.x);
+        x3 = self.ext2.sub(native, &x3, &x2);
+
+        // compute y3 = λ2*(p.x - x3)-p.ys
+        let mut y3 = self.ext2.sub(native, &p.x, &x3);
+        y3 = self.ext2.mul(native, &λ2, &y3);
+        y3 = self.ext2.sub(native, &y3, &p.y);
+
+        G2AffP::new(x3, y3)
+    }
+
+    pub fn double_n<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        p: &G2AffP,
+        n: usize,
+    ) -> G2AffP {
+        let mut pn = self.copy_g2_aff_p(native, p);
+        for _ in 0..n {
+            pn = self.double(native, &pn);
+        }
+
+        pn
+    }
+
+    pub fn triple<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, p: &G2AffP) -> G2AffP {
+        // compute λ1 = (3p.x²)/2p.y
+        let mut xx = self.ext2.square(native, &p.x);
+        xx = self
+            .ext2
+            .mul_by_const_element(native, &xx, &BigInt::from(3));
+        let y2 = self.ext2.double(native, &p.y);
+        let λ1 = self.ext2.div(native, &xx, &y2);
+        // xr = λ1²-2p.x
+        let mut x2 = self
+            .ext2
+            .mul_by_const_element(native, &p.x, &BigInt::from(2));
+        let λ1λ1 = self.ext2.square(native, &λ1);
+        x2 = self.ext2.sub(native, &λ1λ1, &x2);
+
+        let x1x2 = self.ext2.sub(native, &p.x, &x2);
+        let mut λ2 = self.ext2.div(native, &y2, &x1x2);
+        λ2 = self.ext2.sub(native, &λ2, &λ1);
+
+        // xr = λ²-p.x-x2
+        let λ2λ2 = self.ext2.square(native, &λ2);
+        let qxrx = self.ext2.add(native, &x2, &p.x);
+        let xr = self.ext2.sub(native, &λ2λ2, &qxrx);
+
+        // yr = λ(p.x-xr) - p.y
+        let pxrx = self.ext2.sub(native, &p.x, &xr);
+        let λ2pxrx = self.ext2.mul(native, &λ2, &pxrx);
+        let yr = self.ext2.sub(native, &λ2pxrx, &p.y);
+        G2AffP::new(xr, yr)
+    }
+
     pub fn assert_is_equal<C: Config, B: RootAPI<C>>(
         &mut self,
         native: &mut B,
@@ -124,7 +210,7 @@ impl G2 {
         self.ext2.assert_isequal(native, &p.x, &q.x);
         self.ext2.assert_isequal(native, &p.y, &q.y);
     }
-    pub fn g2_add<C: Config, B: RootAPI<C>>(
+    pub fn add<C: Config, B: RootAPI<C>>(
         &mut self,
         native: &mut B,
         p: &G2AffP,
@@ -161,31 +247,31 @@ impl G2 {
             self.copy_g2_aff_p(native, q),
             self.copy_g2_aff_p(native, q),
         ];
-        ops[1] = self.g2_double(native, &ops[1]);
-        ops[2] = self.g2_add(native, &ops[0], &ops[1]);
+        ops[1] = self.double(native, &ops[1]);
+        ops[2] = self.add(native, &ops[0], &ops[1]);
         let b = s.to_bytes_be();
         let b = &b.1[1..];
         let mut res = self.copy_g2_aff_p(native, &ops[2]);
 
-        res = self.g2_double(native, &res);
-        res = self.g2_double(native, &res);
-        res = self.g2_add(native, &res, &ops[0]);
+        res = self.double(native, &res);
+        res = self.double(native, &res);
+        res = self.add(native, &res, &ops[0]);
 
-        res = self.g2_double(native, &res);
-        res = self.g2_double(native, &res);
+        res = self.double(native, &res);
+        res = self.double(native, &res);
 
-        res = self.g2_double(native, &res);
-        res = self.g2_double(native, &res);
-        res = self.g2_add(native, &res, &ops[1]);
+        res = self.double(native, &res);
+        res = self.double(native, &res);
+        res = self.add(native, &res, &ops[1]);
         // let mut copy_res = self.copy_g2_aff_p(native, &res);
         for w in b {
             let mut mask = 0xc0;
             for j in 0..4 {
-                res = self.g2_double(native, &res);
-                res = self.g2_double(native, &res);
+                res = self.double(native, &res);
+                res = self.double(native, &res);
                 let c = (w & mask) >> (6 - 2 * j);
                 if c != 0 {
-                    res = self.g2_add(native, &res, &ops[(c - 1) as usize]);
+                    res = self.add(native, &res, &ops[(c - 1) as usize]);
                 }
                 mask >>= 2;
             }
@@ -206,25 +292,25 @@ impl G2 {
         let xxg = self.mul_windowed(native, &xg, x_big.clone());
         let xxg = self.neg(native, &xxg);
 
-        let mut res = self.g2_add(native, &xxg, &xg_neg);
-        res = self.g2_add(native, &res, &p_neg);
+        let mut res = self.add(native, &xxg, &xg_neg);
+        res = self.add(native, &res, &p_neg);
 
-        let mut t = self.g2_add(native, &xg, &p_neg);
+        let mut t = self.add(native, &xg, &p_neg);
         t = self.psi(native, &t);
 
-        res = self.g2_add(native, &res, &t);
+        res = self.add(native, &res, &t);
 
-        let t_double = self.g2_double(native, p);
+        let t_double = self.double(native, p);
 
         let third_root_one_g1 = value_of::<C, B, Bls12381Fp>(native, Box::new("4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436".to_string()));
 
-        let mut t_double_mul = G2AffP::new(t_double.x.my_clone(), t_double.y.my_clone());
+        let mut t_double_mul = G2AffP::new(t_double.x.clone(), t_double.y.clone());
         t_double_mul.x = self
             .ext2
             .mul_by_element(native, &t_double_mul.x, &third_root_one_g1);
         t_double_mul = self.neg(native, &t_double_mul);
 
-        self.g2_add(native, &res, &t_double_mul)
+        self.add(native, &res, &t_double_mul)
     }
     pub fn map_to_curve2<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, in0: &GE2) -> G2AffP {
         let a = GE2::from_vars(
@@ -278,12 +364,12 @@ impl G2 {
         let g_x1 = self.ext2.mul(native, &xi_3_t_6, &g_x0);
 
         let inputs = vec![
-            g_x0.a0.my_clone(),
-            g_x0.a1.my_clone(),
-            g_x1.a0.my_clone(),
-            g_x1.a1.my_clone(),
-            in0.a0.my_clone(),
-            in0.a1.my_clone(),
+            g_x0.a0.clone(),
+            g_x0.a1.clone(),
+            g_x1.a0.clone(),
+            g_x1.a1.clone(),
+            in0.a0.clone(),
+            in0.a1.clone(),
         ];
         let output = self
             .ext2
@@ -291,8 +377,8 @@ impl G2 {
             .new_hint(native, "myhint.getsqrtx0x1fq2newhint", 3, inputs);
         let is_square = self.ext2.curve_f.is_zero(native, &output[0]); // is_square = 0 if g_x0 has not square root, 1 otherwise
         let y = GE2 {
-            a0: output[1].my_clone(),
-            a1: output[2].my_clone(),
+            a0: output[1].clone(),
+            a1: output[2].clone(),
         };
 
         let y_sq = self.ext2.square(native, &y);
@@ -308,20 +394,21 @@ impl G2 {
         native.assert_is_equal(sgn_in, sgn_y);
 
         let out_b0 = self.ext2.select(native, is_square, &x1, &x0);
-        let out_b1 = y.my_clone();
+        let out_b1 = y.clone();
         G2AffP {
             x: out_b0,
             y: out_b1,
         }
     }
-    pub fn g2_eval_polynomial<C: Config, B: RootAPI<C>>(
+
+    pub fn eval_polynomial<C: Config, B: RootAPI<C>>(
         &mut self,
         native: &mut B,
         monic: bool,
         coefficients: Vec<GE2>,
         x: &GE2,
     ) -> GE2 {
-        let mut dst = coefficients[coefficients.len() - 1].my_clone();
+        let mut dst = coefficients[coefficients.len() - 1].clone();
         if monic {
             dst = self.ext2.add(native, &dst, x);
         }
@@ -331,7 +418,7 @@ impl G2 {
         }
         dst
     }
-    pub fn g2_isogeny_x_numerator<C: Config, B: RootAPI<C>>(
+    pub fn isogeny_x_numerator<C: Config, B: RootAPI<C>>(
         &mut self,
         native: &mut B,
         x: &GE2,
@@ -352,9 +439,9 @@ impl G2 {
             value_of::<C, B, Bls12381Fp>(native, Box::new("3557697382419259905260257622876359250272784728834673675850718343221361467102966990615722337003569479144794908942033".to_string())).limbs,
             value_of::<C, B, Bls12381Fp>(native, Box::new(0)).limbs,
         );
-        self.g2_eval_polynomial(native, false, vec![coeff0, coeff1, coeff2, coeff3], x)
+        self.eval_polynomial(native, false, vec![coeff0, coeff1, coeff2, coeff3], x)
     }
-    pub fn g2_isogeny_y_numerator<C: Config, B: RootAPI<C>>(
+    pub fn isogeny_y_numerator<C: Config, B: RootAPI<C>>(
         &mut self,
         native: &mut B,
         x: &GE2,
@@ -376,10 +463,10 @@ impl G2 {
             value_of::<C, B, Bls12381Fp>(native, Box::new("2816510427748580758331037284777117739799287910327449993381818688383577828123182200904113516794492504322962636245776".to_string())).limbs,
             value_of::<C, B, Bls12381Fp>(native, Box::new(0)).limbs,
         );
-        let dst = self.g2_eval_polynomial(native, false, vec![coeff0, coeff1, coeff2, coeff3], x);
+        let dst = self.eval_polynomial(native, false, vec![coeff0, coeff1, coeff2, coeff3], x);
         self.ext2.mul(native, &dst, y)
     }
-    pub fn g2_isogeny_x_denominator<C: Config, B: RootAPI<C>>(
+    pub fn isogeny_x_denominator<C: Config, B: RootAPI<C>>(
         &mut self,
         native: &mut B,
         x: &GE2,
@@ -392,9 +479,9 @@ impl G2 {
             value_of::<C, B, Bls12381Fp>(native, Box::new(12)).limbs,
             value_of::<C, B, Bls12381Fp>(native, Box::new(-12)).limbs,
         );
-        self.g2_eval_polynomial(native, true, vec![coeff0, coeff1], x)
+        self.eval_polynomial(native, true, vec![coeff0, coeff1], x)
     }
-    pub fn g2_isogeny_y_denominator<C: Config, B: RootAPI<C>>(
+    pub fn isogeny_y_denominator<C: Config, B: RootAPI<C>>(
         &mut self,
         native: &mut B,
         x: &GE2,
@@ -411,17 +498,17 @@ impl G2 {
             value_of::<C, B, Bls12381Fp>(native, Box::new(18)).limbs,
             value_of::<C, B, Bls12381Fp>(native, Box::new(-18)).limbs,
         );
-        self.g2_eval_polynomial(native, true, vec![coeff0, coeff1, coeff2], x)
+        self.eval_polynomial(native, true, vec![coeff0, coeff1, coeff2], x)
     }
-    pub fn g2_isogeny<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, p: &G2AffP) -> G2AffP {
+    pub fn isogeny<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, p: &G2AffP) -> G2AffP {
         let mut p = G2AffP {
-            x: p.x.my_clone(),
-            y: p.y.my_clone(),
+            x: p.x.clone(),
+            y: p.y.clone(),
         };
-        let den1 = self.g2_isogeny_y_denominator(native, &p.x);
-        let den0 = self.g2_isogeny_x_denominator(native, &p.x);
-        p.y = self.g2_isogeny_y_numerator(native, &p.x, &p.y);
-        p.x = self.g2_isogeny_x_numerator(native, &p.x);
+        let den1 = self.isogeny_y_denominator(native, &p.x);
+        let den0 = self.isogeny_x_denominator(native, &p.x);
+        p.y = self.isogeny_y_numerator(native, &p.x, &p.y);
+        p.x = self.isogeny_x_numerator(native, &p.x);
 
         let den0 = self.ext2.inverse(native, &den0);
         let den1 = self.ext2.inverse(native, &den1);
@@ -449,8 +536,8 @@ impl G2 {
     ) -> G2AffP {
         let out0 = self.map_to_curve2(native, in0);
         let out1 = self.map_to_curve2(native, in1);
-        let out = self.g2_add(native, &out0, &out1);
-        let new_out = self.g2_isogeny(native, &out);
+        let out = self.add(native, &out0, &out1);
+        let new_out = self.isogeny(native, &out);
         self.clear_cofactor(native, &new_out)
     }
 
@@ -535,6 +622,33 @@ impl G2 {
 
         //TBD: subgroup check, do we need to do that? Since we are pretty sure that the sig bytes are correct, its unmashalling must be on the right curve?
         G2AffP { x: px, y }
+    }
+
+    pub fn scalar_mul_by_seed<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        q: &G2AffP,
+    ) -> G2AffP {
+        let mut z = self.triple(native, q);
+        z = self.double(native, &z);
+        z = self.double_and_add(native, &z, q);
+        z = self.double_n(native, &z, 2);
+        z = self.double_and_add(native, &z, q);
+        z = self.double_n(native, &z, 8);
+        z = self.double_and_add(native, &z, q);
+        z = self.double_n(native, &z, 31);
+        z = self.double_and_add(native, &z, q);
+        z = self.double_n(native, &z, 16);
+        self.neg(native, &z)
+    }
+}
+
+impl Debug for G2Affine {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        f.debug_struct("G2Affine")
+            .field("P", &self.p)
+            .field("lines", &self.lines)
+            .finish()
     }
 }
 

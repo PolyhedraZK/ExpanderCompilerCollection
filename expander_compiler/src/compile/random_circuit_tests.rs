@@ -1,6 +1,6 @@
 use crate::{
     circuit::{
-        config::{BN254Config, Config, GF2Config, M31Config},
+        config::{BN254Config, Config, GF2Config, GoldilocksConfig, M31Config},
         ir::{
             common::rand_gen::{RandomCircuitConfig, RandomRange},
             source::RootCircuit as IrSourceRoot,
@@ -114,6 +114,11 @@ fn test_gf2() {
 }
 
 #[test]
+fn test_goldilocks() {
+    do_tests::<GoldilocksConfig, NormalInputType>(7000000);
+}
+
+#[test]
 fn test_m31_cross() {
     do_tests::<M31Config, CrossLayerInputType>(4000000);
 }
@@ -126,6 +131,11 @@ fn test_bn254_cross() {
 #[test]
 fn test_gf2_cross() {
     do_tests::<GF2Config, CrossLayerInputType>(6000000);
+}
+
+#[test]
+fn test_goldilocks_cross() {
+    do_tests::<GoldilocksConfig, CrossLayerInputType>(8000000);
 }
 
 fn deterministic_<I: InputType>() {

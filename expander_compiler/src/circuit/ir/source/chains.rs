@@ -2,7 +2,7 @@ use expr::{LinComb, LinCombTerm};
 
 use crate::circuit::ir::common::Instruction as _;
 
-use super::*;
+use super::{expr, Circuit, Config, FieldArith, Instruction, RootCircuit};
 
 impl<C: Config> Circuit<C> {
     pub fn detect_chains(&mut self) {

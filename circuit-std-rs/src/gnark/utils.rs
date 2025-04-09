@@ -2,7 +2,7 @@ use ark_bls12_381::Fq;
 use ark_ff::Field;
 use num_bigint::BigInt;
 
-use crate::gnark::element::*;
+use crate::gnark::element::Element;
 use crate::gnark::emparam::FieldParams;
 use crate::gnark::emulated::field_bls12381::e2::GE2;
 use crate::gnark::limbs::decompose;
@@ -12,7 +12,7 @@ use crate::sha256::m31_utils::from_binary;
 use crate::sha256::m31_utils::to_binary;
 use ark_bls12_381::Fq2;
 use ark_ff::Zero;
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{Config, RootAPI, Variable};
 
 pub fn nb_multiplication_res_limbs(len_left: usize, len_right: usize) -> usize {
     let res = len_left + len_right - 1;
@@ -119,7 +119,7 @@ pub fn expand_msg_xmd_variable<C: Config, B: RootAPI<C>>(
     input.extend_from_slice(&block_v);
     input.extend_from_slice(msg);
     input.push(api.constant((len_in_bytes >> 8) as u32));
-    input.push(api.constant(len_in_bytes as u32));
+    input.push(api.constant((len_in_bytes % 256) as u32));
     input.push(api.constant(0));
     input.extend_from_slice(dst);
     input.push(api.constant(size_domain as u32));

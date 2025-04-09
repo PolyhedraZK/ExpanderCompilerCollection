@@ -1,20 +1,13 @@
 use expander_compiler::frontend::{Config, RootAPI, Variable};
 
-use super::e2::*;
-use super::e6::*;
+use super::e2::GE2;
+use super::e6::{Ext6, GE6};
 #[derive(Default, Clone)]
 pub struct GE12 {
     pub c0: GE6,
     pub c1: GE6,
 }
-impl GE12 {
-    pub fn my_clone(&self) -> Self {
-        GE12 {
-            c0: self.c0.my_clone(),
-            c1: self.c1.my_clone(),
-        }
-    }
-}
+
 pub struct Ext12 {
     pub ext6: Ext6,
 }
@@ -110,7 +103,7 @@ impl Ext12 {
     pub fn conjugate<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, x: &GE12) -> GE12 {
         let z1 = self.ext6.neg(native, &x.c1);
         GE12 {
-            c0: x.c0.my_clone(),
+            c0: x.c0.clone(),
             c1: z1,
         }
     }
@@ -455,7 +448,7 @@ impl Ext12 {
         z: &GE12,
         n: usize,
     ) -> GE12 {
-        let mut new_z = z.my_clone();
+        let mut new_z = z.clone();
         for _ in 0..n {
             new_z = self.cyclotomic_square(native, &new_z);
         }

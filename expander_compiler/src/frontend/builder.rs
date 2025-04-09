@@ -524,7 +524,9 @@ pub struct RootBuilder<C: Config> {
     num_public_inputs: usize,
     current_builders: Vec<(usize, Builder<C>)>,
     sub_circuits: HashMap<usize, source::Circuit<C>>,
+    sub_circuit_output_structure: HashMap<usize, Vec<usize>>,
     full_hash_id: HashMap<usize, [u8; 32]>,
+    outputs: Vec<Variable>,
 }
 
 macro_rules! root_binary_op {
@@ -614,16 +616,66 @@ impl<C: Config> RootAPI<C> for RootBuilder<C> {
         let mut hash = [0u8; 32];
         hasher.finalize(&mut hash);
 
+        let circuit_id = self.hash_to_sub_circuit_id(&hash);
+
+        self.call_sub_circuit(circuit_id, inputs, f)
+    }
+
+    fn hash_to_sub_circuit_id(&mut self, hash: &[u8; 32]) -> usize {
         let circuit_id = usize::from_le_bytes(hash[0..8].try_into().unwrap());
         if let Some(prev_hash) = self.full_hash_id.get(&circuit_id) {
-            if *prev_hash != hash {
+            if *prev_hash != *hash {
                 panic!("subcircuit id collision");
             }
         } else {
-            self.full_hash_id.insert(circuit_id, hash);
+            self.full_hash_id.insert(circuit_id, *hash);
         }
+        circuit_id
+    }
 
-        self.call_sub_circuit(circuit_id, inputs, f)
+    fn call_sub_circuit<F: FnOnce(&mut Self, &Vec<Variable>) -> Vec<Variable>>(
+        &mut self,
+        circuit_id: usize,
+        inputs: &[Variable],
+        f: F,
+    ) -> Vec<Variable> {
+        if !self.sub_circuits.contains_key(&circuit_id) {
+            self.actually_call_sub_circuit(circuit_id, inputs.len(), f);
+        }
+        let sub = self.sub_circuits.get(&circuit_id).unwrap();
+        let outputs: Vec<Variable> = (0..sub.outputs.len())
+            .map(|_| self.last_builder().new_var())
+            .collect();
+        self.last_builder()
+            .instructions
+            .push(SourceInstruction::SubCircuitCall {
+                sub_circuit_id: circuit_id,
+                inputs: inputs.iter().map(|v| v.id).collect(),
+                num_outputs: outputs.len(),
+            });
+        outputs
+    }
+
+    fn register_sub_circuit_output_structure(&mut self, circuit_id: usize, structure: Vec<usize>) {
+        if self
+            .sub_circuit_output_structure
+            .insert(circuit_id, structure)
+            .is_some()
+        {
+            panic!("subcircuit output structure already registered");
+        }
+    }
+
+    fn get_sub_circuit_output_structure(&self, circuit_id: usize) -> Vec<usize> {
+        self.sub_circuit_output_structure
+            .get(&circuit_id)
+            .unwrap()
+            .clone()
+    }
+
+    fn set_outputs(&mut self, outputs: Vec<Variable>) {
+        ensure_variables_valid(&outputs);
+        self.outputs = outputs;
     }
 }
 
@@ -645,6 +697,8 @@ impl<C: Config> RootBuilder<C> {
                 current_builders: vec![(0, builder0)],
                 sub_circuits: HashMap::new(),
                 full_hash_id: HashMap::new(),
+                sub_circuit_output_structure: HashMap::new(),
+                outputs: Vec::new(),
             },
             inputs,
             public_inputs,
@@ -655,7 +709,7 @@ impl<C: Config> RootBuilder<C> {
         let mut circuits = self.sub_circuits;
         assert_eq!(self.current_builders.len(), 1);
         for (circuit_id, builder) in self.current_builders {
-            circuits.insert(circuit_id, builder.build(&[]));
+            circuits.insert(circuit_id, builder.build(&self.outputs));
         }
         source::RootCircuit {
             circuits,
@@ -668,7 +722,7 @@ impl<C: Config> RootBuilder<C> {
         &mut self.current_builders.last_mut().unwrap().1
     }
 
-    fn actually_call_sub_circuit<F: Fn(&mut Self, &Vec<Variable>) -> Vec<Variable>>(
+    fn actually_call_sub_circuit<F: FnOnce(&mut Self, &Vec<Variable>) -> Vec<Variable>>(
         &mut self,
         circuit_id: usize,
         n: usize,
@@ -680,29 +734,6 @@ impl<C: Config> RootBuilder<C> {
         let (_, sub_builder) = self.current_builders.pop().unwrap();
         let sub = sub_builder.build(&sub_outputs);
         self.sub_circuits.insert(circuit_id, sub);
-    }
-
-    fn call_sub_circuit<F: Fn(&mut Self, &Vec<Variable>) -> Vec<Variable>>(
-        &mut self,
-        circuit_id: usize,
-        inputs: &[Variable],
-        f: F,
-    ) -> Vec<Variable> {
-        if !self.sub_circuits.contains_key(&circuit_id) {
-            self.actually_call_sub_circuit(circuit_id, inputs.len(), f);
-        }
-        let sub = self.sub_circuits.get(&circuit_id).unwrap();
-        let outputs: Vec<Variable> = (0..sub.outputs.len())
-            .map(|_| self.last_builder().new_var())
-            .collect();
-        self.last_builder()
-            .instructions
-            .push(SourceInstruction::SubCircuitCall {
-                sub_circuit_id: circuit_id,
-                inputs: inputs.iter().map(|v| v.id).collect(),
-                num_outputs: outputs.len(),
-            });
-        outputs
     }
 }
 

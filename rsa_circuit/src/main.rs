@@ -9,11 +9,11 @@ use circuit_std_rs::{
     LogUpCircuit, LogUpParams, StdCircuit, U2048Variable, BN_TWO_TO_120, N_LIMBS,
 };
 use expander_compiler::frontend::*;
-use extra::Serde;
 use halo2curves::bn256::Fr;
 use native::RSAFieldElement;
 use num_bigint::BigUint;
 use rand::RngCore;
+use serdes::ExpSerde;
 use sha2::Digest;
 
 // see explanation in circuit declaration

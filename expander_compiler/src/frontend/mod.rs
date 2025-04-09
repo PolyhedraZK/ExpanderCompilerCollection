@@ -7,6 +7,7 @@ mod api;
 mod builder;
 mod circuit;
 mod debug;
+mod sub_circuit;
 mod variables;
 mod witness;
 
@@ -14,12 +15,13 @@ pub use circuit::declare_circuit;
 pub type API<C> = builder::RootBuilder<C>;
 pub use crate::circuit::config::*;
 pub use crate::compile::CompileOptions;
-pub use crate::field::{Field, FieldArith, FieldModulus, BN254, GF2, M31};
+pub use crate::field::{BN254Fr, Field, FieldArith, GF2, M31};
 pub use crate::hints::registry::{EmptyHintCaller, HintCaller, HintRegistry};
 pub use crate::utils::error::Error;
 pub use api::{BasicAPI, RootAPI};
 pub use builder::Variable;
 pub use circuit::Define;
+pub use macros::memorized;
 pub use witness::WitnessSolver;
 
 pub mod internal {
@@ -28,16 +30,19 @@ pub mod internal {
         declare_circuit_load_from, declare_circuit_num_vars,
     };
     pub use super::variables::{DumpLoadTwoVariables, DumpLoadVariables};
-    pub use crate::utils::serde::Serde;
+    // pub use crate::utils::serde::Serde;
 }
 
 pub mod extra {
     pub use super::api::UnconstrainedAPI;
     pub use super::debug::DebugBuilder;
+    pub use super::sub_circuit::{
+        HashStructureAndPrimitive, JoinVecVariables, RebuildVecVariables,
+    };
     pub use crate::hints::registry::{EmptyHintCaller, HintCaller, HintRegistry};
-    pub use crate::utils::serde::Serde;
+    // pub use crate::utils::serde::Serde;
 
-    use super::*;
+    use super::{internal, Config, Define, Variable};
 
     pub fn debug_eval<
         C: Config,
@@ -48,7 +53,7 @@ pub mod extra {
         circuit: &Cir,
         assignment: &CA,
         hint_caller: H,
-    ) {
+    ) -> Vec<C::CircuitField> {
         let (num_inputs, num_public_inputs) = circuit.num_vars();
         let (a_num_inputs, a_num_public_inputs) = assignment.num_vars();
         assert_eq!(num_inputs, a_num_inputs);
@@ -63,6 +68,7 @@ pub mod extra {
         let mut public_vars_ptr = public_input_variables.as_slice();
         circuit.load_from(&mut vars_ptr, &mut public_vars_ptr);
         circuit.define(&mut root_builder);
+        root_builder.get_outputs()
     }
 }
 
