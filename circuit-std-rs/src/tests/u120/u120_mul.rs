@@ -1,10 +1,6 @@
 use std::mem::transmute;
 
 use expander_compiler::frontend::*;
-use expander_compiler::{
-    declare_circuit,
-    frontend::{BN254Config, Define, Variable, API},
-};
 use halo2curves::bn256::Fr;
 
 use crate::{u120, BN_TWO_TO_120, MASK120};
@@ -18,7 +14,7 @@ declare_circuit!(MulCircuit {
 });
 
 impl Define<BN254Config> for MulCircuit<Variable> {
-    fn define(&self, builder: &mut API<BN254Config>) {
+    fn define<Builder: RootAPI<BN254Config>>(&self, builder: &mut Builder) {
         let two_to_120 = builder.constant(BN_TWO_TO_120);
 
         let (result, carry_out) =
@@ -50,7 +46,7 @@ impl MulCircuit<Fr> {
 
 #[test]
 fn test_rsa_circuit_120_multiplication() {
-    let compile_result = compile(&MulCircuit::default()).unwrap();
+    let compile_result = compile(&MulCircuit::default(), CompileOptions::default()).unwrap();
 
     {
         // Test case: Simple multiplication without carries

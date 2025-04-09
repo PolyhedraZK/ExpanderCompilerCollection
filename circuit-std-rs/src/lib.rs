@@ -9,6 +9,7 @@ pub use logup::{LogUpCircuit, LogUpParams};
 
 pub mod non_native;
 pub use non_native::*;
+pub mod matmul;
 
 pub mod gnark;
 pub mod poseidon_m31;

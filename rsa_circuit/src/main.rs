@@ -9,10 +9,6 @@ use circuit_std_rs::{
     LogUpCircuit, LogUpParams, StdCircuit, U2048Variable, BN_TWO_TO_120, N_LIMBS,
 };
 use expander_compiler::frontend::*;
-use expander_compiler::{
-    declare_circuit,
-    frontend::{BN254Config, BasicAPI, Define, Variable, API},
-};
 use extra::Serde;
 use halo2curves::bn256::Fr;
 use native::RSAFieldElement;
@@ -103,7 +99,7 @@ fn build_hash_outputs(hash_inputs: &[u8]) -> [u8; HASH_OUTPUT_LEN] {
 }
 
 impl Define<BN254Config> for RSACircuit<Variable> {
-    fn define(&self, builder: &mut API<BN254Config>) {
+    fn define<Builder: RootAPI<BN254Config>>(&self, builder: &mut Builder) {
         // task 1: compute x^e mod n
         {
             let two_to_120 = builder.constant(BN_TWO_TO_120);
@@ -232,7 +228,7 @@ fn main() {
     let mut rng = test_rng();
 
     // build a dummy circuit
-    let compile_result = compile(&RSACircuit::default()).unwrap();
+    let compile_result = compile(&RSACircuit::default(), CompileOptions::default()).unwrap();
 
     // generate the trace and setup the circuit assignment
     let pow = BigUint::from(65537u64);

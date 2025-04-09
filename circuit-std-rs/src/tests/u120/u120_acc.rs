@@ -1,8 +1,4 @@
 use expander_compiler::frontend::*;
-use expander_compiler::{
-    declare_circuit,
-    frontend::{BN254Config, Define, Variable, API},
-};
 use halo2curves::bn256::Fr;
 
 use crate::non_native::u120;
@@ -28,7 +24,7 @@ impl AccumulateCircuit<Variable> {
 }
 
 impl Define<BN254Config> for AccumulateCircuit<Variable> {
-    fn define(&self, builder: &mut API<BN254Config>) {
+    fn define<Builder: RootAPI<BN254Config>>(&self, builder: &mut Builder) {
         println!("len: {}", self.inputs.len());
         let two_to_120 = builder.constant(BN_TWO_TO_120);
         let (result, carry) = u120::accumulate_u120(&self.inputs, &two_to_120, builder);
@@ -61,7 +57,8 @@ impl AccumulateCircuit<Fr> {
 #[test]
 fn test_accumulate_u120() {
     {
-        let compile_result = compile(&AccumulateCircuit::dummy(4)).unwrap();
+        let compile_result =
+            compile(&AccumulateCircuit::dummy(4), CompileOptions::default()).unwrap();
 
         // Test case 1: Simple addition without carry
         let inputs = vec![[1, 0], [2, 0], [3, 0], [4, 0]];
@@ -80,7 +77,8 @@ fn test_accumulate_u120() {
 
     {
         // Test case 2: Overflow within u64
-        let compile_result = compile(&AccumulateCircuit::dummy(3)).unwrap();
+        let compile_result =
+            compile(&AccumulateCircuit::dummy(3), CompileOptions::default()).unwrap();
         let inputs = vec![[u64::MAX - 1, 0], [1, 0], [1, 0]];
         let result = [0, 1]; // MAX - 1 + 1 + 1 = 1 (with carry to next limb)
         let carry = [0, 0];
@@ -96,7 +94,8 @@ fn test_accumulate_u120() {
 
     {
         // Test case 3: Near 2^120 boundary
-        let compile_result = compile(&AccumulateCircuit::dummy(2)).unwrap();
+        let compile_result =
+            compile(&AccumulateCircuit::dummy(2), CompileOptions::default()).unwrap();
         let max_120_bits = [u64::MAX, (1u64 << 56) - 1]; // 2^120 - 1
         let inputs = vec![max_120_bits, [1, 0]];
         let result = [0, 0]; // Wraps to 0
@@ -113,7 +112,8 @@ fn test_accumulate_u120() {
 
     {
         // Test case 4: Multiple carries
-        let compile_result = compile(&AccumulateCircuit::dummy(3)).unwrap();
+        let compile_result =
+            compile(&AccumulateCircuit::dummy(3), CompileOptions::default()).unwrap();
         let near_max = [u64::MAX - 2, (1u64 << 56) - 1];
         let inputs = vec![near_max, near_max, near_max];
         let result = [0xfffffffffffffff7, 0xffffffffffffff];
@@ -130,7 +130,8 @@ fn test_accumulate_u120() {
 
     {
         // Test case 5: Large number of small values
-        let compile_result = compile(&AccumulateCircuit::dummy(10)).unwrap();
+        let compile_result =
+            compile(&AccumulateCircuit::dummy(10), CompileOptions::default()).unwrap();
         let inputs = vec![[1, 0]; 10]; // Ten ones
         let result = [10, 0];
         let carry = [0, 0];
@@ -146,7 +147,8 @@ fn test_accumulate_u120() {
 
     {
         // Test case 6: Single value in upper limb
-        let compile_result = compile(&AccumulateCircuit::dummy(2)).unwrap();
+        let compile_result =
+            compile(&AccumulateCircuit::dummy(2), CompileOptions::default()).unwrap();
         let inputs = vec![[0, 1], [0, 2]];
         let result = [0, 3]; // Adding values in upper limb
         let carry = [0, 0];
@@ -163,7 +165,8 @@ fn test_accumulate_u120() {
     // Negative test cases
     {
         // Test case 7: Incorrect result
-        let compile_result = compile(&AccumulateCircuit::dummy(3)).unwrap();
+        let compile_result =
+            compile(&AccumulateCircuit::dummy(3), CompileOptions::default()).unwrap();
         let inputs = vec![[1, 0], [2, 0], [3, 0]];
         let result = [7, 0]; // Wrong result (should be 6)
         let carry = [0, 0];
@@ -179,7 +182,8 @@ fn test_accumulate_u120() {
 
     {
         // Test case 8: Incorrect handling of upper limb
-        let compile_result = compile(&AccumulateCircuit::dummy(2)).unwrap();
+        let compile_result =
+            compile(&AccumulateCircuit::dummy(2), CompileOptions::default()).unwrap();
         let inputs = vec![[1, 1], [2, 1]];
         let result = [3, 1]; // Wrong result (should be [3, 2])
         let carry = [0, 0];
@@ -195,7 +199,8 @@ fn test_accumulate_u120() {
 
     {
         // Test case 9: Minimum case (two values)
-        let compile_result = compile(&AccumulateCircuit::dummy(2)).unwrap();
+        let compile_result =
+            compile(&AccumulateCircuit::dummy(2), CompileOptions::default()).unwrap();
         let inputs = vec![[5, 0], [7, 0]];
         let result = [12, 0];
         let carry = [0, 0];

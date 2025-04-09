@@ -21,7 +21,7 @@ fn logup_test() {
 }
 
 declare_circuit!(LogUpRangeproofCircuit { test: Variable });
-impl GenericDefine<M31Config> for LogUpRangeproofCircuit<Variable> {
+impl Define<M31Config> for LogUpRangeproofCircuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut table = LogUpRangeProofTable::new(8);
         table.initial(builder);
@@ -45,7 +45,7 @@ fn rangeproof_logup_test() {
     hint_registry.register("myhint.querycounthint", query_count_hint);
     hint_registry.register("myhint.rangeproofhint", rangeproof_hint);
     //compile and test
-    let compile_result = compile_generic(
+    let compile_result = compile(
         &LogUpRangeproofCircuit::default(),
         CompileOptions::default(),
     )

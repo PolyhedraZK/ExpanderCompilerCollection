@@ -1,8 +1,4 @@
 use expander_compiler::frontend::*;
-use expander_compiler::{
-    declare_circuit,
-    frontend::{BN254Config, Variable},
-};
 use halo2curves::bn256::Fr;
 
 use crate::u2048::U2048Variable;
@@ -14,7 +10,7 @@ declare_circuit!(MulNoModCircuit {
     result: [Variable; 2 * N_LIMBS],
 });
 
-impl GenericDefine<BN254Config> for MulNoModCircuit<Variable> {
+impl Define<BN254Config> for MulNoModCircuit<Variable> {
     fn define<Builder: RootAPI<BN254Config>>(&self, builder: &mut Builder) {
         let x = U2048Variable::from_raw(self.x);
         let y = U2048Variable::from_raw(self.y);
@@ -59,8 +55,7 @@ impl MulNoModCircuit<Fr> {
 
 #[test]
 fn test_mul_without_mod() {
-    let compile_result =
-        compile_generic(&MulNoModCircuit::default(), CompileOptions::default()).unwrap();
+    let compile_result = compile(&MulNoModCircuit::default(), CompileOptions::default()).unwrap();
 
     {
         // Test case 1: Simple multiplication with no carries

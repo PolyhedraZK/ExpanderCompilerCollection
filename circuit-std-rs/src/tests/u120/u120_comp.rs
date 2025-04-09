@@ -1,8 +1,4 @@
 use expander_compiler::frontend::*;
-use expander_compiler::{
-    declare_circuit,
-    frontend::{BN254Config, Define, Variable, API},
-};
 use halo2curves::bn256::Fr;
 use std::mem::transmute;
 
@@ -16,7 +12,7 @@ declare_circuit!(LessThanCircuit {
 });
 
 impl Define<BN254Config> for LessThanCircuit<Variable> {
-    fn define(&self, builder: &mut API<BN254Config>) {
+    fn define<Builder: RootAPI<BN254Config>>(&self, builder: &mut Builder) {
         let res = is_less_than_u120(&self.x, &self.y, builder);
         builder.assert_is_equal(res, self.result);
     }
@@ -34,7 +30,7 @@ impl LessThanCircuit<Fr> {
 
 #[test]
 fn test_u120_less_than() {
-    let compile_result = compile(&LessThanCircuit::default()).unwrap();
+    let compile_result = compile(&LessThanCircuit::default(), CompileOptions::default()).unwrap();
 
     {
         // Test case: Simple less than

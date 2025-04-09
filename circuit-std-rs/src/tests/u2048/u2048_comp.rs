@@ -1,8 +1,4 @@
 use expander_compiler::frontend::*;
-use expander_compiler::{
-    declare_circuit,
-    frontend::{BN254Config, Define, Variable, API},
-};
 use halo2curves::bn256::Fr;
 
 use crate::u2048::U2048Variable;
@@ -15,7 +11,7 @@ declare_circuit!(CompareCircuit {
 });
 
 impl Define<BN254Config> for CompareCircuit<Variable> {
-    fn define(&self, builder: &mut API<BN254Config>) {
+    fn define<Builder: RootAPI<BN254Config>>(&self, builder: &mut Builder) {
         let x = U2048Variable { limbs: self.x };
         let y = U2048Variable { limbs: self.y };
 
@@ -47,7 +43,7 @@ impl CompareCircuit<Fr> {
 
 #[test]
 fn test_u2048_comparison() {
-    let compile_result = compile(&CompareCircuit::default()).unwrap();
+    let compile_result = compile(&CompareCircuit::default(), CompileOptions::default()).unwrap();
 
     {
         // Test case: Equal numbers

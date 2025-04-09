@@ -14,7 +14,7 @@ declare_circuit!(ByteDecompCircuit {
 });
 
 impl Define<BN254Config> for ByteDecompCircuit<Variable> {
-    fn define(&self, builder: &mut API<BN254Config>) {
+    fn define<Builder: RootAPI<BN254Config>>(&self, builder: &mut Builder) {
         let two_to_eight = Fr::from(1u64 << 8);
         let constant_scalars = (0..32)
             .map(|i| {
@@ -48,7 +48,7 @@ impl ByteDecompCircuit<Fr> {
 
 #[test]
 fn test_byte_decomposition() {
-    let compile_result = compile(&ByteDecompCircuit::default()).unwrap();
+    let compile_result = compile(&ByteDecompCircuit::default(), CompileOptions::default()).unwrap();
 
     {
         // Test case: Zero

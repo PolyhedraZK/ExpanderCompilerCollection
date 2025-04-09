@@ -1,8 +1,4 @@
 use expander_compiler::frontend::*;
-use expander_compiler::{
-    declare_circuit,
-    frontend::{BN254Config, Define, Variable, API},
-};
 use halo2curves::bn256::Fr;
 
 use crate::u2048::U2048Variable;
@@ -17,7 +13,7 @@ declare_circuit!(MulModCircuit {
 });
 
 impl Define<BN254Config> for MulModCircuit<Variable> {
-    fn define(&self, builder: &mut API<BN254Config>) {
+    fn define<Builder: RootAPI<BN254Config>>(&self, builder: &mut Builder) {
         let x = U2048Variable::from_raw(self.x);
         let y = U2048Variable::from_raw(self.y);
         let result = U2048Variable::from_raw(self.result);
@@ -63,7 +59,7 @@ impl MulModCircuit<Fr> {
 
 #[test]
 fn test_mul_mod() {
-    let compile_result = compile(&MulModCircuit::default()).unwrap();
+    let compile_result = compile(&MulModCircuit::default(), CompileOptions::default()).unwrap();
 
     {
         // Test case 1: Simple modular multiplication
