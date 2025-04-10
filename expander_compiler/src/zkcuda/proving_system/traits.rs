@@ -26,8 +26,8 @@ pub trait ProvingSystem<C: Config> {
     fn prove(
         prover_setup: &Self::ProverSetup,
         kernel: &Kernel<C>,
-        commitments: &[&Self::Commitment],
-        commitments_extra_info: &[&Self::CommitmentExtraInfo],
+        commitments: &[Self::Commitment],
+        commitments_extra_info: &[Self::CommitmentExtraInfo],
         commitments_values: &[&[C::DefaultSimdField]],
         parallel_count: usize,
         is_broadcast: &[bool],
@@ -37,7 +37,7 @@ pub trait ProvingSystem<C: Config> {
         verifier_setup: &Self::VerifierSetup,
         kernel: &Kernel<C>,
         proof: &Self::Proof,
-        commitments: &[&Self::Commitment],
+        commitments: &[Self::Commitment],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> bool;

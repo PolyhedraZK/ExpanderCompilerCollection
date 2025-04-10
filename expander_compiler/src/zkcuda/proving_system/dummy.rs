@@ -66,8 +66,8 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
     fn prove(
         _prover_setup: &Self::ProverSetup,
         kernel: &Kernel<C>,
-        _commitments: &[&Self::Commitment],
-        _commitments_extra_info: &[&Self::CommitmentExtraInfo],
+        _commitments: &[Self::Commitment],
+        _commitments_extra_info: &[Self::CommitmentExtraInfo],
         commitments_values: &[&[C::DefaultSimdField]],
         parallel_count: usize,
         is_broadcast: &[bool],
@@ -92,7 +92,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
         _verifier_setup: &Self::VerifierSetup,
         kernel: &Kernel<C>,
         proof: &Self::Proof,
-        commitments: &[&Self::Commitment],
+        commitments: &[Self::Commitment],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> bool {
