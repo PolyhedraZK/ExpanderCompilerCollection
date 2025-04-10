@@ -164,8 +164,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
         let vals_to_commit = if is_broadcast {
             vec![vals]
         } else {
-            vals.chunks(vals.len() / parallel_count)
-                .collect::<Vec<_>>()
+            vals.chunks(vals.len() / parallel_count).collect::<Vec<_>>()
         };
 
         let n_vars = vals_to_commit[0].len().ilog2() as usize;
