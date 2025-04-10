@@ -66,7 +66,7 @@ impl<C: Config> ExpSerde for ExpanderGKRCommitment<C> {
     fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
         let vals_len = usize::deserialize_from(&mut reader)?;
         let commitment =
-            <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::Commitment::deserialize_from(
+            Vec::<<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::Commitment>::deserialize_from(
                 &mut reader,
             )?;
         Ok(ExpanderGKRCommitment {

@@ -61,7 +61,7 @@ impl<C: Config, P: ProvingSystem<C>> ExpSerde for CombinedProof<C, P> {
         self.proofs.serialize_into(&mut writer)
     }
     fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
-        let commitments = Vec::<P::Commitment>::deserialize_from(&mut reader)?;
+        let commitments = Vec::<Vec::<P::Commitment>>::deserialize_from(&mut reader)?;
         let proofs = Vec::<P::Proof>::deserialize_from(&mut reader)?;
         Ok(CombinedProof {
             commitments,
