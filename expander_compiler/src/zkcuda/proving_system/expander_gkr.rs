@@ -42,6 +42,7 @@ macro_rules! pcs {
     };
 }
 
+#[allow(clippy::type_complexity)]
 pub struct ExpanderGKRCommitment<C: Config> {
     vals_len: usize,
     commitment: Vec<<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::Commitment>,
@@ -62,6 +63,7 @@ impl<C: Config> Commitment<C> for ExpanderGKRCommitment<C> {
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub struct ExpanderGKRCommitmentExtraInfo<C: Config> {
     scratch: Vec<<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::ScratchPad>,
 }
@@ -163,7 +165,6 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
             vec![vals.as_slice()]
         } else {
             vals.chunks(vals.len() / parallel_count)
-                .map(|chunk| chunk)
                 .collect::<Vec<_>>()
         };
 
@@ -384,7 +385,7 @@ fn max_n_vars<C: GKRFieldConfig>(circuit: &Circuit<C>) -> (usize, usize) {
 
 #[allow(clippy::too_many_arguments)]
 fn prove_input_claim<C: Config>(
-    kernel: &Kernel<C>,
+    _kernel: &Kernel<C>,
     commitments_values: &[&[C::DefaultSimdField]],
     p_keys: &ExpanderGKRProverSetup<C>,
     commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<C>],
@@ -428,7 +429,7 @@ fn prove_input_claim<C: Config>(
         transcript.append_field_element(&v);
 
         transcript.lock_proof();
-        let scratch = if *ib {
+        let scratch_for_parallel_index = if *ib {
             &extra_info.scratch[0]
         } else {
             &extra_info.scratch[parallel_index]
@@ -444,7 +445,7 @@ fn prove_input_claim<C: Config>(
                 x_mpi: vec![],
             },
             transcript,
-            scratch,
+            scratch_for_parallel_index,
         )
         .unwrap();
         transcript.unlock_proof();
@@ -468,7 +469,7 @@ fn verify_input_claim<C: Config>(
     commitments: &[ExpanderGKRCommitment<C>],
     is_broadcast: &[bool],
     parallel_index: usize,
-    parallel_count: usize,
+    _parallel_count: usize,
     transcript: &mut transcript!(C),
 ) -> bool {
     let mut target_y = <C::DefaultGKRFieldConfig as GKRFieldConfig>::ChallengeField::ZERO;
@@ -507,7 +508,7 @@ fn verify_input_claim<C: Config>(
         let verified = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::verify(
             &params,
             v_key,
-            &commitment_for_parallel_index,
+            commitment_for_parallel_index,
             &ExpanderGKRChallenge::<C::DefaultGKRFieldConfig> {
                 x: challenge_vars,
                 x_simd: x_simd.to_vec(),
