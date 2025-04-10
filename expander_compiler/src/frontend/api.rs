@@ -32,6 +32,11 @@ pub trait BasicAPI<C: Config> {
         self.div(1, x, true)
     }
     fn is_zero(&mut self, x: impl ToVariableOrValue<C::CircuitField>) -> Variable;
+    fn to_binary(
+        &mut self,
+        x: impl ToVariableOrValue<C::CircuitField>,
+        num_bits: usize,
+    ) -> Vec<Variable>;
     fn assert_is_zero(&mut self, x: impl ToVariableOrValue<C::CircuitField>);
     fn assert_is_non_zero(&mut self, x: impl ToVariableOrValue<C::CircuitField>);
     fn assert_is_bool(&mut self, x: impl ToVariableOrValue<C::CircuitField>);

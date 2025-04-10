@@ -9,7 +9,10 @@ use crate::{
         },
     },
     field::FieldArith,
-    hints::registry::{hint_key_to_id, HintCaller},
+    hints::{
+        self,
+        registry::{hint_key_to_id, HintCaller},
+    },
 };
 
 use super::{
@@ -117,6 +120,18 @@ impl<C: Config, H: HintCaller<C::CircuitField>> BasicAPI<C> for DebugBuilder<C, 
     fn is_zero(&mut self, x: impl ToVariableOrValue<C::CircuitField>) -> Variable {
         let x = self.convert_to_id(x);
         self.eval_ir_insn(IrInstruction::IsZero(x))
+    }
+    fn to_binary(
+        &mut self,
+        x: impl ToVariableOrValue<<C as Config>::CircuitField>,
+        num_bits: usize,
+    ) -> Vec<Variable> {
+        let x = self.convert_to_id(x);
+        hints::to_binary(self.values[x], num_bits)
+            .unwrap()
+            .into_iter()
+            .map(|v| self.return_as_variable(v))
+            .collect()
     }
     fn assert_is_zero(&mut self, x: impl ToVariableOrValue<C::CircuitField>) {
         let x = self.convert_to_value(x);

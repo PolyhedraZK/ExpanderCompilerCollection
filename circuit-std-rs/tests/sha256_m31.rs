@@ -1,4 +1,4 @@
-use circuit_std_rs::{sha256::m31::sha256_37bytes, sha256::m31_utils::to_binary_hint};
+use circuit_std_rs::sha256::m31::sha256_37bytes;
 use expander_compiler::frontend::*;
 use extra::*;
 use sha2::{Digest, Sha256};
@@ -32,8 +32,6 @@ impl Define<M31Config> for SHA25637BYTESCircuit<Variable> {
 
 #[test]
 fn test_sha256_37bytes() {
-    let mut hint_registry = HintRegistry::<M31>::new();
-    hint_registry.register("myhint.tobinary", to_binary_hint);
     let compile_result =
         compile(&SHA25637BYTESCircuit::default(), CompileOptions::default()).unwrap();
     for i in 0..1 {
@@ -50,7 +48,7 @@ fn test_sha256_37bytes() {
         }
         let witness = compile_result
             .witness_solver
-            .solve_witness_with_hints(&assignment, &mut hint_registry)
+            .solve_witness_with_hints(&assignment, &mut EmptyHintCaller)
             .unwrap();
         let output = compile_result.layered_circuit.run(&witness);
         assert_eq!(output, vec![true]);
@@ -59,8 +57,6 @@ fn test_sha256_37bytes() {
 
 #[test]
 fn debug_sha256_37bytes() {
-    let mut hint_registry = HintRegistry::<M31>::new();
-    hint_registry.register("myhint.tobinary", to_binary_hint);
     let data = [255; 37];
     let mut hash = Sha256::new();
     hash.update(data);
@@ -72,5 +68,9 @@ fn debug_sha256_37bytes() {
     for i in 0..32 {
         assignment.output[i] = M31::from(output[i] as u32);
     }
-    debug_eval(&SHA25637BYTESCircuit::default(), &assignment, hint_registry);
+    debug_eval(
+        &SHA25637BYTESCircuit::default(),
+        &assignment,
+        EmptyHintCaller,
+    );
 }

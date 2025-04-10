@@ -26,6 +26,7 @@ pub enum BuiltinHintIds {
     GreaterEq,
     Lesser,
     Greater,
+    ToBinary,
 }
 
 #[cfg(not(target_pointer_width = "64"))]
@@ -59,6 +60,7 @@ impl BuiltinHintIds {
             x if x == BuiltinHintIds::GreaterEq as u64 as usize => Some(BuiltinHintIds::GreaterEq),
             x if x == BuiltinHintIds::Lesser as u64 as usize => Some(BuiltinHintIds::Lesser),
             x if x == BuiltinHintIds::Greater as u64 as usize => Some(BuiltinHintIds::Greater),
+            x if x == BuiltinHintIds::ToBinary as u64 as usize => Some(BuiltinHintIds::ToBinary),
             _ => None,
         }
     }
@@ -133,6 +135,18 @@ fn validate_builtin_hint(
             if num_outputs != 1 {
                 return Err(Error::InternalError(
                     "select requires exactly 1 output".to_string(),
+                ));
+            }
+        }
+        BuiltinHintIds::ToBinary => {
+            if num_inputs != 1 {
+                return Err(Error::InternalError(
+                    "to_binary requires exactly 1 input".to_string(),
+                ));
+            }
+            if num_outputs == 0 {
+                return Err(Error::InternalError(
+                    "to_binary requires at least 1 output".to_string(),
                 ));
             }
         }
@@ -221,6 +235,7 @@ pub fn impl_builtin_hint<F: Field>(
         BuiltinHintIds::GreaterEq => binop_hint(inputs, |x, y| F::from((x >= y) as u32)),
         BuiltinHintIds::Lesser => binop_hint(inputs, |x, y| F::from((x < y) as u32)),
         BuiltinHintIds::Greater => binop_hint(inputs, |x, y| F::from((x > y) as u32)),
+        BuiltinHintIds::ToBinary => to_binary(inputs[0], num_outputs).unwrap(), // TODO: error propagation
     }
 }
 
@@ -233,6 +248,21 @@ fn binop_hint_on_u256<F: Field, G: Fn(U256, U256) -> U256>(inputs: &[F], f: G) -
     let y_u256: U256 = inputs[1].to_u256();
     let z_u256 = f(x_u256, y_u256);
     vec![F::from_u256(z_u256)]
+}
+
+pub fn to_binary<F: Field>(x: F, num_outputs: usize) -> Result<Vec<F>, Error> {
+    let mut outputs = Vec::with_capacity(num_outputs);
+    let mut y = x.to_u256();
+    for _ in 0..num_outputs {
+        outputs.push(F::from_u256(y & U256::from(1u32)));
+        y >>= 1;
+    }
+    if y != U256::ZERO {
+        return Err(Error::UserError(
+            "to_binary hint input too large".to_string(),
+        ));
+    }
+    Ok(outputs)
 }
 
 pub fn stub_impl<F: Field>(hint_id: usize, inputs: &Vec<F>, num_outputs: usize) -> Vec<F> {
@@ -273,6 +303,9 @@ pub fn random_builtin(mut rand: impl RngCore) -> (usize, usize, usize) {
                 }
                 BuiltinHintIds::Select => {
                     return (hint_id as usize, 3, 1);
+                }
+                BuiltinHintIds::ToBinary => {
+                    return (hint_id as usize, 1, 300);
                 }
             }
         }
