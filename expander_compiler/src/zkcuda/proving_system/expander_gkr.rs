@@ -157,12 +157,12 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
 
     fn commit(
         prover_setup: &Self::ProverSetup,
-        vals: &Vec<<C as Config>::DefaultSimdField>,
+        vals: &[C::DefaultSimdField],
         parallel_count: usize,
         is_broadcast: bool,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo) {
         let vals_to_commit = if is_broadcast {
-            vec![vals.as_slice()]
+            vec![vals]
         } else {
             vals.chunks(vals.len() / parallel_count)
                 .collect::<Vec<_>>()

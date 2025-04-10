@@ -18,7 +18,7 @@ pub trait ProvingSystem<C: Config> {
     #[allow(clippy::ptr_arg)]
     fn commit(
         prover_setup: &Self::ProverSetup,
-        vals: &Vec<C::DefaultSimdField>,
+        vals: &[C::DefaultSimdField],
         parallel_count: usize,
         is_broadcast: bool,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo);

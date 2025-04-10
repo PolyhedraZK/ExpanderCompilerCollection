@@ -50,7 +50,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
 
     fn commit(
         _prover_setup: &Self::ProverSetup,
-        vals: &Vec<<C as Config>::DefaultSimdField>,
+        vals: &[<C as Config>::DefaultSimdField],
         _parallel_count: usize,
         _is_broadcast: bool,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo) {
