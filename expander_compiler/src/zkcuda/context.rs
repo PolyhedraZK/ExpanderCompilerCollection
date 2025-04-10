@@ -9,7 +9,7 @@ use crate::{circuit::config::Config, utils::pool::Pool};
 use super::{
     kernel::{shape_prepend, Kernel, Shape},
     proof::{ComputationGraph, ProofTemplate},
-    proving_system::{Commitment, ExpanderGKRProvingSystem, ProvingSystem},
+    proving_system::{ExpanderGKRProvingSystem, ProvingSystem},
     vec_shaped::{flatten_shaped, unflatten_shaped, VecShaped},
 };
 
@@ -50,7 +50,7 @@ pub struct Context<
 }
 
 pub struct CombinedProof<C: Config, P: ProvingSystem<C> = ExpanderGKRProvingSystem<C>> {
-    pub commitments: Vec<P::Commitment>,
+    pub commitments: Vec<Vec<P::Commitment>>, // a vector of commitments for each kernel
     pub proofs: Vec<P::Proof>,
 }
 
@@ -61,7 +61,7 @@ impl<C: Config, P: ProvingSystem<C>> ExpSerde for CombinedProof<C, P> {
         self.proofs.serialize_into(&mut writer)
     }
     fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
-        let commitments = Vec::<P::Commitment>::deserialize_from(&mut reader)?;
+        let commitments = Vec::<Vec<P::Commitment>>::deserialize_from(&mut reader)?;
         let proofs = Vec::<P::Proof>::deserialize_from(&mut reader)?;
         Ok(CombinedProof {
             commitments,
@@ -575,27 +575,35 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
 
     pub fn to_proof(self, prover_setup: &P::ProverSetup) -> CombinedProof<C, P> {
         let commitments = self
-            .device_memories
-            .iter()
-            .map(|x| P::commit(prover_setup, &x.values))
-            .collect::<Vec<_>>();
-        let proofs = self
             .proof_templates
             .iter()
             .map(|template| {
+                template
+                    .commitment_indices
+                    .iter()
+                    .zip(template.is_broadcast.iter())
+                    .map(|(x, is_broadcast)| {
+                        P::commit(
+                            prover_setup,
+                            &self.device_memories[*x].values,
+                            next_power_of_two(template.parallel_count),
+                            *is_broadcast,
+                        )
+                    })
+                    .unzip::<_, _, Vec<_>, Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+
+        let proofs: Vec<P::Proof> = self
+            .proof_templates
+            .iter()
+            .zip(commitments.iter())
+            .map(|(template, commitments_kernel)| {
                 P::prove(
                     prover_setup,
                     self.kernels.get(template.kernel_id),
-                    &template
-                        .commitment_indices
-                        .iter()
-                        .map(|x| &commitments[*x].0)
-                        .collect::<Vec<_>>(),
-                    &template
-                        .commitment_indices
-                        .iter()
-                        .map(|x| &commitments[*x].1)
-                        .collect::<Vec<_>>(),
+                    &commitments_kernel.0,
+                    &commitments_kernel.1,
                     &template
                         .commitment_indices
                         .iter()
@@ -606,6 +614,7 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
                 )
             })
             .collect::<Vec<_>>();
+
         CombinedProof {
             commitments: commitments.into_iter().map(|x| x.0).collect(),
             proofs,
@@ -619,29 +628,27 @@ impl<C: Config> ComputationGraph<C> {
         combined_proof: &CombinedProof<C, P>,
         verifier_setup: &P::VerifierSetup,
     ) -> bool {
-        for (commitment, len) in combined_proof
-            .commitments
-            .iter()
-            .zip(self.commitments_lens.iter())
-        {
-            if commitment.vals_len() != *len {
-                return false;
-            }
-        }
-        for (proof, template) in combined_proof
+        // TODO: Add a proper check
+        // for (commitment, len) in combined_proof
+        //     .commitments
+        //     .iter()
+        //     .zip(self.commitments_lens.iter())
+        // {
+        //     if commitment.vals_len() != *len {
+        //         return false;
+        //     }
+        // }
+        for ((proof, template), commitments_kernel) in combined_proof
             .proofs
             .iter()
             .zip(self.proof_templates.iter())
+            .zip(combined_proof.commitments.iter())
         {
             if !P::verify(
                 verifier_setup,
                 &self.kernels[template.kernel_id],
                 proof,
-                &template
-                    .commitment_indices
-                    .iter()
-                    .map(|&x| &combined_proof.commitments[x])
-                    .collect::<Vec<_>>(),
+                commitments_kernel,
                 next_power_of_two(template.parallel_count),
                 &template.is_broadcast,
             ) {

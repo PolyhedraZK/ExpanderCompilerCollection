@@ -76,9 +76,10 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
 
     fn commit(
         _prover_setup: &Self::ProverSetup,
-        vals: &Vec<<C as Config>::DefaultSimdField>,
+        vals: &[<C as Config>::DefaultSimdField],
+        _parallel_count: usize,
+        _is_broadcast: bool,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo) {
-        println!("Real Commit to {} values", vals.len());
         assert!(vals.len() & (vals.len() - 1) == 0);
         (
             DummyCommitment {
@@ -91,8 +92,8 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
     fn prove(
         _prover_setup: &Self::ProverSetup,
         kernel: &Kernel<C>,
-        _commitments: &[&Self::Commitment],
-        _commitments_extra_info: &[&Self::CommitmentExtraInfo],
+        _commitments: &[Self::Commitment],
+        _commitments_extra_info: &[Self::CommitmentExtraInfo],
         commitments_values: &[&[C::DefaultSimdField]],
         parallel_count: usize,
         is_broadcast: &[bool],
@@ -117,7 +118,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
         _verifier_setup: &Self::VerifierSetup,
         kernel: &Kernel<C>,
         proof: &Self::Proof,
-        commitments: &[&Self::Commitment],
+        commitments: &[Self::Commitment],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> bool {
