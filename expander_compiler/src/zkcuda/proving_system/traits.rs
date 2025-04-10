@@ -15,7 +15,6 @@ pub trait ProvingSystem<C: Config> {
 
     fn setup(computation_graph: &ComputationGraph<C>) -> (Self::ProverSetup, Self::VerifierSetup);
 
-    #[allow(clippy::ptr_arg)]
     fn commit(
         prover_setup: &Self::ProverSetup,
         vals: &[C::DefaultSimdField],
