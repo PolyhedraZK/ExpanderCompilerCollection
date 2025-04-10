@@ -1,4 +1,5 @@
 use expander_compiler::frontend::*;
+use expander_compiler::zkcuda::proof::ComputationGraph;
 use expander_compiler::zkcuda::proving_system::ExpanderGKRProvingSystem;
 use expander_compiler::zkcuda::{context::*, kernel::*};
 use serdes::ExpSerde;
@@ -158,6 +159,21 @@ fn zkcuda_2_simd() {
     let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
     let proof = ctx.to_proof(&prover_setup);
     assert!(computation_graph.verify(&proof, &verifier_setup));
+
+    // test serde
+    let mut buf_cg: Vec<u8> = Vec::new();
+    computation_graph.serialize_into(&mut buf_cg).unwrap();
+    let mut buf_proof: Vec<u8> = Vec::new();
+    proof.serialize_into(&mut buf_proof).unwrap();
+
+    let computation_graph2 =
+        ComputationGraph::<M31Config>::deserialize_from(&mut buf_cg.as_slice()).unwrap();
+    let proof2 = CombinedProof::<M31Config>::deserialize_from(&mut buf_proof.as_slice()).unwrap();
+    let ctx2: Context<M31Config> = Context::default();
+    let (_prover_setup2, verifier_setup2) = ctx2.proving_system_setup(&computation_graph2);
+    assert!(computation_graph2.verify(&proof2, &verifier_setup2));
+    assert!(computation_graph.verify(&proof2, &verifier_setup));
+    assert!(computation_graph2.verify(&proof, &verifier_setup2));
 }
 
 fn to_binary<C: Config>(api: &mut API<C>, x: Variable, n_bits: usize) -> Vec<Variable> {

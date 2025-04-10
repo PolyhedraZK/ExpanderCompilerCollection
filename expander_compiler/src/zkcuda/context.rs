@@ -1,4 +1,5 @@
 use arith::SimdField;
+use serdes::ExpSerde;
 
 use crate::field::FieldArith;
 use crate::hints::registry::{EmptyHintCaller, HintCaller};
@@ -51,6 +52,22 @@ pub struct Context<
 pub struct CombinedProof<C: Config, P: ProvingSystem<C> = ExpanderGKRProvingSystem<C>> {
     pub commitments: Vec<Vec<P::Commitment>>, // a vector of commitments for each kernel
     pub proofs: Vec<P::Proof>,
+}
+
+impl<C: Config, P: ProvingSystem<C>> ExpSerde for CombinedProof<C, P> {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
+        self.commitments.serialize_into(&mut writer)?;
+        self.proofs.serialize_into(&mut writer)
+    }
+    fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
+        let commitments = Vec::<P::Commitment>::deserialize_from(&mut reader)?;
+        let proofs = Vec::<P::Proof>::deserialize_from(&mut reader)?;
+        Ok(CombinedProof {
+            commitments,
+            proofs,
+        })
+    }
 }
 
 impl<C: Config, P: ProvingSystem<C>> Default for Context<C, P> {
