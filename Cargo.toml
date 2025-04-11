@@ -22,7 +22,7 @@ clap = { version = "4.5.30", features = ["derive"] }
 ethnum = "1.5.0"
 stacker = "0.1.15"
 tiny-keccak = { version = "2.0", features = ["keccak"] }
-halo2curves = { git = "https://github.com/PolyhedraZK/halo2curves", default-features = false, features = [
+halo2curves = { git = "https://github.com/PolyhedraZK/halo2curves", branch = "fastmsmm", default-features = false, features = [
     "bits",
 ] }
 hex = "0.4"
@@ -34,15 +34,17 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10.8"
 
-arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-expander_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "config" }
-expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "circuit" }
-gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "transcript" }
-crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "main"}
-serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "main"}
+arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "fastmsmm" }
+mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "fastmsmm" }
+gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "fastmsmm" }
+#expander_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "fastmsmm", package = "config" }
+expander_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "fastmsmm", package = "config" }
+
+expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "fastmsmm", package = "circuit" }
+gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "fastmsmm" }
+gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "fastmsmm" }
+goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "fastmsmm" }
+mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "fastmsmm" }
+expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "fastmsmm", package = "transcript" }
+crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "fastmsmm"}
+serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "fastmsmm"}

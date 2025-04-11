@@ -112,7 +112,7 @@ dependencies = [
 [[package]]
 name = "arith"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8f53f68aeed676c60d6ff3824fc661ef8461aa29"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
 dependencies = [
  "ark-std 0.4.0",
  "cfg-if",
@@ -515,7 +515,7 @@ dependencies = [
 [[package]]
 name = "circuit"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8f53f68aeed676c60d6ff3824fc661ef8461aa29"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
@@ -623,7 +623,7 @@ checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 [[package]]
 name = "config"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8f53f68aeed676c60d6ff3824fc661ef8461aa29"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
@@ -644,7 +644,7 @@ dependencies = [
 [[package]]
 name = "config_macros"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8f53f68aeed676c60d6ff3824fc661ef8461aa29"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -745,7 +745,7 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 [[package]]
 name = "crosslayer_prototype"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8f53f68aeed676c60d6ff3824fc661ef8461aa29"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
 dependencies = [
  "arith",
  "config",
@@ -971,7 +971,7 @@ dependencies = [
 [[package]]
 name = "field_hashers"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8f53f68aeed676c60d6ff3824fc661ef8461aa29"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
 dependencies = [
  "arith",
  "halo2curves",
@@ -1066,7 +1066,7 @@ dependencies = [
 [[package]]
 name = "gf2"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8f53f68aeed676c60d6ff3824fc661ef8461aa29"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
@@ -1084,7 +1084,7 @@ dependencies = [
 [[package]]
 name = "gf2_128"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8f53f68aeed676c60d6ff3824fc661ef8461aa29"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
@@ -1103,7 +1103,7 @@ checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 [[package]]
 name = "gkr"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8f53f68aeed676c60d6ff3824fc661ef8461aa29"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
@@ -1143,7 +1143,7 @@ dependencies = [
 [[package]]
 name = "gkr_field_config"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8f53f68aeed676c60d6ff3824fc661ef8461aa29"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
@@ -1162,7 +1162,7 @@ checksum = "a8d1add55171497b4705a648c6b583acafb01d58050a51727785f0b2c8e0a2b2"
 [[package]]
 name = "goldilocks"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8f53f68aeed676c60d6ff3824fc661ef8461aa29"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
 dependencies = [
  "arith",
  "ark-std 0.3.0",
@@ -1214,7 +1214,7 @@ dependencies = [
 [[package]]
 name = "halo2curves"
 version = "0.6.1"
-source = "git+https://github.com/PolyhedraZK/halo2curves#79a953d0e2cd12478d4046cabdbe72d3abad9166"
+source = "git+https://github.com/PolyhedraZK/halo2curves?branch=fastmsmm#794c0cce663af29275fb2b318f5c1fedf4a191e7"
 dependencies = [
  "blake2",
  "digest",
@@ -1714,7 +1714,7 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 [[package]]
 name = "mersenne31"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8f53f68aeed676c60d6ff3824fc661ef8461aa29"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
@@ -1801,7 +1801,7 @@ dependencies = [
 [[package]]
 name = "mpi_config"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8f53f68aeed676c60d6ff3824fc661ef8461aa29"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
 dependencies = [
  "arith",
  "itertools 0.13.0",
@@ -2014,7 +2014,7 @@ dependencies = [
 [[package]]
 name = "poly_commit"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8f53f68aeed676c60d6ff3824fc661ef8461aa29"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
@@ -2036,7 +2036,7 @@ dependencies = [
 [[package]]
 name = "polynomials"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8f53f68aeed676c60d6ff3824fc661ef8461aa29"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
@@ -2332,7 +2332,7 @@ dependencies = [
 [[package]]
 name = "serdes"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8f53f68aeed676c60d6ff3824fc661ef8461aa29"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
 dependencies = [
  "ethnum",
  "halo2curves",
@@ -2453,7 +2453,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 [[package]]
 name = "sumcheck"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8f53f68aeed676c60d6ff3824fc661ef8461aa29"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
 dependencies = [
  "arith",
  "circuit",
@@ -2638,7 +2638,7 @@ dependencies = [
 [[package]]
 name = "transcript"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8f53f68aeed676c60d6ff3824fc661ef8461aa29"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
 dependencies = [
  "arith",
  "field_hashers",
@@ -2651,7 +2651,7 @@ dependencies = [
 [[package]]
 name = "tree"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8f53f68aeed676c60d6ff3824fc661ef8461aa29"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
@@ -2759,7 +2759,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 [[package]]
 name = "utils"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#8f53f68aeed676c60d6ff3824fc661ef8461aa29"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
 
 [[package]]
 name = "version_check"
