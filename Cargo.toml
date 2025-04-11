@@ -43,14 +43,13 @@ stacker = "0.1.17"
 tiny-keccak = { version = "2.0", features = ["keccak"] }
 
 arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-expander_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "config" }
+crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "main"}
 expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "circuit" }
-gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "transcript" }
 gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+gkr_engine = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "gkr_engine" }
+gkr_hashers = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "transcript" }
-crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "main"}
 serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "main"}

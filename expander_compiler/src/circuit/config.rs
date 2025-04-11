@@ -1,17 +1,25 @@
 use std::{fmt::Debug, hash::Hash};
 
+pub use gkr::{
+    BN254ConfigMIMC5Raw, GF2ExtConfigSha2Raw, GoldilocksExtConfigSha2Raw,
+    M31ExtConfigSha2RawVanilla,
+};
+use gkr_engine::{FieldEngine, GKREngine};
+
 use crate::field::Field;
 
-pub trait Config: Default + Clone + Ord + Debug + Hash + Copy + 'static {
-    type CircuitField: Field;
-
-    type DefaultSimdField: arith::SimdField<Scalar = Self::CircuitField>;
-    type DefaultGKRFieldConfig: gkr_field_config::GKRFieldConfig<
-        CircuitField = Self::CircuitField,
-        SimdCircuitField = Self::DefaultSimdField,
-    >;
-    type DefaultGKRConfig: expander_config::GKRConfig<FieldConfig = Self::DefaultGKRFieldConfig>;
-
+pub trait Config:
+    Default
+    + Clone
+    + Debug
+    + PartialEq
+    + Eq
+    + Ord
+    + Hash
+    + Copy
+    + 'static
+    + GKREngine<FieldConfig: FieldEngine<CircuitField: Field>>
+{
     const CONFIG_ID: usize;
 
     const COST_INPUT: usize = 1000;
@@ -21,51 +29,26 @@ pub trait Config: Default + Clone + Ord + Debug + Hash + Copy + 'static {
     const COST_CONST: usize = 3;
 
     const ENABLE_RANDOM_COMBINATION: bool = true;
-
-    fn new_expander_config() -> expander_config::Config<Self::DefaultGKRConfig> {
-        expander_config::Config::new(
-            expander_config::GKRScheme::Vanilla,
-            mpi_config::MPIConfig::new(),
-        )
-    }
 }
 
-#[derive(Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct M31Config {}
+pub type CircuitField<C> = <<C as GKREngine>::FieldConfig as FieldEngine>::CircuitField;
+pub type ChallengeField<C> = <<C as GKREngine>::FieldConfig as FieldEngine>::ChallengeField;
+pub type SIMDField<C> = <<C as GKREngine>::FieldConfig as FieldEngine>::SimdCircuitField;
+
+pub type BN254Config = BN254ConfigMIMC5Raw;
+pub type M31Config = M31ExtConfigSha2RawVanilla;
+pub type GF2Config = GF2ExtConfigSha2Raw;
+pub type GoldilocksConfig = GoldilocksExtConfigSha2Raw;
 
 impl Config for M31Config {
-    type CircuitField = crate::field::M31;
-
-    type DefaultSimdField = mersenne31::M31x16;
-    type DefaultGKRFieldConfig = gkr_field_config::M31ExtConfig;
-    type DefaultGKRConfig = expander_config::M31ExtConfigSha2Raw; //TODO: compare with M31ExtConfigSha2Orion
-
     const CONFIG_ID: usize = 1;
 }
 
-#[derive(Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct BN254Config {}
-
 impl Config for BN254Config {
-    type CircuitField = crate::field::BN254Fr;
-
-    type DefaultSimdField = crate::field::BN254Fr;
-    type DefaultGKRFieldConfig = gkr_field_config::BN254Config;
-    type DefaultGKRConfig = expander_config::BN254ConfigMIMC5Raw; // TODO: compare with BN254ConfigSha2Raw
-
     const CONFIG_ID: usize = 2;
 }
 
-#[derive(Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct GF2Config {}
-
 impl Config for GF2Config {
-    type CircuitField = crate::field::GF2;
-
-    type DefaultSimdField = gf2::GF2x8;
-    type DefaultGKRFieldConfig = gkr_field_config::GF2ExtConfig;
-    type DefaultGKRConfig = expander_config::GF2ExtConfigSha2Raw; // TODO: compare with GF2ExtConfigSha2Orion
-
     const CONFIG_ID: usize = 3;
 
     // temporary fix for Keccak_GF2
@@ -75,14 +58,6 @@ impl Config for GF2Config {
     const ENABLE_RANDOM_COMBINATION: bool = false;
 }
 
-#[derive(Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct GoldilocksConfig {}
-
 impl Config for GoldilocksConfig {
-    type CircuitField = crate::field::Goldilocks;
-
-    type DefaultSimdField = goldilocks::Goldilocksx8;
-    type DefaultGKRFieldConfig = gkr_field_config::GoldilocksExtConfig;
-    type DefaultGKRConfig = expander_config::GoldilocksExtConfigSha2Raw;
     const CONFIG_ID: usize = 4;
 }

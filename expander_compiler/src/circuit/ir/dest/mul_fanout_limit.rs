@@ -141,7 +141,7 @@ impl<C: Config> CircuitRelaxed<C> {
                 for _ in 0..relay_cnt[x] {
                     let y = new_id[x].get();
                     new_insns.push(Instruction::InternalVariable {
-                        expr: Expression::new_linear(C::CircuitField::one(), y),
+                        expr: Expression::new_linear(CircuitField::<C>::one(), y),
                     });
                     new_var_max += 1;
                     new_id[x].push(new_var_max, limit);
@@ -242,13 +242,15 @@ impl<C: Config> RootCircuitRelaxed<C> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::circuit::config::{Config, M31Config as C};
     use crate::circuit::layered::{InputUsize, NormalInputType};
     use crate::field::FieldArith;
+    use crate::frontend::M31Config as C;
+
+    use mersenne31::M31;
     use rand::{RngCore, SeedableRng};
     use serdes::ExpSerde;
 
-    type CField = <C as Config>::CircuitField;
+    type CField = M31;
 
     fn verify_mul_fanout(rc: &RootCircuitRelaxed<C>, limit: usize) {
         for circuit in rc.circuits.values() {

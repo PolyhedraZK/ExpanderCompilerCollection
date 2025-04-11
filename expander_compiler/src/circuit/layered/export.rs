@@ -1,8 +1,10 @@
+use crate::frontend::CircuitField;
+
 use super::{Circuit, Config, CrossLayerInputType, Input, InputUsize, NormalInputType};
 
 impl<C: Config> Circuit<C, NormalInputType> {
     pub fn export_to_expander<
-        DestConfig: gkr_field_config::GKRFieldConfig<CircuitField = C::CircuitField>,
+        DestConfig: gkr_engine::FieldEngine<CircuitField = CircuitField<C>>,
     >(
         &self,
     ) -> expander_circuit::RecursiveCircuit<DestConfig> {
@@ -68,19 +70,17 @@ impl<C: Config> Circuit<C, NormalInputType> {
         }
     }
 
-    pub fn export_to_expander_flatten(
-        &self,
-    ) -> expander_circuit::Circuit<C::DefaultGKRFieldConfig> {
-        let circuit = self.export_to_expander::<C::DefaultGKRFieldConfig>();
-        let mut flattened = circuit.flatten::<C::DefaultGKRConfig>();
-        flattened.pre_process_gkr::<C::DefaultGKRConfig>();
+    pub fn export_to_expander_flatten(&self) -> expander_circuit::Circuit<C::FieldConfig> {
+        let circuit = self.export_to_expander::<C::FieldConfig>();
+        let mut flattened = circuit.flatten::<C>();
+        flattened.pre_process_gkr::<C>();
         flattened
     }
 }
 
 impl<C: Config> Circuit<C, CrossLayerInputType> {
     pub fn export_to_expander<
-        DestConfig: gkr_field_config::GKRFieldConfig<CircuitField = C::CircuitField>,
+        DestConfig: gkr_engine::FieldEngine<CircuitField = CircuitField<C>>,
     >(
         &self,
     ) -> crosslayer_prototype::CrossLayerRecursiveCircuit<DestConfig> {

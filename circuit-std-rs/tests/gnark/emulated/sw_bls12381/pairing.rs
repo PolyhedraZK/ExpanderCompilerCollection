@@ -184,7 +184,7 @@ impl Define<M31Config> for PairingCheckGKRCircuit<Variable> {
 
 impl StdCircuit<M31Config> for PairingCheckGKRCircuit<Variable> {
     type Params = PairingParams;
-    type Assignment =PairingCheckGKRCircuit<<expander_compiler::frontend::M31Config as expander_compiler::frontend::Config>::CircuitField>;
+    type Assignment = PairingCheckGKRCircuit<M31>;
 
     fn new_circuit(_params: &Self::Params) -> Self {
         let mut circuit = Self::default();
