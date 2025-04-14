@@ -7,25 +7,26 @@ edition = "2021"
 [dependencies]
 expander_compiler = { path = "../expander_compiler"}
 circuit-std-rs = { path = "../circuit-std-rs"}
-hex = "0.4"
-ark-std.workspace = true
-rand.workspace = true
-expander_config.workspace = true
-expander_circuit.workspace = true
-gkr.workspace = true
+
 arith.workspace = true
-gf2.workspace = true
-mersenne31.workspace = true
-ark-ec = "0.4.0"
-ark-ff = "0.4.0"
-ark-bls12-381 = "0.4.0"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-stacker = "0.1.17"
-base64 = "0.22.1"
-rayon = "1.10.0"
+ark-bls12-381.workspace = true
+ark-ec.workspace = true
+ark-ff.workspace = true
+ark-std.workspace = true
+base64.workspace = true
 clap.workspace = true
-num-traits = "0.2.19"
-num-bigint = "0.4.6"
-sha2 = "0.10.8"
-mpi_config.workspace = true
+expander_circuit.workspace = true
+gf2.workspace = true
+gkr.workspace = true
+gkr_engine.workspace = true
+hex.workspace = true
+mersenne31.workspace = true
+num-bigint.workspace = true
+num-traits.workspace = true
+rand.workspace = true
+rayon.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serdes.workspace = true
+sha2.workspace = true
+stacker.workspace = true

@@ -1,14 +1,15 @@
 use std::io::{Error as IoError, Read, Write};
 
-use crate::{
-    circuit::{config::Config, ir::expr::LinComb, layered::Coef},
-    utils::serde::Serde,
-};
+use serdes::{ExpSerde, SerdeResult};
+
+use crate::circuit::{config::Config, ir::expr::LinComb, layered::Coef};
 
 use super::Instruction;
 
-impl<C: Config> Serde for Instruction<C> {
-    fn serialize_into<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
+impl<C: Config> ExpSerde for Instruction<C> {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+
+    fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         match self {
             Instruction::LinComb(lin_comb) => {
                 1u8.serialize_into(&mut writer)?;
@@ -50,7 +51,7 @@ impl<C: Config> Serde for Instruction<C> {
         };
         Ok(())
     }
-    fn deserialize_from<R: Read>(mut reader: R) -> Result<Self, IoError> {
+    fn deserialize_from<R: Read>(mut reader: R) -> SerdeResult<Self> {
         let instruction_type = u8::deserialize_from(&mut reader)?;
         Ok(match instruction_type {
             1 => Instruction::LinComb(LinComb::deserialize_from(&mut reader)?),
@@ -77,7 +78,7 @@ impl<C: Config> Serde for Instruction<C> {
                 return Err(IoError::new(
                     std::io::ErrorKind::InvalidData,
                     "invalid InstructionType",
-                ))
+                ))?
             }
         })
     }

@@ -1,9 +1,13 @@
 use crate::{
     circuit::input_mapping::{InputMapping, EMPTY},
+    frontend::CircuitField,
     utils::{bucket_sort::bucket_sort, static_hash_map::StaticHashMap},
 };
 
-use super::*;
+use super::{
+    Circuit, Constraint, Debug, FieldArith, Hash, HashMap, HashSet, Instruction, IrConfig,
+    RootCircuit,
+};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 struct Element {
@@ -437,8 +441,8 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
                     if *x < i {
                         circuit.instructions.push(Irc::Instruction::from_kx_plus_b(
                             circuit.outputs[*x],
-                            <Irc::Config as Config>::CircuitField::one(),
-                            <Irc::Config as Config>::CircuitField::zero(),
+                            CircuitField::<<Irc as IrConfig>::Config>::one(),
+                            CircuitField::<<Irc as IrConfig>::Config>::zero(),
                         ));
                         var_max += 1;
                         circuit.outputs[i] = var_max;

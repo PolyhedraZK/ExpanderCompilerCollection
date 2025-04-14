@@ -1,4 +1,9 @@
-use expander_compiler::{circuit::layered::witness::Witness, frontend::*};
+use expander_compiler::{
+    circuit::layered::witness::Witness,
+    frontend::{CompileResult, Config},
+};
+use gkr::Prover;
+use gkr_engine::{MPIConfig, MPIEngine};
 use serde::de::DeserializeOwned;
 use std::{fs, path::Path};
 
@@ -12,30 +17,24 @@ pub fn run_circuit<C: Config>(compile_result: &CompileResult<C>, witness: Witnes
     // ########## EXPANDER ##########
 
     //compile
-    let mut expander_circuit = compile_result
-        .layered_circuit
-        .export_to_expander::<C::DefaultGKRFieldConfig>()
-        .flatten();
-    let config = expander_config::Config::<C::DefaultGKRConfig>::new(
-        expander_config::GKRScheme::Vanilla,
-        mpi_config::MPIConfig::new(),
-    );
+    let mut expander_circuit = compile_result.layered_circuit.export_to_expander_flatten();
 
-    let (simd_input, simd_public_input) = witness.to_simd::<C::DefaultSimdField>();
+    let (simd_input, simd_public_input) = witness.to_simd();
     println!("{} {}", simd_input.len(), simd_public_input.len());
     expander_circuit.layers[0].input_vals = simd_input;
     expander_circuit.public_input = simd_public_input.clone();
 
     // prove
     expander_circuit.evaluate();
-    let mut prover = gkr::Prover::new(&config);
+    let mpi_config = MPIConfig::prover_new();
+    let mut prover = Prover::<C>::new(mpi_config.clone());
     prover.prepare_mem(&expander_circuit);
-    let (claimed_v, proof) = gkr::executor::prove(&mut expander_circuit, &config);
+    let (claimed_v, proof) = gkr::executor::prove::<C>(&mut expander_circuit, mpi_config.clone());
 
     // verify
-    assert!(gkr::executor::verify(
+    assert!(gkr::executor::verify::<C>(
         &mut expander_circuit,
-        &config,
+        mpi_config,
         &proof,
         &claimed_v
     ));

@@ -1,7 +1,7 @@
 use expander_compiler::frontend::{Config, RootAPI, Variable};
 
-use super::e2::*;
-use super::e6::*;
+use super::e2::GE2;
+use super::e6::{Ext6, GE6};
 #[derive(Default, Clone)]
 pub struct GE12 {
     pub c0: GE6,

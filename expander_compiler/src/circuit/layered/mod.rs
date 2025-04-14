@@ -1,14 +1,10 @@
 use std::{fmt, hash::Hash};
 
-use arith::FieldForECC;
+use serdes::ExpSerde;
 
-use crate::{
-    field::FieldArith,
-    hints,
-    utils::{error::Error, serde::Serde},
-};
+use crate::{field::FieldArith, hints, utils::error::Error};
 
-use super::config::Config;
+use super::config::{CircuitField, Config};
 
 #[cfg(test)]
 mod tests;
@@ -21,32 +17,32 @@ pub mod witness;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Coef<C: Config> {
-    Constant(C::CircuitField),
+    Constant(CircuitField<C>),
     Random,
     PublicInput(usize),
 }
 
 impl<C: Config> Coef<C> {
-    pub fn get_value_unsafe(&self) -> C::CircuitField {
+    pub fn get_value_unsafe(&self) -> CircuitField<C> {
         match self {
             Coef::Constant(c) => *c,
-            Coef::Random => C::CircuitField::random_unsafe(&mut rand::thread_rng()),
+            Coef::Random => CircuitField::<C>::random_unsafe(&mut rand::thread_rng()),
             Coef::PublicInput(id) => {
                 // stub implementation
                 let t = id * id % 1000000007;
                 let t = t * id % 1000000007;
-                C::CircuitField::from(t as u32)
+                CircuitField::<C>::from(t as u32)
             }
         }
     }
 
     pub fn get_value_with_public_inputs(
         &self,
-        public_inputs: &[C::CircuitField],
-    ) -> C::CircuitField {
+        public_inputs: &[CircuitField<C>],
+    ) -> CircuitField<C> {
         match self {
             Coef::Constant(c) => *c,
-            Coef::Random => C::CircuitField::random_unsafe(&mut rand::thread_rng()),
+            Coef::Random => CircuitField::<C>::random_unsafe(&mut rand::thread_rng()),
             Coef::PublicInput(id) => {
                 if *id >= public_inputs.len() {
                     panic!("public input id {} out of range", id);
@@ -56,7 +52,7 @@ impl<C: Config> Coef<C> {
         }
     }
 
-    pub fn get_value_with_public_inputs_simd<SF: arith::SimdField<Scalar = C::CircuitField>>(
+    pub fn get_value_with_public_inputs_simd<SF: arith::SimdField<Scalar = CircuitField<C>>>(
         &self,
         public_inputs: &[SF],
     ) -> SF {
@@ -93,14 +89,14 @@ impl<C: Config> Coef<C> {
         matches!(self, Coef::Constant(_))
     }
 
-    pub fn add_constant(&self, c: C::CircuitField) -> Self {
+    pub fn add_constant(&self, c: CircuitField<C>) -> Self {
         match self {
             Coef::Constant(x) => Coef::Constant(*x + c),
             _ => panic!("add_constant called on non-constant"),
         }
     }
 
-    pub fn get_constant(&self) -> Option<C::CircuitField> {
+    pub fn get_constant(&self) -> Option<CircuitField<C>> {
         match self {
             Coef::Constant(x) => Some(*x),
             _ => None,
@@ -111,18 +107,21 @@ impl<C: Config> Coef<C> {
     pub fn random_no_random(mut rnd: impl rand::RngCore, num_public_inputs: usize) -> Self {
         use rand::Rng;
         if rnd.gen::<f64>() < 0.94 {
-            Coef::Constant(C::CircuitField::from(rnd.next_u32()))
+            Coef::Constant(CircuitField::<C>::from(rnd.next_u32()))
         } else {
             Coef::PublicInput(rnd.next_u64() as usize % num_public_inputs)
         }
     }
 
-    pub fn export_to_expander(&self) -> (C::CircuitField, expander_circuit::CoefType) {
+    pub fn export_to_expander(&self) -> (CircuitField<C>, expander_circuit::CoefType) {
         match self {
             Coef::Constant(c) => (*c, expander_circuit::CoefType::Constant),
-            Coef::Random => (C::CircuitField::zero(), expander_circuit::CoefType::Random),
+            Coef::Random => (
+                CircuitField::<C>::zero(),
+                expander_circuit::CoefType::Random,
+            ),
             Coef::PublicInput(x) => (
-                C::CircuitField::zero(),
+                CircuitField::<C>::zero(),
                 expander_circuit::CoefType::PublicInput(*x),
             ),
         }
@@ -152,7 +151,7 @@ pub trait Input:
     + Eq
     + PartialOrd
     + Ord
-    + Serde
+    + ExpSerde
 {
     fn layer(&self) -> usize;
     fn offset(&self) -> usize;
@@ -204,7 +203,7 @@ pub struct NormalInputUsize {
 }
 
 pub trait InputUsize:
-    std::fmt::Debug + Default + Clone + Hash + PartialEq + Eq + PartialOrd + Ord + Serde
+    std::fmt::Debug + Default + Clone + Hash + PartialEq + Eq + PartialOrd + Ord + ExpSerde
 {
     type Iter<'a>: Iterator<Item = usize>
     where
@@ -287,7 +286,7 @@ pub struct Gate<C: Config, I: InputType, const INPUT_NUM: usize> {
 
 impl<C: Config, const INPUT_NUM: usize> Gate<C, NormalInputType, INPUT_NUM> {
     pub fn export_to_expander<
-        DestConfig: gkr_field_config::GKRFieldConfig<CircuitField = C::CircuitField>,
+        DestConfig: gkr_engine::FieldEngine<CircuitField = CircuitField<C>>,
     >(
         &self,
     ) -> expander_circuit::Gate<DestConfig, INPUT_NUM> {
@@ -308,7 +307,7 @@ impl<C: Config, const INPUT_NUM: usize> Gate<C, NormalInputType, INPUT_NUM> {
 
 impl<C: Config, const INPUT_NUM: usize> Gate<C, CrossLayerInputType, INPUT_NUM> {
     pub fn export_to_crosslayer_simple<
-        DestConfig: gkr_field_config::GKRFieldConfig<CircuitField = C::CircuitField>,
+        DestConfig: gkr_engine::FieldEngine<CircuitField = CircuitField<C>>,
     >(
         &self,
     ) -> crosslayer_prototype::SimpleGate<DestConfig, INPUT_NUM> {
@@ -656,14 +655,14 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         self.segments[self.layer_ids[0]].num_inputs.get(0)
     }
 
-    pub fn eval_unsafe(&self, inputs: Vec<C::CircuitField>) -> (Vec<C::CircuitField>, bool) {
+    pub fn eval_unsafe(&self, inputs: Vec<CircuitField<C>>) -> (Vec<CircuitField<C>>, bool) {
         if inputs.len() != self.input_size() {
             panic!("input length mismatch");
         }
         let mut cur = vec![inputs];
         for id in self.layer_ids.iter() {
-            let mut next = vec![C::CircuitField::zero(); self.segments[*id].num_outputs];
-            let mut inputs: Vec<&[C::CircuitField]> = Vec::new();
+            let mut next = vec![CircuitField::<C>::zero(); self.segments[*id].num_outputs];
+            let mut inputs: Vec<&[CircuitField<C>]> = Vec::new();
             for i in 0..self.segments[*id].num_inputs.len() {
                 inputs.push(&cur[cur.len() - i - 1]);
             }
@@ -687,8 +686,8 @@ impl<C: Config, I: InputType> Circuit<C, I> {
     fn apply_segment_unsafe(
         &self,
         seg: &Segment<C, I>,
-        cur: &[&[C::CircuitField]],
-        nxt: &mut [C::CircuitField],
+        cur: &[&[CircuitField<C>]],
+        nxt: &mut [CircuitField<C>],
     ) {
         for m in seg.gate_muls.iter() {
             nxt[m.output] += cur[m.inputs[0].layer()][m.inputs[0].offset()]
@@ -733,16 +732,16 @@ impl<C: Config, I: InputType> Circuit<C, I> {
 
     pub fn eval_with_public_inputs(
         &self,
-        inputs: Vec<C::CircuitField>,
-        public_inputs: &[C::CircuitField],
-    ) -> (Vec<C::CircuitField>, bool) {
+        inputs: Vec<CircuitField<C>>,
+        public_inputs: &[CircuitField<C>],
+    ) -> (Vec<CircuitField<C>>, bool) {
         if inputs.len() != self.input_size() {
             panic!("input length mismatch");
         }
         let mut cur = vec![inputs];
         for id in self.layer_ids.iter() {
-            let mut next = vec![C::CircuitField::zero(); self.segments[*id].num_outputs];
-            let mut inputs: Vec<&[C::CircuitField]> = Vec::new();
+            let mut next = vec![CircuitField::<C>::zero(); self.segments[*id].num_outputs];
+            let mut inputs: Vec<&[CircuitField<C>]> = Vec::new();
             for i in 0..self.segments[*id].num_inputs.len() {
                 inputs.push(&cur[cur.len() - i - 1]);
             }
@@ -771,9 +770,9 @@ impl<C: Config, I: InputType> Circuit<C, I> {
     fn apply_segment_with_public_inputs(
         &self,
         seg: &Segment<C, I>,
-        cur: &[&[C::CircuitField]],
-        nxt: &mut [C::CircuitField],
-        public_inputs: &[C::CircuitField],
+        cur: &[&[CircuitField<C>]],
+        nxt: &mut [CircuitField<C>],
+        public_inputs: &[CircuitField<C>],
     ) {
         for m in seg.gate_muls.iter() {
             nxt[m.output] += cur[m.inputs[0].layer()][m.inputs[0].offset()]
@@ -817,7 +816,7 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         }
     }
 
-    pub fn eval_with_public_inputs_simd<SF: arith::SimdField<Scalar = C::CircuitField>>(
+    pub fn eval_with_public_inputs_simd<SF: arith::SimdField<Scalar = CircuitField<C>>>(
         &self,
         inputs: Vec<SF>,
         public_inputs: &[SF],
@@ -856,7 +855,7 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         )
     }
 
-    fn apply_segment_with_public_inputs_simd<SF: arith::SimdField<Scalar = C::CircuitField>>(
+    fn apply_segment_with_public_inputs_simd<SF: arith::SimdField<Scalar = CircuitField<C>>>(
         &self,
         seg: &Segment<C, I>,
         cur: &[&[SF]],

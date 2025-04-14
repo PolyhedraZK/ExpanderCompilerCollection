@@ -1,14 +1,13 @@
-use expander_compiler::circuit::layered::NormalInputType;
 use libc::{c_ulong, malloc};
 use std::ptr;
 use std::slice;
 
-use expander_compiler::{
-    circuit::{config, ir},
-    utils::serde::Serde,
-};
+use expander_compiler::circuit::layered::NormalInputType;
+use expander_compiler::circuit::{config, ir};
+use expander_compiler::frontend::{BN254Config, GF2Config, GoldilocksConfig, M31Config};
+use serdes::ExpSerde;
 
-use super::*;
+use super::{match_config_id, ByteArray, Config};
 
 #[repr(C)]
 pub struct CompileResult {

@@ -1,4 +1,10 @@
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{
+    declare_circuit, Config, Define, M31Config, RootAPI, Variable, M31,
+};
+
+#[cfg(test)]
+use expander_compiler::frontend::{compile, CompileOptions, EmptyHintCaller};
+
 use num_bigint::BigInt;
 use num_traits::cast::ToPrimitive;
 
@@ -209,7 +215,7 @@ pub fn to_binary<C: Config, B: RootAPI<C>>(
     x: Variable,
     n_bits: usize,
 ) -> Vec<Variable> {
-    api.new_hint("myhint.tobinary", &[x], n_bits)
+    api.to_binary(x, n_bits)
 }
 pub fn from_binary<C: Config, B: RootAPI<C>>(api: &mut B, bits: Vec<Variable>) -> Variable {
     let mut res = api.constant(0);
@@ -219,14 +225,6 @@ pub fn from_binary<C: Config, B: RootAPI<C>>(api: &mut B, bits: Vec<Variable>) -
         res = api.add(res, cur);
     }
     res
-}
-
-pub fn to_binary_hint(x: &[M31], y: &mut [M31]) -> Result<(), Error> {
-    let t = x[0].to_u256();
-    for (i, k) in y.iter_mut().enumerate() {
-        *k = M31::from_u256(t >> i as u32 & 1);
-    }
-    Ok(())
 }
 
 pub fn big_is_zero<C: Config, B: RootAPI<C>>(api: &mut B, k: usize, in_: &[Variable]) -> Variable {
@@ -339,9 +337,6 @@ impl Define<M31Config> for IDIVMODBITCircuit<Variable> {
 }
 #[test]
 fn test_idiv_mod_bit() {
-    //register hints
-    let mut hint_registry = HintRegistry::<M31>::new();
-    hint_registry.register("myhint.tobinary", to_binary_hint);
     //compile and test
     let compile_result = compile(&IDIVMODBITCircuit::default(), CompileOptions::default()).unwrap();
     let assignment = IDIVMODBITCircuit::<M31> {
@@ -351,7 +346,7 @@ fn test_idiv_mod_bit() {
     };
     let witness = compile_result
         .witness_solver
-        .solve_witness_with_hints(&assignment, &mut hint_registry)
+        .solve_witness_with_hints(&assignment, &mut EmptyHintCaller)
         .unwrap();
     let output = compile_result.layered_circuit.run(&witness);
     assert_eq!(output, vec![true]);
@@ -380,9 +375,6 @@ impl Define<M31Config> for BITCONVERTCircuit<Variable> {
 }
 #[test]
 fn test_bit_convert() {
-    //register hints
-    let mut hint_registry = HintRegistry::<M31>::new();
-    hint_registry.register("myhint.tobinary", to_binary_hint);
     //compile and test
     let compile_result = compile(&BITCONVERTCircuit::default(), CompileOptions::default()).unwrap();
     let assignment = BITCONVERTCircuit::<M31> {
@@ -402,7 +394,7 @@ fn test_bit_convert() {
     };
     let witness = compile_result
         .witness_solver
-        .solve_witness_with_hints(&assignment, &mut hint_registry)
+        .solve_witness_with_hints(&assignment, &mut EmptyHintCaller)
         .unwrap();
     let output = compile_result.layered_circuit.run(&witness);
     assert_eq!(output, vec![true]);

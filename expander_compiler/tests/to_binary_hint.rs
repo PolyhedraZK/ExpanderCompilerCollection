@@ -8,7 +8,13 @@ declare_circuit!(Circuit {
 });
 
 fn to_binary<C: Config>(api: &mut impl RootAPI<C>, x: Variable, n_bits: usize) -> Vec<Variable> {
-    api.new_hint("myhint.tobinary", &[x], n_bits)
+    let bits = api.new_hint("your_hint_namespace.sub_namespace.tobinary", &[x], n_bits);
+    for bit in bits.iter() {
+        api.assert_is_bool(*bit);
+    }
+    let sum = from_binary(api, bits.to_vec());
+    api.assert_is_equal(sum, x);
+    bits
 }
 
 fn from_binary<C: Config>(api: &mut impl RootAPI<C>, bits: Vec<Variable>) -> Variable {
@@ -40,7 +46,7 @@ fn to_binary_hint(x: &[M31], y: &mut [M31]) -> Result<(), Error> {
 #[test]
 fn test_300() {
     let mut hint_registry = HintRegistry::<M31>::new();
-    hint_registry.register("myhint.tobinary", to_binary_hint);
+    hint_registry.register("your_hint_namespace.sub_namespace.tobinary", to_binary_hint);
 
     let compile_result = compile(&Circuit::default(), CompileOptions::default()).unwrap();
     for i in 0..300 {
@@ -62,7 +68,7 @@ fn test_300_closure() {
     let call_count = Rc::new(RefCell::new(0));
     let call_count_clone = call_count.clone();
     hint_registry.register(
-        "myhint.tobinary",
+        "your_hint_namespace.sub_namespace.tobinary",
         move |x: &[M31], y: &mut [M31]| -> Result<(), Error> {
             *call_count_clone.borrow_mut() += 1;
             let t = x[0].to_u256();

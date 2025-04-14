@@ -1,6 +1,8 @@
 use crate::StdCircuit;
 use arith::Field;
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{
+    declare_circuit, CircuitField, Config, Define, RootAPI, Variable, M31,
+};
 use std::convert::From;
 use std::ops::{AddAssign, Mul};
 
@@ -42,7 +44,7 @@ impl<C: Config> Define<C> for MatMulCircuit {
         builder.assert_is_equal(Variable::from(r1), Variable::from(m1));
         builder.assert_is_equal(Variable::from(r2), Variable::from(n2));
 
-        let loop_count = if C::CircuitField::SIZE == M31::SIZE {
+        let loop_count = if CircuitField::<C>::SIZE == M31::SIZE {
             3
         } else {
             1
@@ -105,7 +107,7 @@ impl MatMulCircuit {
 
 impl<C: Config> StdCircuit<C> for MatMulCircuit {
     type Params = MatMulParams;
-    type Assignment = _MatMulCircuit<C::CircuitField>;
+    type Assignment = _MatMulCircuit<CircuitField<C>>;
 
     fn new_circuit(params: &Self::Params) -> Self {
         let mut circuit = Self::default();
@@ -125,25 +127,25 @@ impl<C: Config> StdCircuit<C> for MatMulCircuit {
     }
 
     fn new_assignment(params: &Self::Params, mut rng: impl rand::RngCore) -> Self::Assignment {
-        let mut assignment = _MatMulCircuit::<C::CircuitField>::default();
+        let mut assignment = _MatMulCircuit::<CircuitField<C>>::default();
         assignment
             .first_mat
-            .resize(params.m1, vec![C::CircuitField::zero(); params.n1]);
+            .resize(params.m1, vec![CircuitField::<C>::zero(); params.n1]);
         assignment
             .second_mat
-            .resize(params.m2, vec![C::CircuitField::zero(); params.n2]);
+            .resize(params.m2, vec![CircuitField::<C>::zero(); params.n2]);
         assignment
             .result_mat
-            .resize(params.m1, vec![C::CircuitField::zero(); params.n2]);
+            .resize(params.m1, vec![CircuitField::<C>::zero(); params.n2]);
 
         for i in 0..params.m1 {
             for j in 0..params.n1 {
-                assignment.first_mat[i][j] = C::CircuitField::random_unsafe(&mut rng);
+                assignment.first_mat[i][j] = CircuitField::<C>::random_unsafe(&mut rng);
             }
         }
         for i in 0..params.m2 {
             for j in 0..params.n2 {
-                assignment.second_mat[i][j] = C::CircuitField::random_unsafe(&mut rng);
+                assignment.second_mat[i][j] = CircuitField::<C>::random_unsafe(&mut rng);
             }
         }
 
@@ -158,9 +160,9 @@ impl<C: Config> StdCircuit<C> for MatMulCircuit {
 // this helper calculates matrix c = a * b;
 #[allow(clippy::needless_range_loop)]
 fn matrix_multiply<C: Config>(
-    a: &[Vec<C::CircuitField>],
-    b: &[Vec<C::CircuitField>],
-) -> Vec<Vec<C::CircuitField>> {
+    a: &[Vec<CircuitField<C>>],
+    b: &[Vec<CircuitField<C>>],
+) -> Vec<Vec<CircuitField<C>>> {
     let m1 = a.len();
     let n1 = a[0].len();
     let m2 = b.len();
@@ -169,7 +171,7 @@ fn matrix_multiply<C: Config>(
     assert_eq!(n1, m2, "n1 ! = m2 ");
 
     // initialize the result matrix
-    let mut c = vec![vec![C::CircuitField::default(); n2]; m1];
+    let mut c = vec![vec![CircuitField::<C>::default(); n2]; m1];
 
     // FIXME: optimize calculating the multiplication for super large matrix.
     for i in 0..m1 {
