@@ -4,9 +4,11 @@ use std::io::{Cursor, Read};
 use crate::circuit::config::Config;
 
 use super::super::kernel::Kernel;
-use super::{check_inputs, prepare_inputs, Commitment, Proof, ProvingSystem};
+use super::{check_inputs, pcs_testing_setup_fixed_seed, prepare_inputs, Commitment, ExpanderGKRProvingSystem, Proof, ProvingSystem};
+use super::expander_gkr::{ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof, ExpanderGKRProverSetup, ExpanderGKRVerifierSetup};
 
 use arith::Field;
+use chrono::format;
 use expander_circuit::Circuit;
 use expander_config::GKRConfig;
 use expander_transcript::{Proof as ExpanderProof, Transcript};
@@ -20,6 +22,8 @@ use poly_commit::{
 use polynomials::{EqPolynomial, MultiLinearPoly, MultiLinearPolyExpander};
 use serdes::ExpSerde;
 use sumcheck::ProverScratchPad;
+use shared_memory::{Shmem, ShmemConf};
+use std::process::Command;
 
 use rand::rngs::StdRng;
 use rand::SeedableRng;
@@ -42,109 +46,122 @@ macro_rules! pcs {
     };
 }
 
-#[allow(clippy::type_complexity)]
-pub struct ExpanderGKRCommitment<C: Config> {
-    vals_len: usize,
-    commitment: Vec<<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::Commitment>,
+#[derive(Default)]
+pub struct SharedMemory {
+    pub pcs_setup: Option<Shmem>,
+    pub input_vals: Option<Shmem>,
+    pub commitment: Option<Shmem>,
+    pub extra_info: Option<Shmem>,
 }
 
-impl<C: Config> Clone for ExpanderGKRCommitment<C> {
-    fn clone(&self) -> Self {
-        Self {
-            vals_len: self.vals_len,
-            commitment: self.commitment.clone(),
-        }
+static mut SHARED_MEMORY: SharedMemory = SharedMemory {
+    pcs_setup: None,
+    input_vals: None,
+    commitment: None,
+    extra_info: None,
+};
+
+fn init_commitment_and_extra_info_shared_memory<C: Config>(commitment_size: usize, extra_info_size: usize) {
+    if unsafe { SHARED_MEMORY.commitment.is_some() } {
+        return;
+    }
+
+    unsafe {
+        SHARED_MEMORY.commitment = Some(
+            ShmemConf::new()
+                .size(commitment_size)
+                .flink("commitment")
+                .create()
+                .unwrap(),
+        );
+        SHARED_MEMORY.extra_info = Some(
+            ShmemConf::new()
+                .size(extra_info_size)
+                .flink("extra_info")
+                .create()
+                .unwrap(),
+        );
     }
 }
 
-impl<C: Config> ExpSerde for ExpanderGKRCommitment<C> {
-    const SERIALIZED_SIZE: usize = unimplemented!();
-    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
-        self.vals_len.serialize_into(&mut writer)?;
-        self.commitment.serialize_into(&mut writer)
-    }
-    fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
-        let vals_len = usize::deserialize_from(&mut reader)?;
-        let commitment = Vec::<
-            <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::Commitment,
-        >::deserialize_from(&mut reader)?;
-        Ok(ExpanderGKRCommitment {
-            vals_len,
-            commitment,
-        })
-    }
-}
+fn write_object_to_shared_memory<T: ExpSerde>(object: &T, shared_memory_ref: &mut Option<Shmem>, name: &str) {
+    let mut buffer = vec![];
+    object
+        .serialize_into(&mut buffer)
+        .expect("Failed to serialize object");
 
-impl<C: Config> Commitment<C> for ExpanderGKRCommitment<C> {
-    fn vals_len(&self) -> usize {
-        self.vals_len
+    unsafe {
+        *shared_memory_ref = Some(
+            ShmemConf::new()
+                .size(buffer.len())
+                .flink(name)
+                .create()
+                .unwrap(),
+        );
+
+        let object_ptr = shared_memory_ref.as_mut().unwrap().as_ptr() as *mut u8;
+        std::ptr::copy_nonoverlapping(buffer.as_ptr(), object_ptr, buffer.len());
     }
 }
 
-#[allow(clippy::type_complexity)]
-pub struct ExpanderGKRCommitmentExtraInfo<C: Config> {
-    pub scratch: Vec<<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::ScratchPad>,
+fn write_pcs_setup_to_shared_memory<C: Config>(
+    pcs_setup: &ExpanderGKRProverSetup<C>,
+    actual_local_len: usize,
+) {
+    let setup = pcs_setup.p_keys.get(&actual_local_len).unwrap();
+    write_object_to_shared_memory(setup, unsafe {&mut SHARED_MEMORY.pcs_setup}, "pcs_setup");
 }
 
-impl<C: Config> Clone for ExpanderGKRCommitmentExtraInfo<C> {
-    fn clone(&self) -> Self {
-        Self {
-            scratch: self.scratch.clone(),
-        }
+fn write_vals_to_shared_memory<C: Config>(vals: &Vec<C::DefaultSimdField>) {
+    write_object_to_shared_memory(vals, unsafe {&mut SHARED_MEMORY.input_vals}, "input_vals");
+}
+
+// TODO: Is this a little dangerous to allow arbitrary cmd strings?
+fn exec_command(cmd: &str) {
+    let mut parts = cmd.split_whitespace();
+    let command = parts.next().unwrap();
+    let args: Vec<&str> = parts.collect();
+    let mut child = Command::new(command)
+        .args(args)
+        .spawn()
+        .expect("Failed to start child process");
+    let _ = child.wait();
+}
+
+
+fn exec_pcs_commit(mpi_size: usize) {
+    let cmd_str = format!(
+        "mpiexec -n {} ./target/release/pcs_commit",
+        mpi_size
+    );
+    exec_command(&cmd_str);
+}
+
+fn read_object_from_shared_memory<T: ExpSerde>(shared_memory_ref: &mut Option<Shmem>) -> T {
+    let shmem = shared_memory_ref.take().unwrap();
+    let object_ptr = shmem.as_ptr() as *const u8;
+    let object_len = shmem.len();
+    let mut buffer = vec![0u8; object_len];
+    unsafe {
+        std::ptr::copy_nonoverlapping(object_ptr, buffer.as_mut_ptr(), object_len);
     }
+    T::deserialize_from(&mut Cursor::new(buffer)).unwrap()
 }
 
-#[allow(clippy::type_complexity)]
-pub struct ExpanderGKRProverSetup<C: Config>
-{
-    pub p_keys: HashMap<usize, <<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::SRS as StructuredReferenceString>::PKey>,
+fn read_commitment_and_extra_info_from_shared_memory<C: Config>() -> (ExpanderGKRCommitment<C>, ExpanderGKRCommitmentExtraInfo<C>) {
+    let commitment = read_object_from_shared_memory(unsafe {&mut SHARED_MEMORY.commitment});
+    let scratch = read_object_from_shared_memory(unsafe {&mut SHARED_MEMORY.extra_info});
+    let extra_info = ExpanderGKRCommitmentExtraInfo {
+        scratch: vec![scratch],
+    };
+    (commitment, extra_info)
 }
 
-impl<C: Config> Clone for ExpanderGKRProverSetup<C> {
-    fn clone(&self) -> Self {
-        Self {
-            p_keys: self.p_keys.clone(),
-        }
-    }
-}
-
-#[allow(clippy::type_complexity)]
-pub struct ExpanderGKRVerifierSetup<C: Config>
-{
-    pub v_keys: HashMap<usize, <<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::SRS as StructuredReferenceString>::VKey>,
-}
-
-impl<C: Config> Clone for ExpanderGKRVerifierSetup<C> {
-    fn clone(&self) -> Self {
-        Self {
-            v_keys: self.v_keys.clone(),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct ExpanderGKRProof {
-    data: Vec<ExpanderProof>,
-}
-
-impl ExpSerde for ExpanderGKRProof {
-    const SERIALIZED_SIZE: usize = unimplemented!();
-    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
-        self.data.serialize_into(&mut writer)
-    }
-    fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
-        let data = Vec::<ExpanderProof>::deserialize_from(&mut reader)?;
-        Ok(ExpanderGKRProof { data })
-    }
-}
-
-impl Proof for ExpanderGKRProof {}
-
-pub struct ExpanderGKRProvingSystem<C: Config> {
+pub struct ParallelizedExpanderGKRProvingSystem<C: Config> {
     _config: std::marker::PhantomData<C>,
 }
 
-impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
+impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
     type ProverSetup = ExpanderGKRProverSetup<C>;
     type VerifierSetup = ExpanderGKRVerifierSetup<C>;
     type Proof = ExpanderGKRProof;
@@ -154,36 +171,10 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
     fn setup(
         computation_graph: &crate::zkcuda::proof::ComputationGraph<C>,
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
-        let mut p_keys = HashMap::new();
-        let mut v_keys = HashMap::new();
-        for template in computation_graph.proof_templates.iter() {
-            for (x, is_broadcast) in template
-                .commitment_indices
-                .iter()
-                .zip(template.is_broadcast.iter())
-            {
-                let val_total_len = computation_graph.commitments_lens[*x];
-                let val_actual_len = if *is_broadcast {
-                    val_total_len
-                } else {
-                    val_total_len / template.parallel_count
-                };
-                if p_keys.contains_key(&val_actual_len) {
-                    continue;
-                }
-                let (_params, p_key, v_key, _scratch) =
-                    pcs_testing_setup_fixed_seed::<field!(C), transcript!(C), pcs!(C)>(
-                        val_actual_len,
-                    );
-                p_keys.insert(val_actual_len, p_key);
-                v_keys.insert(val_actual_len, v_key);
-            }
-        }
-
-        (
-            ExpanderGKRProverSetup { p_keys },
-            ExpanderGKRVerifierSetup { v_keys },
-        )
+        // All of currently supported PCSs(Raw, Orion, Hyrax) do not require the multi-core information in the step of `setup`
+        // So we can simply reuse the setup function from the non-parallelized version
+        // TODO: Consider how to do this properly in supporting future mpi-info-awared PCSs
+        ExpanderGKRProvingSystem::<C>::setup(computation_graph)
     }
 
     fn commit(
@@ -192,44 +183,27 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
         parallel_count: usize,
         is_broadcast: bool,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo) {
-        let vals_to_commit = if is_broadcast {
-            vec![vals]
+        if is_broadcast || parallel_count == 1 {
+            ExpanderGKRProvingSystem::<C>::commit(
+                prover_setup,
+                vals,
+                parallel_count,
+                is_broadcast,
+            )
         } else {
-            vals.chunks(vals.len() / parallel_count).collect::<Vec<_>>()
-        };
+            let actual_local_len = if is_broadcast {
+                vals.len()
+            } else {
+                vals.len() / parallel_count
+            };
 
-        let n_vars = vals_to_commit[0].len().ilog2() as usize;
-        let params = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::gen_params(n_vars);
-        let p_key = prover_setup.p_keys.get(&(1 << n_vars)).unwrap();
-
-        let (commitment, scratch) = vals_to_commit
-            .into_iter()
-            .map(|vals| {
-                let mut scratch =
-                    <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::init_scratch_pad(
-                        &params,
-                        &MPIConfig::default(),
-                    );
-
-                let commitment = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::commit(
-                    &params,
-                    &MPIConfig::default(),
-                    p_key,
-                    &MultiLinearPoly::new(vals.to_vec()),
-                    &mut scratch,
-                )
-                .unwrap();
-                (commitment, scratch)
-            })
-            .unzip::<_, _, Vec<_>, Vec<_>>();
-
-        (
-            Self::Commitment {
-                vals_len: 1 << n_vars,
-                commitment,
-            },
-            Self::CommitmentExtraInfo { scratch },
-        )
+            // TODO: The size here is for the raw commitment, add an function in the pcs trait to get the size of the commitment
+            init_commitment_and_extra_info_shared_memory::<C>(unsafe {SHARED_MEMORY.input_vals.as_ref().unwrap().len()}, 1);
+            write_pcs_setup_to_shared_memory(prover_setup, actual_local_len);
+            write_vals_to_shared_memory::<C>(&vals.to_vec());
+            exec_pcs_commit(parallel_count);
+            read_commitment_and_extra_info_from_shared_memory()
+        }
     }
 
     fn prove(
@@ -380,27 +354,6 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
         }
         true
     }
-}
-
-#[allow(clippy::type_complexity)]
-pub fn pcs_testing_setup_fixed_seed<
-    FConfig: GKRFieldConfig,
-    T: Transcript<FConfig::ChallengeField>,
-    PCS: PCSForExpanderGKR<FConfig, T>,
->(
-    vals_len: usize,
-) -> (
-    PCS::Params,
-    <PCS::SRS as StructuredReferenceString>::PKey,
-    <PCS::SRS as StructuredReferenceString>::VKey,
-    PCS::ScratchPad,
-) {
-    let mut rng = StdRng::from_seed([123; 32]);
-    expander_pcs_init_testing_only::<FConfig, T, PCS>(
-        vals_len.ilog2() as usize,
-        &MPIConfig::default(),
-        &mut rng,
-    )
 }
 
 fn max_n_vars<C: GKRFieldConfig>(circuit: &Circuit<C>) -> (usize, usize) {
