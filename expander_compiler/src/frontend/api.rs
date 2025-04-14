@@ -1,3 +1,5 @@
+use arith::Field;
+
 use crate::circuit::config::Config;
 
 use super::builder::{ToVariableOrValue, Variable};
@@ -70,6 +72,20 @@ pub trait BasicAPI<C: Config> {
         &mut self,
         x: impl ToVariableOrValue<C::CircuitField>,
     ) -> Option<C::CircuitField>;
+
+    fn from_binary(&mut self, xs: &[Variable]) -> Variable {
+        if xs.len() == 0 {
+            return self.constant(0);
+        }
+        let mut res = xs[0];
+        let mut mul = C::CircuitField::one();
+        for x in xs.iter().skip(1) {
+            mul = mul.double();
+            let tmp = self.mul(mul, x);
+            res = self.add(res, tmp);
+        }
+        res
+    }
 }
 
 pub trait UnconstrainedAPI<C: Config> {

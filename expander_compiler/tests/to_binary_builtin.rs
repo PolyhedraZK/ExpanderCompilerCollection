@@ -4,20 +4,10 @@ declare_circuit!(Circuit {
     input: PublicVariable,
 });
 
-fn from_binary<C: Config>(api: &mut impl RootAPI<C>, bits: Vec<Variable>) -> Variable {
-    let mut res = api.constant(0);
-    for i in 0..bits.len() {
-        let coef = 1 << i;
-        let cur = api.mul(coef, bits[i]);
-        res = api.add(res, cur);
-    }
-    res
-}
-
 impl Define<M31Config> for Circuit<Variable> {
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let bits = builder.to_binary(self.input, 8);
-        let x = from_binary(builder, bits);
+        let x = builder.from_binary(&bits);
         builder.assert_is_equal(x, self.input);
     }
 }
