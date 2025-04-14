@@ -1,3 +1,5 @@
+use arith::Field;
+
 use crate::circuit::config::Config;
 
 use super::{
@@ -35,6 +37,11 @@ pub trait BasicAPI<C: Config> {
         self.div(1, x, true)
     }
     fn is_zero(&mut self, x: impl ToVariableOrValue<CircuitField<C>>) -> Variable;
+    fn to_binary(
+        &mut self,
+        x: impl ToVariableOrValue<CircuitField<C>>,
+        num_bits: usize,
+    ) -> Vec<Variable>;
     fn assert_is_zero(&mut self, x: impl ToVariableOrValue<CircuitField<C>>);
     fn assert_is_non_zero(&mut self, x: impl ToVariableOrValue<CircuitField<C>>);
     fn assert_is_bool(&mut self, x: impl ToVariableOrValue<CircuitField<C>>);
@@ -68,6 +75,21 @@ pub trait BasicAPI<C: Config> {
         &mut self,
         x: impl ToVariableOrValue<CircuitField<C>>,
     ) -> Option<CircuitField<C>>;
+
+    #[allow(clippy::wrong_self_convention)]
+    fn from_binary(&mut self, xs: &[Variable]) -> Variable {
+        if xs.is_empty() {
+            return self.constant(0);
+        }
+        let mut res = xs[0];
+        let mut mul = CircuitField::<C>::one();
+        for x in xs.iter().skip(1) {
+            mul = mul.double();
+            let tmp = self.mul(mul, x);
+            res = self.add(res, tmp);
+        }
+        res
+    }
 }
 
 pub trait UnconstrainedAPI<C: Config> {

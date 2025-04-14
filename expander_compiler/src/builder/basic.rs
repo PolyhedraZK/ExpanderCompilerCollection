@@ -101,6 +101,12 @@ impl PartialOrd for LinMeta {
     }
 }
 
+pub enum InsnTransformResult<C: Config, IrcOut: IrConfig<Config = C>> {
+    Insn(IrcOut::Instruction),
+    Vars(Vec<usize>),
+    Err(Error),
+}
+
 pub trait InsnTransformAndExecute<
     'a,
     C: Config,
@@ -111,7 +117,7 @@ pub trait InsnTransformAndExecute<
     fn transform_in_to_out(
         &mut self,
         in_insn: &IrcIn::Instruction,
-    ) -> Result<IrcOut::Instruction, Error>;
+    ) -> InsnTransformResult<C, IrcOut>;
     fn execute_out<'b>(
         &mut self,
         out_insn: &IrcOut::Instruction,
@@ -325,6 +331,16 @@ where
     pub fn push_insn(&mut self, out_insn: IrcOut::Instruction) -> Option<usize> {
         self.push_insn_with_root(out_insn, None)
     }
+    pub fn push_insn_multi_out(&mut self, out_insn: IrcOut::Instruction) -> Vec<usize> {
+        let num_out = out_insn.num_outputs();
+        self.out_insns.push(out_insn.clone());
+        self.execute_out(&out_insn, None);
+        let mut out_var_ids = Vec::new();
+        for i in 0..num_out {
+            out_var_ids.push(self.out_var_exprs.len() - num_out + i);
+        }
+        out_var_ids
+    }
 
     fn process_insn<'b>(
         &mut self,
@@ -335,12 +351,20 @@ where
         'a: 'b,
     {
         let in_mapped = in_insn.replace_vars(|x| self.in_to_out[x]);
-        let out_insn = self.transform_in_to_out(&in_mapped)?;
-        assert_eq!(out_insn.num_outputs(), in_insn.num_outputs());
-        let start_id = self.out_var_exprs.len();
-        self.push_insn_with_root(out_insn, Some(root));
-        for i in 0..in_insn.num_outputs() {
-            self.in_to_out.push(start_id + i);
+        match self.transform_in_to_out(&in_mapped) {
+            InsnTransformResult::Insn(out_insn) => {
+                assert_eq!(out_insn.num_outputs(), in_insn.num_outputs());
+                let start_id = self.out_var_exprs.len();
+                self.push_insn_with_root(out_insn, Some(root));
+                for i in 0..in_insn.num_outputs() {
+                    self.in_to_out.push(start_id + i);
+                }
+            }
+            InsnTransformResult::Vars(vars) => {
+                assert_eq!(vars.len(), in_insn.num_outputs());
+                self.in_to_out.extend(vars);
+            }
+            InsnTransformResult::Err(err) => return Err(err),
         }
         Ok(())
     }

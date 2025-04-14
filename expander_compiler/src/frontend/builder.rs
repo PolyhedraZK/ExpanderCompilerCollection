@@ -365,6 +365,22 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         self.new_var()
     }
 
+    fn to_binary(
+        &mut self,
+        x: impl ToVariableOrValue<CircuitField<C>>,
+        num_bits: usize,
+    ) -> Vec<Variable> {
+        let xc = self.constant_value(x.clone());
+        if let Some(xv) = xc {
+            let values = hints::to_binary(xv, num_bits).unwrap();
+            return values.iter().map(|v| self.constant(*v)).collect();
+        }
+        let x = self.convert_to_variable(x);
+        self.instructions
+            .push(SourceInstruction::ToBinary { x: x.id, num_bits });
+        (0..num_bits).map(|_| self.new_var()).collect()
+    }
+
     fn assert_is_zero(&mut self, x: impl ToVariableOrValue<CircuitField<C>>) {
         let xc = self.constant_value(x.clone());
         if let Some(xv) = xc {
@@ -563,6 +579,14 @@ impl<C: Config> BasicAPI<C> for RootBuilder<C> {
 
     fn is_zero(&mut self, x: impl ToVariableOrValue<CircuitField<C>>) -> Variable {
         self.last_builder().is_zero(x)
+    }
+
+    fn to_binary(
+        &mut self,
+        x: impl ToVariableOrValue<CircuitField<C>>,
+        num_bits: usize,
+    ) -> Vec<Variable> {
+        self.last_builder().to_binary(x, num_bits)
     }
 
     fn assert_is_zero(&mut self, x: impl ToVariableOrValue<CircuitField<C>>) {
