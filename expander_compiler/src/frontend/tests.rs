@@ -1,5 +1,5 @@
+use crate::frontend::M31Config as C;
 use crate::{
-    circuit::config::M31Config,
     compile::CompileOptions,
     field::{FieldArith, M31},
     frontend::{compile, RootAPI},
@@ -55,8 +55,8 @@ declare_circuit!(Circuit2 {
     x: [Variable; 2],
 });
 
-impl Define<M31Config> for Circuit2<Variable> {
-    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
+impl Define<C> for Circuit2<Variable> {
+    fn define<Builder: RootAPI<C>>(&self, builder: &mut Builder) {
         let sum = builder.add(self.x[0], self.x[1]);
         let sum = builder.add(sum, 123);
         builder.assert_is_equal(sum, self.sum);

@@ -1,6 +1,7 @@
 use crate::circuit::ir::common::RawConstraint;
 use crate::circuit::ir::expr;
 use crate::field::FieldArith;
+use crate::frontend::CircuitField;
 use crate::utils::error::Error;
 use crate::{
     circuit::{
@@ -25,7 +26,7 @@ type InsnOut<C> = ir::hint_normalized::Instruction<C>;
 type Builder<'a, C> = super::basic::Builder<'a, C, IrcIn<C>, IrcOut<C>>;
 
 impl<'a, C: Config> Builder<'a, C> {
-    fn push_const(&mut self, c: C::CircuitField) -> usize {
+    fn push_const(&mut self, c: CircuitField<C>) -> usize {
         self.push_insn(InsnOut::ConstantLike(Coef::Constant(c)))
             .unwrap()
     }
@@ -33,15 +34,15 @@ impl<'a, C: Config> Builder<'a, C> {
         self.push_insn(InsnOut::LinComb(LinComb {
             terms: vec![
                 LinCombTerm {
-                    coef: C::CircuitField::one(),
+                    coef: CircuitField::<C>::one(),
                     var: a,
                 },
                 LinCombTerm {
-                    coef: C::CircuitField::one(),
+                    coef: CircuitField::<C>::one(),
                     var: b,
                 },
             ],
-            constant: C::CircuitField::zero(),
+            constant: CircuitField::<C>::zero(),
         }))
         .unwrap()
     }
@@ -49,15 +50,15 @@ impl<'a, C: Config> Builder<'a, C> {
         self.push_insn(InsnOut::LinComb(LinComb {
             terms: vec![
                 LinCombTerm {
-                    coef: C::CircuitField::one(),
+                    coef: CircuitField::<C>::one(),
                     var: a,
                 },
                 LinCombTerm {
-                    coef: -C::CircuitField::one(),
+                    coef: -CircuitField::<C>::one(),
                     var: b,
                 },
             ],
-            constant: C::CircuitField::zero(),
+            constant: CircuitField::<C>::zero(),
         }))
         .unwrap()
     }
@@ -71,7 +72,7 @@ impl<'a, C: Config> Builder<'a, C> {
         InsnTransformResult::Vars(a.to_vec())
     }
     fn bool_cond(&mut self, a: usize) -> usize {
-        let one = self.push_const(C::CircuitField::one());
+        let one = self.push_const(CircuitField::<C>::one());
         let a_minus_one = self.push_sub(a, one);
         self.push_mul(a, a_minus_one)
     }
@@ -103,7 +104,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                 }
                 None => {
                     if *checked {
-                        let one = self.push_const(C::CircuitField::one());
+                        let one = self.push_const(CircuitField::<C>::one());
                         let inv = self
                             .push_insn(InsnOut::Hint {
                                 hint_id: BuiltinHintIds::Div as u64 as usize,
@@ -142,15 +143,15 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                         .push_insn(InsnOut::LinComb(expr::LinComb {
                             terms: vec![
                                 LinCombTerm {
-                                    coef: C::CircuitField::one(),
+                                    coef: CircuitField::<C>::one(),
                                     var: x_plus_y,
                                 },
                                 LinCombTerm {
-                                    coef: -(C::CircuitField::one() + C::CircuitField::one()),
+                                    coef: -(CircuitField::<C>::one() + CircuitField::<C>::one()),
                                     var: x_times_y,
                                 },
                             ],
-                            constant: C::CircuitField::zero(),
+                            constant: CircuitField::<C>::zero(),
                         }))
                         .unwrap(),
                 };
@@ -160,12 +161,12 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
             IsZero(x) => {
                 if let Some(xv) = self.constant_value(*x) {
                     InsnOut::ConstantLike(Coef::Constant(if xv.is_zero() {
-                        C::CircuitField::one()
+                        CircuitField::<C>::one()
                     } else {
-                        C::CircuitField::zero()
+                        CircuitField::<C>::zero()
                     }))
                 } else {
-                    let one = self.push_const(C::CircuitField::one());
+                    let one = self.push_const(CircuitField::<C>::one());
                     let inv = self
                         .push_insn(InsnOut::Hint {
                             hint_id: BuiltinHintIds::Div as u64 as usize,
@@ -269,14 +270,14 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                     inputs: vec![*x],
                     num_outputs: *num_bits,
                 });
-                let mut sum = self.push_const(C::CircuitField::zero());
-                let mut coef = C::CircuitField::one();
+                let mut sum = self.push_const(CircuitField::<C>::zero());
+                let mut coef = CircuitField::<C>::one();
                 for &bit in bits.iter() {
                     self.assert_bool(bit);
                     let bit = self
                         .push_insn(InsnOut::LinComb(expr::LinComb {
                             terms: vec![LinCombTerm { coef, var: bit }],
-                            constant: C::CircuitField::zero(),
+                            constant: CircuitField::<C>::zero(),
                         }))
                         .unwrap();
                     sum = self.push_add(sum, bit);
@@ -286,15 +287,15 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                     .push_insn(InsnOut::LinComb(expr::LinComb {
                         terms: vec![
                             LinCombTerm {
-                                coef: -C::CircuitField::one(),
+                                coef: -CircuitField::<C>::one(),
                                 var: sum,
                             },
                             LinCombTerm {
-                                coef: C::CircuitField::one(),
+                                coef: CircuitField::<C>::one(),
                                 var: *x,
                             },
                         ],
-                        constant: C::CircuitField::zero(),
+                        constant: CircuitField::<C>::zero(),
                     }))
                     .unwrap();
                 self.assert((), sum);
@@ -311,7 +312,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
             ir::source::ConstraintType::Zero => Ok(in_con.var),
             ir::source::ConstraintType::Bool => Ok(self.bool_cond(in_con.var)),
             ir::source::ConstraintType::NonZero => {
-                let one = self.push_const(C::CircuitField::one());
+                let one = self.push_const(CircuitField::<C>::one());
                 let inv = self
                     .push_insn(InsnOut::Hint {
                         hint_id: BuiltinHintIds::Div as u64 as usize,
@@ -377,15 +378,15 @@ pub fn process<C: Config>(
 #[cfg(test)]
 mod tests {
     use crate::field::FieldArith;
+    use crate::frontend::M31Config as C;
     use crate::{
-        circuit::{
-            config::{Config, M31Config as C},
-            ir::{self, common::rand_gen::*},
-        },
+        circuit::ir::{self, common::rand_gen::*},
         utils::error::Error,
     };
 
-    type CField = <C as Config>::CircuitField;
+    use mersenne31::M31;
+
+    type CField = M31;
 
     #[test]
     fn simple_invariant() {

@@ -5,6 +5,7 @@ use crate::circuit::ir::common::{Instruction, RawConstraint};
 use crate::circuit::ir::expr::Expression;
 use crate::circuit::{config::Config, ir, layered::Coef};
 use crate::field::FieldArith;
+use crate::frontend::CircuitField;
 use crate::utils::error::Error;
 
 use super::basic::{
@@ -82,7 +83,7 @@ impl<'a, C: Config> Builder<'a, C> {
             to_really_single(&mut self.mid_vars, &self.out_var_exprs[self.in_to_out[*x]]);
         });
         for (i, expr) in self.mid_vars.vec().iter().enumerate().skip(out_var_max + 1) {
-            let non_iv = *expr == Expression::new_linear(C::CircuitField::one(), i);
+            let non_iv = *expr == Expression::new_linear(CircuitField::<C>::one(), i);
             if i <= last_subc_o_mid_id {
                 assert!(non_iv);
                 continue;
@@ -135,7 +136,7 @@ impl<'a, C: Config> Builder<'a, C> {
                         .collect();
                     fin_insns.push(ir::dest::Instruction::InternalVariable {
                         expr: Expression::new_custom(
-                            C::CircuitField::one(),
+                            CircuitField::<C>::one(),
                             *gate_type,
                             fin_inputs,
                         ),
@@ -238,20 +239,20 @@ pub fn process<'a, C: Config>(
 mod tests {
     use std::vec;
 
+    use mersenne31::M31;
+
     use crate::field::FieldArith;
+    use crate::frontend::M31Config as C;
     use crate::{
-        circuit::{
-            config::{Config, M31Config as C},
-            ir::{
-                self,
-                common::rand_gen::*,
-                expr::{Expression, Term},
-            },
+        circuit::ir::{
+            self,
+            common::rand_gen::*,
+            expr::{Expression, Term},
         },
         utils::error::Error,
     };
 
-    type CField = <C as Config>::CircuitField;
+    type CField = M31;
 
     #[test]
     fn simple_add() {

@@ -1,0 +1,17 @@
+[package]
+name = "rsa_circuit"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ark-std.workspace = true
+halo2curves.workspace = true
+itertools.workspace = true
+num-bigint.workspace = true
+num-traits.workspace = true
+rand.workspace = true
+sha2.workspace = true
+serdes.workspace = true
+
+circuit-std-rs = { path = "../circuit-std-rs" }
+expander_compiler = { path = "../expander_compiler" }

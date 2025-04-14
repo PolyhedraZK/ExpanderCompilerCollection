@@ -1,6 +1,6 @@
 use crate::{
     circuit::{
-        config::{BN254Config, Config, GF2Config, GoldilocksConfig, M31Config},
+        config::{BN254Config, CircuitField, Config, GF2Config, GoldilocksConfig, M31Config},
         ir::{
             common::rand_gen::{RandomCircuitConfig, RandomRange},
             source::RootCircuit as IrSourceRoot,
@@ -32,8 +32,8 @@ fn do_test<C: Config, I: InputType>(mut config: RandomCircuitConfig, seed: Rando
                     root.circuits[&0].outputs.len() - root.expected_num_output_zeroes
                 );
                 for _ in 0..5 {
-                    let input: Vec<C::CircuitField> = (0..root.input_size())
-                        .map(|_| C::CircuitField::random_unsafe(&mut rand::thread_rng()))
+                    let input: Vec<CircuitField<C>> = (0..root.input_size())
+                        .map(|_| CircuitField::<C>::random_unsafe(&mut rand::thread_rng()))
                         .collect();
                     match root.eval_unsafe_with_errors(input.clone()) {
                         Ok((src_output, src_cond)) => {
@@ -115,22 +115,22 @@ fn test_gf2() {
 
 #[test]
 fn test_goldilocks() {
-    do_tests::<GoldilocksConfig, NormalInputType>(7000000);
+    do_tests::<GoldilocksConfig, NormalInputType>(4000000);
 }
 
 #[test]
 fn test_m31_cross() {
-    do_tests::<M31Config, CrossLayerInputType>(4000000);
+    do_tests::<M31Config, CrossLayerInputType>(5000000);
 }
 
 #[test]
 fn test_bn254_cross() {
-    do_tests::<BN254Config, CrossLayerInputType>(5000000);
+    do_tests::<BN254Config, CrossLayerInputType>(6000000);
 }
 
 #[test]
 fn test_gf2_cross() {
-    do_tests::<GF2Config, CrossLayerInputType>(6000000);
+    do_tests::<GF2Config, CrossLayerInputType>(7000000);
 }
 
 #[test]
