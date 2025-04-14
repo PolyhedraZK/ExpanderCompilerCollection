@@ -17,3 +17,5 @@ libec_go_lib.*
 *.json
 *.witness
 *.json
+proofs/
+.*
