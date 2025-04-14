@@ -76,8 +76,9 @@ pub trait BasicAPI<C: Config> {
         x: impl ToVariableOrValue<CircuitField<C>>,
     ) -> Option<CircuitField<C>>;
 
+    #[allow(clippy::wrong_self_convention)]
     fn from_binary(&mut self, xs: &[Variable]) -> Variable {
-        if xs.len() == 0 {
+        if xs.is_empty() {
             return self.constant(0);
         }
         let mut res = xs[0];
