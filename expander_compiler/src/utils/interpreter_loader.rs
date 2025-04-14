@@ -1,6 +1,3 @@
-use arith::FieldForECC;
-use mersenne31::M31;
-
 use crate::frontend::{Config, RootAPI, Variable};
 
 pub struct M31Loader {
@@ -18,14 +15,6 @@ impl M31Loader {
         M31Loader { symbols: vec![] }
     }
 
-    pub fn to_binary_hint(x: &[M31], y: &mut [M31]) -> Result<(), super::error::Error> {
-        let t = x[0].to_u256();
-        for (i, k) in y.iter_mut().enumerate() {
-            *k = M31::from_u256(t >> i as u32 & 1);
-        }
-        Ok(())
-    }
-
     /// Add two m31 numbers
     pub fn big_array_add<C: Config, B: RootAPI<C>>(
         api: &mut B,
@@ -41,30 +30,11 @@ impl M31Loader {
         for i in 0..a.len() {
             c[i] = api.add(a[i], b[i]);
             c[i] = api.add(c[i], carry);
-            carry = Self::to_binary(api, c[i], nb_bits + 1)[nb_bits];
+            carry = api.to_binary(c[i], nb_bits + 1)[nb_bits];
             let tmp = api.mul(carry, 1 << nb_bits);
             c[i] = api.sub(c[i], tmp);
         }
         c
-    }
-
-    pub fn to_binary<C: Config, B: RootAPI<C>>(
-        api: &mut B,
-        x: Variable,
-        n_bits: usize,
-    ) -> Vec<Variable> {
-        api.new_hint("myhint.tobinary", &[x], n_bits)
-    }
-
-    /// Combine binary bits into a single value-variable
-    pub fn from_binary<C: Config, B: RootAPI<C>>(api: &mut B, bits: Vec<Variable>) -> Variable {
-        let mut res = api.constant(0);
-        for (i, bit) in bits.iter().enumerate() {
-            let coef = 1 << i;
-            let cur = api.mul(coef, *bit);
-            res = api.add(res, cur);
-        }
-        res
     }
 
     pub fn register_lval(&mut self, lval: usize, val: Vec<Variable>) {
@@ -178,8 +148,8 @@ impl M31Loader {
                     while to_compose.len() < 60 {
                         to_compose.push(api.constant(0));
                     }
-                    let lo = Self::from_binary(api, to_compose[..30].to_vec());
-                    let hi = Self::from_binary(api, to_compose[30..].to_vec());
+                    let lo = api.from_binary(&to_compose[..30]);
+                    let hi = api.from_binary(&to_compose[30..]);
                     self.register_lval(lval, [lo, hi].to_vec());
                 }
                 "zk.m31.add" => {
@@ -207,7 +177,7 @@ impl M31Loader {
                         let rval = self.parse_rval_scalar(&v, 3 + i, api);
                         to_compose.push(rval);
                     }
-                    let composed = Self::from_binary(api, to_compose);
+                    let composed = api.from_binary(&to_compose);
                     self.register_lval(lval, [composed].to_vec());
                 }
                 "store" => {
