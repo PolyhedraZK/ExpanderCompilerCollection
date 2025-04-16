@@ -16,47 +16,37 @@ for circuit in shuffle permutationhash permutationquery hashtable blsverifier va
     sleep 1
 done
 
-# 4. Clone the EthFullConsensus repo
-cd ../../ || { echo "Failed to enter parent parent directory"; exit 1; }
-rm -rf EthFullConsensus
-git clone https://github.com/PolyhedraZK/EthFullConsensus.git
+# 4. make sure 7z is installed
+sudo apt update
+sudo apt install p7zip-full p7zip-rar
 sleep 2
-# 5. Enter the repo and checkout the branch
-cd EthFullConsensus || { echo "Failed to enter EthFullConsensus"; exit 1; }
-sleep 1
-git checkout dev_pcs
+# 5. unzip to get go program
+7z x cmd.7z
 
-# 6. Build the go program
-cd end2end/cmd || { echo "Go cmd dir not found"; exit 1; }
-go build -o cmd || { echo "Go build failed"; exit 1; }
-sleep 2
-# 7. Move the compiled go program to the original directory
-mv cmd "$ROOT_DIR/"
-
-# 8. Go back to efc root
+# 6. Go back to efc root
 cd "$ROOT_DIR" || exit 1
 
-# 9. Debug all circuits on a default epoch
+# 7. Debug all circuits on a default epoch
 ./cmd -epoch 290001 || { echo "Failed to run cmd"; exit 1; }
 ./efc -d 290001 &
 
-# 10. Clone the Expander repo
+# 8. Clone the Expander repo
 cd ../../ || { echo "Failed to enter parent parent directory"; exit 1; }
 rm -rf Expander
 git clone https://github.com/PolyhedraZK/Expander.git
 sleep 2
 
-# 11. Enter the repo and checkout the branch
+# 9. Enter the repo and checkout the branch
 cd Expander || { echo "Failed to enter Expander"; exit 1; }
 sleep 1
 git checkout main
 
-# 12. Build the rust program
+# 10. Build the rust program
 RUSTFLAGS="-C target-cpu=native" cargo build --release --all || { echo "Rust build failed"; exit 1; }
 sleep 2
-# 13. Move the compiled rust program to the original directory
+# 11. Move the compiled rust program to the original directory
 cp target/release/expander-exec "$ROOT_DIR/"
 
-# 14. Optional: Wait for all background processes to complete
+# 12. Optional: Wait for all background processes to complete
 wait
 echo "All background processes finished."
