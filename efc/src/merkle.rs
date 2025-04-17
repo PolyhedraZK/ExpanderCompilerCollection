@@ -246,7 +246,13 @@ pub fn merkleize_var_with_limit<C: Config, B: RootAPI<C>>(
             let new_hash = param.hash_to_state_flatten(builder, &combined)[..param.rate].to_vec(); // Assume this function is defined
             new_level.push(new_hash);
         }
-        cur_level = new_level;
+        let mut copy_new_level = vec![];
+        for j in 0..new_level.len() {
+            let copy_res = builder.new_hint("myhint.copyvarshint", &new_level[j], new_level[j].len());
+            assert_vars_is_equal(builder, &copy_res, &new_level[j]);
+            copy_new_level.push(copy_res);
+        }
+        cur_level = copy_new_level;
     }
     cur_level[0].clone()
 }
@@ -303,7 +309,9 @@ pub fn verify_merkle_tree_path_var<C: Config, B: RootAPI<C>>(
         for j in 0..cur_leaf.len() {
             new_leaf[j] = simple_select(builder, reach_end, cur_leaf[j], new_leaf[j]);
         }
-        cur_leaf = new_leaf;
+        let copy_leaf = builder.new_hint("myhint.copyvarshint", &new_leaf, new_leaf.len());
+        assert_vars_is_equal(builder, &copy_leaf, &new_leaf);
+        cur_leaf = copy_leaf;
     }
     for i in 0..root.len() {
         cur_leaf[i] = simple_select(builder, ignore_opt, root[i], cur_leaf[i]);
@@ -355,4 +363,10 @@ pub fn calculate_merkle_tree_root_var<C: Config, B: RootAPI<C>>(
     }
 
     cur_leaf
+}
+
+fn assert_vars_is_equal<C: Config, B: RootAPI<C>>(api: &mut B, a: &[Variable], b: &[Variable]) {
+    a.iter()
+        .zip(b.iter())
+        .for_each(|(a, b)| api.assert_is_equal(*a, *b))
 }
