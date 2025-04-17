@@ -7,6 +7,7 @@ use std::{
 use crate::{
     circuit::config::Config,
     field::FieldArith,
+    frontend::CircuitField,
     utils::{
         error::Error,
         misc::{topo_order, topo_order_and_is_dag},
@@ -36,14 +37,14 @@ pub trait Instruction<C: Config>: Debug + Clone + Hash + PartialEq + Eq {
     fn as_sub_circuit_call(&self) -> Option<(usize, &Vec<usize>, usize)>;
     fn sub_circuit_call(sub_circuit_id: usize, inputs: Vec<usize>, num_outputs: usize) -> Self;
     fn replace_vars<F: Fn(usize) -> usize>(&self, f: F) -> Self;
-    fn from_kx_plus_b(x: usize, k: C::CircuitField, b: C::CircuitField) -> Self;
+    fn from_kx_plus_b(x: usize, k: CircuitField<C>, b: CircuitField<C>) -> Self;
     fn validate(&self, num_public_inputs: usize) -> Result<(), Error>;
-    fn eval_unsafe(&self, values: &[C::CircuitField]) -> EvalResult<'_, C>;
+    fn eval_unsafe(&self, values: &[CircuitField<C>]) -> EvalResult<'_, C>;
 }
 
 pub enum EvalResult<'a, C: Config> {
-    Value(C::CircuitField),
-    Values(Vec<C::CircuitField>),
+    Value(CircuitField<C>),
+    Values(Vec<CircuitField<C>>),
     SubCircuitCall(usize, &'a Vec<usize>),
     Error(Error),
 }
@@ -57,7 +58,7 @@ pub trait Constraint<C: Config>: Debug + Clone + Hash + PartialEq + Eq {
 }
 
 pub trait ConstraintType<C: Config>: Debug + Copy + Clone + Hash + PartialEq + Eq {
-    fn verify(&self, value: &C::CircuitField) -> bool;
+    fn verify(&self, value: &CircuitField<C>) -> bool;
 }
 
 pub type RawConstraint = usize;
@@ -78,7 +79,7 @@ impl<C: Config> Constraint<C> for RawConstraint {
 }
 
 impl<C: Config> ConstraintType<C> for RawConstraintType {
-    fn verify(&self, x: &C::CircuitField) -> bool {
+    fn verify(&self, x: &CircuitField<C>) -> bool {
         x.is_zero()
     }
 }
@@ -180,10 +181,7 @@ impl<Irc: IrConfig> Circuit<Irc> {
     }
 }
 
-pub type EvalOk<Irc> = (
-    Vec<<<Irc as IrConfig>::Config as Config>::CircuitField>,
-    bool,
-);
+pub type EvalOk<Irc> = (Vec<CircuitField<<Irc as IrConfig>::Config>>, bool);
 
 impl<Irc: IrConfig> RootCircuit<Irc> {
     pub fn sub_circuit_graph_vertices(&self) -> HashSet<usize> {
@@ -293,7 +291,7 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
     // eval the circuit. This function should be used for testing only
     pub fn eval_unsafe_with_errors(
         &self,
-        inputs: Vec<<Irc::Config as Config>::CircuitField>,
+        inputs: Vec<CircuitField<<Irc as IrConfig>::Config>>,
     ) -> Result<EvalOk<Irc>, Error> {
         assert_eq!(inputs.len(), self.input_size());
         let (res, mut cond) = self.eval_unsafe_sub(&self.circuits[&0], inputs)?;
@@ -306,17 +304,17 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
 
     pub fn eval_unsafe(
         &self,
-        inputs: Vec<<Irc::Config as Config>::CircuitField>,
-    ) -> (Vec<<Irc::Config as Config>::CircuitField>, bool) {
+        inputs: Vec<CircuitField<<Irc as IrConfig>::Config>>,
+    ) -> (Vec<CircuitField<<Irc as IrConfig>::Config>>, bool) {
         self.eval_unsafe_with_errors(inputs).unwrap()
     }
 
     fn eval_unsafe_sub(
         &self,
         circuit: &Circuit<Irc>,
-        inputs: Vec<<Irc::Config as Config>::CircuitField>,
+        inputs: Vec<CircuitField<<Irc as IrConfig>::Config>>,
     ) -> Result<EvalOk<Irc>, Error> {
-        let mut values = vec![<Irc::Config as Config>::CircuitField::zero(); 1];
+        let mut values = vec![CircuitField::<<Irc as IrConfig>::Config>::zero(); 1];
         values.extend(inputs);
         let mut cond = true;
         for insn in circuit.instructions.iter() {

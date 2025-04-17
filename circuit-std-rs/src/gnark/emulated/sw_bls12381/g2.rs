@@ -1,15 +1,16 @@
+use std::fmt::{Debug, Formatter, Result};
+use std::str::FromStr;
+
 use crate::gnark::element::{value_of, Element};
 use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::emulated::field_bls12381::e2::Ext2;
 use crate::gnark::emulated::field_bls12381::e2::GE2;
 use crate::sha256::m31_utils::{big_less_than, from_binary, to_binary};
 use crate::utils::simple_select;
+
 use expander_compiler::declare_circuit;
 use expander_compiler::frontend::{Config, Define, M31Config, RootAPI, Variable};
 use num_bigint::BigInt;
-use std::fmt::{Debug, Formatter, Result};
-use std::str::FromStr;
-
 const M_COMPRESSED_SMALLEST: u8 = 0b100 << 5;
 const M_COMPRESSED_LARGEST: u8 = 0b101 << 5;
 

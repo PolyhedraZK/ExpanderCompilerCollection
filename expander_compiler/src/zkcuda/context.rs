@@ -4,7 +4,10 @@ use serdes::ExpSerde;
 use crate::field::FieldArith;
 use crate::hints::registry::{EmptyHintCaller, HintCaller};
 use crate::utils::misc::next_power_of_two;
-use crate::{circuit::config::Config, utils::pool::Pool};
+use crate::{
+    circuit::config::{CircuitField, Config, SIMDField},
+    utils::pool::Pool,
+};
 
 use super::{
     kernel::{shape_prepend, Kernel, Shape},
@@ -16,8 +19,8 @@ use super::{
 pub use macros::call_kernel;
 
 pub struct DeviceMemory<C: Config, P: ProvingSystem<C>> {
-    pub raw_values: Vec<C::DefaultSimdField>,
-    pub values: Vec<C::DefaultSimdField>,
+    pub raw_values: Vec<SIMDField<C>>,
+    pub values: Vec<SIMDField<C>>,
     pub _proving_system: std::marker::PhantomData<P>,
 }
 
@@ -40,7 +43,7 @@ pub enum BroadcastType {
 pub struct Context<
     C: Config,
     P: ProvingSystem<C> = ExpanderGKRProvingSystem<C>,
-    H: HintCaller<C::CircuitField> = EmptyHintCaller,
+    H: HintCaller<CircuitField<C>> = EmptyHintCaller,
 > {
     pub kernels: Pool<Kernel<C>>,
     pub device_memories: Vec<DeviceMemory<C, P>>,
@@ -83,19 +86,19 @@ fn ensure_handle(handle: DeviceMemoryHandle) -> DeviceMemoryHandleRaw {
     }
 }
 
-fn pack_vec<C: Config>(v: &[C::CircuitField]) -> Vec<C::DefaultSimdField> {
+fn pack_vec<C: Config>(v: &[CircuitField<C>]) -> Vec<SIMDField<C>> {
     v.iter()
         .map(|x| {
-            let mut v = Vec::with_capacity(C::DefaultSimdField::PACK_SIZE);
-            for _ in 0..C::DefaultSimdField::PACK_SIZE {
+            let mut v = Vec::with_capacity(SIMDField::<C>::PACK_SIZE);
+            for _ in 0..SIMDField::<C>::PACK_SIZE {
                 v.push(*x);
             }
-            C::DefaultSimdField::pack(&v)
+            SIMDField::<C>::pack(&v)
         })
         .collect::<Vec<_>>()
 }
 
-fn unpack_vec<C: Config>(v: &[C::DefaultSimdField]) -> Vec<C::CircuitField> {
+fn unpack_vec<C: Config>(v: &[SIMDField<C>]) -> Vec<CircuitField<C>> {
     v.iter().map(|x| x.unpack()[0]).collect()
 }
 
@@ -226,7 +229,7 @@ impl Reshape for DeviceMemoryHandle {
     }
 }
 
-impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, P, H> {
+impl<C: Config, P: ProvingSystem<C>, H: HintCaller<CircuitField<C>>> Context<C, P, H> {
     pub fn new(hint_caller: H) -> Self {
         Context {
             kernels: Pool::new(),
@@ -239,8 +242,8 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
 
     fn make_device_mem(
         &mut self,
-        values: Vec<C::DefaultSimdField>,
-        padded_values: Vec<C::DefaultSimdField>,
+        values: Vec<SIMDField<C>>,
+        padded_values: Vec<SIMDField<C>>,
         broadcast_type: BroadcastType,
         shape: Shape,
     ) -> DeviceMemoryHandle {
@@ -256,7 +259,7 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
         })
     }
 
-    pub fn copy_raw_to_device(&mut self, host_memory: &[C::CircuitField]) -> DeviceMemoryHandle {
+    pub fn copy_raw_to_device(&mut self, host_memory: &[CircuitField<C>]) -> DeviceMemoryHandle {
         let simd_host_memory = pack_vec::<C>(host_memory);
         self.make_device_mem(
             simd_host_memory.clone(),
@@ -268,7 +271,7 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
 
     pub fn copy_raw_simd_to_device(
         &mut self,
-        simd_host_memory: &[C::DefaultSimdField],
+        simd_host_memory: &[SIMDField<C>],
     ) -> DeviceMemoryHandle {
         self.make_device_mem(
             simd_host_memory.to_vec(),
@@ -278,7 +281,7 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
         )
     }
 
-    pub fn copy_to_device<T: VecShaped<C::CircuitField>>(
+    pub fn copy_to_device<T: VecShaped<CircuitField<C>>>(
         &mut self,
         host_memory: &T,
         is_broadcast: bool,
@@ -295,7 +298,7 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
         )
     }
 
-    pub fn copy_simd_to_device<T: VecShaped<C::DefaultSimdField>>(
+    pub fn copy_simd_to_device<T: VecShaped<SIMDField<C>>>(
         &mut self,
         host_memory: &T,
         is_broadcast: bool,
@@ -309,7 +312,7 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
     pub fn copy_raw_to_host(
         &self,
         device_memory_handle: DeviceMemoryHandle,
-    ) -> Vec<C::CircuitField> {
+    ) -> Vec<CircuitField<C>> {
         let device_memory_handle = ensure_handle(device_memory_handle);
         unpack_vec::<C>(&self.device_memories[device_memory_handle.id].values)
     }
@@ -317,12 +320,12 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
     pub fn copy_raw_simd_to_host(
         &self,
         device_memory_handle: DeviceMemoryHandle,
-    ) -> Vec<C::DefaultSimdField> {
+    ) -> Vec<SIMDField<C>> {
         let device_memory_handle = ensure_handle(device_memory_handle);
         self.device_memories[device_memory_handle.id].values.clone()
     }
 
-    pub fn copy_to_host<T: VecShaped<C::CircuitField> + Default>(
+    pub fn copy_to_host<T: VecShaped<CircuitField<C>> + Default>(
         &self,
         device_memory_handle: DeviceMemoryHandle,
     ) -> T {
@@ -333,7 +336,7 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
         )
     }
 
-    pub fn copy_simd_to_host<T: VecShaped<C::DefaultSimdField> + Default>(
+    pub fn copy_simd_to_host<T: VecShaped<SIMDField<C>> + Default>(
         &self,
         device_memory_handle: DeviceMemoryHandle,
     ) -> T {
@@ -458,8 +461,7 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
         let mut hint_output_vec = vec![];
 
         for parallel_i in 0..parallel_count {
-            let mut ws_inputs =
-                vec![C::DefaultSimdField::zero(); kernel.witness_solver.input_size()];
+            let mut ws_inputs = vec![SIMDField::<C>::zero(); kernel.witness_solver.input_size()];
             for (i, (input, ws_input)) in
                 ios.iter().zip(kernel.witness_solver_io.iter()).enumerate()
             {
@@ -497,7 +499,7 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
                 output_vecs[i].extend_from_slice(values);
                 output_vecs_raw[i].extend_from_slice(values);
                 for _ in ws_input.len..next_power_of_two(ws_input.len) {
-                    output_vecs[i].push(C::DefaultSimdField::zero());
+                    output_vecs[i].push(SIMDField::<C>::zero());
                 }
             }
             if let Some(hint_io) = &kernel.witness_solver_hint_input {
@@ -505,7 +507,7 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
                     [hint_io.output_offset.unwrap()..hint_io.output_offset.unwrap() + hint_io.len];
                 hint_output_vec.extend_from_slice(values);
                 for _ in hint_io.len..next_power_of_two(hint_io.len) {
-                    hint_output_vec.push(C::DefaultSimdField::zero());
+                    hint_output_vec.push(SIMDField::<C>::zero());
                 }
             }
         }
@@ -521,7 +523,7 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
                 *output = None;
                 continue;
             }
-            ov.resize(next_power_of_two(ov.len()), C::DefaultSimdField::zero());
+            ov.resize(next_power_of_two(ov.len()), SIMDField::<C>::zero());
             let handle = self.make_device_mem(
                 ov_raw,
                 ov,
@@ -535,7 +537,7 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<C::CircuitField>> Context<C, 
         if kernel.witness_solver_hint_input.is_some() {
             hint_output_vec.resize(
                 next_power_of_two(hint_output_vec.len()),
-                C::DefaultSimdField::zero(),
+                SIMDField::<C>::zero(),
             );
             let handle = self.make_device_mem(
                 hint_output_vec.clone(),

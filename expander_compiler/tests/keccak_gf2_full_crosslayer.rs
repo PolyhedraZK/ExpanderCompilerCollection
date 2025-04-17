@@ -1,5 +1,7 @@
 use expander_compiler::frontend::*;
-use expander_transcript::{BytesHashTranscript, SHA256hasher, Transcript};
+use expander_transcript::BytesHashTranscript;
+use gkr_engine::Transcript;
+use gkr_hashers::SHA256hasher;
 use rand::{Rng, SeedableRng};
 use tiny_keccak::Hasher;
 
@@ -270,7 +272,7 @@ fn keccak_gf2_full_crosslayer() {
     println!("basic test passed");
 
     let expander_circuit = layered_circuit
-        .export_to_expander::<gkr_field_config::GF2ExtConfig>()
+        .export_to_expander::<gkr_engine::GF2ExtConfig>()
         .flatten();
 
     let (simd_input, simd_public_input) = witness.to_simd::<gf2::GF2x8>();
@@ -278,7 +280,7 @@ fn keccak_gf2_full_crosslayer() {
     assert_eq!(simd_public_input.len(), 0); // public input is not supported in current virgo++
 
     let mut transcript = BytesHashTranscript::<
-        <gkr_field_config::GF2ExtConfig as gkr_field_config::GKRFieldConfig>::ChallengeField,
+        <gkr_engine::GF2ExtConfig as gkr_engine::FieldEngine>::ChallengeField,
         SHA256hasher,
     >::new();
 
@@ -286,13 +288,12 @@ fn keccak_gf2_full_crosslayer() {
 
     let start_time = std::time::Instant::now();
     let evals = expander_circuit.evaluate(&simd_input);
-    let mut sp =
-        crosslayer_prototype::CrossLayerProverScratchPad::<gkr_field_config::GF2ExtConfig>::new(
-            expander_circuit.layers.len(),
-            expander_circuit.max_num_input_var(),
-            expander_circuit.max_num_output_var(),
-            1,
-        );
+    let mut sp = crosslayer_prototype::CrossLayerProverScratchPad::<gkr_engine::GF2ExtConfig>::new(
+        expander_circuit.layers.len(),
+        expander_circuit.max_num_input_var(),
+        expander_circuit.max_num_output_var(),
+        1,
+    );
     let (_output_claim, _input_challenge, _input_claim) = crosslayer_prototype::prove_gkr(
         &expander_circuit,
         &evals,

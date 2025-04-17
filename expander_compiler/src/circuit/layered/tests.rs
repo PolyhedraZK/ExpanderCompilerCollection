@@ -1,11 +1,13 @@
 use std::vec;
 
-use super::{Allocation, Circuit, Coef, GateAdd, GateConst, GateMul, Segment};
+use mersenne31::M31;
 
-use crate::circuit::config::{Config, M31Config as C};
+use super::{Allocation, Circuit, Coef, GateAdd, GateConst, GateMul, Segment};
 use crate::circuit::layered::{NormalInput, NormalInputType, NormalInputUsize};
 use crate::field::FieldArith;
-type CField = <C as Config>::CircuitField;
+use crate::frontend::M31Config as C;
+
+type CField = M31;
 
 #[test]
 fn simple() {

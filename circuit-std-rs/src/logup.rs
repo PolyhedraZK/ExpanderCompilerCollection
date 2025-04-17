@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use arith::Field;
-use expander_compiler::frontend::{declare_circuit, Config, Define, Error, RootAPI, Variable};
+use expander_compiler::frontend::{
+    declare_circuit, CircuitField, Config, Define, Error, RootAPI, Variable,
+};
 use rand::Rng;
 
 use crate::StdCircuit;
@@ -21,7 +23,7 @@ declare_circuit!(_LogUpCircuit {
     query_keys: [[Variable]],
     query_results: [[Variable]],
 
-    // counting the number of occurences for each row of the table
+    // counting the number of occurrences for each row of the table
     query_count: [Variable],
 });
 
@@ -183,7 +185,7 @@ impl<C: Config> Define<C> for LogUpCircuit {
 
 impl<C: Config> StdCircuit<C> for LogUpCircuit {
     type Params = LogUpParams;
-    type Assignment = _LogUpCircuit<C::CircuitField>;
+    type Assignment = _LogUpCircuit<CircuitField<C>>;
 
     fn new_circuit(params: &Self::Params) -> Self {
         let mut circuit = Self::default();
@@ -211,7 +213,7 @@ impl<C: Config> StdCircuit<C> for LogUpCircuit {
     }
 
     fn new_assignment(params: &Self::Params, mut rng: impl rand::RngCore) -> Self::Assignment {
-        let mut assignment = _LogUpCircuit::<C::CircuitField>::default();
+        let mut assignment = _LogUpCircuit::<CircuitField<C>>::default();
         assignment.table_keys.resize(params.n_table_rows, vec![]);
         assignment.table_values.resize(params.n_table_rows, vec![]);
         assignment.query_keys.resize(params.n_queries, vec![]);
@@ -219,18 +221,18 @@ impl<C: Config> StdCircuit<C> for LogUpCircuit {
 
         for i in 0..params.n_table_rows {
             for _ in 0..params.key_len {
-                assignment.table_keys[i].push(C::CircuitField::random_unsafe(&mut rng));
+                assignment.table_keys[i].push(CircuitField::<C>::random_unsafe(&mut rng));
             }
 
             for _ in 0..params.value_len {
-                assignment.table_values[i].push(C::CircuitField::random_unsafe(&mut rng));
+                assignment.table_values[i].push(CircuitField::<C>::random_unsafe(&mut rng));
             }
         }
 
-        assignment.query_count = vec![C::CircuitField::ZERO; params.n_table_rows];
+        assignment.query_count = vec![CircuitField::<C>::ZERO; params.n_table_rows];
         for i in 0..params.n_queries {
             let query_id: usize = rng.gen::<usize>() % params.n_table_rows;
-            assignment.query_count[query_id] += C::CircuitField::ONE;
+            assignment.query_count[query_id] += CircuitField::<C>::ONE;
             assignment.query_keys[i] = assignment.table_keys[query_id].clone();
             assignment.query_results[i] = assignment.table_values[query_id].clone();
         }

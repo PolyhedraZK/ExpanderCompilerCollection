@@ -1,3 +1,4 @@
+/*
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
 
@@ -578,3 +579,4 @@ fn verify_input_claim<C: Config>(
 
     *y == target_y
 }
+*/

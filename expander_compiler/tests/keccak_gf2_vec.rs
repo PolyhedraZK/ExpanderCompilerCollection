@@ -188,7 +188,7 @@ declare_circuit!(Keccak256Circuit {
     out: [[PublicVariable]],
 });
 
-fn compute_keccak<C: Config>(api: &mut impl RootAPI<C>, p: &Vec<Variable>) -> Vec<Variable> {
+fn compute_keccak<C: Config, B: RootAPI<C>>(api: &mut B, p: &Vec<Variable>) -> Vec<Variable> {
     let mut ss = vec![vec![api.constant(0); 64]; 25];
     let mut new_p = p.clone();
     let mut append_data = vec![0; 136 - 64];

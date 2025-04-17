@@ -1,6 +1,6 @@
 use expr::{LinComb, LinCombTerm};
 
-use crate::circuit::ir::common::Instruction as _;
+use crate::{circuit::ir::common::Instruction as _, frontend::CircuitField};
 
 use super::{expr, Circuit, Config, FieldArith, Instruction, RootCircuit};
 
@@ -66,7 +66,7 @@ impl<C: Config> Circuit<C> {
                     if !x_lc.constant.is_zero() {
                         constant += x_lc.constant * x.coef;
                     }
-                    if x.coef == C::CircuitField::one() {
+                    if x.coef == CircuitField::<C>::one() {
                         lcs.push(std::mem::take(&mut x_lc.terms));
                     } else {
                         lcs.push(

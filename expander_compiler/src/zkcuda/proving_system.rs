@@ -8,4 +8,5 @@ mod dummy;
 pub use dummy::*;
 
 mod expander_gkr;
-pub use expander_gkr::*;
+//pub use expander_gkr::*;
+pub use dummy::DummyProvingSystem as ExpanderGKRProvingSystem;

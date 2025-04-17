@@ -13,7 +13,7 @@ where
 
 pub fn circuit_test_helper_with_hint<Cfg, Cir>(
     params: &Cir::Params,
-    hint: &mut impl HintCaller<Cfg::CircuitField>,
+    hint: &mut impl HintCaller<CircuitField<Cfg>>,
 ) where
     Cfg: Config,
     Cir: StdCircuit<Cfg>,

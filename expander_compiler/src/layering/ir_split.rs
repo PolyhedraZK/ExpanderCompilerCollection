@@ -8,7 +8,7 @@ use crate::{
         expr::{Expression, Term},
     },
     field::FieldArith,
-    frontend::Config,
+    frontend::{CircuitField, Config},
     utils::pool::Pool,
 };
 
@@ -250,14 +250,14 @@ impl<'a, C: Config> SplitContext<'a, C> {
                     && min_layers[sub_combined_constraints[j]] == i
                 {
                     terms.push(Term::new_linear(
-                        C::CircuitField::one(),
+                        CircuitField::<C>::one(),
                         sub_combined_constraints[j],
                     ));
                     j += 1;
                 }
                 while circuit_id == 0 && !add_outputs.is_empty() {
                     terms.push(Term::new_linear(
-                        C::CircuitField::one(),
+                        CircuitField::<C>::one(),
                         add_outputs[add_outputs.len() - 1],
                     ));
                     add_outputs.pop();
@@ -484,9 +484,10 @@ pub fn split_to_single_layer<C: Config>(root: &IrRootCircuit<C>) -> IrRootCircui
 
 #[cfg(test)]
 mod tests {
-    use crate::circuit::config::{GF2Config, M31Config};
+
     use crate::circuit::ir::common::rand_gen::{RandomCircuitConfig, RandomRange};
     use crate::field::M31;
+    use crate::frontend::{GF2Config, M31Config};
 
     use super::*;
     use Instruction::*;
@@ -561,8 +562,8 @@ mod tests {
             assert_eq!(root.validate(), Ok(()));
             let new_root = split_to_single_layer(&root);
             assert_eq!(new_root.validate(), Ok(()));
-            let input: Vec<C::CircuitField> = (0..root.input_size())
-                .map(|_| C::CircuitField::random_unsafe(&mut rand::thread_rng()))
+            let input: Vec<CircuitField<C>> = (0..root.input_size())
+                .map(|_| CircuitField::<C>::random_unsafe(&mut rand::thread_rng()))
                 .collect();
             let (out, cond) = root.eval_unsafe(input.clone());
             let (out2, cond2) = new_root.eval_unsafe(input.clone());

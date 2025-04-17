@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::circuit::{config::Config, layered::Coef};
 use crate::field::FieldArith;
+use crate::frontend::CircuitField;
 use crate::hints;
 use crate::utils::error::Error;
 
@@ -110,7 +111,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             },
         }
     }
-    fn from_kx_plus_b(x: usize, k: C::CircuitField, b: C::CircuitField) -> Self {
+    fn from_kx_plus_b(x: usize, k: CircuitField<C>, b: CircuitField<C>) -> Self {
         Instruction::InternalVariable {
             expr: Expression::from_terms(vec![Term::new_linear(k, x), Term::new_const(b)]),
         }
@@ -121,10 +122,10 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             _ => Ok(()),
         }
     }
-    fn eval_unsafe(&self, values: &[C::CircuitField]) -> EvalResult<C> {
+    fn eval_unsafe(&self, values: &[CircuitField<C>]) -> EvalResult<C> {
         match self {
             Instruction::InternalVariable { expr } => {
-                let mut sum = C::CircuitField::zero();
+                let mut sum = CircuitField::<C>::zero();
                 for term in expr.iter() {
                     match &term.vars {
                         VarSpec::Const => {
@@ -137,7 +138,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                             sum += values[*i] * values[*j] * term.coef;
                         }
                         VarSpec::Custom { gate_type, inputs } => {
-                            let args: Vec<C::CircuitField> =
+                            let args: Vec<CircuitField<C>> =
                                 inputs.iter().map(|i| values[*i]).collect();
                             sum += hints::stub_impl(*gate_type, &args, 1)[0] * term.coef;
                         }
@@ -198,7 +199,7 @@ impl<C: Config> CircuitRelaxed<C> {
                             let copy_insn = match &insn_of_var[i] {
                                 Some(insn_id) => new_instructions[*insn_id].clone(),
                                 None => Instruction::InternalVariable {
-                                    expr: Expression::new_linear(C::CircuitField::one(), i),
+                                    expr: Expression::new_linear(CircuitField::<C>::one(), i),
                                 },
                             };
                             new_var_max += 1;
