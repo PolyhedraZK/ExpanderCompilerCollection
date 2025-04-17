@@ -7,6 +7,7 @@ pub mod api;
 pub mod builder;
 pub mod circuit;
 pub mod debug;
+pub mod sub_circuit;
 pub mod variables;
 pub mod witness;
 
@@ -20,6 +21,7 @@ pub use crate::utils::error::Error;
 pub use api::{BasicAPI, RootAPI};
 pub use builder::Variable;
 pub use circuit::Define;
+pub use macros::memorized;
 pub use witness::WitnessSolver;
 
 pub mod internal {
@@ -32,23 +34,27 @@ pub mod internal {
 }
 
 pub mod extra {
+
     pub use super::api::UnconstrainedAPI;
     pub use super::debug::DebugBuilder;
+    pub use super::sub_circuit::{
+        HashStructureAndPrimitive, JoinVecVariables, RebuildVecVariables,
+    };
     pub use crate::hints::registry::{EmptyHintCaller, HintCaller, HintRegistry};
     // pub use crate::utils::serde::Serde;
 
-    use super::{internal, Config, Define, Variable};
+    use super::{internal, CircuitField, Config, Define, Variable};
 
     pub fn debug_eval<
         C: Config,
         Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone,
-        CA: internal::DumpLoadTwoVariables<C::CircuitField>,
-        H: HintCaller<C::CircuitField>,
+        CA: internal::DumpLoadTwoVariables<CircuitField<C>>,
+        H: HintCaller<CircuitField<C>>,
     >(
         circuit: &Cir,
         assignment: &CA,
         hint_caller: H,
-    ) -> Vec<C::CircuitField> {
+    ) -> Vec<CircuitField<C>> {
         let (num_inputs, num_public_inputs) = circuit.num_vars();
         let (a_num_inputs, a_num_public_inputs) = assignment.num_vars();
         assert_eq!(num_inputs, a_num_inputs);

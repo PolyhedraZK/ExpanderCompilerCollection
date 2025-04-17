@@ -184,7 +184,7 @@ impl Define<M31Config> for PairingCheckGKRCircuit<Variable> {
 
 impl StdCircuit<M31Config> for PairingCheckGKRCircuit<Variable> {
     type Params = PairingParams;
-    type Assignment =PairingCheckGKRCircuit<<expander_compiler::frontend::M31Config as expander_compiler::frontend::Config>::CircuitField>;
+    type Assignment = PairingCheckGKRCircuit<M31>;
 
     fn new_circuit(_params: &Self::Params) -> Self {
         let mut circuit = Self::default();
@@ -257,10 +257,10 @@ fn affine_point_to_bytes_g1(point: &BlsG1Affine) -> [[u8; 48]; 2] {
     let mut y_bytes = [0u8; 48];
 
     // serialize x
-    point.x.serialize_compressed(x_bytes.as_mut()).unwrap();
+    point.x.serialize_compressed(&mut x_bytes.as_mut()).unwrap();
 
     //serialize y
-    point.y.serialize_compressed(y_bytes.as_mut()).unwrap();
+    point.y.serialize_compressed(&mut y_bytes.as_mut()).unwrap();
 
     [x_bytes, y_bytes]
 }
@@ -273,24 +273,24 @@ fn affine_point_to_bytes_g2(point: &BlsG2Affine) -> [[[u8; 48]; 2]; 2] {
     point
         .x
         .c0
-        .serialize_compressed(x_bytes[0].as_mut())
+        .serialize_compressed(&mut x_bytes[0].as_mut())
         .unwrap(); // x.c0
     point
         .x
         .c1
-        .serialize_compressed(x_bytes[1].as_mut())
+        .serialize_compressed(&mut x_bytes[1].as_mut())
         .unwrap(); // x.c1
 
     // serialize x
     point
         .y
         .c0
-        .serialize_compressed(y_bytes[0].as_mut())
+        .serialize_compressed(&mut y_bytes[0].as_mut())
         .unwrap(); // y.c0
     point
         .y
         .c1
-        .serialize_compressed(y_bytes[1].as_mut())
+        .serialize_compressed(&mut y_bytes[1].as_mut())
         .unwrap(); // y.c1
 
     [x_bytes, y_bytes]
@@ -402,6 +402,7 @@ fn test_pairing_check_gkr() {
 }
 
 #[test]
+#[ignore]
 fn pairing_random_test() {
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);

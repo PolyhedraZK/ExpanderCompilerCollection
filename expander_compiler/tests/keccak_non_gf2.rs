@@ -59,7 +59,7 @@ fn check_bits<C: Config>(
     mut a: Vec<Variable>,
     b_compressed: Vec<Variable>,
 ) {
-    if a.len() != CHECK_BITS || C::CircuitField::FIELD_SIZE <= PARTITION_BITS {
+    if a.len() != CHECK_BITS || CircuitField::<C>::FIELD_SIZE <= PARTITION_BITS {
         panic!("gg");
     }
     for i in 0..a.len() {
@@ -81,12 +81,12 @@ fn from_my_bit_form<C: Config>(api: &mut impl RootAPI<C>, x: Variable) -> Variab
     api.div(t, 2, true)
 }
 
-fn to_my_bit_form<C: Config>(x: usize) -> C::CircuitField {
+fn to_my_bit_form<C: Config>(x: usize) -> CircuitField<C> {
     if x == 0 {
-        C::CircuitField::one()
+        CircuitField::<C>::one()
     } else {
         assert_eq!(x, 1);
-        -C::CircuitField::one()
+        -CircuitField::<C>::one()
     }
 }
 
@@ -296,7 +296,7 @@ fn keccak_big_field<C: Config, const N_WITNESSES: usize>(field_name: &str) {
         layered_circuit,
     } = compile_result;
 
-    let mut assignment = Keccak256Circuit::<C::CircuitField>::default();
+    let mut assignment = Keccak256Circuit::<CircuitField<C>>::default();
     let mut rng = rand::rngs::StdRng::seed_from_u64(1235);
     for k in 0..N_HASHES {
         let mut data = vec![0u8; 64];
@@ -321,8 +321,8 @@ fn keccak_big_field<C: Config, const N_WITNESSES: usize>(field_name: &str) {
         let out_compressed = compress_bits(out_bits);
         assert_eq!(out_compressed.len(), CHECK_PARTITIONS);
         for (i, x) in out_compressed.iter().enumerate() {
-            assert!(U256::from(*x as u64) < C::CircuitField::MODULUS);
-            assignment.out[k][i] = C::CircuitField::from(*x as u32);
+            assert!(U256::from(*x as u64) < CircuitField::<C>::MODULUS);
+            assignment.out[k][i] = CircuitField::<C>::from(*x as u32);
         }
     }
     let witness = witness_solver.solve_witness(&assignment).unwrap();
@@ -354,7 +354,7 @@ fn keccak_big_field<C: Config, const N_WITNESSES: usize>(field_name: &str) {
     assert_eq!(res, expected_res);
     println!("test 3 passed");
 
-    let assignments_correct: Vec<Keccak256Circuit<C::CircuitField>> = (0..N_WITNESSES)
+    let assignments_correct: Vec<Keccak256Circuit<CircuitField<C>>> = (0..N_WITNESSES)
         .map(|i| assignments[i * 2].clone())
         .collect();
     let witness = witness_solver
@@ -364,6 +364,7 @@ fn keccak_big_field<C: Config, const N_WITNESSES: usize>(field_name: &str) {
     let file = match field_name {
         "m31" => std::fs::File::create("circuit_m31.txt").unwrap(),
         "bn254" => std::fs::File::create("circuit_bn254.txt").unwrap(),
+        "goldilocks" => std::fs::File::create("circuit_goldilocks.txt").unwrap(),
         _ => panic!("unknown field"),
     };
     let writer = std::io::BufWriter::new(file);
@@ -372,6 +373,7 @@ fn keccak_big_field<C: Config, const N_WITNESSES: usize>(field_name: &str) {
     let file = match field_name {
         "m31" => std::fs::File::create("witness_m31.txt").unwrap(),
         "bn254" => std::fs::File::create("witness_bn254.txt").unwrap(),
+        "goldilocks" => std::fs::File::create("witness_goldilocks.txt").unwrap(),
         _ => panic!("unknown field"),
     };
 
@@ -381,6 +383,7 @@ fn keccak_big_field<C: Config, const N_WITNESSES: usize>(field_name: &str) {
     let file = match field_name {
         "m31" => std::fs::File::create("witness_m31_solver.txt").unwrap(),
         "bn254" => std::fs::File::create("witness_bn254_solver.txt").unwrap(),
+        "goldilocks" => std::fs::File::create("witness_goldilocks_solver.txt").unwrap(),
         _ => panic!("unknown field"),
     };
     let writer = std::io::BufWriter::new(file);
@@ -397,4 +400,9 @@ fn keccak_m31_test() {
 #[test]
 fn keccak_bn254_test() {
     keccak_big_field::<BN254Config, 1>("bn254");
+}
+
+#[test]
+fn keccak_goldilocks_test() {
+    keccak_big_field::<GoldilocksConfig, 8>("goldilocks");
 }
