@@ -100,8 +100,11 @@ impl Define<BN254Config> for RangeproofLogupCircuit<Variable> {
     fn define<Builder: RootAPI<BN254Config>>(&self, builder: &mut Builder) {
         let mut table = LogUpRangeProofTable::new(16);
         table.initial(builder);
-        let key = builder.constant(18888888);
-        table.rangeproof(builder, key, 37);
+        let key1 = builder.constant(18888888);
+        table.rangeproof(builder, key1, 37);
+
+        let key2 = builder.constant(58888888);
+        table.rangeproof(builder, key2, 49);
 
         table.final_check(builder);
     }
