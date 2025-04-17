@@ -45,7 +45,7 @@ macro_rules! pcs {
 #[allow(clippy::type_complexity)]
 pub struct ExpanderGKRCommitment<C: Config> {
     vals_len: usize,
-    commitment: Vec<<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::Commitment>,
+    pub commitment: Vec<<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::Commitment>,
 }
 
 impl<C: Config> Clone for ExpanderGKRCommitment<C> {
@@ -83,7 +83,7 @@ impl<C: Config> Commitment<C> for ExpanderGKRCommitment<C> {
 
 #[allow(clippy::type_complexity)]
 pub struct ExpanderGKRCommitmentExtraInfo<C: Config> {
-    scratch: Vec<<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::ScratchPad>,
+    pub scratch: Vec<<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::ScratchPad>,
 }
 
 impl<C: Config> Clone for ExpanderGKRCommitmentExtraInfo<C> {
@@ -94,10 +94,23 @@ impl<C: Config> Clone for ExpanderGKRCommitmentExtraInfo<C> {
     }
 }
 
+impl<C: Config> ExpSerde for ExpanderGKRCommitmentExtraInfo<C> {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
+        self.scratch.serialize_into(&mut writer)
+    }
+    fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
+        let scratch = Vec::<
+            <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::ScratchPad,
+        >::deserialize_from(&mut reader)?;
+        Ok(ExpanderGKRCommitmentExtraInfo { scratch })
+    }
+}
+
 #[allow(clippy::type_complexity)]
 pub struct ExpanderGKRProverSetup<C: Config>
 {
-    p_keys: HashMap<usize, <<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::SRS as StructuredReferenceString>::PKey>,
+    pub p_keys: HashMap<usize, <<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::SRS as StructuredReferenceString>::PKey>,
 }
 
 impl<C: Config> Clone for ExpanderGKRProverSetup<C> {
@@ -108,10 +121,22 @@ impl<C: Config> Clone for ExpanderGKRProverSetup<C> {
     }
 }
 
+impl<C: Config> ExpSerde for ExpanderGKRProverSetup<C> {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
+        self.p_keys.serialize_into(&mut writer)
+    }
+    fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
+        let p_keys = HashMap::<_, _>::deserialize_from(&mut reader)?;
+        Ok(ExpanderGKRProverSetup { p_keys })
+    }
+}
+
+
 #[allow(clippy::type_complexity)]
 pub struct ExpanderGKRVerifierSetup<C: Config>
 {
-    v_keys: HashMap<usize, <<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::SRS as StructuredReferenceString>::VKey>,
+    pub v_keys: HashMap<usize, <<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::SRS as StructuredReferenceString>::VKey>,
 }
 
 impl<C: Config> Clone for ExpanderGKRVerifierSetup<C> {
@@ -122,9 +147,20 @@ impl<C: Config> Clone for ExpanderGKRVerifierSetup<C> {
     }
 }
 
+impl<C: Config> ExpSerde for ExpanderGKRVerifierSetup<C> {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
+        self.v_keys.serialize_into(&mut writer)
+    }
+    fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
+        let v_keys = HashMap::<_, _>::deserialize_from(&mut reader)?;
+        Ok(ExpanderGKRVerifierSetup { v_keys })
+    }
+}
+
 #[derive(Clone)]
 pub struct ExpanderGKRProof {
-    data: Vec<ExpanderProof>,
+    pub data: Vec<ExpanderProof>,
 }
 
 impl ExpSerde for ExpanderGKRProof {
@@ -383,7 +419,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
 }
 
 #[allow(clippy::type_complexity)]
-fn pcs_testing_setup_fixed_seed<
+pub fn pcs_testing_setup_fixed_seed<
     FConfig: GKRFieldConfig,
     T: Transcript<FConfig::ChallengeField>,
     PCS: PCSForExpanderGKR<FConfig, T>,

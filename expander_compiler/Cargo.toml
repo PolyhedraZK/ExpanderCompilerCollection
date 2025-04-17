@@ -27,6 +27,7 @@ polynomials.workspace = true
 sumcheck.workspace = true
 rand.workspace = true
 serdes.workspace = true
+shared_memory.workspace = true
 
 [dev-dependencies]
 rayon = "1.9"
