@@ -108,7 +108,7 @@ impl Define<BN254Config> for RangeproofLogupCircuit<Variable> {
 }
 
 #[test]
-fn rangeproof_BN254_test() {
+fn rangeproof_bn254_test() {
     let mut hint_registry = HintRegistry::<BN254Fr>::new();
     hint_registry.register("myhint.querycounthint", query_count_hint);
     hint_registry.register("myhint.rangeproofhint", rangeproof_hint);
