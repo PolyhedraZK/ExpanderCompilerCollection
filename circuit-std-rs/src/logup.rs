@@ -2,8 +2,6 @@ use std::collections::HashMap;
 
 use arith::Field;
 use ethnum::U256;
-use expander_compiler::frontend::BN254Fr;
-use expander_compiler::frontend::M31;
 use expander_compiler::frontend::{
     declare_circuit, CircuitField, Config, Define, Error, RootAPI, Variable,
 };
