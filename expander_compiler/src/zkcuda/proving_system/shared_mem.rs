@@ -1,10 +1,13 @@
 use std::{io::Cursor, process::Command};
 
-use expander_circuit::Circuit;
+#[allow(unused_imports)]
+use expander_circuit::Circuit as ExpanderCircuit;
+
+use crate::circuit::layered::Circuit;
 use serdes::ExpSerde;
 use shared_memory::{Shmem, ShmemConf};
 
-use crate::circuit::config::Config;
+use crate::circuit::{config::Config, layered::InputType};
 
 use super::{ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof, ExpanderGKRProverSetup};
 
@@ -12,22 +15,27 @@ use super::{ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRPr
 #[derive(Default)]
 pub struct SharedMemory {
     pub pcs_setup: Option<Shmem>,
+    pub circuit: Option<Shmem>,
     pub input_vals: Option<Shmem>,
     pub commitment: Option<Shmem>,
     pub extra_info: Option<Shmem>,
+    pub broadcast_info: Option<Shmem>,
     pub proof: Option<Shmem>,
 }
 
 pub static mut SHARED_MEMORY: SharedMemory = SharedMemory {
     pcs_setup: None,
+    circuit: None,
     input_vals: None,
     commitment: None,
     extra_info: None,
+    broadcast_info: None,
     proof: None,
 };
 
 pub fn init_commitment_and_extra_info_shared_memory<C: Config>(commitment_size: usize, extra_info_size: usize) {
-    if unsafe { SHARED_MEMORY.commitment.is_some() } {
+    if unsafe { SHARED_MEMORY.commitment.is_some() && SHARED_MEMORY.extra_info.is_some() } {
+        // TODO: Check if the sizes suffice
         return;
     }
 
@@ -43,6 +51,22 @@ pub fn init_commitment_and_extra_info_shared_memory<C: Config>(commitment_size: 
             ShmemConf::new()
                 .size(extra_info_size)
                 .flink("extra_info")
+                .create()
+                .unwrap(),
+        );
+    }
+}
+
+pub fn init_proof_shared_memory(max_proof_size: usize) {
+    if unsafe {SHARED_MEMORY.proof.is_some()} {
+        return;
+    }
+
+    unsafe {
+        SHARED_MEMORY.proof = Some(
+            ShmemConf::new()
+                .size(max_proof_size)
+                .flink("proof")
                 .create()
                 .unwrap(),
         );
@@ -72,25 +96,52 @@ fn write_object_to_shared_memory<T: ExpSerde>(object: &T, shared_memory_ref: &mu
     }
 }
 
-pub fn write_pcs_setup_to_shared_memory<C: Config>(
+pub fn write_selected_pcs_setup_to_shared_memory<C: Config>(
     pcs_setup: &ExpanderGKRProverSetup<C>,
-    actual_local_len: usize,
+    actual_local_lens: &[usize],
 ) {
-    let setup = pcs_setup.p_keys.get(&actual_local_len).unwrap();
-    write_object_to_shared_memory(&(actual_local_len, setup.clone()), unsafe {&mut SHARED_MEMORY.pcs_setup}, "pcs_setup");
+    let pairs = actual_local_lens.iter().map(|len| {
+        let setup = pcs_setup.p_keys.get(len).unwrap().clone();
+        (*len, setup)
+    })
+    .collect::<Vec<_>>();
+    write_object_to_shared_memory(&pairs, unsafe {&mut SHARED_MEMORY.pcs_setup}, "pcs_setup");
 }
 
 pub fn write_commit_vals_to_shared_memory<C: Config>(vals: &Vec<C::DefaultSimdField>) {
     write_object_to_shared_memory(vals, unsafe {&mut SHARED_MEMORY.input_vals}, "input_vals");
 }
 
-// I think we have ExpSerde implemented for Circuit in the latest version of expander circuit
-pub fn write_circuit_to_shared_memory<C: Config>(circuit: &Circuit<C::DefaultGKRFieldConfig>) {
-    write_object_to_shared_memory(circuit, unsafe {&mut SHARED_MEMORY.pcs_setup}, "circuit");
+pub fn write_pcs_setup_to_shared_memory<C: Config>(pcs_setup: &ExpanderGKRProverSetup<C>) {
+    write_object_to_shared_memory(pcs_setup, unsafe {&mut SHARED_MEMORY.pcs_setup}, "pcs_setup");
 }
 
-pub fn write_proving_inputs_to_shared_memory<C: Config>(inputs: &Vec<Vec<C::DefaultSimdField>>) {
-    write_object_to_shared_memory(inputs, unsafe {&mut SHARED_MEMORY.input_vals}, "inputs_vals");
+// I think we have ExpSerde implemented for Circuit in the latest version of expander circuit
+// pub fn write_circuit_to_shared_memory<C: Config>(circuit: &Circuit<C::DefaultGKRFieldConfig>) {
+//     write_object_to_shared_memory(circuit, unsafe {&mut SHARED_MEMORY.pcs_setup}, "circuit");
+// }
+pub fn write_ecc_circuit_to_shared_memory<C: Config, I: InputType>(ecc_circuit: &Circuit<C, I>) {
+    write_object_to_shared_memory(ecc_circuit, unsafe {&mut SHARED_MEMORY.circuit}, "ecc_circuit");
+}
+
+pub fn write_commitments_to_shared_memory<C: Config>(commitments: &Vec<ExpanderGKRCommitment<C>>) {
+    write_object_to_shared_memory(commitments, unsafe {&mut SHARED_MEMORY.commitment}, "commitments");
+}
+
+pub fn write_commitments_extra_info_to_shared_memory<C: Config>(commitments_extra_info: &Vec<ExpanderGKRCommitmentExtraInfo<C>>) {
+    write_object_to_shared_memory(commitments_extra_info, unsafe {&mut SHARED_MEMORY.extra_info}, "commitments_extra_info");
+}
+
+pub fn write_commitments_values_to_shared_memory<C: Config>(commitments_values: &Vec<&[C::DefaultSimdField]>) {
+    let commitments_values = commitments_values
+        .iter()
+        .map(|&commitment| commitment.to_vec())
+        .collect::<Vec<_>>();
+    write_object_to_shared_memory(&commitments_values, unsafe {&mut SHARED_MEMORY.input_vals}, "commitments_values");
+}
+
+pub fn write_broadcast_info_to_shared_memory(is_broadcast: &Vec<bool>) {
+    write_object_to_shared_memory(is_broadcast, unsafe {&mut SHARED_MEMORY.input_vals}, "is_broadcast");
 }
 
 // TODO: Is it a little dangerous to allow arbitrary cmd strings?

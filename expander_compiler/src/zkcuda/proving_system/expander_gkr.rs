@@ -94,6 +94,19 @@ impl<C: Config> Clone for ExpanderGKRCommitmentExtraInfo<C> {
     }
 }
 
+impl<C: Config> ExpSerde for ExpanderGKRCommitmentExtraInfo<C> {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
+        self.scratch.serialize_into(&mut writer)
+    }
+    fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
+        let scratch = Vec::<
+            <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::ScratchPad,
+        >::deserialize_from(&mut reader)?;
+        Ok(ExpanderGKRCommitmentExtraInfo { scratch })
+    }
+}
+
 #[allow(clippy::type_complexity)]
 pub struct ExpanderGKRProverSetup<C: Config>
 {
@@ -108,6 +121,18 @@ impl<C: Config> Clone for ExpanderGKRProverSetup<C> {
     }
 }
 
+impl<C: Config> ExpSerde for ExpanderGKRProverSetup<C> {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
+        self.p_keys.serialize_into(&mut writer)
+    }
+    fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
+        let p_keys = HashMap::<_, _>::deserialize_from(&mut reader)?;
+        Ok(ExpanderGKRProverSetup { p_keys })
+    }
+}
+
+
 #[allow(clippy::type_complexity)]
 pub struct ExpanderGKRVerifierSetup<C: Config>
 {
@@ -119,6 +144,17 @@ impl<C: Config> Clone for ExpanderGKRVerifierSetup<C> {
         Self {
             v_keys: self.v_keys.clone(),
         }
+    }
+}
+
+impl<C: Config> ExpSerde for ExpanderGKRVerifierSetup<C> {
+    const SERIALIZED_SIZE: usize = unimplemented!();
+    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
+        self.v_keys.serialize_into(&mut writer)
+    }
+    fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
+        let v_keys = HashMap::<_, _>::deserialize_from(&mut reader)?;
+        Ok(ExpanderGKRVerifierSetup { v_keys })
     }
 }
 

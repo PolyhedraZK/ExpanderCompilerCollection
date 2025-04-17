@@ -47,6 +47,7 @@ macro_rules! pcs {
     };
 }
 
+const SINGEL_KERNEL_MAX_PROOF_SIZE: usize = 10 * 1024 * 1024; // 10MB
 
 pub struct ParallelizedExpanderGKRProvingSystem<C: Config> {
     _config: std::marker::PhantomData<C>,
@@ -89,8 +90,8 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
             };
 
             // TODO: The size here is for the raw commitment, add an function in the pcs trait to get the size of the commitment
-            init_commitment_and_extra_info_shared_memory::<C>(unsafe {SHARED_MEMORY.input_vals.as_ref().unwrap().len()}, 1);
-            write_pcs_setup_to_shared_memory(prover_setup, actual_local_len);
+            init_commitment_and_extra_info_shared_memory::<C>(vals.len(), 1);
+            write_selected_pcs_setup_to_shared_memory(prover_setup,&[actual_local_len]);
             write_commit_vals_to_shared_memory::<C>(&vals.to_vec());
             exec_pcs_commit(parallel_count);
             read_commitment_and_extra_info_from_shared_memory()
@@ -117,23 +118,13 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
                 is_broadcast,
             )
         } else {
-            let expander_circuit = kernel
-                .layered_circuit
-                .export_to_expander()
-                .flatten::<C::DefaultGKRConfig>();
-        
-            write_circuit_to_shared_memory::<C>(&expander_circuit);
-            let inputs = (0..parallel_count)
-                .map(|i| {
-                    prepare_inputs(
-                        kernel,
-                        commitments_values,
-                        is_broadcast,
-                        i,
-                    )
-                })
-                .collect::<Vec<_>>();
-            write_proving_inputs_to_shared_memory::<C>(&inputs);
+            init_proof_shared_memory(SINGEL_KERNEL_MAX_PROOF_SIZE);
+            write_pcs_setup_to_shared_memory(prover_setup);
+            write_ecc_circuit_to_shared_memory(&kernel.layered_circuit);
+            write_commitments_to_shared_memory(&commitments.to_vec());
+            write_commitments_extra_info_to_shared_memory(&commitments_extra_info.to_vec());
+            write_commitments_values_to_shared_memory::<C>(&commitments_values.to_vec());
+            write_broadcast_info_to_shared_memory(&is_broadcast.to_vec());
             exec_gkr_prove_with_pcs(parallel_count);
             read_proof_from_shared_memory::<C>()
         }
@@ -187,7 +178,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
                 &mut cursor,
                 kernel,
                 verifier_setup,
-                &rz0,
+                &rz1,
                 &r_simd,
                 &r_mpi,
                 &claimed_v1.unwrap(),
@@ -198,7 +189,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
             );
         }
 
-        true
+        verified
     }
 }
 
