@@ -375,10 +375,7 @@ impl LogUpRangeProofTable {
         if rem != 0 {
             let shift = self.rangeproof_bits - rem;
             let constant = (1 << shift) - 1;
-            // println!(
-            //     "rangeproof::rem: {:?}, shift: {:?}, constant: {:?}",
-            //     rem, shift, constant
-            // );
+
             let mut mul_factor: u128 = 1;
             mul_factor <<= n;
             let mul_factor_u256 = U256::new(mul_factor);
