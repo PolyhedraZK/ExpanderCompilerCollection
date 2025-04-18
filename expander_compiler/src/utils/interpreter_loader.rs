@@ -49,8 +49,8 @@ impl M31Loader {
 
     fn parse_lval(toks: &[&str]) -> usize {
         let raw = toks[1];
-        assert!(raw.chars().nth(0).map_or(false, |c| c == '='));
-        assert!(raw.chars().nth(1).map_or(false, |c| c == 'v'));
+        assert!((raw.chars().nth(0) == Some('=')));
+        assert!((raw.chars().nth(0) == Some('v')));
         raw[2..].parse::<usize>().unwrap()
     }
 
@@ -61,7 +61,7 @@ impl M31Loader {
         api: &mut B,
     ) -> Variable {
         let raw = toks[idx];
-        if raw.chars().nth(0).map_or(false, |c| c == 'v') {
+        if raw.chars().nth(0) == Some('v') {
             let value = raw[1..].parse::<i32>().unwrap();
             if value < 0 {
                 panic!("negative value: {}", value);

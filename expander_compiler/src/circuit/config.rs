@@ -1,7 +1,7 @@
 use std::{fmt::Debug, hash::Hash};
 
 pub use gkr::{
-    BN254ConfigMIMC5Raw, GF2ExtConfigSha2Raw, GoldilocksExtConfigSha2Raw,
+    BN254ConfigMIMC5Raw, BabyBearExtConfigSha2Raw, GF2ExtConfigSha2Raw, GoldilocksExtConfigSha2Raw,
     M31ExtConfigSha2RawVanilla,
 };
 use gkr_engine::{FieldEngine, GKREngine};
@@ -39,6 +39,7 @@ pub type BN254Config = BN254ConfigMIMC5Raw;
 pub type M31Config = M31ExtConfigSha2RawVanilla;
 pub type GF2Config = GF2ExtConfigSha2Raw;
 pub type GoldilocksConfig = GoldilocksExtConfigSha2Raw;
+pub type BabyBearConfig = BabyBearExtConfigSha2Raw;
 
 impl Config for M31Config {
     const CONFIG_ID: usize = 1;
@@ -60,4 +61,8 @@ impl Config for GF2Config {
 
 impl Config for GoldilocksConfig {
     const CONFIG_ID: usize = 4;
+}
+
+impl Config for BabyBearConfig {
+    const CONFIG_ID: usize = 5;
 }

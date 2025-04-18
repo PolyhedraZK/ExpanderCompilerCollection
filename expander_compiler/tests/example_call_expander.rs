@@ -84,3 +84,8 @@ fn example_goldilocks() {
 fn example_bn254() {
     example::<BN254Config>();
 }
+
+#[test]
+fn example_babybear() {
+    example::<BabyBearConfig>();
+}

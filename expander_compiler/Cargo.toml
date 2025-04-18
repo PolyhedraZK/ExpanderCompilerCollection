@@ -7,6 +7,7 @@ edition = "2021"
 [dependencies]
 arith.workspace = true
 ark-std.workspace = true
+babybear.workspace = true
 chrono.workspace = true
 clap.workspace = true
 crosslayer_prototype.workspace = true

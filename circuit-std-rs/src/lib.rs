@@ -1,3 +1,4 @@
+#![allow(clippy::manual_div_ceil)]
 // allow range loop for better readability
 #![allow(clippy::needless_range_loop)]
 
