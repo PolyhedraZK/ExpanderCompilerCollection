@@ -18,6 +18,7 @@ use crate::{
         layered::Coef,
     },
     field::FieldArith,
+    frontend::CircuitField,
     utils::{error::Error, pool::Pool},
 };
 
@@ -60,9 +61,9 @@ struct MidVarKey<C: Config> {
 
 #[derive(Debug, Clone)]
 struct MidVarCoef<C: Config> {
-    k: C::CircuitField,
-    kinv: C::CircuitField,
-    b: C::CircuitField,
+    k: CircuitField<C>,
+    kinv: CircuitField<C>,
+    b: CircuitField<C>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -75,9 +76,9 @@ struct InVarRefCounts {
 impl<C: Config> Default for MidVarCoef<C> {
     fn default() -> Self {
         MidVarCoef {
-            k: C::CircuitField::one(),
-            kinv: C::CircuitField::one(),
-            b: C::CircuitField::zero(),
+            k: CircuitField::<C>::one(),
+            kinv: CircuitField::<C>::one(),
+            b: CircuitField::<C>::zero(),
         }
     }
 }
@@ -104,7 +105,7 @@ impl<C: Config> Builder<C> {
         let id = self.stripped_mid_vars.len();
         assert_eq!(
             self.stripped_mid_vars.add(&MidVarKey {
-                expr: Expression::new_linear(C::CircuitField::one(), id),
+                expr: Expression::new_linear(CircuitField::<C>::one(), id),
                 is_force_single: false
             }),
             id
@@ -119,11 +120,11 @@ impl<C: Config> Builder<C> {
         for i in 0..n {
             self.new_var(layer);
             self.in_var_exprs
-                .push(Expression::new_linear(C::CircuitField::one(), start + i));
+                .push(Expression::new_linear(CircuitField::<C>::one(), start + i));
         }
     }
 
-    fn add_const(&mut self, c: C::CircuitField) {
+    fn add_const(&mut self, c: CircuitField<C>) {
         self.in_var_exprs.push(Expression::new_const(c));
     }
 
@@ -143,7 +144,7 @@ impl<C: Config> Builder<C> {
                 b: constant,
             });
             self.mid_var_layer.push(self.layer_of_expr(&e) + 1);
-            return Expression::new_linear(C::CircuitField::one(), idx);
+            return Expression::new_linear(CircuitField::<C>::one(), idx);
         }
         unstrip_constants_single(idx, coef, constant, &self.mid_var_coefs[idx])
     }
@@ -163,7 +164,7 @@ impl<C: Config> Builder<C> {
     }
 
     fn make_really_single(&mut self, e: Expression<C>) -> usize {
-        if e.len() == 1 && e.degree() == 1 && e[0].coef == C::CircuitField::one() {
+        if e.len() == 1 && e.degree() == 1 && e[0].coef == CircuitField::<C>::one() {
             match e[0].vars {
                 VarSpec::Linear(v) => return v,
                 _ => unreachable!(),
@@ -193,9 +194,9 @@ impl<C: Config> Builder<C> {
         });
         if idx == self.mid_var_coefs.len() {
             self.mid_var_coefs.push(MidVarCoef {
-                k: C::CircuitField::one(),
-                kinv: C::CircuitField::one(),
-                b: C::CircuitField::zero(),
+                k: CircuitField::<C>::one(),
+                kinv: CircuitField::<C>::one(),
+                b: CircuitField::<C>::zero(),
             });
             self.mid_var_layer.push(self.layer_of_expr(&e) + 1);
         }
@@ -238,12 +239,12 @@ impl<C: Config> Builder<C> {
             if i < lcs.terms.len() {
                 lcs.terms[i].coef
             } else {
-                C::CircuitField::one()
+                CircuitField::<C>::one()
             }
         })
     }
 
-    fn lin_comb_inner<F: Fn(usize) -> C::CircuitField>(
+    fn lin_comb_inner<F: Fn(usize) -> CircuitField<C>>(
         &mut self,
         mut vars: Vec<Expression<C>>,
         var_coef: F,
@@ -462,7 +463,7 @@ impl<C: Config> Builder<C> {
                     expr2.iter().map(|x2| x1.mul(x2)).collect(),
                 ));
             }
-            exprs.push(self.lin_comb_inner(vars, |_| C::CircuitField::one()));
+            exprs.push(self.lin_comb_inner(vars, |_| CircuitField::<C>::one()));
         }
         let final_pos = exprs_pos_heap.pop().unwrap();
         exprs.swap_remove(final_pos)
@@ -492,9 +493,9 @@ impl<C: Config> Builder<C> {
 
 fn strip_constants<C: Config>(
     expr: &Expression<C>,
-) -> (Expression<C>, C::CircuitField, C::CircuitField) {
+) -> (Expression<C>, CircuitField<C>, CircuitField<C>) {
     let mut e = Vec::new();
-    let mut cst = C::CircuitField::zero();
+    let mut cst = CircuitField::<C>::zero();
     for term in expr.iter() {
         if term.vars == VarSpec::Const {
             cst = term.coef;
@@ -503,7 +504,7 @@ fn strip_constants<C: Config>(
         }
     }
     if e.is_empty() {
-        return (Expression::default(), C::CircuitField::one(), cst);
+        return (Expression::default(), CircuitField::<C>::one(), cst);
     }
     let v = e[0].coef;
     let vi = v.inv().unwrap();
@@ -515,8 +516,8 @@ fn strip_constants<C: Config>(
 
 fn unstrip_constants_single<C: Config>(
     vid: usize,
-    coef: C::CircuitField,
-    constant: C::CircuitField,
+    coef: CircuitField<C>,
+    constant: CircuitField<C>,
     mid_var_coef: &MidVarCoef<C>,
 ) -> Expression<C> {
     assert_ne!(vid, 0);
@@ -645,7 +646,7 @@ fn process_circuit<C: Config>(
                     .map(|&var| builder.make_really_single(builder.in_var_exprs[var].clone()))
                     .collect();
                 builder.add_and_check_if_should_make_single(Expression::new_custom(
-                    C::CircuitField::one(),
+                    CircuitField::<C>::one(),
                     *gate_type,
                     single_inputs,
                 ));
@@ -686,7 +687,7 @@ fn process_circuit<C: Config>(
             oinsn_id += 1;
         }
         let mvk = builder.stripped_mid_vars.get(mid_var_id);
-        let non_iv = mvk.expr == Expression::new_linear(C::CircuitField::one(), mid_var_id);
+        let non_iv = mvk.expr == Expression::new_linear(CircuitField::<C>::one(), mid_var_id);
         if non_iv {
             continue;
         }
@@ -740,20 +741,20 @@ pub fn process<C: Config>(rc: &InRootCircuit<C>) -> Result<OutRootCircuit<C>, Er
 mod tests {
     use std::vec;
 
+    use mersenne31::M31;
+
     use crate::field::FieldArith;
+    use crate::frontend::M31Config as C;
     use crate::{
-        circuit::{
-            config::{Config, M31Config as C},
-            ir::{
-                self,
-                common::rand_gen::*,
-                expr::{Expression, Term},
-            },
+        circuit::ir::{
+            self,
+            common::rand_gen::*,
+            expr::{Expression, Term},
         },
         utils::error::Error,
     };
 
-    type CField = <C as Config>::CircuitField;
+    type CField = M31;
 
     #[test]
     fn simple_add() {

@@ -141,7 +141,7 @@ impl<C: Config> CircuitRelaxed<C> {
                 for _ in 0..relay_cnt[x] {
                     let y = new_id[x].get();
                     new_insns.push(Instruction::InternalVariable {
-                        expr: Expression::new_linear(C::CircuitField::one(), y),
+                        expr: Expression::new_linear(CircuitField::<C>::one(), y),
                     });
                     new_var_max += 1;
                     new_id[x].push(new_var_max, limit);
@@ -242,13 +242,15 @@ impl<C: Config> RootCircuitRelaxed<C> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::circuit::config::{Config, M31Config as C};
     use crate::circuit::layered::{InputUsize, NormalInputType};
     use crate::field::FieldArith;
+    use crate::frontend::M31Config as C;
+
+    use mersenne31::M31;
     use rand::{RngCore, SeedableRng};
     use serdes::ExpSerde;
 
-    type CField = <C as Config>::CircuitField;
+    type CField = M31;
 
     fn verify_mul_fanout(rc: &RootCircuitRelaxed<C>, limit: usize) {
         for circuit in rc.circuits.values() {
@@ -443,36 +445,45 @@ mod tests {
     fn full_fanout_test_and_dump() {
         use crate::circuit::ir::common::rand_gen::{RandomCircuitConfig, RandomRange};
 
-        let config = RandomCircuitConfig {
-            seed: 2,
-            num_circuits: RandomRange { min: 20, max: 20 },
-            num_inputs: RandomRange { min: 1, max: 3 },
-            num_instructions: RandomRange { min: 30, max: 50 },
-            num_constraints: RandomRange { min: 0, max: 5 },
-            num_outputs: RandomRange { min: 1, max: 3 },
-            num_terms: RandomRange { min: 1, max: 5 },
-            sub_circuit_prob: 0.05,
-        };
-        let root = crate::circuit::ir::source::RootCircuit::<C>::random(&config);
-        assert_eq!(root.validate(), Ok(()));
-        let (_, circuit) = crate::compile::compile_with_options::<_, NormalInputType>(
-            &root,
-            crate::compile::CompileOptions::default().with_mul_fanout_limit(256),
-        )
-        .unwrap();
-        assert_eq!(circuit.validate(), Ok(()));
-        for segment in circuit.segments.iter() {
-            let mut ref_num = vec![0; segment.num_inputs.get(0)];
-            for m in segment.gate_muls.iter() {
-                ref_num[m.inputs[0].offset] += 1;
-                ref_num[m.inputs[1].offset] += 1;
-            }
-            for x in ref_num.iter() {
-                assert!(*x <= 256);
+        for i in 0..1000 {
+            let config = RandomCircuitConfig {
+                seed: i + 100000,
+                num_circuits: RandomRange { min: 20, max: 20 },
+                num_inputs: RandomRange { min: 1, max: 3 },
+                num_instructions: RandomRange { min: 30, max: 50 },
+                num_constraints: RandomRange { min: 0, max: 5 },
+                num_outputs: RandomRange { min: 1, max: 3 },
+                num_terms: RandomRange { min: 1, max: 5 },
+                sub_circuit_prob: 0.05,
+            };
+            let root = crate::circuit::ir::source::RootCircuit::<C>::random(&config);
+            assert_eq!(root.validate(), Ok(()));
+            match crate::compile::compile_with_options::<_, NormalInputType>(
+                &root,
+                crate::compile::CompileOptions::default().with_mul_fanout_limit(256),
+            ) {
+                Err(e) => {
+                    if e.is_internal() {
+                        panic!("{:?}", e);
+                    }
+                }
+                Ok((_, circuit)) => {
+                    assert_eq!(circuit.validate(), Ok(()));
+                    for segment in circuit.segments.iter() {
+                        let mut ref_num = vec![0; segment.num_inputs.get(0)];
+                        for m in segment.gate_muls.iter() {
+                            ref_num[m.inputs[0].offset] += 1;
+                            ref_num[m.inputs[1].offset] += 1;
+                        }
+                        for x in ref_num.iter() {
+                            assert!(*x <= 256);
+                        }
+                    }
+
+                    let mut buf = Vec::new();
+                    circuit.serialize_into(&mut buf).unwrap();
+                }
             }
         }
-
-        let mut buf = Vec::new();
-        circuit.serialize_into(&mut buf).unwrap();
     }
 }

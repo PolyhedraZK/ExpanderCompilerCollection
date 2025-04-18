@@ -8,7 +8,6 @@ use crate::{
         inverse_e12_hint, inverse_e2_hint, inverse_e6_hint, mul_hint, simple_rangecheck_hint,
     },
     logup::{query_count_by_key_hint, query_count_hint, rangeproof_hint},
-    sha256::m31_utils::to_binary_hint,
 };
 
 pub fn simple_select<C: Config, B: RootAPI<C>>(
@@ -41,7 +40,6 @@ pub fn simple_lookup2<C: Config, B: RootAPI<C>>(
 }
 
 pub fn register_hint(hint_registry: &mut HintRegistry<M31>) {
-    hint_registry.register("myhint.tobinary", to_binary_hint);
     hint_registry.register("myhint.mulhint", mul_hint);
     hint_registry.register("myhint.simple_rangecheck_hint", simple_rangecheck_hint);
     hint_registry.register("myhint.querycounthint", query_count_hint);

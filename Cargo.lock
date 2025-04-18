@@ -112,7 +112,7 @@ dependencies = [
 [[package]]
 name = "arith"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#811797ebcb5cbc5c4e733bd3a4ece7c220c9dc3f"
 dependencies = [
  "ark-std 0.4.0",
  "cfg-if",
@@ -449,9 +449,9 @@ checksum = "37b2a672a2cb129a2e41c10b1224bb368f9f37a2b16b612598138befd7b37eb5"
 
 [[package]]
 name = "cc"
-version = "1.2.17"
+version = "1.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fcb57c740ae1daf453ae85f16e37396f672b039e00d9d866e07ddb24e328e3a"
+checksum = "525046617d8376e3db1deffb079e91cef90a89fc3ca5c185bbf8c9ecdd15cd5c"
 dependencies = [
  "shlex",
 ]
@@ -515,17 +515,16 @@ dependencies = [
 [[package]]
 name = "circuit"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#811797ebcb5cbc5c4e733bd3a4ece7c220c9dc3f"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
  "bytes",
- "config",
  "ethnum",
- "gkr_field_config",
+ "gkr_engine",
+ "gkr_hashers",
  "log",
  "mpi",
- "mpi_config",
  "rand",
  "serdes",
  "thiserror",
@@ -545,11 +544,10 @@ dependencies = [
  "ark-std 0.4.0",
  "big-int",
  "circuit",
- "config",
  "expander_compiler",
  "gf2",
  "gkr",
- "gkr_field_config",
+ "halo2curves",
  "mersenne31",
  "mpi_config",
  "num-bigint",
@@ -621,34 +619,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 
 [[package]]
-name = "config"
-version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
-dependencies = [
- "arith",
- "ark-std 0.4.0",
- "config_macros",
- "field_hashers",
- "gf2",
- "gf2_128",
- "gkr_field_config",
- "halo2curves",
- "mersenne31",
- "mpi",
- "mpi_config",
- "poly_commit",
- "thiserror",
- "transcript",
-]
-
-[[package]]
 name = "config_macros"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#811797ebcb5cbc5c4e733bd3a4ece7c220c9dc3f"
 dependencies = [
+ "gkr_engine",
+ "gkr_hashers",
+ "poly_commit",
  "proc-macro2",
  "quote",
  "syn 2.0.100",
+ "transcript",
 ]
 
 [[package]]
@@ -745,13 +726,13 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 [[package]]
 name = "crosslayer_prototype"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#811797ebcb5cbc5c4e733bd3a4ece7c220c9dc3f"
 dependencies = [
  "arith",
- "config",
  "env_logger",
  "ethnum",
- "gkr_field_config",
+ "gkr_engine",
+ "gkr_hashers",
  "log",
  "polynomials",
  "rand",
@@ -828,12 +809,10 @@ version = "0.1.0"
 dependencies = [
  "arith",
  "circuit",
- "config",
  "expander_compiler",
  "gkr",
- "gkr_field_config",
+ "gkr_engine",
  "libc",
- "mpi_config",
  "rand",
  "serdes",
  "transcript",
@@ -852,13 +831,12 @@ dependencies = [
  "circuit",
  "circuit-std-rs",
  "clap",
- "config",
  "expander_compiler",
  "gf2",
  "gkr",
+ "gkr_engine",
  "hex",
  "mersenne31",
- "mpi_config",
  "num-bigint",
  "num-traits",
  "rand",
@@ -916,9 +894,9 @@ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
 name = "errno"
-version = "0.3.10"
+version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33d852cb9b869c2a9b3df2f71a3074817f01e1844f839a144f5fcef059a4eb5d"
+checksum = "976dd42dc7e85965fe702eb8164f21f450704bdde31faefd6471dba214cb594e"
 dependencies = [
  "libc",
  "windows-sys 0.59.0",
@@ -939,16 +917,16 @@ dependencies = [
  "chrono",
  "circuit",
  "clap",
- "config",
  "crosslayer_prototype",
  "ethnum",
  "gf2",
  "gkr",
- "gkr_field_config",
+ "gkr_engine",
+ "gkr_hashers",
  "goldilocks",
  "halo2curves",
+ "macros",
  "mersenne31",
- "mpi_config",
  "rand",
  "rayon",
  "serdes",
@@ -966,17 +944,6 @@ dependencies = [
  "bitvec",
  "rand_core",
  "subtle",
-]
-
-[[package]]
-name = "field_hashers"
-version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
-dependencies = [
- "arith",
- "halo2curves",
- "serdes",
- "tiny-keccak",
 ]
 
 [[package]]
@@ -1066,7 +1033,7 @@ dependencies = [
 [[package]]
 name = "gf2"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#811797ebcb5cbc5c4e733bd3a4ece7c220c9dc3f"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
@@ -1084,7 +1051,7 @@ dependencies = [
 [[package]]
 name = "gf2_128"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#811797ebcb5cbc5c4e733bd3a4ece7c220c9dc3f"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
@@ -1103,7 +1070,7 @@ checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 [[package]]
 name = "gkr"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#811797ebcb5cbc5c4e733bd3a4ece7c220c9dc3f"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
@@ -1111,20 +1078,18 @@ dependencies = [
  "chrono",
  "circuit",
  "clap",
- "config",
  "config_macros",
  "env_logger",
  "ethnum",
- "field_hashers",
  "gf2",
  "gf2_128",
- "gkr_field_config",
+ "gkr_engine",
+ "gkr_hashers",
  "goldilocks",
  "halo2curves",
  "log",
  "mersenne31",
  "mpi",
- "mpi_config",
  "poly_commit",
  "polynomials",
  "rand",
@@ -1141,16 +1106,33 @@ dependencies = [
 ]
 
 [[package]]
-name = "gkr_field_config"
+name = "gkr_engine"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#811797ebcb5cbc5c4e733bd3a4ece7c220c9dc3f"
 dependencies = [
  "arith",
- "ark-std 0.4.0",
  "gf2",
  "gf2_128",
  "goldilocks",
+ "itertools 0.13.0",
  "mersenne31",
+ "mpi",
+ "polynomials",
+ "rand",
+ "serdes",
+ "thiserror",
+]
+
+[[package]]
+name = "gkr_hashers"
+version = "0.1.0"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#811797ebcb5cbc5c4e733bd3a4ece7c220c9dc3f"
+dependencies = [
+ "arith",
+ "halo2curves",
+ "serdes",
+ "sha2",
+ "tiny-keccak",
 ]
 
 [[package]]
@@ -1162,7 +1144,7 @@ checksum = "a8d1add55171497b4705a648c6b583acafb01d58050a51727785f0b2c8e0a2b2"
 [[package]]
 name = "goldilocks"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#811797ebcb5cbc5c4e733bd3a4ece7c220c9dc3f"
 dependencies = [
  "arith",
  "ark-std 0.3.0",
@@ -1203,9 +1185,9 @@ dependencies = [
 
 [[package]]
 name = "half"
-version = "2.5.0"
+version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7db2ff139bba50379da6aa0766b52fdcb62cb5b263009b09ed58ba604e14bbd1"
+checksum = "459196ed295495a68f7d7fe1d84f6c4b7ff0e21fe3017b2f283c6fac3ad803c9"
 dependencies = [
  "cfg-if",
  "crunchy",
@@ -1535,9 +1517,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.8.0"
+version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3954d50fe15b02142bf25d3b8bdadb634ec3948f103d04ffe3031bc8fe9d7058"
+checksum = "cea70ddb795996207ad57735b50c5982d8844f38ba9ee5f1aedcfb708a2aa11e"
 dependencies = [
  "equivalent",
  "hashbrown 0.15.2",
@@ -1595,9 +1577,9 @@ checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 
 [[package]]
 name = "jiff"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c102670231191d07d37a35af3eb77f1f0dbf7a71be51a962dcd57ea607be7260"
+checksum = "1f33145a5cbea837164362c7bd596106eb7c5198f97d1ba6f6ebb3223952e488"
 dependencies = [
  "jiff-static",
  "log",
@@ -1608,9 +1590,9 @@ dependencies = [
 
 [[package]]
 name = "jiff-static"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4cdde31a9d349f1b1f51a0b3714a5940ac022976f4b49485fc04be052b183b4c"
+checksum = "43ce13c40ec6956157a3635d97a1ee2df323b263f09ea14165131289cb0f5c19"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1706,6 +1688,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 
 [[package]]
+name = "macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.100",
+]
+
+[[package]]
 name = "memchr"
 version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1714,13 +1705,13 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 [[package]]
 name = "mersenne31"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#811797ebcb5cbc5c4e733bd3a4ece7c220c9dc3f"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
  "cfg-if",
  "ethnum",
- "field_hashers",
+ "gkr_hashers",
  "halo2curves",
  "log",
  "rand",
@@ -1754,9 +1745,9 @@ checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
 name = "miniz_oxide"
-version = "0.8.5"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e3e04debbb59698c15bacbb6d93584a8c0ca9cc3213cb423d31f760d8843ce5"
+checksum = "3be647b768db090acb35d5ec5db2b0e1f1de11133ca123b9eacf5137868f892a"
 dependencies = [
  "adler2",
 ]
@@ -1796,17 +1787,6 @@ dependencies = [
  "bindgen",
  "build-probe-mpi",
  "cc",
-]
-
-[[package]]
-name = "mpi_config"
-version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
-dependencies = [
- "arith",
- "itertools 0.13.0",
- "mpi",
- "serdes",
 ]
 
 [[package]]
@@ -2014,17 +1994,16 @@ dependencies = [
 [[package]]
 name = "poly_commit"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#811797ebcb5cbc5c4e733bd3a4ece7c220c9dc3f"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
  "derivative",
  "ethnum",
  "gf2",
- "gkr_field_config",
+ "gkr_engine",
  "halo2curves",
  "itertools 0.13.0",
- "mpi_config",
  "polynomials",
  "rand",
  "serdes",
@@ -2036,15 +2015,13 @@ dependencies = [
 [[package]]
 name = "polynomials"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#811797ebcb5cbc5c4e733bd3a4ece7c220c9dc3f"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
  "criterion",
- "gkr_field_config",
  "halo2curves",
  "itertools 0.13.0",
- "mpi_config",
  "rand",
 ]
 
@@ -2074,9 +2051,9 @@ dependencies = [
 
 [[package]]
 name = "prettyplease"
-version = "0.2.31"
+version = "0.2.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5316f57387668042f561aae71480de936257848f9c43ce528e311d89a07cadeb"
+checksum = "664ec5419c51e34154eec046ebcba56312d5a2fc3b09a06da188e1ad21afadf6"
 dependencies = [
  "proc-macro2",
  "syn 2.0.100",
@@ -2176,9 +2153,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.5.10"
+version = "0.5.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b8c0c260b63a8219631167be35e6a988e9554dbd323f8bd08439c8ed1302bd1"
+checksum = "d2f103c6d277498fbceb16e84d317e2a400f160f46904d5f5410848c829511a3"
 dependencies = [
  "bitflags",
 ]
@@ -2211,6 +2188,22 @@ name = "regex-syntax"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
+
+[[package]]
+name = "rsa_circuit"
+version = "0.1.0"
+dependencies = [
+ "ark-std 0.4.0",
+ "circuit-std-rs",
+ "expander_compiler",
+ "halo2curves",
+ "itertools 0.13.0",
+ "num-bigint",
+ "num-traits",
+ "rand",
+ "serdes",
+ "sha2",
+]
 
 [[package]]
 name = "rustc-demangle"
@@ -2332,7 +2325,7 @@ dependencies = [
 [[package]]
 name = "serdes"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#811797ebcb5cbc5c4e733bd3a4ece7c220c9dc3f"
 dependencies = [
  "ethnum",
  "halo2curves",
@@ -2393,9 +2386,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.14.0"
+version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fcf8323ef1faaee30a44a340193b1ac6814fd9b7b4e88e9d4519a3e4abe1cfd"
+checksum = "8917285742e9f3e1683f0a9c4e6b57960b7314d0b08d30d1ecd426713ee2eee9"
 
 [[package]]
 name = "socket2"
@@ -2453,15 +2446,13 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 [[package]]
 name = "sumcheck"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#811797ebcb5cbc5c4e733bd3a4ece7c220c9dc3f"
 dependencies = [
  "arith",
  "circuit",
- "config",
  "env_logger",
- "gkr_field_config",
+ "gkr_engine",
  "log",
- "mpi_config",
  "polynomials",
  "transcript",
  "utils",
@@ -2557,9 +2548,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "1.44.1"
+version = "1.44.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f382da615b842244d4b8738c82ed1275e6c5dd90c459a30941cd07080b06c91a"
+checksum = "e6b88822cbe49de4185e3a4cbf8321dd487cf5fe0c5c65695fef6346371e9c48"
 dependencies = [
  "backtrace",
  "bytes",
@@ -2638,11 +2629,11 @@ dependencies = [
 [[package]]
 name = "transcript"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#811797ebcb5cbc5c4e733bd3a4ece7c220c9dc3f"
 dependencies = [
  "arith",
- "field_hashers",
- "mpi_config",
+ "gkr_engine",
+ "gkr_hashers",
  "serdes",
  "sha2",
  "tiny-keccak",
@@ -2651,7 +2642,7 @@ dependencies = [
 [[package]]
 name = "tree"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#811797ebcb5cbc5c4e733bd3a4ece7c220c9dc3f"
 dependencies = [
  "arith",
  "ark-std 0.4.0",
@@ -2759,7 +2750,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 [[package]]
 name = "utils"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=fastmsmm#a7e847f0d1cea600c39da06582a88e9465772d84"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#811797ebcb5cbc5c4e733bd3a4ece7c220c9dc3f"
 
 [[package]]
 name = "version_check"

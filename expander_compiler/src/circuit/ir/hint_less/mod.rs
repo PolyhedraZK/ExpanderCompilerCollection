@@ -1,5 +1,6 @@
 use crate::circuit::{config::Config, layered::Coef};
 use crate::field::FieldArith;
+use crate::frontend::CircuitField;
 use crate::hints;
 use crate::utils::error::Error;
 
@@ -105,7 +106,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             },
         }
     }
-    fn from_kx_plus_b(x: usize, k: C::CircuitField, b: C::CircuitField) -> Self {
+    fn from_kx_plus_b(x: usize, k: CircuitField<C>, b: CircuitField<C>) -> Self {
         Instruction::LinComb(expr::LinComb::from_kx_plus_b(x, k, b))
     }
     fn validate(&self, num_public_inputs: usize) -> Result<(), Error> {
@@ -123,11 +124,11 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             _ => Ok(()),
         }
     }
-    fn eval_unsafe(&self, values: &[C::CircuitField]) -> EvalResult<C> {
+    fn eval_unsafe(&self, values: &[CircuitField<C>]) -> EvalResult<C> {
         match self {
             Instruction::LinComb(lc) => EvalResult::Value(lc.eval(values)),
             Instruction::Mul(inputs) => {
-                let mut res = C::CircuitField::one();
+                let mut res = CircuitField::<C>::one();
                 for &i in inputs.iter() {
                     res *= values[i];
                 }

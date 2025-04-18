@@ -1,3 +1,4 @@
+use mersenne31::M31;
 use rand::{Rng, RngCore};
 
 use arith::SimdField;
@@ -6,17 +7,19 @@ use super::{
     Instruction::{self, ConstantLike, LinComb, Mul},
     RootCircuit,
 };
+use crate::frontend::M31Config as C;
 use crate::{
     circuit::{
-        config::{Config, M31Config as C},
+        config::Config,
         ir::{common::rand_gen::*, expr},
         layered::Coef,
     },
+    frontend::CircuitField,
     hints,
 };
 use crate::{field::FieldArith, hints::registry::StubHintCaller};
 
-type CField = <C as Config>::CircuitField;
+type CField = M31;
 type SF = mersenne31::M31x16;
 
 #[test]
@@ -118,11 +121,11 @@ impl<C: Config> RandomInstruction for Instruction<C> {
             LinComb(expr::LinComb {
                 terms: (0..num_terms.random(&mut rnd))
                     .map(|_| expr::LinCombTerm {
-                        coef: C::CircuitField::from(rnd.next_u32()),
+                        coef: CircuitField::<C>::from(rnd.next_u32()),
                         var: rnd.next_u64() as usize % num_vars + 1,
                     })
                     .collect(),
-                constant: C::CircuitField::from(rnd.next_u32()),
+                constant: CircuitField::<C>::from(rnd.next_u32()),
             })
         } else if rnd.gen::<f64>() < 0.4 {
             Mul((0..num_terms.random(&mut rnd).max(2))
