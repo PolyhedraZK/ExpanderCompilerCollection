@@ -1,7 +1,7 @@
 use expander_compiler::frontend::*;
 use expander_compiler::circuit::layered::{NormalInputType, CrossLayerInputType};
-use expander_compiler::Proof;
-use expander_config::BN254ConfigSha2Hyrax;
+use gkr_engine::{Proof, MPIConfig, MPIEngine};
+use gkr::BN254ConfigSha2Raw;
 use serdes::ExpSerde;
 use serde::{Serialize, Deserialize};
 use stacker;
@@ -21,7 +21,6 @@ fn expander_prover() -> std::io::Result<()>{
 			let reader = std::io::BufReader::new(file);
 			let layered_circuit = expander_compiler::circuit::layered::Circuit::<BN254Config, NormalInputType>::deserialize_from(reader).unwrap();
 			let mut expander_circuit = layered_circuit.export_to_expander_flatten();
-			let config = BN254Config::new_expander_config();
 			let file = std::fs::File::open("witness.txt").unwrap();
 			let reader = std::io::BufReader::new(file);
 			let witness = expander_compiler::circuit::layered::witness::Witness::<BN254Config>::deserialize_from(reader).unwrap();
@@ -33,8 +32,11 @@ fn expander_prover() -> std::io::Result<()>{
 			println!("Read circuit & witness End");
 			println!("Read circuit & witness Time: {:?}", duration);
 			println!("Prove Begin");
+			let mpi_config = MPIConfig::prover_new();
+
 			let start: Instant = Instant::now();
-			let (claimed_v, proof) = gkr::executor::prove(&mut expander_circuit, &config);
+
+			let (claimed_v, proof) = gkr::executor::prove::<BN254Config>(&mut expander_circuit, mpi_config.clone());
 			let duration = start.elapsed();
 			println!("Prove End");
 			println!("Proof Generation Time: {:?}", duration);
