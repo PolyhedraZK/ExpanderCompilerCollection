@@ -15,7 +15,9 @@ use crate::{
     hints::BuiltinHintIds,
 };
 
-use super::basic::{process_root_circuit, InsnTransformAndExecute, RootBuilder};
+use super::basic::{
+    process_root_circuit, InsnTransformAndExecute, InsnTransformResult, RootBuilder,
+};
 
 type IrcIn<C> = ir::source::Irc<C>;
 type IrcOut<C> = ir::hint_normalized::Irc<C>;
@@ -63,14 +65,11 @@ impl<'a, C: Config> Builder<'a, C> {
     fn push_mul(&mut self, a: usize, b: usize) -> usize {
         self.push_insn(InsnOut::Mul(vec![a, b])).unwrap()
     }
-    fn copy(&mut self, a: usize) -> InsnOut<C> {
-        InsnOut::LinComb(LinComb {
-            terms: vec![LinCombTerm {
-                coef: CircuitField::<C>::one(),
-                var: a,
-            }],
-            constant: CircuitField::<C>::zero(),
-        })
+    fn copy(&mut self, a: usize) -> InsnTransformResult<C, IrcOut<C>> {
+        self.copys(&[a])
+    }
+    fn copys(&mut self, a: &[usize]) -> InsnTransformResult<C, IrcOut<C>> {
+        InsnTransformResult::Vars(a.to_vec())
     }
     fn bool_cond(&mut self, a: usize) -> usize {
         let one = self.push_const(CircuitField::<C>::one());
@@ -88,15 +87,17 @@ impl<'a, C: Config> Builder<'a, C> {
 }
 
 impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Builder<'a, C> {
-    fn transform_in_to_out(&mut self, in_insn: &InsnIn<C>) -> Result<InsnOut<C>, Error> {
+    fn transform_in_to_out(&mut self, in_insn: &InsnIn<C>) -> InsnTransformResult<C, IrcOut<C>> {
         use ir::source::Instruction::*;
-        Ok(match in_insn {
+        InsnTransformResult::Insn(match in_insn {
             LinComb(lcs) => InsnOut::LinComb(lcs.clone()),
             Mul(vars) => InsnOut::Mul(vars.clone()),
             Div { x, y, checked } => match self.constant_value(*y) {
                 Some(yv) => {
                     if yv.is_zero() {
-                        return Err(Error::UserError("division by zero constant".to_string()));
+                        return InsnTransformResult::Err(Error::UserError(
+                            "division by zero constant".to_string(),
+                        ));
                     }
                     let y = self.push_const(yv.inv().unwrap());
                     InsnOut::Mul(vec![*x, y])
@@ -126,7 +127,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                         let multy = self.push_mul(*y, div_res);
                         let subx = self.push_sub(multy, *x);
                         self.assert((), subx);
-                        self.copy(div_res)
+                        return self.copy(div_res);
                     }
                 }
             },
@@ -155,7 +156,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                         .unwrap(),
                 };
                 self.mark_bool(res);
-                self.copy(res)
+                return self.copy(res);
             }
             IsZero(x) => {
                 if let Some(xv) = self.constant_value(*x) {
@@ -178,7 +179,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                     let xm = self.push_mul(*x, m);
                     self.assert((), xm);
                     self.mark_bool(m);
-                    self.copy(m)
+                    return self.copy(m);
                 }
             }
             Commit(_) => {
@@ -208,7 +209,10 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                 let xc = self.constant_value(*x);
                 let yc = self.constant_value(*y);
                 if let (Some(xv), Some(yv)) = (&xc, &yc) {
-                    InsnOut::ConstantLike(Coef::Constant(op.eval(xv, yv)?))
+                    InsnOut::ConstantLike(Coef::Constant(match op.eval(xv, yv) {
+                        Ok(v) => v,
+                        Err(e) => return InsnTransformResult::Err(e),
+                    }))
                 } else {
                     use ir::source::UnconstrainedBinOpType::*;
                     let op = match op {
@@ -244,9 +248,9 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
             } => {
                 if let Some(cond) = self.constant_value(*cond) {
                     if cond.is_zero() {
-                        self.copy(*if_false)
+                        return self.copy(*if_false);
                     } else {
-                        self.copy(*if_true)
+                        return self.copy(*if_true);
                     }
                 } else {
                     InsnOut::Hint {
@@ -260,6 +264,43 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                 gate_type: *gate_type,
                 inputs: inputs.clone(),
             },
+            ToBinary { x, num_bits } => {
+                let bits = self.push_insn_multi_out(InsnOut::Hint {
+                    hint_id: BuiltinHintIds::ToBinary as u64 as usize,
+                    inputs: vec![*x],
+                    num_outputs: *num_bits,
+                });
+                let mut sum = self.push_const(CircuitField::<C>::zero());
+                let mut coef = CircuitField::<C>::one();
+                for &bit in bits.iter() {
+                    self.assert_bool(bit);
+                    let bit = self
+                        .push_insn(InsnOut::LinComb(expr::LinComb {
+                            terms: vec![LinCombTerm { coef, var: bit }],
+                            constant: CircuitField::<C>::zero(),
+                        }))
+                        .unwrap();
+                    sum = self.push_add(sum, bit);
+                    coef = coef.double();
+                }
+                let sum = self
+                    .push_insn(InsnOut::LinComb(expr::LinComb {
+                        terms: vec![
+                            LinCombTerm {
+                                coef: -CircuitField::<C>::one(),
+                                var: sum,
+                            },
+                            LinCombTerm {
+                                coef: CircuitField::<C>::one(),
+                                var: *x,
+                            },
+                        ],
+                        constant: CircuitField::<C>::zero(),
+                    }))
+                    .unwrap();
+                self.assert((), sum);
+                return self.copys(&bits);
+            }
         })
     }
 
@@ -411,9 +452,11 @@ mod tests {
                             .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
                             .collect();
                         let e1 = root.eval_unsafe_with_errors(inputs.clone());
-                        let e2 = root_processed.eval_unsafe_with_errors(inputs);
                         if e1.is_ok() {
+                            let e2 = root_processed.eval_unsafe_with_errors(inputs);
                             assert_eq!(e2, e1);
+                        } else if e1.as_ref().err().unwrap().is_internal() {
+                            panic!("{:?}", e1);
                         }
                     }
                 }
@@ -452,9 +495,11 @@ mod tests {
                             .map(|_| CField::random_unsafe(&mut rand::thread_rng()))
                             .collect();
                         let e1 = root.eval_unsafe_with_errors(inputs.clone());
-                        let e2 = root_processed.eval_unsafe_with_errors(inputs);
                         if e1.is_ok() {
+                            let e2 = root_processed.eval_unsafe_with_errors(inputs);
                             assert_eq!(e2, e1);
+                        } else if e1.as_ref().err().unwrap().is_internal() {
+                            panic!("{:?}", e1);
                         }
                     }
                 }

@@ -112,7 +112,7 @@ dependencies = [
 [[package]]
 name = "arith"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz%2Fimpl_babybear#241cbadb8dd7c1a6670f103fd8fdeb83f38a2797"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#2fb63c9af0b01b218b246442e31e61216be63572"
 dependencies = [
  "ark-std",
  "criterion",
@@ -265,7 +265,7 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 [[package]]
 name = "babybear"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz%2Fimpl_babybear#241cbadb8dd7c1a6670f103fd8fdeb83f38a2797"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#2fb63c9af0b01b218b246442e31e61216be63572"
 dependencies = [
  "arith",
  "ark-std",
@@ -493,7 +493,7 @@ dependencies = [
 [[package]]
 name = "circuit"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz%2Fimpl_babybear#241cbadb8dd7c1a6670f103fd8fdeb83f38a2797"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#2fb63c9af0b01b218b246442e31e61216be63572"
 dependencies = [
  "arith",
  "ark-std",
@@ -524,6 +524,7 @@ dependencies = [
  "expander_compiler",
  "gf2",
  "gkr",
+ "halo2curves",
  "mersenne31",
  "num-bigint",
  "num-traits",
@@ -593,7 +594,7 @@ checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 [[package]]
 name = "config_macros"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz%2Fimpl_babybear#241cbadb8dd7c1a6670f103fd8fdeb83f38a2797"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#2fb63c9af0b01b218b246442e31e61216be63572"
 dependencies = [
  "gkr_engine",
  "gkr_hashers",
@@ -698,7 +699,7 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 [[package]]
 name = "crosslayer_prototype"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz%2Fimpl_babybear#241cbadb8dd7c1a6670f103fd8fdeb83f38a2797"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#2fb63c9af0b01b218b246442e31e61216be63572"
 dependencies = [
  "arith",
  "env_logger",
@@ -1006,7 +1007,7 @@ dependencies = [
 [[package]]
 name = "gf2"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz%2Fimpl_babybear#241cbadb8dd7c1a6670f103fd8fdeb83f38a2797"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#2fb63c9af0b01b218b246442e31e61216be63572"
 dependencies = [
  "arith",
  "ark-std",
@@ -1024,7 +1025,7 @@ dependencies = [
 [[package]]
 name = "gf2_128"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz%2Fimpl_babybear#241cbadb8dd7c1a6670f103fd8fdeb83f38a2797"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#2fb63c9af0b01b218b246442e31e61216be63572"
 dependencies = [
  "arith",
  "ark-std",
@@ -1043,7 +1044,7 @@ checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 [[package]]
 name = "gkr"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz%2Fimpl_babybear#241cbadb8dd7c1a6670f103fd8fdeb83f38a2797"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#2fb63c9af0b01b218b246442e31e61216be63572"
 dependencies = [
  "arith",
  "ark-std",
@@ -1082,7 +1083,7 @@ dependencies = [
 [[package]]
 name = "gkr_engine"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz%2Fimpl_babybear#241cbadb8dd7c1a6670f103fd8fdeb83f38a2797"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#2fb63c9af0b01b218b246442e31e61216be63572"
 dependencies = [
  "arith",
  "babybear",
@@ -1101,7 +1102,7 @@ dependencies = [
 [[package]]
 name = "gkr_hashers"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz%2Fimpl_babybear#241cbadb8dd7c1a6670f103fd8fdeb83f38a2797"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#2fb63c9af0b01b218b246442e31e61216be63572"
 dependencies = [
  "arith",
  "halo2curves",
@@ -1119,7 +1120,7 @@ checksum = "a8d1add55171497b4705a648c6b583acafb01d58050a51727785f0b2c8e0a2b2"
 [[package]]
 name = "goldilocks"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz%2Fimpl_babybear#241cbadb8dd7c1a6670f103fd8fdeb83f38a2797"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#2fb63c9af0b01b218b246442e31e61216be63572"
 dependencies = [
  "arith",
  "ark-std",
@@ -1680,7 +1681,7 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 [[package]]
 name = "mersenne31"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz%2Fimpl_babybear#241cbadb8dd7c1a6670f103fd8fdeb83f38a2797"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#2fb63c9af0b01b218b246442e31e61216be63572"
 dependencies = [
  "arith",
  "ark-std",
@@ -1969,7 +1970,7 @@ dependencies = [
 [[package]]
 name = "poly_commit"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz%2Fimpl_babybear#241cbadb8dd7c1a6670f103fd8fdeb83f38a2797"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#2fb63c9af0b01b218b246442e31e61216be63572"
 dependencies = [
  "arith",
  "ark-std",
@@ -1990,7 +1991,7 @@ dependencies = [
 [[package]]
 name = "polynomials"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz%2Fimpl_babybear#241cbadb8dd7c1a6670f103fd8fdeb83f38a2797"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#2fb63c9af0b01b218b246442e31e61216be63572"
 dependencies = [
  "arith",
  "ark-std",
@@ -2165,6 +2166,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
+name = "rsa_circuit"
+version = "0.1.0"
+dependencies = [
+ "ark-std",
+ "circuit-std-rs",
+ "expander_compiler",
+ "halo2curves",
+ "itertools 0.13.0",
+ "num-bigint",
+ "num-traits",
+ "rand",
+ "serdes",
+ "sha2",
+]
+
+[[package]]
 name = "rustc-demangle"
 version = "0.1.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2284,7 +2301,7 @@ dependencies = [
 [[package]]
 name = "serdes"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz%2Fimpl_babybear#241cbadb8dd7c1a6670f103fd8fdeb83f38a2797"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#2fb63c9af0b01b218b246442e31e61216be63572"
 dependencies = [
  "ethnum",
  "halo2curves",
@@ -2405,7 +2422,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 [[package]]
 name = "sumcheck"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz%2Fimpl_babybear#241cbadb8dd7c1a6670f103fd8fdeb83f38a2797"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#2fb63c9af0b01b218b246442e31e61216be63572"
 dependencies = [
  "arith",
  "circuit",
@@ -2588,7 +2605,7 @@ dependencies = [
 [[package]]
 name = "transcript"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz%2Fimpl_babybear#241cbadb8dd7c1a6670f103fd8fdeb83f38a2797"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#2fb63c9af0b01b218b246442e31e61216be63572"
 dependencies = [
  "arith",
  "gkr_engine",
@@ -2601,7 +2618,7 @@ dependencies = [
 [[package]]
 name = "tree"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz%2Fimpl_babybear#241cbadb8dd7c1a6670f103fd8fdeb83f38a2797"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#2fb63c9af0b01b218b246442e31e61216be63572"
 dependencies = [
  "arith",
  "ark-std",
@@ -2709,7 +2726,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 [[package]]
 name = "utils"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zz%2Fimpl_babybear#241cbadb8dd7c1a6670f103fd8fdeb83f38a2797"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#2fb63c9af0b01b218b246442e31e61216be63572"
 
 [[package]]
 name = "version_check"

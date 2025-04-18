@@ -4,7 +4,7 @@ use crate::{
     circuit::{config::Config, layered::Coef},
     field::{Field, FieldArith},
     frontend::CircuitField,
-    hints::{self, circom_shift_l_impl, circom_shift_r_impl},
+    hints::{self, circom_shift_l_impl, circom_shift_r_impl, to_binary},
     utils::error::Error,
 };
 
@@ -59,6 +59,10 @@ pub enum Instruction<C: Config> {
     CustomGate {
         gate_type: usize,
         inputs: Vec<usize>,
+    },
+    ToBinary {
+        x: usize,
+        num_bits: usize,
     },
 }
 
@@ -164,6 +168,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 if_false,
             } => vec![*cond, *if_true, *if_false],
             Instruction::CustomGate { inputs, .. } => inputs.clone(),
+            Instruction::ToBinary { x, .. } => vec![*x],
         }
     }
     fn num_outputs(&self) -> usize {
@@ -180,6 +185,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             Instruction::UnconstrainedBinOp { .. } => 1,
             Instruction::UnconstrainedSelect { .. } => 1,
             Instruction::CustomGate { .. } => 1,
+            Instruction::ToBinary { num_bits, .. } => *num_bits,
         }
     }
     fn as_sub_circuit_call(&self) -> Option<(usize, &Vec<usize>, usize)> {
@@ -254,6 +260,10 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 gate_type: *gate_type,
                 inputs: inputs.iter().map(|i| f(*i)).collect(),
             },
+            Instruction::ToBinary { x, num_bits } => Instruction::ToBinary {
+                x: f(*x),
+                num_bits: *num_bits,
+            },
         }
     }
     fn from_kx_plus_b(x: usize, k: CircuitField<C>, b: CircuitField<C>) -> Self {
@@ -291,6 +301,15 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 } else {
                     Err(Error::InternalError(
                         "custom gate instruction must have at least 1 input".to_string(),
+                    ))
+                }
+            }
+            Instruction::ToBinary { num_bits, .. } => {
+                if *num_bits > 0 {
+                    Ok(())
+                } else {
+                    Err(Error::InternalError(
+                        "to_binary instruction must have at least 1 bit".to_string(),
                     ))
                 }
             }
@@ -383,6 +402,10 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                     hints::stub_impl(*gate_type, &inputs.iter().map(|i| values[*i]).collect(), 1);
                 EvalResult::Values(outputs)
             }
+            Instruction::ToBinary { x, num_bits } => match to_binary(values[*x], *num_bits) {
+                Ok(outputs) => EvalResult::Values(outputs),
+                Err(e) => EvalResult::Error(e),
+            },
         }
     }
 }
