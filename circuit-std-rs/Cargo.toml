@@ -9,31 +9,27 @@ expander_compiler = { path = "../expander_compiler"}
 
 ark-std.workspace = true
 rand.workspace = true
-expander_config.workspace = true
 expander_circuit.workspace = true
 
-mpi_config.workspace = true
-gkr_field_config.workspace = true
-
 gkr.workspace = true
+gkr_engine.workspace = true
+
 arith.workspace = true
 ark-bls12-381.workspace = true
 ark-ec.workspace = true
 ark-ff.workspace = true
 big-int.workspace = true
-expander_circuit.workspace = true
 gf2.workspace = true
-gkr.workspace = true
 halo2curves.workspace = true
 mersenne31.workspace = true
 stacker.workspace = true
-sha2 = "0.10.8"
 ark-serialize = { version = "0.5.0", features = ["std"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 num-bigint.workspace = true
 num-traits.workspace = true
 serdes.workspace = true
+sha2.workspace = true
 tiny-keccak.workspace = true
 
 [dev-dependencies]
