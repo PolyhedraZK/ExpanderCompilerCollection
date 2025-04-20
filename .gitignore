@@ -16,4 +16,3 @@ libec_go_lib.*
 *.txt
 *.json
 *.witness
-*.json

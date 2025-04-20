@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+<<<<<<< HEAD
 use crate::gnark::element::*;
 use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::emulated::field_bls12381::e2::CurveF;
@@ -13,12 +14,28 @@ use num_bigint::BigInt;
 
 const M_COMPRESSED_SMALLEST: u8 = 0b100 << 5;
 const M_COMPRESSED_LARGEST: u8 = 0b101 << 5;
+=======
+use crate::gnark::element::{new_internal_element, value_of, Element};
+use crate::gnark::emparam::Bls12381Fp;
+use crate::gnark::emulated::field_bls12381::e2::CurveF;
+use crate::sha256::m31_utils::{big_less_than, from_binary, to_binary};
+use crate::utils::simple_select;
+use expander_compiler::frontend::M31Config;
+use expander_compiler::{
+    declare_circuit,
+    frontend::{Config, Define, RootAPI, Variable},
+};
+use num_bigint::BigInt;
+use std::fmt::{Debug, Formatter, Result};
 
-#[derive(Default, Clone)]
-pub struct G1Affine {
-    pub x: Element<Bls12381Fp>,
-    pub y: Element<Bls12381Fp>,
-}
+use super::point::AffinePoint;
+
+const M_COMPRESSED_SMALLEST: u8 = 0b100 << 5;
+const M_COMPRESSED_LARGEST: u8 = 0b101 << 5;
+
+pub type G1Affine = AffinePoint<Bls12381Fp>;
+>>>>>>> master
+
 impl G1Affine {
     pub fn new(x: Element<Bls12381Fp>, y: Element<Bls12381Fp>) -> Self {
         Self { x, y }
@@ -38,6 +55,16 @@ impl G1Affine {
         }
     }
 }
+
+impl Debug for G1Affine {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        f.debug_struct("G1Affine")
+            .field("x", &self.x)
+            .field("y", &self.y)
+            .finish()
+    }
+}
+
 pub struct G1 {
     pub curve_f: CurveF,
     pub w: Element<Bls12381Fp>,
@@ -70,6 +97,15 @@ impl G1 {
 
         G1Affine { x: xr, y: yr }
     }
+<<<<<<< HEAD
+=======
+
+    pub fn phi<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, q: &G1Affine) -> G1Affine {
+        let x = self.curve_f.mul(native, &q.x, &self.w);
+        G1Affine { x, y: q.y.clone() }
+    }
+
+>>>>>>> master
     pub fn double<C: Config, B: RootAPI<C>>(&mut self, native: &mut B, p: &G1Affine) -> G1Affine {
         let xx3a = self.curve_f.mul(native, &p.x, &p.x);
         let two = value_of::<C, B, Bls12381Fp>(native, Box::new(2));
@@ -88,6 +124,89 @@ impl G1 {
 
         G1Affine { x: xr, y: yr }
     }
+<<<<<<< HEAD
+=======
+
+    pub fn double_n<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        p: &G1Affine,
+        n: usize,
+    ) -> G1Affine {
+        let mut pn: G1Affine = p.clone();
+        for _ in 0..n {
+            pn = self.double(native, &pn);
+        }
+        pn
+    }
+
+    pub fn double_and_add<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        p: &G1Affine,
+        q: &G1Affine,
+    ) -> G1Affine {
+        // compute λ1 = (q.y-p.y)/(q.x-p.x)
+        let yqyp = self.curve_f.sub(native, &q.y, &p.y);
+        let xqxp = self.curve_f.sub(native, &q.x, &p.x);
+        let λ1 = self.curve_f.div(native, &yqyp, &xqxp);
+
+        // compute x1 = λ1²-p.x-q.x
+        let λ1λ1 = self.curve_f.mul(native, &λ1, &λ1);
+        let xqxp = self.curve_f.add(native, &p.x, &q.x);
+        let x2 = self.curve_f.sub(native, &λ1λ1, &xqxp);
+
+        // omit y1 computation
+        // compute λ1 = -λ1-1*p.y/(x1-p.x)
+        let ypyp = self.curve_f.add(native, &p.y, &p.y);
+        let x2xp = self.curve_f.sub(native, &x2, &p.x);
+        let mut λ2 = self.curve_f.div(native, &ypyp, &x2xp);
+        λ2 = self.curve_f.add(native, &λ1, &λ2);
+        λ2 = self.curve_f.neg(native, &λ2);
+
+        // compute x3 =λ2²-p.x-x3
+        let λ2λ2 = self.curve_f.mul(native, &λ2, &λ2);
+        let mut x3 = self.curve_f.sub(native, &λ2λ2, &p.x);
+        x3 = self.curve_f.sub(native, &x3, &x2);
+
+        // compute y3 = λ2*(p.x - x3)-p.y
+        let mut y3 = self.curve_f.sub(native, &p.x, &x3);
+        y3 = self.curve_f.mul(native, &λ2, &y3);
+        y3 = self.curve_f.sub(native, &y3, &p.y);
+
+        G1Affine { x: x3, y: y3 }
+    }
+
+    pub fn scalar_mul_by_seed_square<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        q: &G1Affine,
+    ) -> G1Affine {
+        let mut z = self.double(native, q);
+        z = self.add(native, q, &z);
+        z = self.double(native, &z);
+        z = self.double_and_add(native, &z, q);
+        z = self.double_n(native, &z, 2);
+        z = self.double_and_add(native, &z, q);
+        z = self.double_n(native, &z, 8);
+        z = self.double_and_add(native, &z, q);
+        let mut t0 = self.double(native, &z);
+        t0 = self.add(native, &z, &t0);
+        let mut t0 = self.double(native, &t0);
+        t0 = self.double_and_add(native, &t0, &z);
+        t0 = self.double_n(native, &t0, 2);
+        t0 = self.double_and_add(native, &t0, &z);
+        t0 = self.double_n(native, &t0, 8);
+        t0 = self.double_and_add(native, &t0, &z);
+        t0 = self.double_n(native, &t0, 31);
+        z = self.add(native, &t0, &z);
+        z = self.double_n(native, &z, 32);
+        z = self.double_and_add(native, &z, q);
+        z = self.double_n(native, &z, 32);
+        z
+    }
+
+>>>>>>> master
     pub fn assert_is_equal<C: Config, B: RootAPI<C>>(
         &mut self,
         native: &mut B,
@@ -113,8 +232,13 @@ impl G1 {
         let mut buf_x = bytes.to_vec();
         let buf0 = to_binary(native, buf_x[0], 8);
         let pad = vec![native.constant(0); 5];
+<<<<<<< HEAD
         let m_data = from_binary(native, &[pad, buf0[5..].to_vec()].concat()); //buf0 & mMask
         let buf0_and_non_mask = from_binary(native, &buf0[..5]); //buf0 & ^mMask
+=======
+        let m_data = from_binary(native, [pad, buf0[5..].to_vec()].concat()); //buf0 & mMask
+        let buf0_and_non_mask = from_binary(native, buf0[..5].to_vec()); //buf0 & ^mMask
+>>>>>>> master
         buf_x[0] = buf0_and_non_mask;
 
         //get p.x
@@ -189,8 +313,13 @@ impl G1 {
         p: &G1Affine,
     ) -> G1Affine {
         let mut p = G1Affine {
+<<<<<<< HEAD
             x: p.x.my_clone(),
             y: p.y.my_clone(),
+=======
+            x: p.x.clone(),
+            y: p.y.clone(),
+>>>>>>> master
         };
         let den1 = self.g1_isogeny_y_denominator(native, &p.x);
         let den0 = self.g1_isogeny_x_denominator(native, &p.x);
@@ -302,7 +431,11 @@ impl G1 {
         coefficients: Vec<Element<Bls12381Fp>>,
         x: &Element<Bls12381Fp>,
     ) -> Element<Bls12381Fp> {
+<<<<<<< HEAD
         let mut dst = coefficients[coefficients.len() - 1].my_clone();
+=======
+        let mut dst = coefficients[coefficients.len() - 1].clone();
+>>>>>>> master
         if monic {
             dst = self.curve_f.add(native, &dst, x);
         }
@@ -465,7 +598,11 @@ impl G1 {
         native.assert_is_equal(sgn_in, sgn_y);
 
         let out_b0 = self.curve_f.select(native, is_square, &x1, &tv3_div_tv4);
+<<<<<<< HEAD
         let out_b1 = res_y.my_clone();
+=======
+        let out_b1 = res_y.clone();
+>>>>>>> master
         G1Affine {
             x: out_b0,
             y: out_b1,
@@ -479,7 +616,11 @@ declare_circuit!(G1AddCircuit {
     r: [[Variable; 48]; 2],
 });
 
+<<<<<<< HEAD
 impl GenericDefine<M31Config> for G1AddCircuit<Variable> {
+=======
+impl Define<M31Config> for G1AddCircuit<Variable> {
+>>>>>>> master
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g1 = G1::new(builder);
         let p1_g1 = G1Affine::from_vars(self.p[0].to_vec(), self.p[1].to_vec());
@@ -503,7 +644,11 @@ declare_circuit!(G1UncompressCircuit {
     y: [[Variable; 48]; 2],
 });
 
+<<<<<<< HEAD
 impl GenericDefine<M31Config> for G1UncompressCircuit<Variable> {
+=======
+impl Define<M31Config> for G1UncompressCircuit<Variable> {
+>>>>>>> master
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g1 = G1::new(builder);
         let public_key = g1.uncompressed(builder, &self.x);
@@ -524,7 +669,11 @@ declare_circuit!(HashToG1Circuit {
     out: [[Variable; 48]; 2],
 });
 
+<<<<<<< HEAD
 impl GenericDefine<M31Config> for HashToG1Circuit<Variable> {
+=======
+impl Define<M31Config> for HashToG1Circuit<Variable> {
+>>>>>>> master
     fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
         let mut g1 = G1::new(builder);
         let (hm0, hm1) = g1.hash_to_fp(builder, &self.msg);
@@ -548,7 +697,11 @@ mod tests {
     use expander_compiler::frontend::*;
     use expander_compiler::{
         compile::CompileOptions,
+<<<<<<< HEAD
         frontend::{compile_generic, HintRegistry, M31},
+=======
+        frontend::{compile, HintRegistry, M31},
+>>>>>>> master
     };
     use extra::debug_eval;
     use num_bigint::BigInt;
@@ -556,7 +709,11 @@ mod tests {
 
     #[test]
     fn test_g1_add() {
+<<<<<<< HEAD
         compile_generic(&G1AddCircuit::default(), CompileOptions::default()).unwrap();
+=======
+        compile(&G1AddCircuit::default(), CompileOptions::default()).unwrap();
+>>>>>>> master
         let mut hint_registry = HintRegistry::<M31>::new();
         register_hint(&mut hint_registry);
         let mut assignment = G1AddCircuit::<M31> {
@@ -609,7 +766,11 @@ mod tests {
 
     #[test]
     fn test_uncompress_g1() {
+<<<<<<< HEAD
         // compile_generic(&G1UncompressCircuit::default(), CompileOptions::default()).unwrap();
+=======
+        // compile(&G1UncompressCircuit::default(), CompileOptions::default()).unwrap();
+>>>>>>> master
         let mut hint_registry = HintRegistry::<M31>::new();
         register_hint(&mut hint_registry);
         let mut assignment = G1UncompressCircuit::<M31> {
@@ -637,7 +798,11 @@ mod tests {
 
     #[test]
     fn test_hash_to_g1() {
+<<<<<<< HEAD
         // compile_generic(&HashToG2Circuit::default(), CompileOptions::default()).unwrap();
+=======
+        // compile(&HashToG2Circuit::default(), CompileOptions::default()).unwrap();
+>>>>>>> master
         let mut hint_registry = HintRegistry::<M31>::new();
         register_hint(&mut hint_registry);
         let mut assignment = HashToG1Circuit::<M31> {

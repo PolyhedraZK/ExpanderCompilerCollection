@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use arith::Field;
-use expander_compiler::frontend::*;
+use ethnum::U256;
+use expander_compiler::frontend::{
+    declare_circuit, CircuitField, Config, Define, Error, RootAPI, Variable,
+};
 use rand::Rng;
 
 use crate::StdCircuit;
@@ -21,7 +24,7 @@ declare_circuit!(_LogUpCircuit {
     query_keys: [[Variable]],
     query_results: [[Variable]],
 
-    // counting the number of occurences for each row of the table
+    // counting the number of occurrences for each row of the table
     query_count: [Variable],
 });
 
@@ -150,7 +153,7 @@ fn logup_poly_val<C: Config, B: RootAPI<C>>(
 }
 
 impl<C: Config> Define<C> for LogUpCircuit {
-    fn define(&self, builder: &mut API<C>) {
+    fn define<Builder: RootAPI<C>>(&self, builder: &mut Builder) {
         let key_len = self.table_keys[0].len();
         let value_len = self.table_values[0].len();
 
@@ -183,7 +186,7 @@ impl<C: Config> Define<C> for LogUpCircuit {
 
 impl<C: Config> StdCircuit<C> for LogUpCircuit {
     type Params = LogUpParams;
-    type Assignment = _LogUpCircuit<C::CircuitField>;
+    type Assignment = _LogUpCircuit<CircuitField<C>>;
 
     fn new_circuit(params: &Self::Params) -> Self {
         let mut circuit = Self::default();
@@ -211,7 +214,7 @@ impl<C: Config> StdCircuit<C> for LogUpCircuit {
     }
 
     fn new_assignment(params: &Self::Params, mut rng: impl rand::RngCore) -> Self::Assignment {
-        let mut assignment = _LogUpCircuit::<C::CircuitField>::default();
+        let mut assignment = _LogUpCircuit::<CircuitField<C>>::default();
         assignment.table_keys.resize(params.n_table_rows, vec![]);
         assignment.table_values.resize(params.n_table_rows, vec![]);
         assignment.query_keys.resize(params.n_queries, vec![]);
@@ -219,18 +222,18 @@ impl<C: Config> StdCircuit<C> for LogUpCircuit {
 
         for i in 0..params.n_table_rows {
             for _ in 0..params.key_len {
-                assignment.table_keys[i].push(C::CircuitField::random_unsafe(&mut rng));
+                assignment.table_keys[i].push(CircuitField::<C>::random_unsafe(&mut rng));
             }
 
             for _ in 0..params.value_len {
-                assignment.table_values[i].push(C::CircuitField::random_unsafe(&mut rng));
+                assignment.table_values[i].push(CircuitField::<C>::random_unsafe(&mut rng));
             }
         }
 
-        assignment.query_count = vec![C::CircuitField::ZERO; params.n_table_rows];
+        assignment.query_count = vec![CircuitField::<C>::ZERO; params.n_table_rows];
         for i in 0..params.n_queries {
             let query_id: usize = rng.gen::<usize>() % params.n_table_rows;
-            assignment.query_count[query_id] += C::CircuitField::ONE;
+            assignment.query_count[query_id] += CircuitField::<C>::ONE;
             assignment.query_keys[i] = assignment.table_keys[query_id].clone();
             assignment.query_results[i] = assignment.table_values[query_id].clone();
         }
@@ -358,9 +361,35 @@ impl LogUpRangeProofTable {
     }
 
     pub fn rangeproof<C: Config, B: RootAPI<C>>(&mut self, builder: &mut B, a: Variable, n: usize) {
+<<<<<<< HEAD
         if n <= self.rangeproof_bits {
             self.rangeproof_onechunk(builder, a, n);
             return;
+=======
+        if n > 128 {
+            panic!("n must be less than 128");
+        }
+        if n <= self.rangeproof_bits {
+            self.rangeproof_onechunk(builder, a, n);
+            return;
+        }
+        //add a shift value
+        let mut n = n;
+        let mut new_a = a;
+        let rem = n % self.rangeproof_bits;
+        if rem != 0 {
+            let shift = self.rangeproof_bits - rem;
+            let constant = (1 << shift) - 1;
+
+            let mut mul_factor: u128 = 1;
+            mul_factor <<= n;
+            let mul_factor_u256 = U256::new(mul_factor);
+            let mul_factor_var = CircuitField::<C>::from_u256(mul_factor_u256);
+            let mul_factor = builder.constant(mul_factor_var);
+            let a_shift = builder.mul(constant, mul_factor);
+            new_a = builder.add(a, a_shift);
+            n += shift;
+>>>>>>> master
         }
         //split a into multiple chunks
         let hint_input = vec![
@@ -376,8 +405,10 @@ impl LogUpRangeProofTable {
         //ensure the sum of the chunks is equal to a
         let mut sum = witnesses[0];
         for (i, witness) in witnesses.iter().enumerate().skip(1) {
-            let constant = 1 << (self.rangeproof_bits * i);
-            let constant = builder.constant(constant);
+            let constant = 1u128 << (self.rangeproof_bits * i);
+            let constant_u256 = U256::new(constant);
+            let constant_u256_var = CircuitField::<C>::from_u256(constant_u256);
+            let constant = builder.constant(constant_u256_var);
             let mul = builder.mul(witness, constant);
             sum = builder.add(sum, mul);
         }
@@ -433,7 +464,9 @@ impl LogUpRangeProofTable {
     pub fn final_check<C: Config, B: RootAPI<C>>(&mut self, builder: &mut B) {
         let alpha = builder.get_random_value();
         let inputs = self.query_keys.clone();
+
         let query_count = builder.new_hint("myhint.querycounthint", &inputs, self.table_keys.len());
+
         let v_table = logup_poly_val(builder, &self.table_keys, &query_count, &alpha);
 
         let one = builder.constant(1);
@@ -447,19 +480,19 @@ impl LogUpRangeProofTable {
     }
 }
 
-pub fn query_count_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+pub fn query_count_hint<F: Field>(inputs: &[F], outputs: &mut [F]) -> Result<(), Error> {
     let mut count = vec![0; outputs.len()];
     for input in inputs {
         let query_id = input.to_u256().as_usize();
         count[query_id] += 1;
     }
     for i in 0..outputs.len() {
-        outputs[i] = M31::from(count[i] as u32);
+        outputs[i] = F::from(count[i] as u32);
     }
     Ok(())
 }
 
-pub fn query_count_by_key_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+pub fn query_count_by_key_hint<F: Field>(inputs: &[F], outputs: &mut [F]) -> Result<(), Error> {
     let mut outputs_u32 = vec![0; outputs.len()];
 
     let table_size = inputs[0].to_u256().as_usize();
@@ -478,20 +511,36 @@ pub fn query_count_by_key_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<()
         outputs_u32[i] = count as u32;
     }
     for i in 0..outputs.len() {
-        outputs[i] = M31::from(outputs_u32[i]);
+        outputs[i] = F::from(outputs_u32[i]);
     }
 
     Ok(())
 }
 
-pub fn rangeproof_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
+pub fn rangeproof_hint<F: Field>(inputs: &[F], outputs: &mut [F]) -> Result<(), Error> {
     let n = inputs[0].to_u256().as_i64();
     let m = inputs[1].to_u256().as_i64();
+<<<<<<< HEAD
     let mut a = inputs[2].to_u256().as_i64();
     for i in 0..((n + m - 1) / m) {
         let r = a % (1 << m);
         a /= 1 << m;
         outputs[i as usize] = M31::from(r as u32);
+=======
+
+    let mut a = inputs[2].to_u256(); // Value 'new_a' as U256
+
+    let chunk_mod = U256::from(1_u64) << m;
+
+    for i in 0..n / m {
+        let r = a % chunk_mod;
+        a /= chunk_mod;
+        // println!(
+        //     "rangeproof_hint chunk {}: r = {}, a_remaining = {}",
+        //     i, r, a
+        // ); // Log chunks
+        outputs[i as usize] = F::from(r.as_u32());
+>>>>>>> master
     }
     Ok(())
 }

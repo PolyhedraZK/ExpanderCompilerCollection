@@ -2,7 +2,7 @@ use super::m31_utils::{
     big_array_add_no_reduce, bit_array_to_m31_26, bytes_to_bits, cap_sigma0, cap_sigma1, ch,
     m31_26_array_put_uint32, m31_26_to_bit_array_seperate, maj, sha_m31_26_add, sigma0, sigma1,
 };
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{Config, RootAPI, Variable};
 
 const SHA256LEN: usize = 32;
 const CHUNK: usize = 64;
@@ -427,6 +427,7 @@ pub fn sha256_37bytes<C: Config, B: RootAPI<C>>(
     d.return_sum(builder).to_vec()
 }
 
+<<<<<<< HEAD
 pub fn sha256_37bytes_compress<C: Config, B: RootAPI<C>>(
     builder: &mut B,
     orign_data: &[Variable],
@@ -480,6 +481,8 @@ pub fn sha256_37bytes_256batch_compress<C: Config, B: RootAPI<C>>(
     outputs
 }
 
+=======
+>>>>>>> master
 pub fn sha256_var_bytes<C: Config, B: RootAPI<C>>(
     builder: &mut B,
     orign_data: &[Variable],
@@ -523,6 +526,7 @@ pub fn check_sha256_37bytes<C: Config, B: RootAPI<C>>(
     }
     result
 }
+<<<<<<< HEAD
 
 pub fn check_sha256_37bytes_compress<C: Config, B: RootAPI<C>>(
     builder: &mut B,
@@ -549,3 +553,5 @@ pub fn check_sha256_37bytes_256batch_compress<C: Config, B: RootAPI<C>>(
     }
     result
 }
+=======
+>>>>>>> master
