@@ -497,7 +497,6 @@ pub fn query_count_by_key_hint<F: Field>(inputs: &[F], outputs: &mut [F]) -> Res
 pub fn rangeproof_hint<F: Field>(inputs: &[F], outputs: &mut [F]) -> Result<(), Error> {
     let n = inputs[0].to_u256().as_i64();
     let m = inputs[1].to_u256().as_i64();
-    //let mut a = inputs[2].to_u256().as_i64();
 
     let mut a = inputs[2].to_u256(); // Value 'new_a' as U256
 
