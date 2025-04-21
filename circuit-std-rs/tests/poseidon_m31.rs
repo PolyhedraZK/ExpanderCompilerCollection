@@ -1,4 +1,4 @@
-use circuit_std_rs::{poseidon_m31::*, utils::register_hint};
+use circuit_std_rs::{poseidon::poseidon_m31::*,poseidon::utils::*, utils::register_hint};
 use expander_compiler::frontend::*;
 
 declare_circuit!(PoseidonSpongeLen8Circuit {
