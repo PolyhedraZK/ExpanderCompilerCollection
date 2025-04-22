@@ -132,7 +132,6 @@ impl<C: Config> ExpSerde for ExpanderGKRProverSetup<C> {
     }
 }
 
-
 #[allow(clippy::type_complexity)]
 pub struct ExpanderGKRVerifierSetup<C: Config>
 {

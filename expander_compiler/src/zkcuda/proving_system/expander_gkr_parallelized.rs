@@ -4,9 +4,15 @@ use std::io::{Cursor, Read};
 use crate::circuit::config::Config;
 
 use super::super::kernel::Kernel;
-use super::{check_inputs, pcs_testing_setup_fixed_seed, prepare_inputs, Commitment, ExpanderGKRProvingSystem, Proof, ProvingSystem};
-use super::expander_gkr::{ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof, ExpanderGKRProverSetup, ExpanderGKRVerifierSetup};
+use super::expander_gkr::{
+    ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof,
+    ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
+};
 use super::shared_mem::*;
+use super::{
+    check_inputs, pcs_testing_setup_fixed_seed, prepare_inputs, Commitment,
+    ExpanderGKRProvingSystem, Proof, ProvingSystem,
+};
 
 use arith::Field;
 use chrono::format;
@@ -22,9 +28,9 @@ use poly_commit::{
 };
 use polynomials::{EqPolynomial, MultiLinearPoly, MultiLinearPolyExpander};
 use serdes::ExpSerde;
-use sumcheck::ProverScratchPad;
 use shared_memory::{Shmem, ShmemConf};
 use std::process::Command;
+use sumcheck::ProverScratchPad;
 
 use rand::rngs::StdRng;
 use rand::SeedableRng;
@@ -76,18 +82,13 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
         is_broadcast: bool,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo) {
         if is_broadcast || parallel_count == 1 {
-            ExpanderGKRProvingSystem::<C>::commit(
-                prover_setup,
-                vals,
-                parallel_count,
-                is_broadcast,
-            )
+            ExpanderGKRProvingSystem::<C>::commit(prover_setup, vals, parallel_count, is_broadcast)
         } else {
             let actual_local_len = vals.len() / parallel_count;
 
             // TODO: The size here is for the raw commitment, add an function in the pcs trait to get the size of the commitment
             init_commitment_and_extra_info_shared_memory::<C>(vals.len(), 1);
-            write_selected_pcs_setup_to_shared_memory(prover_setup,&[actual_local_len]);
+            write_selected_pcs_setup_to_shared_memory(prover_setup, &[actual_local_len]);
             write_commit_vals_to_shared_memory::<C>(&vals.to_vec());
             exec_pcs_commit(parallel_count);
             read_commitment_and_extra_info_from_shared_memory()
@@ -240,7 +241,7 @@ fn verify_input_claim<C: Config>(
             &ExpanderGKRChallenge::<C::DefaultGKRFieldConfig> {
                 x: challenge_vars,
                 x_simd: x_simd.to_vec(),
-                x_mpi: if *ib {vec![]} else {x_mpi.to_vec()}, // In the case of broadcast, whatever x_mpi is, the opening is the same
+                x_mpi: if *ib { vec![] } else { x_mpi.to_vec() }, // In the case of broadcast, whatever x_mpi is, the opening is the same
             },
             claim,
             transcript,
