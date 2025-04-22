@@ -9,7 +9,6 @@ use crate::gnark::limbs::decompose;
 use crate::gnark::limbs::recompose;
 use crate::sha256::m31::sha256_var_bytes;
 use crate::sha256::m31_utils::from_binary;
-use crate::sha256::m31_utils::to_binary;
 use ark_bls12_381::Fq2;
 use ark_ff::Zero;
 use expander_compiler::frontend::{Config, RootAPI, Variable};
@@ -89,8 +88,8 @@ pub fn xor_variable<C: Config, B: RootAPI<C>>(
     a: Variable,
     b: Variable,
 ) -> Variable {
-    let bits_a = to_binary(api, a, nbits);
-    let bits_b = to_binary(api, b, nbits);
+    let bits_a = api.to_binary(a, nbits);
+    let bits_b = api.to_binary(b, nbits);
     let mut bits_res = vec![Variable::default(); nbits];
     for i in 0..nbits {
         bits_res[i] = api.xor(bits_a[i], bits_b[i]);

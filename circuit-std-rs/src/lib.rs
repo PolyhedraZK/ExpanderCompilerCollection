@@ -13,7 +13,7 @@ pub use non_native::*;
 pub mod matmul;
 
 pub mod gnark;
-pub mod poseidon_m31;
+pub mod poseidon;
 pub mod sha256;
 pub mod utils;
 
