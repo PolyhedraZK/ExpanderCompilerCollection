@@ -13,6 +13,7 @@ ark-ec.workspace = true
 ark-ff.workspace = true
 ark-std.workspace = true
 big-int.workspace = true
+gkr_hashers.workspace = true
 expander_circuit.workspace = true
 gf2.workspace = true
 gkr.workspace = true

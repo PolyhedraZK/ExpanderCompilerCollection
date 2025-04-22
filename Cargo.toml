@@ -5,8 +5,7 @@ members = [
     "expander_compiler",
     "expander_compiler/ec_go_lib",
     "expander_compiler/macros",
-    "rsa_circuit",
-    "efc"
+    "rsa_circuit"
 ]
 
 [profile.test]
