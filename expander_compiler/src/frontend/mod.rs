@@ -3,13 +3,13 @@ use builder::RootBuilder;
 use crate::circuit::layered::{CrossLayerInputType, NormalInputType};
 use crate::circuit::{ir, layered};
 
-mod api;
-mod builder;
-mod circuit;
-mod debug;
-mod sub_circuit;
-mod variables;
-mod witness;
+pub mod api;
+pub mod builder;
+pub mod circuit;
+pub mod debug;
+pub mod sub_circuit;
+pub mod variables;
+pub mod witness;
 
 pub use circuit::declare_circuit;
 pub type API<C> = builder::RootBuilder<C>;
@@ -30,6 +30,7 @@ pub mod internal {
         declare_circuit_load_from, declare_circuit_num_vars,
     };
     pub use super::variables::{DumpLoadTwoVariables, DumpLoadVariables};
+    // pub use crate::utils::serde::Serde;
 }
 
 pub mod extra {
@@ -40,6 +41,7 @@ pub mod extra {
         HashStructureAndPrimitive, JoinVecVariables, RebuildVecVariables,
     };
     pub use crate::hints::registry::{EmptyHintCaller, HintCaller, HintRegistry};
+    // pub use crate::utils::serde::Serde;
 
     use super::{internal, CircuitField, Config, Define, Variable};
 

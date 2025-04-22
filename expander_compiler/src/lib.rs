@@ -1,3 +1,4 @@
+#![feature(min_specialization)]
 #![allow(clippy::manual_div_ceil)]
 
 pub mod builder;

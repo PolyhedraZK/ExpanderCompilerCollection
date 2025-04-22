@@ -1,4 +1,4 @@
-use crate::frontend::CircuitField;
+use crate::circuit::config::CircuitField;
 
 use super::{Circuit, Config, CrossLayerInputType, Input, InputUsize, NormalInputType};
 

@@ -5,7 +5,7 @@ Expander is a proof generation backend for the Polyhedra Network. The ExpanderCo
 
 ## Documentation
 
-Documentation is available at [Expander Compiler Collection Documentation](https://polyhedrazk.github.io/ExpanderDocs/).
+Documentation is available at [Expander Compiler Collection Documentation](https://polyhedrazk.github.io/ExpanderDocs/docs/overview).
 
 ## Using this Library
 

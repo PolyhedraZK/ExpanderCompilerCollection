@@ -245,7 +245,6 @@ mod tests {
     use crate::circuit::layered::{InputUsize, NormalInputType};
     use crate::field::FieldArith;
     use crate::frontend::M31Config as C;
-
     use mersenne31::M31;
     use rand::{RngCore, SeedableRng};
     use serdes::ExpSerde;

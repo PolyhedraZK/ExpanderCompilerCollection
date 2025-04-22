@@ -713,6 +713,7 @@ mod tests {
     use crate::frontend::CircuitField;
     use crate::frontend::M31Config as C;
     use crate::layering::compile;
+    use crate::layering::CompileOptions;
     use crate::{
         circuit::{
             ir::{self, common::rand_gen::*},
@@ -745,7 +746,12 @@ mod tests {
                 }
             },
         }
-        let (lc, _) = compile(&root);
+        let (lc, _) = compile(
+            &root,
+            CompileOptions {
+                allow_input_reorder: true,
+            },
+        );
         assert_eq!(lc.validate(), Ok(()));
         Some(lc)
     }
