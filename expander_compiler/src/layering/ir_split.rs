@@ -5,7 +5,7 @@ use crate::{
     circuit::ir::{
         common::Instruction as _,
         dest::{CircuitRelaxed as IrCircuit, Instruction, RootCircuitRelaxed as IrRootCircuit},
-        expr::{Expression, Term},
+        expr::{Expression, Term, VarSpec},
     },
     field::FieldArith,
     frontend::{CircuitField, Config},
@@ -238,7 +238,7 @@ impl<'a, C: Config> SplitContext<'a, C> {
         let mut add_outputs = Vec::new();
 
         if C::ENABLE_RANDOM_COMBINATION {
-            let n_layers = min_layers.iter().max().unwrap() + 3;
+            let n_layers = min_layers.iter().max().unwrap() + 10;
             sub_combined_constraints.sort_by(|a, b| min_layers[*a].cmp(&min_layers[*b]));
             let mut constraints = std::mem::take(&mut circuit.constraints);
             constraints.sort_by(|a, b| min_layers[*a].cmp(&min_layers[*b]));
@@ -267,6 +267,15 @@ impl<'a, C: Config> SplitContext<'a, C> {
                     k += 1;
                 }
                 if !terms.is_empty() {
+                    if terms.len() == 1 && terms[0].coef == CircuitField::<C>::one() {
+                        match terms[0].vars {
+                            VarSpec::Linear(x) => {
+                                add_outputs.push(x);
+                                continue;
+                            }
+                            _ => {}
+                        }
+                    }
                     circuit.instructions.push(Instruction::InternalVariable {
                         expr: Expression::from_terms(terms),
                     });
@@ -540,6 +549,34 @@ mod tests {
         let (out2, cond2) = new_root.eval_unsafe(inputs.clone());
         assert_eq!(out, out2);
         assert_eq!(cond, cond2);
+    }
+
+    #[test]
+    fn ensure_circuit_is_minimal() {
+        let mut root = IrRootCircuit::<M31Config>::default();
+        root.circuits.insert(
+            0,
+            IrCircuit {
+                instructions: vec![],
+                constraints: vec![1],
+                outputs: vec![],
+                num_inputs: 1,
+            },
+        );
+        assert_eq!(root.validate(), Ok(()));
+        let new_root = split_to_single_layer(&root);
+        assert_eq!(new_root.validate(), Ok(()));
+        assert_eq!(
+            new_root.circuits.get(&0).unwrap(),
+            &IrCircuit {
+                instructions: vec![InternalVariable {
+                    expr: Expression::from_terms(vec![Term::new_random_linear(1)]),
+                },],
+                constraints: vec![],
+                outputs: vec![2],
+                num_inputs: 1,
+            },
+        );
     }
 
     fn rand_test<C: Config>() {

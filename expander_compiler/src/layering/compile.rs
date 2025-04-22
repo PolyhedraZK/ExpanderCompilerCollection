@@ -362,6 +362,9 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
                 *cc_i = None;
             }
         }
+        while cc.len() - 1 > ic.output_layer && cc.last().unwrap().is_none() {
+            cc.pop();
+        }
         if circuit_id == 0 {
             if ic.output_layer < cc.len() {
                 ic.output_layer = cc.len() - 1;
