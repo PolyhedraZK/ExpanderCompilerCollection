@@ -587,10 +587,7 @@ impl<C: Config> RootCircuit<C> {
                         vec![CircuitField::<C>::zero(); num_outputs * SF::PACK_SIZE];
                     for (i, inputs) in inputs_scalar.iter().enumerate() {
                         let outputs =
-                            match hints::safe_impl(hint_caller, *hint_id, inputs, *num_outputs) {
-                                Ok(outputs) => outputs,
-                                Err(e) => return Err(e),
-                            };
+                            hints::safe_impl(hint_caller, *hint_id, inputs, *num_outputs)?;
                         for (j, x) in outputs.iter().enumerate() {
                             outputs_tmp[j * SF::PACK_SIZE + i] = *x;
                         }

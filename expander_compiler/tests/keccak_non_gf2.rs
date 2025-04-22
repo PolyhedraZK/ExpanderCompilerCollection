@@ -365,6 +365,7 @@ fn keccak_big_field<C: Config, const N_WITNESSES: usize>(field_name: &str) {
         "m31" => std::fs::File::create("circuit_m31.txt").unwrap(),
         "bn254" => std::fs::File::create("circuit_bn254.txt").unwrap(),
         "goldilocks" => std::fs::File::create("circuit_goldilocks.txt").unwrap(),
+        "babybear" => std::fs::File::create("circuit_babybear.txt").unwrap(),
         _ => panic!("unknown field"),
     };
     let writer = std::io::BufWriter::new(file);
@@ -374,6 +375,7 @@ fn keccak_big_field<C: Config, const N_WITNESSES: usize>(field_name: &str) {
         "m31" => std::fs::File::create("witness_m31.txt").unwrap(),
         "bn254" => std::fs::File::create("witness_bn254.txt").unwrap(),
         "goldilocks" => std::fs::File::create("witness_goldilocks.txt").unwrap(),
+        "babybear" => std::fs::File::create("witness_babybear.txt").unwrap(),
         _ => panic!("unknown field"),
     };
 
@@ -384,6 +386,7 @@ fn keccak_big_field<C: Config, const N_WITNESSES: usize>(field_name: &str) {
         "m31" => std::fs::File::create("witness_m31_solver.txt").unwrap(),
         "bn254" => std::fs::File::create("witness_bn254_solver.txt").unwrap(),
         "goldilocks" => std::fs::File::create("witness_goldilocks_solver.txt").unwrap(),
+        "babybear" => std::fs::File::create("witness_babybear_solver.txt").unwrap(),
         _ => panic!("unknown field"),
     };
     let writer = std::io::BufWriter::new(file);
@@ -405,4 +408,9 @@ fn keccak_bn254_test() {
 #[test]
 fn keccak_goldilocks_test() {
     keccak_big_field::<GoldilocksConfig, 8>("goldilocks");
+}
+
+#[test]
+fn keccak_babybear_test() {
+    keccak_big_field::<BabyBearConfig, 16>("babybear");
 }
