@@ -8,4 +8,3 @@ pub mod frontend;
 pub mod hints;
 pub mod layering;
 pub mod utils;
-pub mod zkcuda;
