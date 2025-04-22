@@ -47,7 +47,7 @@ macro_rules! pcs {
     };
 }
 
-const SINGEL_KERNEL_MAX_PROOF_SIZE: usize = 10 * 1024 * 1024; // 10MB
+const SINGLE_KERNEL_MAX_PROOF_SIZE: usize = 10 * 1024 * 1024; // 10MB
 
 pub struct ParallelizedExpanderGKRProvingSystem<C: Config> {
     _config: std::marker::PhantomData<C>,
@@ -65,7 +65,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
         // All of currently supported PCSs(Raw, Orion, Hyrax) do not require the multi-core information in the step of `setup`
         // So we can simply reuse the setup function from the non-parallelized version
-        // TODO: Consider how to do this properly in supporting future mpi-info-awared PCSs
+        // TODO: Do this properly in supporting future mpi-info-awared PCSs
         ExpanderGKRProvingSystem::<C>::setup(computation_graph)
     }
 
@@ -83,11 +83,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
                 is_broadcast,
             )
         } else {
-            let actual_local_len = if is_broadcast {
-                vals.len()
-            } else {
-                vals.len() / parallel_count
-            };
+            let actual_local_len = vals.len() / parallel_count;
 
             // TODO: The size here is for the raw commitment, add an function in the pcs trait to get the size of the commitment
             init_commitment_and_extra_info_shared_memory::<C>(vals.len(), 1);
@@ -118,7 +114,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
                 is_broadcast,
             )
         } else {
-            init_proof_shared_memory(SINGEL_KERNEL_MAX_PROOF_SIZE);
+            init_proof_shared_memory(SINGLE_KERNEL_MAX_PROOF_SIZE);
             write_pcs_setup_to_shared_memory(prover_setup);
             write_ecc_circuit_to_shared_memory(&kernel.layered_circuit);
             write_commitments_to_shared_memory(&commitments.to_vec());
@@ -152,7 +148,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
         cursor.set_position(32);
 
         let (mut verified, rz0, rz1, r_simd, r_mpi, claimed_v0, claimed_v1) = gkr_verify(
-            &MPIConfig::default(),
+            &MPIConfig::new_for_verifier(parallel_count as i32),
             &expander_circuit,
             &[],
             &<C::DefaultGKRFieldConfig as GKRFieldConfig>::ChallengeField::ZERO,
@@ -207,6 +203,7 @@ fn verify_input_claim<C: Config>(
     parallel_count: usize,
     transcript: &mut transcript!(C),
 ) -> bool {
+    assert_eq!(1 << x_mpi.len(), parallel_count);
     let mut target_y = <C::DefaultGKRFieldConfig as GKRFieldConfig>::ChallengeField::ZERO;
     for ((input, commitment), ib) in kernel
         .layered_circuit_input
@@ -214,14 +211,14 @@ fn verify_input_claim<C: Config>(
         .zip(commitments)
         .zip(is_broadcast)
     {
-        let commitment_len = commitment.vals_len();
-        let nb_challenge_vars = commitment_len.ilog2() as usize;
+        let local_vals_len = commitment.vals_len();
+        let nb_challenge_vars = local_vals_len.ilog2() as usize;
         let challenge_vars = x[..nb_challenge_vars].to_vec();
 
         let params = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::gen_params(
-            commitment_len.ilog2() as usize,
+            nb_challenge_vars,
         );
-        let v_key = v_keys.v_keys.get(&commitment_len).unwrap();
+        let v_key = v_keys.v_keys.get(&local_vals_len).unwrap();
 
         let claim =
             <field!(C) as GKRFieldConfig>::ChallengeField::deserialize_from(&mut proof_reader)
@@ -243,7 +240,7 @@ fn verify_input_claim<C: Config>(
             &ExpanderGKRChallenge::<C::DefaultGKRFieldConfig> {
                 x: challenge_vars,
                 x_simd: x_simd.to_vec(),
-                x_mpi: x_mpi.to_vec(),
+                x_mpi: if *ib {vec![]} else {x_mpi.to_vec()}, // In the case of broadcast, whatever x_mpi is, the opening is the same
             },
             claim,
             transcript,
