@@ -5,7 +5,7 @@ use crate::gnark::element::{value_of, Element};
 use crate::gnark::emparam::Bls12381Fp;
 use crate::gnark::emulated::field_bls12381::e2::Ext2;
 use crate::gnark::emulated::field_bls12381::e2::GE2;
-use crate::sha256::m31_utils::{big_less_than, from_binary, to_binary};
+use crate::sha256::m31_utils::{big_less_than, from_binary};
 use crate::utils::simple_select;
 
 use expander_compiler::declare_circuit;
@@ -548,7 +548,7 @@ impl G2 {
         bytes: &[Variable],
     ) -> G2AffP {
         let mut buf_x = bytes.to_vec();
-        let buf0 = to_binary(native, buf_x[0], 8);
+        let buf0 = native.to_binary(buf_x[0], 8);
         let pad = vec![native.constant(0); 5];
         let m_data = from_binary(native, [pad, buf0[5..].to_vec()].concat()); //buf0 & mMask
         let buf0_and_non_mask = from_binary(native, buf0[..5].to_vec()); //buf0 & ^mMask
