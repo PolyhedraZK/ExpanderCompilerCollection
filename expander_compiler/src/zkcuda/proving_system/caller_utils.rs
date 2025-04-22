@@ -104,18 +104,14 @@ fn write_object_to_shared_memory<T: ExpSerde>(
     }
 }
 
-pub fn write_selected_pcs_setup_to_shared_memory<C: Config>(
+pub fn write_selected_pkey_to_shared_memory<C: Config>(
     pcs_setup: &ExpanderGKRProverSetup<C>,
-    actual_local_lens: &[usize],
+    actual_local_len: usize,
 ) {
-    let pairs = actual_local_lens
-        .iter()
-        .map(|len| {
-            let setup = pcs_setup.p_keys.get(len).unwrap().clone();
-            (*len, setup)
-        })
-        .collect::<Vec<_>>();
-    write_object_to_shared_memory(&pairs, unsafe { &mut SHARED_MEMORY.pcs_setup }, "pcs_setup");
+    let setup = pcs_setup.p_keys.get(&actual_local_len).unwrap().clone();
+    let pair = (actual_local_len, setup);
+
+    write_object_to_shared_memory(&pair, unsafe { &mut SHARED_MEMORY.pcs_setup }, "pcs_setup");
 }
 
 pub fn write_commit_vals_to_shared_memory<C: Config>(vals: &Vec<C::DefaultSimdField>) {
@@ -177,7 +173,7 @@ pub fn write_commitments_values_to_shared_memory<C: Config>(
 pub fn write_broadcast_info_to_shared_memory(is_broadcast: &Vec<bool>) {
     write_object_to_shared_memory(
         is_broadcast,
-        unsafe { &mut SHARED_MEMORY.input_vals },
+        unsafe { &mut SHARED_MEMORY.broadcast_info },
         "is_broadcast",
     );
 }
@@ -207,7 +203,7 @@ pub fn exec_gkr_prove_with_pcs(mpi_size: usize) {
     exec_command(&cmd_str);
 }
 
-fn read_object_from_shared_memory<T: ExpSerde>(shared_memory_ref: &mut Option<Shmem>) -> T {
+pub fn read_object_from_shared_memory<T: ExpSerde>(shared_memory_ref: &mut Option<Shmem>) -> T {
     let shmem = shared_memory_ref.take().unwrap();
     let object_ptr = shmem.as_ptr() as *const u8;
     let object_len = shmem.len();

@@ -7,7 +7,7 @@ use super::expander_gkr::{
     ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof,
     ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
 };
-use super::shared_mem::{exec_gkr_prove_with_pcs, exec_pcs_commit, init_commitment_and_extra_info_shared_memory, init_proof_shared_memory, read_commitment_and_extra_info_from_shared_memory, read_proof_from_shared_memory, write_broadcast_info_to_shared_memory, write_commit_vals_to_shared_memory, write_commitments_extra_info_to_shared_memory, write_commitments_to_shared_memory, write_commitments_values_to_shared_memory, write_ecc_circuit_to_shared_memory, write_pcs_setup_to_shared_memory, write_selected_pcs_setup_to_shared_memory};
+use super::caller_utils::{exec_gkr_prove_with_pcs, exec_pcs_commit, init_commitment_and_extra_info_shared_memory, init_proof_shared_memory, read_commitment_and_extra_info_from_shared_memory, read_proof_from_shared_memory, write_broadcast_info_to_shared_memory, write_commit_vals_to_shared_memory, write_commitments_extra_info_to_shared_memory, write_commitments_to_shared_memory, write_commitments_values_to_shared_memory, write_ecc_circuit_to_shared_memory, write_pcs_setup_to_shared_memory, write_selected_pkey_to_shared_memory};
 use super::{
     Commitment,
     ExpanderGKRProvingSystem, ProvingSystem,
@@ -79,7 +79,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
 
             // TODO: The size here is for the raw commitment, add an function in the pcs trait to get the size of the commitment
             init_commitment_and_extra_info_shared_memory::<C>(vals.len(), 1);
-            write_selected_pcs_setup_to_shared_memory(prover_setup, &[actual_local_len]);
+            write_selected_pkey_to_shared_memory(prover_setup, actual_local_len);
             write_commit_vals_to_shared_memory::<C>(&vals.to_vec());
             exec_pcs_commit(parallel_count);
             read_commitment_and_extra_info_from_shared_memory()
