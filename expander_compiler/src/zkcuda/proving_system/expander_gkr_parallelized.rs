@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::io::{Cursor, Read};
 
 use crate::circuit::config::Config;
@@ -8,32 +7,24 @@ use super::expander_gkr::{
     ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof,
     ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
 };
-use super::shared_mem::*;
+use super::shared_mem::{exec_gkr_prove_with_pcs, exec_pcs_commit, init_commitment_and_extra_info_shared_memory, init_proof_shared_memory, read_commitment_and_extra_info_from_shared_memory, read_proof_from_shared_memory, write_broadcast_info_to_shared_memory, write_commit_vals_to_shared_memory, write_commitments_extra_info_to_shared_memory, write_commitments_to_shared_memory, write_commitments_values_to_shared_memory, write_ecc_circuit_to_shared_memory, write_pcs_setup_to_shared_memory, write_selected_pcs_setup_to_shared_memory};
 use super::{
-    check_inputs, pcs_testing_setup_fixed_seed, prepare_inputs, Commitment,
-    ExpanderGKRProvingSystem, Proof, ProvingSystem,
+    Commitment,
+    ExpanderGKRProvingSystem, ProvingSystem,
 };
 
 use arith::Field;
-use chrono::format;
-use expander_circuit::Circuit;
 use expander_config::GKRConfig;
-use expander_transcript::{Proof as ExpanderProof, Transcript};
-use gkr::{gkr_prove, gkr_verify};
+use expander_transcript::Transcript;
+use gkr::gkr_verify;
 use gkr_field_config::GKRFieldConfig;
 use mpi_config::MPIConfig;
 use poly_commit::{
-    expander_pcs_init_testing_only, ExpanderGKRChallenge, PCSForExpanderGKR,
-    StructuredReferenceString,
+    ExpanderGKRChallenge, PCSForExpanderGKR,
 };
-use polynomials::{EqPolynomial, MultiLinearPoly, MultiLinearPolyExpander};
+use polynomials::EqPolynomial;
 use serdes::ExpSerde;
-use shared_memory::{Shmem, ShmemConf};
-use std::process::Command;
-use sumcheck::ProverScratchPad;
 
-use rand::rngs::StdRng;
-use rand::SeedableRng;
 
 macro_rules! field {
     ($config: ident) => {
