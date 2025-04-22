@@ -5,8 +5,7 @@ use arith::{Field, SimdField as ExpSimdField};
 use serdes::{ExpSerde, SerdeResult};
 
 use super::{Circuit, InputType};
-use crate::circuit::config::Config;
-use crate::frontend::{CircuitField, SIMDField};
+use crate::circuit::config::{CircuitField, Config, SIMDField};
 
 #[derive(Clone, Debug)]
 pub enum WitnessValues<C: Config> {
