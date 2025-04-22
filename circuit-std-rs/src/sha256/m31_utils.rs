@@ -310,16 +310,6 @@ pub fn m31_26_to_bit_array_seperate<C: Config, B: RootAPI<C>>(
     bits.extend_from_slice(&api.to_binary(high, 6 + overflow + 1));
     bits
 }
-pub fn to_binary<C: Config, B: RootAPI<C>>(
-    api: &mut B,
-    x: Variable,
-    n_bits: usize,
-) -> Vec<Variable> {
-    let res = api.new_hint("myhint.tobinary", &[x], n_bits);
-    let res_x = from_binary(api, res.clone());
-    api.assert_is_equal(x, res_x);
-    res
-}
 pub fn from_binary<C: Config, B: RootAPI<C>>(api: &mut B, bits: Vec<Variable>) -> Variable {
     let mut res = api.constant(0);
     for (i, bit) in bits.iter().enumerate() {
