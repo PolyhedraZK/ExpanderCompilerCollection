@@ -1,5 +1,5 @@
-use super::utils::*;
-use expander_compiler::frontend::*;
+use super::utils::{get_constants, get_mds_matrix};
+use expander_compiler::frontend::{Config, RootAPI, Variable};
 
 fn power_5<C: Config, B: RootAPI<C>>(api: &mut B, base: Variable) -> Variable {
     let pow2 = api.mul(base, base);

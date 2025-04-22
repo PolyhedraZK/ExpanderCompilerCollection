@@ -11,7 +11,8 @@ use num_traits::cast::ToPrimitive;
 pub fn bytes_to_bits<C: Config, B: RootAPI<C>>(api: &mut B, vals: &[Variable]) -> Vec<Variable> {
     let mut ret = api.to_binary(vals[0], 8);
     for val in vals.iter().skip(1) {
-        ret = api.to_binary(*val, 8)
+        ret = api
+            .to_binary(*val, 8)
             .into_iter()
             .chain(ret.into_iter())
             .collect();
@@ -241,7 +242,10 @@ pub fn bit_array_to_m31_26<C: Config, B: RootAPI<C>>(
     if bits.len() >= 54 {
         panic!("BitArrayToM31: length of bits must be less than 60");
     }
-    [from_binary(api, bits[..26].to_vec()), from_binary(api, bits[26..].to_vec())]
+    [
+        from_binary(api, bits[..26].to_vec()),
+        from_binary(api, bits[26..].to_vec()),
+    ]
 }
 
 pub fn big_endian_m31_array_put_uint32<C: Config, B: RootAPI<C>>(

@@ -1,5 +1,8 @@
+use gkr_hashers::poseidon::r#impls::{
+    MATRIX_CIRC_MDS_12_SML_ROW, MATRIX_CIRC_MDS_16_SML_ROW, MATRIX_CIRC_MDS_8_SML_ROW,
+    POSEIDON_SEED_PREFIX,
+};
 use tiny_keccak::{Hasher, Keccak};
-use gkr_hashers::poseidon::r#impls::*;
 
 const FIELD_NAME: &str = "Mersenne 31";
 

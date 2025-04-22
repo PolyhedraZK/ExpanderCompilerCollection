@@ -2,7 +2,7 @@ use super::m31_utils::{
     big_array_add_no_reduce, bit_array_to_m31_26, bytes_to_bits, cap_sigma0, cap_sigma1, ch,
     m31_26_array_put_uint32, m31_26_to_bit_array_seperate, maj, sha_m31_26_add, sigma0, sigma1,
 };
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{Config, RootAPI, Variable};
 
 const SHA256LEN: usize = 32;
 const CHUNK: usize = 64;

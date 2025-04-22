@@ -1,4 +1,4 @@
-use super::utils::*;
+use super::utils::{get_constants, get_mds_matrix};
 
 const M31_MODULUS: u32 = 2147483647; // Example modulus for Mersenne 31
 
