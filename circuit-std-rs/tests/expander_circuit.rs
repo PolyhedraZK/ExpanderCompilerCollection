@@ -1,7 +1,7 @@
 use expander_compiler::frontend::*;
 use expander_compiler::circuit::layered::{NormalInputType, CrossLayerInputType};
-use gkr_engine::Proof;
 use gkr::BN254ConfigSha2Raw;
+use gkr_engine::{MPIConfig, MPIEngine, Proof};
 use serdes::ExpSerde;
 use serde::{Serialize, Deserialize};
 use stacker;
