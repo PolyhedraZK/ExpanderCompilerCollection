@@ -3,15 +3,20 @@ use std::io::{Cursor, Read};
 use crate::circuit::config::Config;
 
 use super::super::kernel::Kernel;
+use super::caller_utils::{
+    exec_gkr_prove_with_pcs, exec_pcs_commit, init_commitment_and_extra_info_shared_memory,
+    init_proof_shared_memory, read_commitment_and_extra_info_from_shared_memory,
+    read_proof_from_shared_memory, write_broadcast_info_to_shared_memory,
+    write_commit_vals_to_shared_memory, write_commitments_extra_info_to_shared_memory,
+    write_commitments_to_shared_memory, write_commitments_values_to_shared_memory,
+    write_ecc_circuit_to_shared_memory, write_input_partition_info_to_shared_memory,
+    write_pcs_setup_to_shared_memory, write_selected_pkey_to_shared_memory,
+};
 use super::expander_gkr::{
     ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof,
     ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
 };
-use super::caller_utils::{exec_gkr_prove_with_pcs, exec_pcs_commit, init_commitment_and_extra_info_shared_memory, init_proof_shared_memory, read_commitment_and_extra_info_from_shared_memory, read_proof_from_shared_memory, write_broadcast_info_to_shared_memory, write_commit_vals_to_shared_memory, write_commitments_extra_info_to_shared_memory, write_commitments_to_shared_memory, write_commitments_values_to_shared_memory, write_ecc_circuit_to_shared_memory, write_pcs_setup_to_shared_memory, write_selected_pkey_to_shared_memory};
-use super::{
-    Commitment,
-    ExpanderGKRProvingSystem, ProvingSystem,
-};
+use super::{Commitment, ExpanderGKRProvingSystem, ProvingSystem};
 
 use arith::Field;
 use expander_config::GKRConfig;
@@ -19,12 +24,9 @@ use expander_transcript::Transcript;
 use gkr::gkr_verify;
 use gkr_field_config::GKRFieldConfig;
 use mpi_config::MPIConfig;
-use poly_commit::{
-    ExpanderGKRChallenge, PCSForExpanderGKR,
-};
+use poly_commit::{ExpanderGKRChallenge, PCSForExpanderGKR};
 use polynomials::EqPolynomial;
 use serdes::ExpSerde;
-
 
 macro_rules! field {
     ($config: ident) => {
@@ -109,6 +111,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
             init_proof_shared_memory(SINGLE_KERNEL_MAX_PROOF_SIZE);
             write_pcs_setup_to_shared_memory(prover_setup);
             write_ecc_circuit_to_shared_memory(&kernel.layered_circuit);
+            write_input_partition_info_to_shared_memory(&kernel.layered_circuit_input);
             write_commitments_to_shared_memory(&commitments.to_vec());
             write_commitments_extra_info_to_shared_memory(&commitments_extra_info.to_vec());
             write_commitments_values_to_shared_memory::<C>(&commitments_values.to_vec());

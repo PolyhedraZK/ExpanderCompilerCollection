@@ -1,9 +1,11 @@
-
 use expander_compiler::circuit::config::Config;
 use expander_compiler::frontend::M31Config;
-use expander_compiler::zkcuda::proving_system::callee_utils::{read_commit_vals_from_shared_memory, read_selected_pkey_from_shared_memory, write_commitment_extra_info_to_shared_memory, write_commitment_to_shared_memory};
-use mpi_config::MPIConfig;
+use expander_compiler::zkcuda::proving_system::callee_utils::{
+    read_commit_vals_from_shared_memory, read_selected_pkey_from_shared_memory,
+    write_commitment_extra_info_to_shared_memory, write_commitment_to_shared_memory,
+};
 use expander_config::GKRConfig;
+use mpi_config::MPIConfig;
 use poly_commit::PCSForExpanderGKR;
 use polynomials::MultiLinearPoly;
 
@@ -30,19 +32,21 @@ fn commit<C: Config>() {
     let rank = mpi_config.world_rank();
 
     let (local_val_len, p_key) = read_selected_pkey_from_shared_memory::<C>();
-    
-    // seems a bit redundant
+
+    // TODO: remove the redundancy
     let global_vals_to_commit = read_commit_vals_from_shared_memory::<C>();
-    let local_vals_to_commit = global_vals_to_commit[local_val_len * rank..local_val_len * (rank + 1)].to_vec();
+    let local_vals_to_commit =
+        global_vals_to_commit[local_val_len * rank..local_val_len * (rank + 1)].to_vec();
     drop(global_vals_to_commit);
 
-    let params = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::gen_params(local_val_len.ilog2() as usize);
+    let params = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::gen_params(
+        local_val_len.ilog2() as usize,
+    );
 
-    let mut scratch =
-        <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::init_scratch_pad(
-            &params,
-            &MPIConfig::default(),
-        );
+    let mut scratch = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::init_scratch_pad(
+        &params,
+        &MPIConfig::default(),
+    );
 
     let commitment = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::commit(
         &params,
@@ -52,7 +56,7 @@ fn commit<C: Config>() {
         &mut scratch,
     )
     .unwrap();
-    
+
     write_commitment_to_shared_memory::<C>(&commitment);
     write_commitment_extra_info_to_shared_memory::<C>(&scratch);
 }

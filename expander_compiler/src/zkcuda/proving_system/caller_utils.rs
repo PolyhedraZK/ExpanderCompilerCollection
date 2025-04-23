@@ -1,9 +1,6 @@
 use std::{io::Cursor, process::Command};
 
-#[allow(unused_imports)]
-use expander_circuit::Circuit as ExpanderCircuit;
-
-use crate::circuit::layered::Circuit;
+use crate::{circuit::layered::Circuit, zkcuda::kernel::LayeredCircuitInputVec};
 use serdes::ExpSerde;
 use shared_memory::{Shmem, ShmemConf};
 
@@ -17,6 +14,7 @@ use super::{
 pub struct SharedMemory {
     pub pcs_setup: Option<Shmem>,
     pub circuit: Option<Shmem>,
+    pub input_partition: Option<Shmem>,
     pub input_vals: Option<Shmem>,
     pub commitment: Option<Shmem>,
     pub extra_info: Option<Shmem>,
@@ -27,6 +25,7 @@ pub struct SharedMemory {
 pub static mut SHARED_MEMORY: SharedMemory = SharedMemory {
     pcs_setup: None,
     circuit: None,
+    input_partition: None,
     input_vals: None,
     commitment: None,
     extra_info: None,
@@ -135,6 +134,14 @@ pub fn write_ecc_circuit_to_shared_memory<C: Config, I: InputType>(ecc_circuit: 
         ecc_circuit,
         unsafe { &mut SHARED_MEMORY.circuit },
         "ecc_circuit",
+    );
+}
+
+pub fn write_input_partition_info_to_shared_memory(input_partition: &Vec<LayeredCircuitInputVec>) {
+    write_object_to_shared_memory(
+        input_partition,
+        unsafe { &mut SHARED_MEMORY.input_partition },
+        "input_partition",
     );
 }
 

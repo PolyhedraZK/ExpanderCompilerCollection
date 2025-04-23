@@ -13,5 +13,5 @@ pub use expander_gkr::*;
 mod expander_gkr_parallelized;
 pub use expander_gkr_parallelized::*;
 
-mod caller_utils;
 pub mod callee_utils;
+mod caller_utils;

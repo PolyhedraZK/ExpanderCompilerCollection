@@ -1,11 +1,28 @@
-
 use expander_compiler::circuit::config::Config;
+use expander_compiler::circuit::layered::{Circuit, NormalInputType};
 use expander_compiler::frontend::M31Config;
-use expander_compiler::zkcuda::proving_system::callee_utils::{read_commit_vals_from_shared_memory, read_selected_pkey_from_shared_memory, write_commitment_extra_info_to_shared_memory, write_commitment_to_shared_memory};
-use mpi_config::MPIConfig;
+use expander_compiler::zkcuda::kernel::{Kernel, LayeredCircuitInputVec};
+use expander_compiler::zkcuda::proving_system::callee_utils::{
+    read_broadcast_info_from_shared_memory, read_commit_vals_from_shared_memory,
+    read_commitment_extra_info_from_shared_memory, read_commitment_from_shared_memory,
+    read_commitment_values_from_shared_memory, read_ecc_circuit_from_shared_memory,
+    read_partition_info_from_shared_memory, read_pcs_setup_from_shared_memory,
+    read_selected_pkey_from_shared_memory, write_commitment_extra_info_to_shared_memory,
+    write_commitment_to_shared_memory,
+};
+use expander_compiler::zkcuda::proving_system::{
+    max_n_vars, prepare_inputs, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProverSetup,
+};
+
 use expander_config::GKRConfig;
-use poly_commit::PCSForExpanderGKR;
-use polynomials::MultiLinearPoly;
+use expander_transcript::Transcript;
+use gkr::gkr_prove;
+use gkr_field_config::GKRFieldConfig;
+use mpi_config::MPIConfig;
+use poly_commit::{ExpanderGKRChallenge, PCSForExpanderGKR};
+use polynomials::{MultiLinearPoly, MultiLinearPolyExpander};
+use serdes::ExpSerde;
+use sumcheck::ProverScratchPad;
 
 macro_rules! field {
     ($config: ident) => {
@@ -27,34 +44,159 @@ macro_rules! pcs {
 
 fn prove<C: Config>() {
     let mpi_config = MPIConfig::new();
-    let rank = mpi_config.world_rank();
+    let world_rank = mpi_config.world_rank();
+    let world_size = mpi_config.world_size();
 
-    let (local_val_len, p_key) = read_selected_pkey_from_shared_memory::<C>();
-    
-    // seems a bit redundant
-    let global_vals_to_commit = read_commit_vals_from_shared_memory::<C>();
-    let local_vals_to_commit = global_vals_to_commit[local_val_len * rank..local_val_len * (rank + 1)].to_vec();
-    drop(global_vals_to_commit);
+    let pcs_setup = read_pcs_setup_from_shared_memory::<C>();
+    let ecc_circuit = read_ecc_circuit_from_shared_memory::<C>();
+    let partition_info = read_partition_info_from_shared_memory();
 
-    let params = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::gen_params(local_val_len.ilog2() as usize);
+    let _commitments = read_commitment_from_shared_memory::<C>();
+    let commitments_extra_info = read_commitment_extra_info_from_shared_memory::<C>();
+    let commitment_values = read_commitment_values_from_shared_memory::<C>();
+    let commitment_values_refs = commitment_values
+        .iter()
+        .map(|commitment| &commitment[..])
+        .collect::<Vec<_>>();
+    let broadcast_info = read_broadcast_info_from_shared_memory();
 
-    let mut scratch =
-        <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::init_scratch_pad(
+    let mut expander_circuit = ecc_circuit
+        .export_to_expander()
+        .flatten::<C::DefaultGKRConfig>();
+    expander_circuit.pre_process_gkr::<C::DefaultGKRConfig>();
+    let (max_num_input_var, max_num_output_var) = max_n_vars(&expander_circuit);
+    let mut prover_scratch = ProverScratchPad::<C::DefaultGKRFieldConfig>::new(
+        max_num_input_var,
+        max_num_output_var,
+        world_size,
+    );
+
+    let mut transcript = <C::DefaultGKRConfig as GKRConfig>::Transcript::new();
+    transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
+    expander_circuit.layers[0].input_vals = prepare_inputs(
+        &ecc_circuit,
+        &partition_info,
+        &commitment_values_refs,
+        &broadcast_info,
+        world_rank,
+    );
+    expander_circuit.fill_rnd_coefs(&mut transcript);
+    expander_circuit.evaluate();
+    let (claimed_v, rx, ry, rsimd, rmpi) = gkr_prove(
+        &expander_circuit,
+        &mut prover_scratch,
+        &mut transcript,
+        &mpi_config,
+    );
+    assert_eq!(
+        claimed_v,
+        <C::DefaultGKRFieldConfig as GKRFieldConfig>::ChallengeField::from(0)
+    );
+
+    prove_input_claim(
+        &mpi_config,
+        &commitment_values_refs,
+        &pcs_setup,
+        &commitments_extra_info,
+        &rx,
+        &rsimd,
+        &rmpi,
+        &broadcast_info,
+        &mut transcript,
+    );
+    if let Some(ry) = ry {
+        prove_input_claim(
+            &mpi_config,
+            &commitment_values_refs,
+            &pcs_setup,
+            &commitments_extra_info,
+            &ry,
+            &rsimd,
+            &rmpi,
+            &broadcast_info,
+            &mut transcript,
+        );
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn prove_input_claim<C: Config>(
+    mpi_config: &MPIConfig,
+    commitments_values: &[&[C::DefaultSimdField]],
+    p_keys: &ExpanderGKRProverSetup<C>,
+    commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<C>],
+    x: &[<field!(C) as GKRFieldConfig>::ChallengeField],
+    x_simd: &[<field!(C) as GKRFieldConfig>::ChallengeField],
+    x_mpi: &[<field!(C) as GKRFieldConfig>::ChallengeField],
+    is_broadcast: &[bool],
+    transcript: &mut transcript!(C),
+) {
+    let parallel_count = mpi_config.world_size() as usize;
+    let parallel_index = mpi_config.world_rank() as usize;
+
+    for ((commitment_val, extra_info), ib) in commitments_values
+        .iter()
+        .zip(commitments_extra_info)
+        .zip(is_broadcast)
+    {
+        let val_len = if *ib {
+            commitment_val.len()
+        } else {
+            commitment_val.len() / parallel_count
+        };
+        let vals_to_open = if *ib {
+            *commitment_val
+        } else {
+            &commitment_val[val_len * parallel_index..val_len * (parallel_index + 1)]
+        };
+
+        let nb_challenge_vars = val_len.ilog2() as usize;
+        let challenge_vars = x[..nb_challenge_vars].to_vec();
+
+        let params = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::gen_params(val_len);
+        let p_key = p_keys.p_keys.get(&val_len).unwrap();
+
+        // TODO: Remove unnecessary `to_vec` clone
+        let poly = MultiLinearPoly::new(vals_to_open.to_vec());
+        let v = MultiLinearPolyExpander::<field!(C)>::collectively_eval_circuit_vals_at_expander_challenge(
+            vals_to_open,
+            &challenge_vars,
+            x_simd,
+            x_mpi,
+            &mut vec![],
+            &mut vec![],
+            mpi_config,
+        );
+        transcript.append_field_element(&v);
+
+        transcript.lock_proof();
+        let scratch_for_parallel_index = if *ib {
+            &extra_info.scratch[0]
+        } else {
+            &extra_info.scratch[parallel_index]
+        };
+        let opening = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::open(
             &params,
             &MPIConfig::default(),
-        );
+            p_key,
+            &poly,
+            &ExpanderGKRChallenge::<C::DefaultGKRFieldConfig> {
+                x: challenge_vars.to_vec(),
+                x_simd: x_simd.to_vec(),
+                x_mpi: vec![],
+            },
+            transcript,
+            scratch_for_parallel_index,
+        )
+        .unwrap();
+        transcript.unlock_proof();
 
-    let commitment = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::commit(
-        &params,
-        &MPIConfig::default(),
-        &p_key,
-        &MultiLinearPoly::new(local_vals_to_commit),
-        &mut scratch,
-    )
-    .unwrap();
-    
-    write_commitment_to_shared_memory::<C>(&commitment);
-    write_commitment_extra_info_to_shared_memory::<C>(&scratch);
+        let mut buffer = vec![];
+        opening
+            .serialize_into(&mut buffer)
+            .expect("Failed to serialize opening");
+        transcript.append_u8_slice(&buffer);
+    }
 }
 
 fn main() {

@@ -101,7 +101,13 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
         check_inputs(kernel, commitments_values, parallel_count, is_broadcast);
         let mut res = vec![];
         for i in 0..parallel_count {
-            let lc_input = prepare_inputs(kernel, commitments_values, is_broadcast, i);
+            let lc_input = prepare_inputs(
+                &kernel.layered_circuit,
+                &kernel.layered_circuit_input,
+                commitments_values,
+                is_broadcast,
+                i,
+            );
             let (_, cond) = kernel
                 .layered_circuit
                 .eval_with_public_inputs_simd(lc_input, &[]);
@@ -125,7 +131,13 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
         let values = commitments.iter().map(|c| &c.vals[..]).collect::<Vec<_>>();
         check_inputs(kernel, &values, parallel_count, is_broadcast);
         for i in 0..parallel_count {
-            let lc_input = prepare_inputs(kernel, &values, is_broadcast, i);
+            let lc_input = prepare_inputs(
+                &kernel.layered_circuit,
+                &kernel.layered_circuit_input,
+                &values,
+                is_broadcast,
+                i,
+            );
             let (_, cond) = kernel
                 .layered_circuit
                 .eval_with_public_inputs_simd(lc_input, &[]);

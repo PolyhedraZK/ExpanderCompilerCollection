@@ -296,8 +296,13 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
         for i in 0..parallel_count {
             let mut transcript = <C::DefaultGKRConfig as GKRConfig>::Transcript::new();
             transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
-            expander_circuit.layers[0].input_vals =
-                prepare_inputs(kernel, commitments_values, is_broadcast, i);
+            expander_circuit.layers[0].input_vals = prepare_inputs(
+                &kernel.layered_circuit,
+                &kernel.layered_circuit_input,
+                commitments_values,
+                is_broadcast,
+                i,
+            );
             expander_circuit.fill_rnd_coefs(&mut transcript);
             expander_circuit.evaluate();
             let (claimed_v, rx, ry, rsimd, _rmpi) = gkr_prove(
@@ -438,7 +443,7 @@ pub fn pcs_testing_setup_fixed_seed<
     )
 }
 
-fn max_n_vars<C: GKRFieldConfig>(circuit: &Circuit<C>) -> (usize, usize) {
+pub fn max_n_vars<C: GKRFieldConfig>(circuit: &Circuit<C>) -> (usize, usize) {
     let mut max_num_input_var = 0;
     let mut max_num_output_var = 0;
     for layer in circuit.layers.iter() {
