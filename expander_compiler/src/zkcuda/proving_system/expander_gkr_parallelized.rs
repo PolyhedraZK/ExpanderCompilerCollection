@@ -117,7 +117,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
             write_commitments_values_to_shared_memory::<C>(&commitments_values.to_vec());
             write_broadcast_info_to_shared_memory(&is_broadcast.to_vec());
             exec_gkr_prove_with_pcs(parallel_count);
-            read_proof_from_shared_memory::<C>()
+            read_proof_from_shared_memory()
         }
     }
 

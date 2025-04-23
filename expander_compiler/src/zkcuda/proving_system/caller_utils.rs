@@ -231,7 +231,7 @@ pub fn read_commitment_and_extra_info_from_shared_memory<C: Config>(
     (commitment, extra_info)
 }
 
-pub fn read_proof_from_shared_memory<C: Config>() -> ExpanderGKRProof {
+pub fn read_proof_from_shared_memory() -> ExpanderGKRProof {
     let proof = read_object_from_shared_memory(unsafe { &mut SHARED_MEMORY.proof });
     ExpanderGKRProof { data: vec![proof] }
 }

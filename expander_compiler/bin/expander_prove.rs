@@ -1,14 +1,10 @@
 use expander_compiler::circuit::config::Config;
-use expander_compiler::circuit::layered::{Circuit, NormalInputType};
 use expander_compiler::frontend::M31Config;
-use expander_compiler::zkcuda::kernel::{Kernel, LayeredCircuitInputVec};
 use expander_compiler::zkcuda::proving_system::callee_utils::{
-    read_broadcast_info_from_shared_memory, read_commit_vals_from_shared_memory,
+    read_broadcast_info_from_shared_memory,
     read_commitment_extra_info_from_shared_memory, read_commitment_from_shared_memory,
     read_commitment_values_from_shared_memory, read_ecc_circuit_from_shared_memory,
     read_partition_info_from_shared_memory, read_pcs_setup_from_shared_memory,
-    read_selected_pkey_from_shared_memory, write_commitment_extra_info_to_shared_memory,
-    write_commitment_to_shared_memory,
 };
 use expander_compiler::zkcuda::proving_system::{
     max_n_vars, prepare_inputs, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProverSetup,
@@ -131,8 +127,8 @@ fn prove_input_claim<C: Config>(
     is_broadcast: &[bool],
     transcript: &mut transcript!(C),
 ) {
-    let parallel_count = mpi_config.world_size() as usize;
-    let parallel_index = mpi_config.world_rank() as usize;
+    let parallel_count = mpi_config.world_size();
+    let parallel_index = mpi_config.world_rank();
 
     for ((commitment_val, extra_info), ib) in commitments_values
         .iter()
@@ -163,8 +159,8 @@ fn prove_input_claim<C: Config>(
             &challenge_vars,
             x_simd,
             x_mpi,
-            &mut vec![],
-            &mut vec![],
+            &mut [],
+            &mut [],
             mpi_config,
         );
         transcript.append_field_element(&v);
