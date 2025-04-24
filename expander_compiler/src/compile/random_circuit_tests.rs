@@ -9,6 +9,7 @@ use crate::{
     },
     compile::compile,
     field::FieldArith,
+    frontend::BabyBearConfig,
     utils::error::Error,
 };
 
@@ -119,23 +120,33 @@ fn test_goldilocks() {
 }
 
 #[test]
+fn test_babybear() {
+    do_tests::<BabyBearConfig, NormalInputType>(5000000);
+}
+
+#[test]
 fn test_m31_cross() {
-    do_tests::<M31Config, CrossLayerInputType>(5000000);
+    do_tests::<M31Config, CrossLayerInputType>(6000000);
 }
 
 #[test]
 fn test_bn254_cross() {
-    do_tests::<BN254Config, CrossLayerInputType>(6000000);
+    do_tests::<BN254Config, CrossLayerInputType>(7000000);
 }
 
 #[test]
 fn test_gf2_cross() {
-    do_tests::<GF2Config, CrossLayerInputType>(7000000);
+    do_tests::<GF2Config, CrossLayerInputType>(8000000);
 }
 
 #[test]
 fn test_goldilocks_cross() {
-    do_tests::<GoldilocksConfig, CrossLayerInputType>(8000000);
+    do_tests::<GoldilocksConfig, CrossLayerInputType>(9000000);
+}
+
+#[test]
+fn test_babybear_cross() {
+    do_tests::<BabyBearConfig, CrossLayerInputType>(10000000);
 }
 
 fn deterministic_<I: InputType>() {

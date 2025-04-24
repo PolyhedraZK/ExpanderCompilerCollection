@@ -5,8 +5,7 @@ members = [
     "expander_compiler",
     "expander_compiler/ec_go_lib",
     "expander_compiler/macros",
-    "rsa_circuit",
-    "efc"
+    "rsa_circuit"
 ]
 
 [profile.test]
@@ -44,6 +43,7 @@ tiny-keccak = { version = "2.0", features = ["keccak"] }
 
 
 arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+babybear = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "main"}
 expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "circuit" }
 expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "transcript" }

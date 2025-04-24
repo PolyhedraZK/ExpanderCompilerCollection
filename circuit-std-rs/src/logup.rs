@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use arith::Field;
+use ethnum::U256;
 use expander_compiler::frontend::{
     declare_circuit, CircuitField, Config, Define, Error, RootAPI, Variable,
 };
@@ -360,6 +361,9 @@ impl LogUpRangeProofTable {
     }
 
     pub fn rangeproof<C: Config, B: RootAPI<C>>(&mut self, builder: &mut B, a: Variable, n: usize) {
+        if n > 128 {
+            panic!("n must be less than 128");
+        }
         if n <= self.rangeproof_bits {
             self.rangeproof_onechunk(builder, a, n);
             return;
@@ -367,13 +371,16 @@ impl LogUpRangeProofTable {
         //add a shift value
         let mut n = n;
         let mut new_a = a;
-        if n % self.rangeproof_bits != 0 {
-            let rem = n % self.rangeproof_bits;
+        let rem = n % self.rangeproof_bits;
+        if rem != 0 {
             let shift = self.rangeproof_bits - rem;
             let constant = (1 << shift) - 1;
-            let mut mul_factor = 1;
-            // println!("n:{}", n);
+
+            let mut mul_factor: u128 = 1;
             mul_factor <<= n;
+            let mul_factor_u256 = U256::new(mul_factor);
+            let mul_factor_var = CircuitField::<C>::from_u256(mul_factor_u256);
+            let mul_factor = builder.constant(mul_factor_var);
             let a_shift = builder.mul(constant, mul_factor);
             new_a = builder.add(a, a_shift);
             n += shift;
@@ -390,8 +397,10 @@ impl LogUpRangeProofTable {
         );
         let mut sum = witnesses[0];
         for (i, witness) in witnesses.iter().enumerate().skip(1) {
-            let constant = 1 << (self.rangeproof_bits * i);
-            let constant = builder.constant(constant);
+            let constant = 1u128 << (self.rangeproof_bits * i);
+            let constant_u256 = U256::new(constant);
+            let constant_u256_var = CircuitField::<C>::from_u256(constant_u256);
+            let constant = builder.constant(constant_u256_var);
             let mul = builder.mul(witness, constant);
             sum = builder.add(sum, mul);
         }
@@ -435,6 +444,7 @@ impl LogUpRangeProofTable {
         println!("lookup inputs's len {}", inputs.len());
 
         let query_count = builder.new_hint("myhint.querycounthint", &inputs, self.table_keys.len());
+
         let v_table = logup_poly_val(builder, &self.table_keys, &query_count, &alpha);
 
         let one = builder.constant(1);
@@ -488,12 +498,19 @@ pub fn query_count_by_key_hint<F: Field>(inputs: &[F], outputs: &mut [F]) -> Res
 pub fn rangeproof_hint<F: Field>(inputs: &[F], outputs: &mut [F]) -> Result<(), Error> {
     let n = inputs[0].to_u256().as_i64();
     let m = inputs[1].to_u256().as_i64();
-    let mut a = inputs[2].to_u256().as_i64();
+
+    let mut a = inputs[2].to_u256(); // Value 'new_a' as U256
+
+    let chunk_mod = U256::from(1_u64) << m;
 
     for i in 0..n / m {
-        let r = a % (1 << m);
-        a /= 1 << m;
-        outputs[i as usize] = F::from(r as u32);
+        let r = a % chunk_mod;
+        a /= chunk_mod;
+        // println!(
+        //     "rangeproof_hint chunk {}: r = {}, a_remaining = {}",
+        //     i, r, a
+        // ); // Log chunks
+        outputs[i as usize] = F::from(r.as_u32());
     }
     Ok(())
 }
