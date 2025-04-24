@@ -441,6 +441,7 @@ impl LogUpRangeProofTable {
     pub fn final_check<C: Config, B: RootAPI<C>>(&mut self, builder: &mut B) {
         let alpha = builder.get_random_value();
         let inputs = self.query_keys.clone();
+        println!("lookup inputs's len {}", inputs.len());
 
         let query_count = builder.new_hint("myhint.querycounthint", &inputs, self.table_keys.len());
 
