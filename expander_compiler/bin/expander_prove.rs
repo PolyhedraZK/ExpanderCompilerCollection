@@ -1,3 +1,6 @@
+use std::cmp;
+
+use arith::Field;
 use expander_compiler::circuit::config::Config;
 use expander_compiler::frontend::M31Config;
 use expander_compiler::zkcuda::proving_system::callee_utils::{
@@ -42,6 +45,7 @@ fn prove<C: Config>() {
     let mpi_config = MPIConfig::new();
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
+    assert!(world_size > 1, "In case world_size is 1, we should not use the mpi version of the prover");
 
     let pcs_setup = read_pcs_setup_from_shared_memory::<C>();
     let ecc_circuit = read_ecc_circuit_from_shared_memory::<C>();
@@ -152,37 +156,31 @@ fn prove_input_claim<C: Config>(
         let params = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::gen_params(val_len);
         let p_key = p_keys.p_keys.get(&val_len).unwrap();
 
-        // TODO: Remove unnecessary `to_vec` clone
         let poly = MultiLinearPoly::new(vals_to_open.to_vec());
         let v = MultiLinearPolyExpander::<field!(C)>::collectively_eval_circuit_vals_at_expander_challenge(
             vals_to_open,
             &challenge_vars,
             x_simd,
             x_mpi,
-            &mut [],
-            &mut [],
+            &mut vec![<C::DefaultGKRFieldConfig as GKRFieldConfig>::Field::ZERO; val_len],
+            &mut vec![<C::DefaultGKRFieldConfig as GKRFieldConfig>::ChallengeField::ZERO; 1 << cmp::max(x_simd.len(), x_mpi.len())],
             mpi_config,
         );
         transcript.append_field_element(&v);
 
         transcript.lock_proof();
-        let scratch_for_parallel_index = if *ib {
-            &extra_info.scratch[0]
-        } else {
-            &extra_info.scratch[parallel_index]
-        };
         let opening = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::open(
             &params,
-            &MPIConfig::default(),
+            mpi_config,
             p_key,
             &poly,
             &ExpanderGKRChallenge::<C::DefaultGKRFieldConfig> {
                 x: challenge_vars.to_vec(),
                 x_simd: x_simd.to_vec(),
-                x_mpi: vec![],
+                x_mpi: x_mpi.to_vec(),
             },
             transcript,
-            scratch_for_parallel_index,
+            &extra_info.scratch[0],
         )
         .unwrap();
         transcript.unlock_proof();

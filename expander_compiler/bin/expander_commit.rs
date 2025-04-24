@@ -30,6 +30,8 @@ macro_rules! pcs {
 fn commit<C: Config>() {
     let mpi_config = MPIConfig::new();
     let rank = mpi_config.world_rank();
+    let world_size = mpi_config.world_size();
+    assert!(world_size > 1, "In case world_size is 1, we should not use the mpi version of the prover");
 
     let (local_val_len, p_key) = read_selected_pkey_from_shared_memory::<C>();
 
@@ -45,12 +47,12 @@ fn commit<C: Config>() {
 
     let mut scratch = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::init_scratch_pad(
         &params,
-        &MPIConfig::default(),
+        &mpi_config,
     );
 
     let commitment = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::commit(
         &params,
-        &MPIConfig::default(),
+        &mpi_config,
         &p_key,
         &MultiLinearPoly::new(local_vals_to_commit),
         &mut scratch,
