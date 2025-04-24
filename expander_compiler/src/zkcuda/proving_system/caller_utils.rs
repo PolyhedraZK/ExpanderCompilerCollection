@@ -137,7 +137,7 @@ pub fn write_ecc_circuit_to_shared_memory<C: Config, I: InputType>(ecc_circuit: 
     write_object_to_shared_memory(
         ecc_circuit,
         unsafe { &mut SHARED_MEMORY.circuit },
-        "ecc_circuit",
+        "circuit",
     );
 }
 
@@ -153,7 +153,7 @@ pub fn write_commitments_to_shared_memory<C: Config>(commitments: &Vec<ExpanderG
     write_object_to_shared_memory(
         commitments,
         unsafe { &mut SHARED_MEMORY.commitment },
-        "commitments",
+        "commitment",
     );
 }
 
@@ -163,7 +163,7 @@ pub fn write_commitments_extra_info_to_shared_memory<C: Config>(
     write_object_to_shared_memory(
         commitments_extra_info,
         unsafe { &mut SHARED_MEMORY.extra_info },
-        "commitments_extra_info",
+        "extra_info",
     );
 }
 
@@ -177,7 +177,7 @@ pub fn write_commitments_values_to_shared_memory<C: Config>(
     write_object_to_shared_memory(
         &commitments_values,
         unsafe { &mut SHARED_MEMORY.input_vals },
-        "commitments_values",
+        "input_vals",
     );
 }
 
@@ -185,7 +185,7 @@ pub fn write_broadcast_info_to_shared_memory(is_broadcast: &Vec<bool>) {
     write_object_to_shared_memory(
         is_broadcast,
         unsafe { &mut SHARED_MEMORY.broadcast_info },
-        "is_broadcast",
+        "broadcast_info",
     );
 }
 
@@ -202,13 +202,13 @@ fn exec_command(cmd: &str) {
 }
 
 pub fn exec_pcs_commit(mpi_size: usize) {
-    let cmd_str = format!("mpiexec -n {} ./target/release/pcs_commit", mpi_size);
+    let cmd_str = format!("mpiexec -n {} ../target/release/expander_commit", mpi_size);
     exec_command(&cmd_str);
 }
 
 pub fn exec_gkr_prove_with_pcs(mpi_size: usize) {
     let cmd_str = format!(
-        "mpiexec -n {} ./target/release/gkr_prove_with_pcs",
+        "mpiexec -n {} ../target/release/expander_prove",
         mpi_size
     );
     exec_command(&cmd_str);

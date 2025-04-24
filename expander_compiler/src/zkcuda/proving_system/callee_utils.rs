@@ -44,7 +44,7 @@ pub fn read_selected_pkey_from_shared_memory<C: Config>() -> (usize, <<pcs!(C) a
 }
 
 pub fn read_commit_vals_from_shared_memory<C: Config>() -> Vec<C::DefaultSimdField> {
-    read_object_from_shared_memory_name_string("commit_vals")
+    read_object_from_shared_memory_name_string("input_vals")
 }
 
 pub fn write_object_to_shared_memory_name_string<T: ExpSerde>(object: &T, shared_memory_ref: &str) {
@@ -70,7 +70,7 @@ pub fn write_commitment_to_shared_memory<C: Config>(
 pub fn write_commitment_extra_info_to_shared_memory<C: Config>(
     extra_info: &<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::ScratchPad,
 ) {
-    write_object_to_shared_memory_name_string(extra_info, "commitment_extra_info");
+    write_object_to_shared_memory_name_string(extra_info, "extra_info");
 }
 
 pub fn read_pcs_setup_from_shared_memory<C: Config>() -> ExpanderGKRProverSetup<C> {
@@ -78,7 +78,7 @@ pub fn read_pcs_setup_from_shared_memory<C: Config>() -> ExpanderGKRProverSetup<
 }
 
 pub fn read_ecc_circuit_from_shared_memory<C: Config>() -> Circuit<C, NormalInputType> {
-    read_object_from_shared_memory_name_string("ecc_circuit")
+    read_object_from_shared_memory_name_string("circuit")
 }
 
 pub fn read_partition_info_from_shared_memory() -> Vec<LayeredCircuitInputVec> {
@@ -91,11 +91,11 @@ pub fn read_commitment_from_shared_memory<C: Config>() -> Vec<ExpanderGKRCommitm
 
 pub fn read_commitment_extra_info_from_shared_memory<C: Config>(
 ) -> Vec<ExpanderGKRCommitmentExtraInfo<C>> {
-    read_object_from_shared_memory_name_string("commitment_extra_info")
+    read_object_from_shared_memory_name_string("extra_info")
 }
 
 pub fn read_commitment_values_from_shared_memory<C: Config>() -> Vec<Vec<C::DefaultSimdField>> {
-    read_object_from_shared_memory_name_string("commitment_values")
+    read_object_from_shared_memory_name_string("input_vals")
 }
 
 pub fn read_broadcast_info_from_shared_memory() -> Vec<bool> {

@@ -36,7 +36,7 @@ fn commit<C: Config>() {
         "In case world_size is 1, we should not use the mpi version of the prover"
     );
     if rank == 0 {
-        println!("Expander Prove Exec Called with world size {}", world_size);
+        println!("Expander Commit Exec Called with world size {}", world_size);
     }
 
     let (local_val_len, p_key) = read_selected_pkey_from_shared_memory::<C>();
