@@ -29,13 +29,13 @@ macro_rules! pcs {
 
 fn commit<C: Config>() {
     let mpi_config = MPIConfig::new();
-    let rank = mpi_config.world_rank();
+    let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
     assert!(
         world_size > 1,
         "In case world_size is 1, we should not use the mpi version of the prover"
     );
-    if rank == 0 {
+    if world_rank == 0 {
         println!("Expander Commit Exec Called with world size {}", world_size);
     }
 
@@ -44,7 +44,7 @@ fn commit<C: Config>() {
     // TODO: remove the redundancy
     let global_vals_to_commit = read_commit_vals_from_shared_memory::<C>();
     let local_vals_to_commit =
-        global_vals_to_commit[local_val_len * rank..local_val_len * (rank + 1)].to_vec();
+        global_vals_to_commit[local_val_len * world_rank..local_val_len * (world_rank + 1)].to_vec();
     drop(global_vals_to_commit);
 
     let params = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::gen_params(
@@ -62,11 +62,12 @@ fn commit<C: Config>() {
         &p_key,
         &MultiLinearPoly::new(local_vals_to_commit),
         &mut scratch,
-    )
-    .unwrap();
+    );
 
-    write_commitment_to_shared_memory::<C>(&commitment);
-    write_commitment_extra_info_to_shared_memory::<C>(&scratch);
+    if world_rank == 0 {
+        write_commitment_to_shared_memory::<C>(&commitment.unwrap());
+        write_commitment_extra_info_to_shared_memory::<C>(&scratch);
+    }
 }
 
 fn main() {

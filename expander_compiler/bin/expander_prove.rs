@@ -126,7 +126,9 @@ fn prove<C: Config>() {
     }
 
     let proof = transcript.finalize_and_get_proof();
-    write_proof_to_shared_memory(&ExpanderGKRProof { data: vec![proof] });
+    if world_rank == 0 {
+        write_proof_to_shared_memory(&ExpanderGKRProof { data: vec![proof] });
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
