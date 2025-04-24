@@ -1,7 +1,10 @@
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::proof::ComputationGraph;
-use expander_compiler::zkcuda::proving_system::ExpanderGKRProvingSystem;
+use expander_compiler::zkcuda::proving_system::{
+    ExpanderGKRProvingSystem, ParallelizedExpanderGKRProvingSystem, ProvingSystem,
+};
 use expander_compiler::zkcuda::{context::*, kernel::*};
+use gkr_field_config::GKRFieldConfig;
 use serdes::ExpSerde;
 
 fn add_2<C: Config>(api: &mut API<C>, inputs: &mut Vec<Vec<Variable>>) {
@@ -19,9 +22,8 @@ fn add_16<C: Config>(api: &mut API<C>, inputs: &mut Vec<Vec<Variable>>) {
     inputs[1][0] = sum;
 }
 
-#[test]
-fn zkcuda_1_expander() {
-    let kernel_add_2: Kernel<M31Config> = compile_with_spec(
+fn zkcuda_1_expander<C: Config, P: ProvingSystem<C>>() {
+    let kernel_add_2: Kernel<C> = compile_with_spec(
         add_2,
         &[
             IOVecSpec {
@@ -37,7 +39,7 @@ fn zkcuda_1_expander() {
         ],
     )
     .unwrap();
-    let kernel_add_16: Kernel<M31Config> = compile_with_spec(
+    let kernel_add_16: Kernel<C> = compile_with_spec(
         add_16,
         &[
             IOVecSpec {
@@ -54,10 +56,10 @@ fn zkcuda_1_expander() {
     )
     .unwrap();
 
-    let mut ctx: Context<M31Config> = Context::default();
+    let mut ctx = Context::<C, P>::default();
     let mut a = vec![];
     for i in 0..32 {
-        a.push(M31::from(i + 1_u32));
+        a.push(<C::DefaultGKRFieldConfig as GKRFieldConfig>::CircuitField::from(i + 1_u32));
     }
     let a = ctx.copy_raw_to_device(&a);
     let mut io = vec![a, None];
@@ -67,12 +69,25 @@ fn zkcuda_1_expander() {
     ctx.call_kernel_raw(&kernel_add_16, &mut io, 1, &[false, false]);
     let c = io[1].clone();
     let result = ctx.copy_raw_to_host(c);
-    assert_eq!(result, vec![M31::from(32 * 33 / 2)]);
+    assert_eq!(
+        result,
+        vec![<C::DefaultGKRFieldConfig as GKRFieldConfig>::CircuitField::from(32 * 33 / 2)]
+    );
 
     let computation_graph = ctx.to_computation_graph();
     let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
     let proof = ctx.to_proof(&prover_setup);
     assert!(computation_graph.verify(&proof, &verifier_setup));
+}
+
+#[test]
+fn zkcuda_1_single_core() {
+    zkcuda_1_expander::<M31Config, ExpanderGKRProvingSystem<M31Config>>();
+}
+
+#[test]
+fn zkcuda_1_multi_core() {
+    zkcuda_1_expander::<M31Config, ParallelizedExpanderGKRProvingSystem<M31Config>>();
 }
 
 #[kernel]

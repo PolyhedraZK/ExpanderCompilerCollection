@@ -4,13 +4,14 @@ use arith::Field;
 use expander_compiler::circuit::config::Config;
 use expander_compiler::frontend::M31Config;
 use expander_compiler::zkcuda::proving_system::callee_utils::{
-    read_broadcast_info_from_shared_memory,
-    read_commitment_extra_info_from_shared_memory, read_commitment_from_shared_memory,
-    read_commitment_values_from_shared_memory, read_ecc_circuit_from_shared_memory,
-    read_partition_info_from_shared_memory, read_pcs_setup_from_shared_memory,
+    read_broadcast_info_from_shared_memory, read_commitment_extra_info_from_shared_memory,
+    read_commitment_from_shared_memory, read_commitment_values_from_shared_memory,
+    read_ecc_circuit_from_shared_memory, read_partition_info_from_shared_memory,
+    read_pcs_setup_from_shared_memory, write_proof_to_shared_memory,
 };
 use expander_compiler::zkcuda::proving_system::{
-    max_n_vars, prepare_inputs, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProverSetup,
+    max_n_vars, prepare_inputs, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof,
+    ExpanderGKRProverSetup,
 };
 
 use expander_config::GKRConfig;
@@ -45,7 +46,13 @@ fn prove<C: Config>() {
     let mpi_config = MPIConfig::new();
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
-    assert!(world_size > 1, "In case world_size is 1, we should not use the mpi version of the prover");
+    assert!(
+        world_size > 1,
+        "In case world_size is 1, we should not use the mpi version of the prover"
+    );
+    if world_rank == 0 {
+        println!("Expander Prove Exec Called with world size {}", world_size);
+    }
 
     let pcs_setup = read_pcs_setup_from_shared_memory::<C>();
     let ecc_circuit = read_ecc_circuit_from_shared_memory::<C>();
@@ -117,6 +124,9 @@ fn prove<C: Config>() {
             &mut transcript,
         );
     }
+
+    let proof = transcript.finalize_and_get_proof();
+    write_proof_to_shared_memory(&ExpanderGKRProof { data: vec![proof] });
 }
 
 #[allow(clippy::too_many_arguments)]

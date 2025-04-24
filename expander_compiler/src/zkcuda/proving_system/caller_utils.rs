@@ -47,6 +47,7 @@ pub fn init_commitment_and_extra_info_shared_memory<C: Config>(
             ShmemConf::new()
                 .size(commitment_size)
                 .flink("commitment")
+                .force_create_flink()
                 .create()
                 .unwrap(),
         );
@@ -54,6 +55,7 @@ pub fn init_commitment_and_extra_info_shared_memory<C: Config>(
             ShmemConf::new()
                 .size(extra_info_size)
                 .flink("extra_info")
+                .force_create_flink()
                 .create()
                 .unwrap(),
         );
@@ -70,6 +72,7 @@ pub fn init_proof_shared_memory(max_proof_size: usize) {
             ShmemConf::new()
                 .size(max_proof_size)
                 .flink("proof")
+                .force_create_flink()
                 .create()
                 .unwrap(),
         );
@@ -94,6 +97,7 @@ fn write_object_to_shared_memory<T: ExpSerde>(
             ShmemConf::new()
                 .size(buffer.len())
                 .flink(name)
+                .force_create_flink()
                 .create()
                 .unwrap(),
         );
