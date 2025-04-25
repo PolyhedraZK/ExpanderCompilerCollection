@@ -58,7 +58,7 @@ fn compress_bits(b: Vec<usize>) -> Vec<usize> {
 }
 
 fn compress_bits_var<C: Config>(api: &mut API<C>, mut a: Vec<Variable>) -> Vec<Variable> {
-    if a.len() != CHECK_BITS || C::CircuitField::FIELD_SIZE <= PARTITION_BITS {
+    if a.len() != CHECK_BITS || CircuitField::<C>::FIELD_SIZE <= PARTITION_BITS {
         panic!("gg");
     }
     for i in 0..a.len() {
@@ -82,12 +82,12 @@ fn from_my_bit_form<C: Config>(api: &mut API<C>, x: Variable) -> Variable {
     api.div(t, 2, true)
 }
 
-fn to_my_bit_form<C: Config>(x: usize) -> C::CircuitField {
+fn to_my_bit_form<C: Config>(x: usize) -> CircuitField<C> {
     if x == 0 {
-        C::CircuitField::one()
+        CircuitField::<C>::one()
     } else {
         assert_eq!(x, 1);
-        -C::CircuitField::one()
+        -CircuitField::<C>::one()
     }
 }
 

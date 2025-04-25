@@ -1,6 +1,6 @@
 use crate::{
     circuit::{
-        config::Config,
+        config::{Config, SIMDField},
         layered::{Circuit, NormalInputType},
     },
     zkcuda::kernel::LayeredCircuitInputVec,
@@ -11,7 +11,7 @@ use super::super::kernel::Kernel;
 
 pub fn check_inputs<C: Config>(
     kernel: &Kernel<C>,
-    values: &[&[C::DefaultSimdField]],
+    values: &[&[SIMDField<C>]],
     parallel_count: usize,
     is_broadcast: &[bool],
 ) {
@@ -35,10 +35,10 @@ pub fn check_inputs<C: Config>(
 pub fn prepare_inputs<C: Config>(
     layered_circuit: &Circuit<C, NormalInputType>,
     partition_info: &[LayeredCircuitInputVec],
-    values: &[&[C::DefaultSimdField]],
+    values: &[&[SIMDField<C>]],
     is_broadcast: &[bool],
     parallel_index: usize,
-) -> Vec<C::DefaultSimdField> {
+) -> Vec<SIMDField<C>> {
     let mut lc_input = vec![C::DefaultSimdField::zero(); layered_circuit.input_size()];
     for ((input, value), ib) in partition_info.iter().zip(values.iter()).zip(is_broadcast) {
         if *ib {

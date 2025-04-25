@@ -1,6 +1,6 @@
 use serdes::ExpSerde;
 
-use crate::circuit::config::Config;
+use crate::circuit::config::{Config, SIMDField};
 
 use super::super::kernel::Kernel;
 use super::{check_inputs, prepare_inputs, Commitment, Proof, ProvingSystem};
@@ -9,7 +9,7 @@ use super::{check_inputs, prepare_inputs, Commitment, Proof, ProvingSystem};
 
 #[derive(Clone)]
 pub struct DummyCommitment<C: Config> {
-    vals: Vec<C::DefaultSimdField>,
+    vals: Vec<SIMDField<C>>,
 }
 
 impl<C: Config> ExpSerde for DummyCommitment<C> {
@@ -18,7 +18,7 @@ impl<C: Config> ExpSerde for DummyCommitment<C> {
         self.vals.serialize_into(&mut writer)
     }
     fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
-        let vals = Vec::<C::DefaultSimdField>::deserialize_from(&mut reader)?;
+        let vals = Vec::<SIMDField<C>>::deserialize_from(&mut reader)?;
         Ok(DummyCommitment { vals })
     }
 }
@@ -47,9 +47,10 @@ impl ExpSerde for DummyProof {
 
 impl Proof for DummyProof {}
 
-#[deprecated(
+// TODO
+/*#[deprecated(
     note = "DummyProvingSystem is a dummy implementation for testing purposes. Please use ExpanderGKRProvingSystem."
-)]
+)]*/
 pub struct DummyProvingSystem<C: Config> {
     _config: std::marker::PhantomData<C>,
 }
@@ -76,7 +77,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
 
     fn commit(
         _prover_setup: &Self::ProverSetup,
-        vals: &[<C as Config>::DefaultSimdField],
+        vals: &[SIMDField<C>],
         _parallel_count: usize,
         _is_broadcast: bool,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo) {
@@ -94,7 +95,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
         kernel: &Kernel<C>,
         _commitments: &[Self::Commitment],
         _commitments_extra_info: &[Self::CommitmentExtraInfo],
-        commitments_values: &[&[C::DefaultSimdField]],
+        commitments_values: &[&[SIMDField<C>]],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> DummyProof {

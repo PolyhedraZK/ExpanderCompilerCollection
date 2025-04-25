@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::field::FieldArith;
+use crate::frontend::CircuitField;
 use crate::hints::registry::HintCaller;
 use crate::utils::error::Error;
 use crate::{
@@ -124,7 +125,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             },
         }
     }
-    fn from_kx_plus_b(x: usize, k: C::CircuitField, b: C::CircuitField) -> Self {
+    fn from_kx_plus_b(x: usize, k: CircuitField<C>, b: CircuitField<C>) -> Self {
         Instruction::LinComb(expr::LinComb::from_kx_plus_b(x, k, b))
     }
     fn validate(&self, num_public_inputs: usize) -> Result<(), Error> {
@@ -165,11 +166,11 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             _ => Ok(()),
         }
     }
-    fn eval_unsafe(&self, values: &[C::CircuitField]) -> EvalResult<C> {
+    fn eval_unsafe(&self, values: &[CircuitField<C>]) -> EvalResult<C> {
         match self {
             Instruction::LinComb(lc) => EvalResult::Value(lc.eval(values)),
             Instruction::Mul(inputs) => {
-                let mut res = C::CircuitField::one();
+                let mut res = CircuitField::<C>::one();
                 for &i in inputs.iter() {
                     res *= values[i];
                 }
@@ -205,9 +206,9 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
 impl<C: Config> Instruction<C> {
     fn eval_safe(
         &self,
-        values: &[C::CircuitField],
-        public_inputs: &[C::CircuitField],
-        hint_caller: &mut impl HintCaller<C::CircuitField>,
+        values: &[CircuitField<C>],
+        public_inputs: &[CircuitField<C>],
+        hint_caller: &mut impl HintCaller<CircuitField<C>>,
     ) -> EvalResult<C> {
         if let Instruction::ConstantLike(coef) = self {
             return match coef {
@@ -224,7 +225,7 @@ impl<C: Config> Instruction<C> {
             num_outputs,
         } = self
         {
-            let inputs: Vec<C::CircuitField> = inputs.iter().map(|i| values[*i]).collect();
+            let inputs: Vec<CircuitField<C>> = inputs.iter().map(|i| values[*i]).collect();
             return match hints::safe_impl(hint_caller, *hint_id, &inputs, *num_outputs) {
                 Ok(outputs) => EvalResult::Values(outputs),
                 Err(e) => EvalResult::Error(e),
@@ -483,10 +484,10 @@ impl<C: Config> RootCircuit<C> {
 
     pub fn eval_safe(
         &self,
-        inputs: Vec<C::CircuitField>,
-        public_inputs: &[C::CircuitField],
-        hint_caller: &mut impl HintCaller<C::CircuitField>,
-    ) -> Result<Vec<C::CircuitField>, Error> {
+        inputs: Vec<CircuitField<C>>,
+        public_inputs: &[CircuitField<C>],
+        hint_caller: &mut impl HintCaller<CircuitField<C>>,
+    ) -> Result<Vec<CircuitField<C>>, Error> {
         assert_eq!(inputs.len(), self.input_size());
         self.eval_sub_safe(&self.circuits[&0], inputs, public_inputs, hint_caller)
     }
@@ -494,11 +495,11 @@ impl<C: Config> RootCircuit<C> {
     fn eval_sub_safe(
         &self,
         circuit: &Circuit<C>,
-        inputs: Vec<C::CircuitField>,
-        public_inputs: &[C::CircuitField],
-        hint_caller: &mut impl HintCaller<C::CircuitField>,
-    ) -> Result<Vec<C::CircuitField>, Error> {
-        let mut values = vec![C::CircuitField::zero(); 1];
+        inputs: Vec<CircuitField<C>>,
+        public_inputs: &[CircuitField<C>],
+        hint_caller: &mut impl HintCaller<CircuitField<C>>,
+    ) -> Result<Vec<CircuitField<C>>, Error> {
+        let mut values = vec![CircuitField::<C>::zero(); 1];
         values.extend(inputs);
         for insn in circuit.instructions.iter() {
             match insn.eval_safe(&values, public_inputs, hint_caller) {
@@ -529,11 +530,11 @@ impl<C: Config> RootCircuit<C> {
         Ok(res)
     }
 
-    pub fn eval_safe_simd<SF: arith::SimdField<Scalar = C::CircuitField>>(
+    pub fn eval_safe_simd<SF: arith::SimdField<Scalar = CircuitField<C>>>(
         &self,
         inputs: Vec<SF>,
         public_inputs: &[SF],
-        hint_caller: &mut impl HintCaller<C::CircuitField>,
+        hint_caller: &mut impl HintCaller<CircuitField<C>>,
     ) -> Result<Vec<SF>, Error> {
         assert_eq!(inputs.len(), self.input_size());
         let mut result_values = Vec::new();
@@ -547,12 +548,12 @@ impl<C: Config> RootCircuit<C> {
         Ok(result_values)
     }
 
-    fn eval_sub_safe_simd<SF: arith::SimdField<Scalar = C::CircuitField>>(
+    fn eval_sub_safe_simd<SF: arith::SimdField<Scalar = CircuitField<C>>>(
         &self,
         circuit: &Circuit<C>,
         inputs: Vec<SF>,
         public_inputs: &[SF],
-        hint_caller: &mut impl HintCaller<C::CircuitField>,
+        hint_caller: &mut impl HintCaller<CircuitField<C>>,
         result_values: &mut Vec<SF>,
     ) -> Result<(), Error> {
         let mut values = vec![SF::zero(); 1];
@@ -583,13 +584,10 @@ impl<C: Config> RootCircuit<C> {
                         }
                     }
                     let mut outputs_tmp =
-                        vec![C::CircuitField::zero(); num_outputs * SF::PACK_SIZE];
+                        vec![CircuitField::<C>::zero(); num_outputs * SF::PACK_SIZE];
                     for (i, inputs) in inputs_scalar.iter().enumerate() {
                         let outputs =
-                            match hints::safe_impl(hint_caller, *hint_id, inputs, *num_outputs) {
-                                Ok(outputs) => outputs,
-                                Err(e) => return Err(e),
-                            };
+                            hints::safe_impl(hint_caller, *hint_id, inputs, *num_outputs)?;
                         for (j, x) in outputs.iter().enumerate() {
                             outputs_tmp[j * SF::PACK_SIZE + i] = *x;
                         }

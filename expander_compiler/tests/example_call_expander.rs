@@ -1,5 +1,7 @@
 use arith::Field;
+use arith::SimdField as _SimdField;
 use expander_compiler::frontend::*;
+use gkr_engine::{MPIConfig, MPIEngine};
 use rand::SeedableRng;
 
 declare_circuit!(Circuit {
@@ -18,16 +20,16 @@ impl<C: Config> Define<C> for Circuit<Variable> {
 }
 
 fn example<C: Config>() {
-    let n_witnesses = <C::DefaultSimdField as arith::SimdField>::PACK_SIZE;
+    let n_witnesses = SIMDField::<C>::PACK_SIZE;
     println!("n_witnesses: {}", n_witnesses);
     let compile_result: CompileResult<C> =
         compile(&Circuit::default(), CompileOptions::default()).unwrap();
-    let mut s = [C::CircuitField::zero(); 100];
+    let mut s = [CircuitField::<C>::zero(); 100];
     let mut rng = rand::rngs::StdRng::seed_from_u64(1235);
     for i in 0..s.len() {
-        s[i] = C::CircuitField::random_unsafe(&mut rng);
+        s[i] = CircuitField::<C>::random_unsafe(&mut rng);
     }
-    let assignment = Circuit::<C::CircuitField> {
+    let assignment = Circuit::<CircuitField<C>> {
         s,
         sum: s.iter().sum(),
     };
@@ -43,7 +45,7 @@ fn example<C: Config>() {
 
     let mut expander_circuit = compile_result.layered_circuit.export_to_expander_flatten();
 
-    let config = C::new_expander_config();
+    let mpi_config = MPIConfig::prover_new();
 
     let (simd_input, simd_public_input) = witness.to_simd();
     println!("{} {}", simd_input.len(), simd_public_input.len());
@@ -52,12 +54,12 @@ fn example<C: Config>() {
 
     // prove
     expander_circuit.evaluate();
-    let (claimed_v, proof) = gkr::executor::prove(&mut expander_circuit, &config);
+    let (claimed_v, proof) = gkr::executor::prove::<C>(&mut expander_circuit, mpi_config.clone());
 
     // verify
-    assert!(gkr::executor::verify(
+    assert!(gkr::executor::verify::<C>(
         &mut expander_circuit,
-        &config,
+        mpi_config,
         &proof,
         &claimed_v
     ));
@@ -74,6 +76,16 @@ fn example_m31() {
 }
 
 #[test]
+fn example_goldilocks() {
+    example::<GoldilocksConfig>();
+}
+
+#[test]
 fn example_bn254() {
     example::<BN254Config>();
+}
+
+#[test]
+fn example_babybear() {
+    example::<BabyBearConfig>();
 }
