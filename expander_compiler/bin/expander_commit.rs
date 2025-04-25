@@ -4,6 +4,10 @@ use expander_compiler::zkcuda::proving_system::callee_utils::{
     read_commit_vals_from_shared_memory, read_selected_pkey_from_shared_memory,
     write_commitment_extra_info_to_shared_memory, write_commitment_to_shared_memory,
 };
+use expander_compiler::zkcuda::proving_system::{
+    ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo,
+};
+
 use expander_config::GKRConfig;
 use mpi_config::MPIConfig;
 use poly_commit::PCSForExpanderGKR;
@@ -43,8 +47,9 @@ fn commit<C: Config>() {
 
     // TODO: remove the redundancy
     let global_vals_to_commit = read_commit_vals_from_shared_memory::<C>();
-    let local_vals_to_commit =
-        global_vals_to_commit[local_val_len * world_rank..local_val_len * (world_rank + 1)].to_vec();
+    let local_vals_to_commit = global_vals_to_commit
+        [local_val_len * world_rank..local_val_len * (world_rank + 1)]
+        .to_vec();
     drop(global_vals_to_commit);
 
     let params = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::gen_params(
@@ -65,9 +70,19 @@ fn commit<C: Config>() {
     );
 
     if world_rank == 0 {
-        write_commitment_to_shared_memory::<C>(&commitment.unwrap());
-        write_commitment_extra_info_to_shared_memory::<C>(&scratch);
+        let commitment = ExpanderGKRCommitment {
+            vals_len: local_val_len,
+            commitment: vec![commitment.unwrap()],
+        };
+        let extra_info = ExpanderGKRCommitmentExtraInfo {
+            scratch: vec![scratch],
+        };
+
+        write_commitment_to_shared_memory::<C>(&commitment);
+        write_commitment_extra_info_to_shared_memory::<C>(&extra_info);
     }
+
+    MPIConfig::finalize();
 }
 
 fn main() {

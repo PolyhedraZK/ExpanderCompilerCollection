@@ -44,7 +44,7 @@ macro_rules! pcs {
 
 #[allow(clippy::type_complexity)]
 pub struct ExpanderGKRCommitment<C: Config> {
-    vals_len: usize,
+    pub vals_len: usize,
     pub commitment: Vec<<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::Commitment>,
 }
 

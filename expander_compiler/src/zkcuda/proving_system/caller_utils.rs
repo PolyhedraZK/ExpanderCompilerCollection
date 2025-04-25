@@ -207,10 +207,7 @@ pub fn exec_pcs_commit(mpi_size: usize) {
 }
 
 pub fn exec_gkr_prove_with_pcs(mpi_size: usize) {
-    let cmd_str = format!(
-        "mpiexec -n {} ../target/release/expander_prove",
-        mpi_size
-    );
+    let cmd_str = format!("mpiexec -n {} ../target/release/expander_prove", mpi_size);
     exec_command(&cmd_str);
 }
 
@@ -228,14 +225,10 @@ pub fn read_object_from_shared_memory<T: ExpSerde>(shared_memory_ref: &mut Optio
 pub fn read_commitment_and_extra_info_from_shared_memory<C: Config>(
 ) -> (ExpanderGKRCommitment<C>, ExpanderGKRCommitmentExtraInfo<C>) {
     let commitment = read_object_from_shared_memory(unsafe { &mut SHARED_MEMORY.commitment });
-    let scratch = read_object_from_shared_memory(unsafe { &mut SHARED_MEMORY.extra_info });
-    let extra_info = ExpanderGKRCommitmentExtraInfo {
-        scratch: vec![scratch],
-    };
+    let extra_info = read_object_from_shared_memory(unsafe { &mut SHARED_MEMORY.extra_info });
     (commitment, extra_info)
 }
 
 pub fn read_proof_from_shared_memory() -> ExpanderGKRProof {
-    let proof = read_object_from_shared_memory(unsafe { &mut SHARED_MEMORY.proof });
-    ExpanderGKRProof { data: vec![proof] }
+    read_object_from_shared_memory(unsafe { &mut SHARED_MEMORY.proof })
 }

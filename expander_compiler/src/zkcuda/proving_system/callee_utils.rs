@@ -55,20 +55,24 @@ pub fn write_object_to_shared_memory_name_string<T: ExpSerde>(object: &T, shared
 
     unsafe {
         let shmem = ShmemConf::new().flink(shared_memory_ref).open().unwrap();
+        assert!(
+            shmem.len() >= buffer.len(),
+            "{}, {}",
+            shmem.len(),
+            buffer.len()
+        );
 
         let object_ptr = shmem.as_ptr() as *mut u8;
         std::ptr::copy_nonoverlapping(buffer.as_ptr(), object_ptr, buffer.len());
     }
 }
 
-pub fn write_commitment_to_shared_memory<C: Config>(
-    commitment: &<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::Commitment,
-) {
+pub fn write_commitment_to_shared_memory<C: Config>(commitment: &ExpanderGKRCommitment<C>) {
     write_object_to_shared_memory_name_string(commitment, "commitment");
 }
 
 pub fn write_commitment_extra_info_to_shared_memory<C: Config>(
-    extra_info: &<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::ScratchPad,
+    extra_info: &ExpanderGKRCommitmentExtraInfo<C>,
 ) {
     write_object_to_shared_memory_name_string(extra_info, "extra_info");
 }
@@ -82,7 +86,7 @@ pub fn read_ecc_circuit_from_shared_memory<C: Config>() -> Circuit<C, NormalInpu
 }
 
 pub fn read_partition_info_from_shared_memory() -> Vec<LayeredCircuitInputVec> {
-    read_object_from_shared_memory_name_string("partition_info")
+    read_object_from_shared_memory_name_string("input_partition")
 }
 
 pub fn read_commitment_from_shared_memory<C: Config>() -> Vec<ExpanderGKRCommitment<C>> {
