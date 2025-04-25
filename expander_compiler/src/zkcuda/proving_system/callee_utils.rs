@@ -39,6 +39,7 @@ pub fn read_object_from_shared_memory_name_string<T: ExpSerde>(shared_memory_ref
     read_object_from_shared_memory(&mut Some(shmem))
 }
 
+#[allow(clippy::type_complexity)]
 pub fn read_selected_pkey_from_shared_memory<C: Config>() -> (usize, <<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::SRS as StructuredReferenceString>::PKey){
     read_object_from_shared_memory_name_string("pcs_setup")
 }
@@ -62,7 +63,7 @@ pub fn write_object_to_shared_memory_name_string<T: ExpSerde>(object: &T, shared
             buffer.len()
         );
 
-        let object_ptr = shmem.as_ptr() as *mut u8;
+        let object_ptr = shmem.as_ptr();
         std::ptr::copy_nonoverlapping(buffer.as_ptr(), object_ptr, buffer.len());
     }
 }

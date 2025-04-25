@@ -33,7 +33,7 @@ pub static mut SHARED_MEMORY: SharedMemory = SharedMemory {
     proof: None,
 };
 
-pub fn init_commitment_and_extra_info_shared_memory<C: Config>(
+pub fn init_commitment_and_extra_info_shared_memory(
     commitment_size: usize,
     extra_info_size: usize,
 ) {
@@ -102,7 +102,7 @@ fn write_object_to_shared_memory<T: ExpSerde>(
                 .unwrap(),
         );
 
-        let object_ptr = shared_memory_ref.as_mut().unwrap().as_ptr() as *mut u8;
+        let object_ptr = shared_memory_ref.as_mut().unwrap().as_ptr();
         std::ptr::copy_nonoverlapping(buffer.as_ptr(), object_ptr, buffer.len());
     }
 }
@@ -168,7 +168,7 @@ pub fn write_commitments_extra_info_to_shared_memory<C: Config>(
 }
 
 pub fn write_commitments_values_to_shared_memory<C: Config>(
-    commitments_values: &Vec<&[C::DefaultSimdField]>,
+    commitments_values: &[&[C::DefaultSimdField]],
 ) {
     let commitments_values = commitments_values
         .iter()
