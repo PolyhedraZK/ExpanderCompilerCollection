@@ -1,5 +1,4 @@
-use expander_config::GKRConfig;
-use poly_commit::{PCSForExpanderGKR, StructuredReferenceString};
+use gkr_engine::{ExpanderPCS, StructuredReferenceString};
 use serdes::ExpSerde;
 use shared_memory::ShmemConf;
 
@@ -8,6 +7,7 @@ use crate::{
         config::Config,
         layered::{Circuit, NormalInputType},
     },
+    frontend::SIMDField,
     zkcuda::kernel::LayeredCircuitInputVec,
 };
 
@@ -18,19 +18,13 @@ use super::{
 
 macro_rules! field {
     ($config: ident) => {
-        $config::DefaultGKRFieldConfig
-    };
-}
-
-macro_rules! transcript {
-    ($config: ident) => {
-        <$config::DefaultGKRConfig as GKRConfig>::Transcript
+        $config::FieldConfig
     };
 }
 
 macro_rules! pcs {
     ($config: ident) => {
-        <$config::DefaultGKRConfig as GKRConfig>::PCS
+        $config::PCSConfig
     };
 }
 
@@ -40,11 +34,14 @@ pub fn read_object_from_shared_memory_name_string<T: ExpSerde>(shared_memory_ref
 }
 
 #[allow(clippy::type_complexity)]
-pub fn read_selected_pkey_from_shared_memory<C: Config>() -> (usize, <<pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::SRS as StructuredReferenceString>::PKey){
+pub fn read_selected_pkey_from_shared_memory<C: Config>() -> (
+    usize,
+    <<pcs!(C) as ExpanderPCS<field!(C)>>::SRS as StructuredReferenceString>::PKey,
+) {
     read_object_from_shared_memory_name_string("pcs_setup")
 }
 
-pub fn read_commit_vals_from_shared_memory<C: Config>() -> Vec<C::DefaultSimdField> {
+pub fn read_commit_vals_from_shared_memory<C: Config>() -> Vec<SIMDField<C>> {
     read_object_from_shared_memory_name_string("input_vals")
 }
 
@@ -99,7 +96,7 @@ pub fn read_commitment_extra_info_from_shared_memory<C: Config>(
     read_object_from_shared_memory_name_string("extra_info")
 }
 
-pub fn read_commitment_values_from_shared_memory<C: Config>() -> Vec<Vec<C::DefaultSimdField>> {
+pub fn read_commitment_values_from_shared_memory<C: Config>() -> Vec<Vec<SIMDField<C>>> {
     read_object_from_shared_memory_name_string("input_vals")
 }
 

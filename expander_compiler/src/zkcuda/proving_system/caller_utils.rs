@@ -1,6 +1,8 @@
 use std::{io::Cursor, process::Command};
 
-use crate::{circuit::layered::Circuit, zkcuda::kernel::LayeredCircuitInputVec};
+use crate::{
+    circuit::layered::Circuit, frontend::SIMDField, zkcuda::kernel::LayeredCircuitInputVec,
+};
 use serdes::ExpSerde;
 use shared_memory::{Shmem, ShmemConf};
 
@@ -117,7 +119,7 @@ pub fn write_selected_pkey_to_shared_memory<C: Config>(
     write_object_to_shared_memory(&pair, unsafe { &mut SHARED_MEMORY.pcs_setup }, "pcs_setup");
 }
 
-pub fn write_commit_vals_to_shared_memory<C: Config>(vals: &Vec<C::DefaultSimdField>) {
+pub fn write_commit_vals_to_shared_memory<C: Config>(vals: &Vec<SIMDField<C>>) {
     write_object_to_shared_memory(vals, unsafe { &mut SHARED_MEMORY.input_vals }, "input_vals");
 }
 
@@ -168,7 +170,7 @@ pub fn write_commitments_extra_info_to_shared_memory<C: Config>(
 }
 
 pub fn write_commitments_values_to_shared_memory<C: Config>(
-    commitments_values: &[&[C::DefaultSimdField]],
+    commitments_values: &[&[SIMDField<C>]],
 ) {
     let commitments_values = commitments_values
         .iter()

@@ -8,31 +8,23 @@ use expander_compiler::zkcuda::proving_system::{
     ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo,
 };
 
-use expander_config::GKRConfig;
-use mpi_config::MPIConfig;
-use poly_commit::PCSForExpanderGKR;
+use gkr_engine::{ExpanderPCS, MPIConfig, MPIEngine};
 use polynomials::MultiLinearPoly;
 
 macro_rules! field {
     ($config: ident) => {
-        $config::DefaultGKRFieldConfig
-    };
-}
-
-macro_rules! transcript {
-    ($config: ident) => {
-        <$config::DefaultGKRConfig as GKRConfig>::Transcript
+        $config::FieldConfig
     };
 }
 
 macro_rules! pcs {
     ($config: ident) => {
-        <$config::DefaultGKRConfig as GKRConfig>::PCS
+        $config::PCSConfig
     };
 }
 
 fn commit<C: Config>() {
-    let mpi_config = MPIConfig::new();
+    let mpi_config = MPIConfig::prover_new();
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
     assert!(
@@ -52,16 +44,11 @@ fn commit<C: Config>() {
         .to_vec();
     drop(global_vals_to_commit);
 
-    let params = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::gen_params(
-        local_val_len.ilog2() as usize,
-    );
+    let params = <pcs!(C) as ExpanderPCS<field!(C)>>::gen_params(local_val_len.ilog2() as usize);
 
-    let mut scratch = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::init_scratch_pad(
-        &params,
-        &mpi_config,
-    );
+    let mut scratch = <pcs!(C) as ExpanderPCS<field!(C)>>::init_scratch_pad(&params, &mpi_config);
 
-    let commitment = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::commit(
+    let commitment = <pcs!(C) as ExpanderPCS<field!(C)>>::commit(
         &params,
         &mpi_config,
         &p_key,

@@ -2,7 +2,7 @@ use serdes::ExpSerde;
 
 use super::super::{kernel::Kernel, proof::ComputationGraph};
 
-use crate::circuit::config::{Config,SIMDField};
+use crate::circuit::config::{Config, SIMDField};
 
 pub trait Commitment<C: Config>: Clone + ExpSerde {
     fn vals_len(&self) -> usize;

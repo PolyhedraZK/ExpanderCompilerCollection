@@ -5,6 +5,7 @@ use crate::{
     },
     zkcuda::kernel::LayeredCircuitInputVec,
 };
+
 use arith::Field;
 
 use super::super::kernel::Kernel;
@@ -39,7 +40,7 @@ pub fn prepare_inputs<C: Config>(
     is_broadcast: &[bool],
     parallel_index: usize,
 ) -> Vec<SIMDField<C>> {
-    let mut lc_input = vec![C::DefaultSimdField::zero(); layered_circuit.input_size()];
+    let mut lc_input = vec![SIMDField::<C>::zero(); layered_circuit.input_size()];
     for ((input, value), ib) in partition_info.iter().zip(values.iter()).zip(is_broadcast) {
         if *ib {
             for (i, x) in value.iter().enumerate() {

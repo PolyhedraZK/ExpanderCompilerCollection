@@ -2,7 +2,7 @@ use std::cmp;
 
 use arith::Field;
 use expander_compiler::circuit::config::Config;
-use expander_compiler::frontend::M31Config;
+use expander_compiler::frontend::{M31Config, SIMDField};
 use expander_compiler::zkcuda::proving_system::callee_utils::{
     read_broadcast_info_from_shared_memory, read_commitment_extra_info_from_shared_memory,
     read_commitment_from_shared_memory, read_commitment_values_from_shared_memory,
@@ -14,36 +14,34 @@ use expander_compiler::zkcuda::proving_system::{
     ExpanderGKRProverSetup,
 };
 
-use expander_config::GKRConfig;
-use expander_transcript::Transcript;
 use gkr::gkr_prove;
-use gkr_field_config::GKRFieldConfig;
-use mpi_config::MPIConfig;
-use poly_commit::{ExpanderGKRChallenge, PCSForExpanderGKR};
-use polynomials::{MultiLinearPoly, MultiLinearPolyExpander};
+use gkr_engine::{
+    ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, MPIConfig, MPIEngine, Transcript,
+};
+use polynomials::MultiLinearPoly;
 use serdes::ExpSerde;
 use sumcheck::ProverScratchPad;
 
 macro_rules! field {
     ($config: ident) => {
-        $config::DefaultGKRFieldConfig
+        $config::FieldConfig
     };
 }
 
 macro_rules! transcript {
     ($config: ident) => {
-        <$config::DefaultGKRConfig as GKRConfig>::Transcript
+        $config::TranscriptConfig
     };
 }
 
 macro_rules! pcs {
     ($config: ident) => {
-        <$config::DefaultGKRConfig as GKRConfig>::PCS
+        $config::PCSConfig
     };
 }
 
 fn prove<C: Config>() {
-    let mpi_config = MPIConfig::new();
+    let mpi_config = MPIConfig::prover_new();
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
     assert!(
@@ -67,18 +65,13 @@ fn prove<C: Config>() {
         .collect::<Vec<_>>();
     let broadcast_info = read_broadcast_info_from_shared_memory();
 
-    let mut expander_circuit = ecc_circuit
-        .export_to_expander()
-        .flatten::<C::DefaultGKRConfig>();
-    expander_circuit.pre_process_gkr::<C::DefaultGKRConfig>();
+    let mut expander_circuit = ecc_circuit.export_to_expander().flatten::<C>();
+    expander_circuit.pre_process_gkr::<C>();
     let (max_num_input_var, max_num_output_var) = max_n_vars(&expander_circuit);
-    let mut prover_scratch = ProverScratchPad::<C::DefaultGKRFieldConfig>::new(
-        max_num_input_var,
-        max_num_output_var,
-        world_size,
-    );
+    let mut prover_scratch =
+        ProverScratchPad::<C::FieldConfig>::new(max_num_input_var, max_num_output_var, world_size);
 
-    let mut transcript = <C::DefaultGKRConfig as GKRConfig>::Transcript::new();
+    let mut transcript = C::TranscriptConfig::new();
     transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
     expander_circuit.layers[0].input_vals = prepare_inputs(
         &ecc_circuit,
@@ -89,7 +82,7 @@ fn prove<C: Config>() {
     );
     expander_circuit.fill_rnd_coefs(&mut transcript);
     expander_circuit.evaluate();
-    let (claimed_v, rx, ry, rsimd, rmpi) = gkr_prove(
+    let (claimed_v, challenge) = gkr_prove(
         &expander_circuit,
         &mut prover_scratch,
         &mut transcript,
@@ -97,7 +90,7 @@ fn prove<C: Config>() {
     );
     assert_eq!(
         claimed_v,
-        <C::DefaultGKRFieldConfig as GKRFieldConfig>::ChallengeField::from(0)
+        <C::FieldConfig as FieldEngine>::ChallengeField::from(0)
     );
 
     prove_input_claim(
@@ -105,21 +98,17 @@ fn prove<C: Config>() {
         &commitment_values_refs,
         &pcs_setup,
         &commitments_extra_info,
-        &rx,
-        &rsimd,
-        &rmpi,
+        &challenge.challenge_x(),
         &broadcast_info,
         &mut transcript,
     );
-    if let Some(ry) = ry {
+    if challenge.rz_1.is_some() {
         prove_input_claim(
             &mpi_config,
             &commitment_values_refs,
             &pcs_setup,
             &commitments_extra_info,
-            &ry,
-            &rsimd,
-            &rmpi,
+            &challenge.challenge_y(),
             &broadcast_info,
             &mut transcript,
         );
@@ -136,12 +125,10 @@ fn prove<C: Config>() {
 #[allow(clippy::too_many_arguments)]
 fn prove_input_claim<C: Config>(
     mpi_config: &MPIConfig,
-    commitments_values: &[&[C::DefaultSimdField]],
+    commitments_values: &[&[SIMDField<C>]],
     p_keys: &ExpanderGKRProverSetup<C>,
     commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<C>],
-    x: &[<field!(C) as GKRFieldConfig>::ChallengeField],
-    x_simd: &[<field!(C) as GKRFieldConfig>::ChallengeField],
-    x_mpi: &[<field!(C) as GKRFieldConfig>::ChallengeField],
+    challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
     is_broadcast: &[bool],
     transcript: &mut transcript!(C),
 ) {
@@ -165,33 +152,38 @@ fn prove_input_claim<C: Config>(
         };
 
         let nb_challenge_vars = val_len.ilog2() as usize;
-        let challenge_vars = x[..nb_challenge_vars].to_vec();
+        let challenge_vars = challenge.rz[..nb_challenge_vars].to_vec();
 
-        let params = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::gen_params(val_len);
+        let params = <pcs!(C) as ExpanderPCS<field!(C)>>::gen_params(val_len);
         let p_key = p_keys.p_keys.get(&val_len).unwrap();
 
         let poly = MultiLinearPoly::new(vals_to_open.to_vec());
-        let v = MultiLinearPolyExpander::<field!(C)>::collectively_eval_circuit_vals_at_expander_challenge(
+        let v = C::FieldConfig::collectively_eval_circuit_vals_at_expander_challenge(
             vals_to_open,
-            &challenge_vars,
-            x_simd,
-            x_mpi,
-            &mut vec![<C::DefaultGKRFieldConfig as GKRFieldConfig>::Field::ZERO; val_len],
-            &mut vec![<C::DefaultGKRFieldConfig as GKRFieldConfig>::ChallengeField::ZERO; 1 << cmp::max(x_simd.len(), x_mpi.len())],
+            &ExpanderSingleVarChallenge::<C::FieldConfig> {
+                rz: challenge_vars.to_vec(),
+                r_simd: challenge.r_simd.to_vec(),
+                r_mpi: challenge.r_mpi.to_vec(),
+            },
+            &mut vec![<C::FieldConfig as FieldEngine>::Field::ZERO; val_len],
+            &mut vec![
+                <C::FieldConfig as FieldEngine>::ChallengeField::ZERO;
+                1 << cmp::max(challenge.r_simd.len(), challenge.r_mpi.len())
+            ],
             mpi_config,
         );
         transcript.append_field_element(&v);
 
         transcript.lock_proof();
-        let opening = <pcs!(C) as PCSForExpanderGKR<field!(C), transcript!(C)>>::open(
+        let opening = <pcs!(C) as ExpanderPCS<field!(C)>>::open(
             &params,
             mpi_config,
             p_key,
             &poly,
-            &ExpanderGKRChallenge::<C::DefaultGKRFieldConfig> {
-                x: challenge_vars.to_vec(),
-                x_simd: x_simd.to_vec(),
-                x_mpi: x_mpi.to_vec(),
+            &ExpanderSingleVarChallenge::<C::FieldConfig> {
+                rz: challenge_vars.to_vec(),
+                r_simd: challenge.r_simd.to_vec(),
+                r_mpi: challenge.r_mpi.to_vec(),
             },
             transcript,
             &extra_info.scratch[0],
