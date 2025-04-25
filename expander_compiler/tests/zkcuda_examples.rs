@@ -59,7 +59,9 @@ fn zkcuda_1_expander<C: Config, P: ProvingSystem<C>>() {
     let mut ctx = Context::<C, P>::default();
     let mut a = vec![];
     for i in 0..32 {
-        a.push(<C::FieldConfig as FieldEngine>::CircuitField::from(i + 1_u32));
+        a.push(<C::FieldConfig as FieldEngine>::CircuitField::from(
+            i + 1_u32,
+        ));
     }
     let a = ctx.copy_raw_to_device(&a);
     let mut io = vec![a, None];
@@ -71,7 +73,9 @@ fn zkcuda_1_expander<C: Config, P: ProvingSystem<C>>() {
     let result = ctx.copy_raw_to_host(c);
     assert_eq!(
         result,
-        vec![<C::FieldConfig as FieldEngine>::CircuitField::from(32 * 33 / 2)]
+        vec![<C::FieldConfig as FieldEngine>::CircuitField::from(
+            32 * 33 / 2
+        )]
     );
 
     let computation_graph = ctx.to_computation_graph();
