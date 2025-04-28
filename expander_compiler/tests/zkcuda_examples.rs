@@ -86,12 +86,20 @@ fn zkcuda_1_expander<C: Config, P: ProvingSystem<C>>() {
 
 #[test]
 fn zkcuda_1_single_core() {
+    zkcuda_1_expander::<GF2Config, ExpanderGKRProvingSystem<GF2Config>>();
     zkcuda_1_expander::<M31Config, ExpanderGKRProvingSystem<M31Config>>();
+    zkcuda_1_expander::<GoldilocksConfig, ExpanderGKRProvingSystem<GoldilocksConfig>>();
+    zkcuda_1_expander::<BabyBearConfig, ExpanderGKRProvingSystem<BabyBearConfig>>();
+    zkcuda_1_expander::<BN254Config, ExpanderGKRProvingSystem<BN254Config>>();
 }
 
 #[test]
 fn zkcuda_1_multi_core() {
     zkcuda_1_expander::<M31Config, ParallelizedExpanderGKRProvingSystem<M31Config>>();
+    zkcuda_1_expander::<GF2Config, ParallelizedExpanderGKRProvingSystem<GF2Config>>();
+    zkcuda_1_expander::<GoldilocksConfig, ParallelizedExpanderGKRProvingSystem<GoldilocksConfig>>();
+    zkcuda_1_expander::<BabyBearConfig, ParallelizedExpanderGKRProvingSystem<BabyBearConfig>>();
+    zkcuda_1_expander::<BN254Config, ParallelizedExpanderGKRProvingSystem<BN254Config>>();
 }
 
 #[kernel]
