@@ -1,6 +1,6 @@
-use crate::{
-    circuit::layered::witness::{Witness, WitnessValues},
-    frontend::{CircuitField, SIMDField},
+use crate::circuit::{
+    config::{CircuitField, SIMDField},
+    layered::witness::{Witness, WitnessValues},
 };
 
 use arith::SimdField;

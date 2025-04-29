@@ -19,7 +19,7 @@ use crate::field::M31 as CField;
 
 use crate::field::FieldArith;
 
-use super::compile;
+use super::{compile, CompileOptions};
 
 pub fn test_input<C: Config, I: InputType>(
     rc: &IrRootCircuit<C>,
@@ -39,7 +39,12 @@ pub fn compile_and_random_test<C: Config, I: InputType>(
     n_tests: usize,
 ) -> (layered::Circuit<C, I>, InputMapping) {
     assert!(rc.validate().is_ok());
-    let (lc, input_mapping) = compile(rc);
+    let (lc, input_mapping) = compile(
+        rc,
+        CompileOptions {
+            allow_input_reorder: true,
+        },
+    );
     assert_eq!(lc.validate(), Ok(()));
     assert_eq!(rc.input_size(), input_mapping.cur_size());
     let input_size = rc.input_size();

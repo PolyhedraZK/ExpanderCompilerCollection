@@ -19,8 +19,13 @@ mod wire;
 #[cfg(test)]
 mod tests;
 
+pub struct CompileOptions {
+    pub allow_input_reorder: bool,
+}
+
 pub fn compile<C: Config, I: InputType>(
     rc: &ir::dest::RootCircuit<C>,
+    opts: CompileOptions,
 ) -> (layered::Circuit<C, I>, InputMapping) {
     let mut ctx = compile::CompileContext {
         rc,
@@ -34,6 +39,7 @@ pub fn compile<C: Config, I: InputType>(
         layers: Vec::new(),
         input_order: Vec::new(),
         root_has_constraints: false,
+        opts,
     };
     ctx.compile();
     let t: &I::InputUsize = &ctx.compiled_circuits[ctx.layers[0]].num_inputs;

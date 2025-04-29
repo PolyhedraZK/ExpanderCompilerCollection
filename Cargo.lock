@@ -866,10 +866,13 @@ dependencies = [
  "halo2curves",
  "macros",
  "mersenne31",
+ "poly_commit",
+ "polynomials",
  "rand",
  "rayon",
  "serdes",
  "sha2",
+ "sumcheck",
  "tiny-keccak",
  "transcript",
 ]
