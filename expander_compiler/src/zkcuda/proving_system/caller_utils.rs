@@ -5,8 +5,7 @@ use std::{io::Cursor, process::Command};
 use crate::{
     circuit::layered::Circuit, frontend::SIMDField, zkcuda::kernel::LayeredCircuitInputVec,
 };
-use arith::Field;
-use gkr_engine::FieldEngine;
+use gkr_engine::{FieldEngine, FieldType};
 use serdes::ExpSerde;
 use shared_memory::{Shmem, ShmemConf};
 
@@ -215,11 +214,17 @@ pub fn exec_pcs_commit<C: Config>(mpi_size: usize) {
         ""
     };
 
+    let field_name = match <C::FieldConfig as FieldEngine>::FIELD_TYPE {
+        FieldType::M31 => "M31",
+        FieldType::GF2 => "GF2",
+        FieldType::Goldilocks => "Goldilocks",
+        FieldType::BabyBear => "BabyBear",
+        FieldType::BN254 => "BN254",
+    };
+
     let cmd_str = format!(
         "mpiexec -n {} {} ../target/release/expander_commit -f {}",
-        mpi_size,
-        oversubscription,
-        <C::FieldConfig as FieldEngine>::CircuitField::NAME
+        mpi_size, oversubscription, field_name,
     );
     exec_command(&cmd_str);
 }
@@ -231,11 +236,18 @@ pub fn exec_gkr_prove_with_pcs<C: Config>(mpi_size: usize) {
     } else {
         ""
     };
+
+    let field_name = match <C::FieldConfig as FieldEngine>::FIELD_TYPE {
+        FieldType::M31 => "M31",
+        FieldType::GF2 => "GF2",
+        FieldType::Goldilocks => "Goldilocks",
+        FieldType::BabyBear => "BabyBear",
+        FieldType::BN254 => "BN254",
+    };
+
     let cmd_str = format!(
         "mpiexec -n {} {} ../target/release/expander_prove -f {}",
-        mpi_size,
-        oversubscription,
-        <C::FieldConfig as FieldEngine>::CircuitField::NAME
+        mpi_size, oversubscription, field_name,
     );
     exec_command(&cmd_str);
 }
