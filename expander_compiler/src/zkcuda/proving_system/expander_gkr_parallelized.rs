@@ -81,7 +81,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
             init_commitment_and_extra_info_shared_memory(vals.len() * SIMDField::<C>::SIZE + 48, 8);
             write_selected_pkey_to_shared_memory(prover_setup, actual_local_len);
             write_commit_vals_to_shared_memory::<C>(&vals.to_vec());
-            exec_pcs_commit(parallel_count);
+            exec_pcs_commit::<C>(parallel_count);
             println!("Reading commitment and extra info");
             let (commitment, extra_info) = read_commitment_and_extra_info_from_shared_memory();
             println!(
@@ -121,7 +121,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
             write_commitments_extra_info_to_shared_memory(&commitments_extra_info.to_vec());
             write_commitments_values_to_shared_memory::<C>(commitments_values);
             write_broadcast_info_to_shared_memory(&is_broadcast.to_vec());
-            exec_gkr_prove_with_pcs(parallel_count);
+            exec_gkr_prove_with_pcs::<C>(parallel_count);
             read_proof_from_shared_memory()
         }
     }

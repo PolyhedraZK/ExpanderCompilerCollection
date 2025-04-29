@@ -5,6 +5,8 @@ use std::{io::Cursor, process::Command};
 use crate::{
     circuit::layered::Circuit, frontend::SIMDField, zkcuda::kernel::LayeredCircuitInputVec,
 };
+use arith::Field;
+use gkr_engine::FieldEngine;
 use serdes::ExpSerde;
 use shared_memory::{Shmem, ShmemConf};
 
@@ -205,13 +207,21 @@ fn exec_command(cmd: &str) {
     let _ = child.wait();
 }
 
-pub fn exec_pcs_commit(mpi_size: usize) {
-    let cmd_str = format!("mpiexec -n {} ../target/release/expander_commit", mpi_size);
+pub fn exec_pcs_commit<C: Config>(mpi_size: usize) {
+    let cmd_str = format!(
+        "mpiexec -n {} ../target/release/expander_commit -f {}",
+        mpi_size,
+        <C::FieldConfig as FieldEngine>::CircuitField::NAME
+    );
     exec_command(&cmd_str);
 }
 
-pub fn exec_gkr_prove_with_pcs(mpi_size: usize) {
-    let cmd_str = format!("mpiexec -n {} ../target/release/expander_prove", mpi_size);
+pub fn exec_gkr_prove_with_pcs<C: Config>(mpi_size: usize) {
+    let cmd_str = format!(
+        "mpiexec -n {} ../target/release/expander_prove -f {}",
+        mpi_size,
+        <C::FieldConfig as FieldEngine>::CircuitField::NAME
+    );
     exec_command(&cmd_str);
 }
 
