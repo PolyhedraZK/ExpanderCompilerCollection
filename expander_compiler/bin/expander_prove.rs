@@ -1,8 +1,14 @@
+mod common;
+use common::ExpanderExecArgs;
+
+use clap::Parser;
 use std::cmp;
 
 use arith::Field;
 use expander_compiler::circuit::config::Config;
-use expander_compiler::frontend::{M31Config, SIMDField};
+use expander_compiler::frontend::{
+    BN254Config, BabyBearConfig, GF2Config, GoldilocksConfig, M31Config, SIMDField,
+};
 use expander_compiler::zkcuda::proving_system::callee_utils::{
     read_broadcast_info_from_shared_memory, read_commitment_extra_info_from_shared_memory,
     read_commitment_from_shared_memory, read_commitment_values_from_shared_memory,
@@ -200,6 +206,13 @@ fn prove_input_claim<C: Config>(
 }
 
 fn main() {
-    // TODO: Add command line argument parsing
-    prove::<M31Config>();
+    let expander_exec_args = ExpanderExecArgs::parse();
+    match expander_exec_args.field_type.as_str() {
+        "M31" => prove::<M31Config>(),
+        "GF2" => prove::<GF2Config>(),
+        "Goldilocks" => prove::<GoldilocksConfig>(),
+        "BabyBear" => prove::<BabyBearConfig>(),
+        "BN254" => prove::<BN254Config>(),
+        _ => panic!("Unsupported field type"),
+    }
 }

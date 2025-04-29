@@ -1,5 +1,11 @@
+mod common;
+
+use clap::Parser;
+use common::ExpanderExecArgs;
 use expander_compiler::circuit::config::Config;
-use expander_compiler::frontend::M31Config;
+use expander_compiler::frontend::{
+    BN254Config, BabyBearConfig, GF2Config, GoldilocksConfig, M31Config,
+};
 use expander_compiler::zkcuda::proving_system::callee_utils::{
     read_commit_vals_from_shared_memory, read_selected_pkey_from_shared_memory,
     write_commitment_extra_info_to_shared_memory, write_commitment_to_shared_memory,
@@ -73,6 +79,13 @@ fn commit<C: Config>() {
 }
 
 fn main() {
-    // TODO: Add command line argument parsing
-    commit::<M31Config>();
+    let expander_exec_args = ExpanderExecArgs::parse();
+    match expander_exec_args.field_type.as_str() {
+        "M31" => commit::<M31Config>(),
+        "GF2" => commit::<GF2Config>(),
+        "Goldilocks" => commit::<GoldilocksConfig>(),
+        "BabyBear" => commit::<BabyBearConfig>(),
+        "BN254" => commit::<BN254Config>(),
+        _ => panic!("Unsupported field type"),
+    }
 }
