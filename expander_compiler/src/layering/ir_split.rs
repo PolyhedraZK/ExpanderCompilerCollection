@@ -273,13 +273,10 @@ impl<'a, C: Config> SplitContext<'a, C> {
                         && terms[0].coef == CircuitField::<C>::one()
                         && lst_terms.is_some()
                     {
-                        match terms[0].vars {
-                            VarSpec::Linear(x) => {
-                                if lst == Some(x) {
-                                    terms = lst_terms.clone().unwrap();
-                                }
+                        if let VarSpec::Linear(x) = terms[0].vars {
+                            if lst == Some(x) {
+                                terms = lst_terms.clone().unwrap();
                             }
-                            _ => {}
                         }
                     }
                     circuit.instructions.push(Instruction::InternalVariable {

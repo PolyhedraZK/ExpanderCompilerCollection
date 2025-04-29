@@ -205,7 +205,7 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
                 return self.solve_layer_layout_fixed(req);
             }
         }
-        return self.solve_layer_layout_normal(req);
+        self.solve_layer_layout_normal(req)
     }
 
     fn solve_layer_layout_fixed(&mut self, req: &LayerReq) -> LayerLayout {
@@ -213,14 +213,14 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
             vec![],
             (0..self.circuits[&req.circuit_id].lcs[req.layer].vars.len()).collect(),
         );
-        return LayerLayout {
+        LayerLayout {
             circuit_id: req.circuit_id,
             layer: req.layer,
             size: layout_vec.len(),
             inner: super::layer_layout::LayerLayoutInner::Dense {
                 placement: layout_vec,
             },
-        };
+        }
     }
 
     fn solve_layer_layout_normal(&mut self, req: &LayerReq) -> LayerLayout {
