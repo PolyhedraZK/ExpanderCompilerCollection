@@ -244,6 +244,8 @@ impl<'a, C: Config> SplitContext<'a, C> {
             constraints.sort_by(|a, b| min_layers[*a].cmp(&min_layers[*b]));
             let mut j = 0;
             let mut k = 0;
+            let mut lst = None;
+            let mut lst_terms = None;
             for i in 0..n_layers {
                 let mut terms = Vec::new();
                 while j < sub_combined_constraints.len()
@@ -267,20 +269,26 @@ impl<'a, C: Config> SplitContext<'a, C> {
                     k += 1;
                 }
                 if !terms.is_empty() {
-                    if terms.len() == 1 && terms[0].coef == CircuitField::<C>::one() {
+                    if terms.len() == 1
+                        && terms[0].coef == CircuitField::<C>::one()
+                        && lst_terms.is_some()
+                    {
                         match terms[0].vars {
                             VarSpec::Linear(x) => {
-                                add_outputs.push(x);
-                                continue;
+                                if lst == Some(x) {
+                                    terms = lst_terms.clone().unwrap();
+                                }
                             }
                             _ => {}
                         }
                     }
                     circuit.instructions.push(Instruction::InternalVariable {
-                        expr: Expression::from_terms(terms),
+                        expr: Expression::from_terms(terms.clone()),
                     });
                     min_layers.push(i + 1);
                     add_outputs.push(min_layers.len() - 1);
+                    lst = Some(min_layers.len() - 1);
+                    lst_terms = Some(terms);
                 }
             }
         }

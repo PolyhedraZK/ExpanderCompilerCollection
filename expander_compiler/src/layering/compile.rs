@@ -443,6 +443,10 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
             }
         }
 
+        if ic.output_layer == ic.combined_constraints.len() {
+            ic.combined_constraints.push(None);
+        }
+
         // force maxLayer of output to be outputLayer
         for x in circuit.outputs.iter().cloned() {
             ic.max_layer[x] = ic.output_layer;
