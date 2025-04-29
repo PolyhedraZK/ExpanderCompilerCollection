@@ -470,7 +470,11 @@ fn prove_input_claim<C: Config>(
         let v =
             <C::FieldConfig as FieldEngine>::single_core_eval_circuit_vals_at_expander_challenge(
                 vals_to_open,
-                challenge,
+                &ExpanderSingleVarChallenge {
+                    rz: challenge_vars.to_vec(),
+                    r_simd: challenge.r_simd.to_vec(),
+                    r_mpi: vec![],
+                },
             );
         transcript.append_field_element(&v);
 
