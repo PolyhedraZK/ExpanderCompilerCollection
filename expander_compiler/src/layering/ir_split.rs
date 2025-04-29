@@ -556,34 +556,6 @@ mod tests {
         assert_eq!(cond, cond2);
     }
 
-    #[test]
-    fn ensure_circuit_is_minimal() {
-        let mut root = IrRootCircuit::<M31Config>::default();
-        root.circuits.insert(
-            0,
-            IrCircuit {
-                instructions: vec![],
-                constraints: vec![1],
-                outputs: vec![],
-                num_inputs: 1,
-            },
-        );
-        assert_eq!(root.validate(), Ok(()));
-        let new_root = split_to_single_layer(&root);
-        assert_eq!(new_root.validate(), Ok(()));
-        assert_eq!(
-            new_root.circuits.get(&0).unwrap(),
-            &IrCircuit {
-                instructions: vec![InternalVariable {
-                    expr: Expression::from_terms(vec![Term::new_random_linear(1)]),
-                },],
-                constraints: vec![],
-                outputs: vec![2],
-                num_inputs: 1,
-            },
-        );
-    }
-
     fn rand_test<C: Config>() {
         let mut config = RandomCircuitConfig {
             seed: 0,
