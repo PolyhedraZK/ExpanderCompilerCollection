@@ -208,18 +208,33 @@ fn exec_command(cmd: &str) {
 }
 
 pub fn exec_pcs_commit<C: Config>(mpi_size: usize) {
+    let oversubscription = if mpi_size > num_cpus::get() {
+        println!("Warning: Not enough cores available for the requested number of processes. Using oversubscription.");
+        "--oversubscribe"
+    } else {
+        ""
+    };
+
     let cmd_str = format!(
-        "mpiexec -n {} ../target/release/expander_commit -f {}",
+        "mpiexec -n {} {} ../target/release/expander_commit -f {}",
         mpi_size,
+        oversubscription,
         <C::FieldConfig as FieldEngine>::CircuitField::NAME
     );
     exec_command(&cmd_str);
 }
 
 pub fn exec_gkr_prove_with_pcs<C: Config>(mpi_size: usize) {
+    let oversubscription = if mpi_size > num_cpus::get() {
+        println!("Warning: Not enough cores available for the requested number of processes. Using oversubscription.");
+        "--oversubscribe"
+    } else {
+        ""
+    };
     let cmd_str = format!(
-        "mpiexec -n {} ../target/release/expander_prove -f {}",
+        "mpiexec -n {} {} ../target/release/expander_prove -f {}",
         mpi_size,
+        oversubscription,
         <C::FieldConfig as FieldEngine>::CircuitField::NAME
     );
     exec_command(&cmd_str);

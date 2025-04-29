@@ -22,6 +22,7 @@ gkr_hashers.workspace = true
 goldilocks.workspace = true
 halo2curves.workspace = true
 mersenne31.workspace = true
+num_cpus.workspace = true
 poly_commit.workspace = true
 polynomials.workspace = true
 sumcheck.workspace = true
