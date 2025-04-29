@@ -15,6 +15,7 @@ impl Define<M31Config> for Circuit<Variable> {
 #[test]
 fn example_full() {
     let compile_result = compile(&Circuit::default(), CompileOptions::default()).unwrap();
+    assert_eq!(compile_result.layered_circuit.layer_ids.len(), 2);
     let assignment = Circuit::<M31> {
         x: M31::from(123),
         y: M31::from(123),
@@ -43,4 +44,11 @@ fn example_full() {
         .witness_solver
         .serialize_into(writer)
         .unwrap();
+}
+
+#[test]
+fn example_cross_layer() {
+    let compile_result =
+        compile_cross_layer(&Circuit::default(), CompileOptions::default()).unwrap();
+    assert_eq!(compile_result.layered_circuit.layer_ids.len(), 2);
 }

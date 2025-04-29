@@ -190,10 +190,37 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
         if let Some(id) = self.layer_req_to_layout.get(req) {
             return *id;
         }
-        let res = self.solve_layer_layout_normal(req);
+        let res = self.solve_layer_layout_inner(req);
         let id = self.layer_layout_pool.add(&res);
         self.layer_req_to_layout.insert(req.clone(), id);
         id
+    }
+
+    fn solve_layer_layout_inner(&mut self, req: &LayerReq) -> LayerLayout {
+        if req.circuit_id == 0 {
+            if req.layer == 0 && !self.opts.allow_input_reorder {
+                return self.solve_layer_layout_fixed(req);
+            }
+            if req.layer == self.circuits[&req.circuit_id].output_layer {
+                return self.solve_layer_layout_fixed(req);
+            }
+        }
+        self.solve_layer_layout_normal(req)
+    }
+
+    fn solve_layer_layout_fixed(&mut self, req: &LayerReq) -> LayerLayout {
+        let layout_vec = merge_layouts(
+            vec![],
+            (0..self.circuits[&req.circuit_id].lcs[req.layer].vars.len()).collect(),
+        );
+        LayerLayout {
+            circuit_id: req.circuit_id,
+            layer: req.layer,
+            size: layout_vec.len(),
+            inner: super::layer_layout::LayerLayoutInner::Dense {
+                placement: layout_vec,
+            },
+        }
     }
 
     fn solve_layer_layout_normal(&mut self, req: &LayerReq) -> LayerLayout {

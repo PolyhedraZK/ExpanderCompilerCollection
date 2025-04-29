@@ -178,7 +178,7 @@ impl<C: Config> fmt::Display for Term<C> {
                     }
                     write!(f, ")")
                 }
-                VarSpec::RandomLinear(index) => write!(f, "random{}", index),
+                VarSpec::RandomLinear(index) => write!(f, "random*v{}", index),
             }
         } else {
             match &self.vars {
