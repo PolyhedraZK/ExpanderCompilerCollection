@@ -78,7 +78,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
             let actual_local_len = vals.len() / parallel_count;
 
             // TODO: The size here is for the raw commitment, add an function in the pcs trait to get the size of the commitment
-            init_commitment_and_extra_info_shared_memory(vals.len() * SIMDField::<C>::SIZE + 48, 8);
+            init_commitment_and_extra_info_shared_memory(SINGLE_KERNEL_MAX_PROOF_SIZE, 8);
             write_selected_pkey_to_shared_memory(prover_setup, actual_local_len);
             write_commit_vals_to_shared_memory::<C>(&vals.to_vec());
             exec_pcs_commit::<C>(parallel_count);
