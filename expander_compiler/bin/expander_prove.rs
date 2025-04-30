@@ -122,7 +122,6 @@ fn prove<C: Config>() {
 
     let proof = transcript.finalize_and_get_proof();
     if world_rank == 0 {
-        println!("proof len {}", proof.bytes.len());
         write_proof_to_shared_memory(&ExpanderGKRProof { data: vec![proof] });
     }
     MPIConfig::finalize();

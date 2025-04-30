@@ -82,13 +82,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
             write_selected_pkey_to_shared_memory(prover_setup, actual_local_len);
             write_commit_vals_to_shared_memory::<C>(&vals.to_vec());
             exec_pcs_commit::<C>(parallel_count);
-            println!("Reading commitment and extra info");
             let (commitment, extra_info) = read_commitment_and_extra_info_from_shared_memory();
-            println!(
-                "commitment len {}, extra info len {}",
-                commitment.commitment.len(),
-                extra_info.scratch.len()
-            );
             (commitment, extra_info)
         }
     }
@@ -135,14 +129,12 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> bool {
-        println!("Verifying parallel count {}", parallel_count);
         let mut expander_circuit = kernel.layered_circuit.export_to_expander().flatten::<C>();
         expander_circuit.pre_process_gkr::<C>();
 
         let mut transcript = C::TranscriptConfig::new();
         transcript.append_u8_slice(&[0u8; 32]);
         expander_circuit.fill_rnd_coefs(&mut transcript);
-        println!("Proof len {}", proof.data[0].bytes.len());
         let mut cursor = Cursor::new(&proof.data[0].bytes);
         cursor.set_position(32);
 
@@ -180,10 +172,6 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
             );
         }
 
-        println!(
-            "Verified: {} for parallel count {}",
-            verified, parallel_count
-        );
         verified
     }
 }
