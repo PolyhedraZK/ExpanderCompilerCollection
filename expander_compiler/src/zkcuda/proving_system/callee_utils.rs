@@ -30,7 +30,7 @@ macro_rules! pcs {
 
 pub fn read_object_from_shared_memory_name_string<T: ExpSerde>(shared_memory_ref: &str) -> T {
     let shmem = ShmemConf::new().flink(shared_memory_ref).open().unwrap();
-    read_object_from_shared_memory(&mut Some(shmem))
+    read_object_from_shared_memory(&Some(shmem))
 }
 
 #[allow(clippy::type_complexity)]

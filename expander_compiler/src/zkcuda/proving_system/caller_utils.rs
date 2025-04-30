@@ -95,18 +95,19 @@ fn write_object_to_shared_memory<T: ExpSerde>(
         .expect("Failed to serialize object");
 
     unsafe {
-        if shared_memory_ref.is_some() {
+        if shared_memory_ref.is_some() && shared_memory_ref.as_ref().unwrap().len() >= buffer.len()
+        {
+        } else {
             *shared_memory_ref = None;
+            *shared_memory_ref = Some(
+                ShmemConf::new()
+                    .size(buffer.len())
+                    .flink(name)
+                    .force_create_flink()
+                    .create()
+                    .unwrap(),
+            );
         }
-        *shared_memory_ref = Some(
-            ShmemConf::new()
-                .size(buffer.len())
-                .flink(name)
-                .force_create_flink()
-                .create()
-                .unwrap(),
-        );
-
         let object_ptr = shared_memory_ref.as_mut().unwrap().as_ptr();
         std::ptr::copy_nonoverlapping(buffer.as_ptr(), object_ptr, buffer.len());
     }
@@ -252,8 +253,8 @@ pub fn exec_gkr_prove_with_pcs<C: Config>(mpi_size: usize) {
     exec_command(&cmd_str);
 }
 
-pub fn read_object_from_shared_memory<T: ExpSerde>(shared_memory_ref: &mut Option<Shmem>) -> T {
-    let shmem = shared_memory_ref.take().unwrap();
+pub fn read_object_from_shared_memory<T: ExpSerde>(shared_memory_ref: &Option<Shmem>) -> T {
+    let shmem = shared_memory_ref.as_ref().unwrap();
     let object_ptr = shmem.as_ptr() as *const u8;
     let object_len = shmem.len();
     let mut buffer = vec![0u8; object_len];
@@ -265,11 +266,11 @@ pub fn read_object_from_shared_memory<T: ExpSerde>(shared_memory_ref: &mut Optio
 
 pub fn read_commitment_and_extra_info_from_shared_memory<C: Config>(
 ) -> (ExpanderGKRCommitment<C>, ExpanderGKRCommitmentExtraInfo<C>) {
-    let commitment = read_object_from_shared_memory(unsafe { &mut SHARED_MEMORY.commitment });
-    let extra_info = read_object_from_shared_memory(unsafe { &mut SHARED_MEMORY.extra_info });
+    let commitment = read_object_from_shared_memory(unsafe { &SHARED_MEMORY.commitment });
+    let extra_info = read_object_from_shared_memory(unsafe { &SHARED_MEMORY.extra_info });
     (commitment, extra_info)
 }
 
 pub fn read_proof_from_shared_memory() -> ExpanderGKRProof {
-    read_object_from_shared_memory(unsafe { &mut SHARED_MEMORY.proof })
+    read_object_from_shared_memory(unsafe { &SHARED_MEMORY.proof })
 }
