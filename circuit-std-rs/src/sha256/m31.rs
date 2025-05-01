@@ -89,7 +89,7 @@ impl MyDigest {
             first_8words_h: h,
         }
     }
-    fn reset<C: Config, B: RootAPI<C>>(&mut self, api: &mut B) {
+    pub fn reset<C: Config, B: RootAPI<C>>(&mut self, api: &mut B) {
         for i in 0..8 {
             self.h[i] = [api.constant(0); 2];
         }
@@ -113,7 +113,7 @@ impl MyDigest {
         self.len = 0;
     }
     //always write a chunk
-    fn chunk_write<C: Config, B: RootAPI<C>>(&mut self, api: &mut B, p: &[Variable]) {
+    pub fn chunk_write<C: Config, B: RootAPI<C>>(&mut self, api: &mut B, p: &[Variable]) {
         if p.len() != CHUNK || self.nx != 0 {
             panic!("p.len() != CHUNK || self.nx != 0");
         }
@@ -121,7 +121,7 @@ impl MyDigest {
         let tmp_h = self.h;
         self.h = self.block(api, tmp_h, p);
     }
-    fn chunk_write_compress<C: Config, B: RootAPI<C>>(&mut self, api: &mut B, p: &[Variable]) {
+    pub fn chunk_write_compress<C: Config, B: RootAPI<C>>(&mut self, api: &mut B, p: &[Variable]) {
         if p.len() != CHUNK * 8 || self.nx != 0 {
             panic!("p.len() != CHUNK || self.nx != 0");
         }
@@ -129,7 +129,7 @@ impl MyDigest {
         let tmp_h = self.h;
         self.h = self.block_37bytes_compress(api, tmp_h, p);
     }
-    fn return_sum<C: Config, B: RootAPI<C>>(&mut self, api: &mut B) -> [Variable; SHA256LEN] {
+    pub fn return_sum<C: Config, B: RootAPI<C>>(&mut self, api: &mut B) -> [Variable; SHA256LEN] {
         let mut digest = [api.constant(0); SHA256LEN];
 
         m31_26_array_put_uint32(api, &mut digest[0..], self.h[0]);
@@ -142,7 +142,7 @@ impl MyDigest {
         m31_26_array_put_uint32(api, &mut digest[28..], self.h[7]);
         digest
     }
-    fn block<C: Config, B: RootAPI<C>>(
+    pub fn block<C: Config, B: RootAPI<C>>(
         &mut self,
         api: &mut B,
         h: [[Variable; 2]; 8],
@@ -241,7 +241,7 @@ impl MyDigest {
     }
     //consider in a 64-byte block, only 8-th word is different
     //so we can skip the 0~7-th word when doing second part
-    fn block_37bytes_compress<C: Config, B: RootAPI<C>>(
+    pub fn block_37bytes_compress<C: Config, B: RootAPI<C>>(
         &mut self,
         api: &mut B,
         h: [[Variable; 2]; 8],
@@ -330,7 +330,7 @@ impl MyDigest {
         hh[7] = sha_m31_26_add(api, &hh[7], &h, 26);
         hh
     }
-    fn block_37bytes_compress_26_set_8words_states<C: Config, B: RootAPI<C>>(
+    pub fn block_37bytes_compress_26_set_8words_states<C: Config, B: RootAPI<C>>(
         &mut self,
         api: &mut B,
         h: [[Variable; 2]; 8],
