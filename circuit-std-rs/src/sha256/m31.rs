@@ -49,7 +49,7 @@ pub struct MyDigest {
 }
 
 impl MyDigest {
-    fn new<C: Config, B: RootAPI<C>>(api: &mut B) -> Self {
+    pub fn new<C: Config, B: RootAPI<C>>(api: &mut B) -> Self {
         let mut h = [[api.constant(0); 2]; 8];
         h[0][0] = api.constant(INIT00);
         h[0][1] = api.constant(INIT01);
@@ -86,7 +86,7 @@ impl MyDigest {
             kbits,
         }
     }
-    fn reset<C: Config, B: RootAPI<C>>(&mut self, api: &mut B) {
+    pub fn reset<C: Config, B: RootAPI<C>>(&mut self, api: &mut B) {
         for i in 0..8 {
             self.h[i] = [api.constant(0); 2];
         }
@@ -110,7 +110,7 @@ impl MyDigest {
         self.len = 0;
     }
     //always write a chunk
-    fn chunk_write<C: Config, B: RootAPI<C>>(&mut self, api: &mut B, p: &[Variable]) {
+    pub fn chunk_write<C: Config, B: RootAPI<C>>(&mut self, api: &mut B, p: &[Variable]) {
         if p.len() != CHUNK || self.nx != 0 {
             panic!("p.len() != CHUNK || self.nx != 0");
         }
@@ -118,7 +118,7 @@ impl MyDigest {
         let tmp_h = self.h;
         self.h = self.block(api, tmp_h, p);
     }
-    fn return_sum<C: Config, B: RootAPI<C>>(&mut self, api: &mut B) -> [Variable; SHA256LEN] {
+    pub fn return_sum<C: Config, B: RootAPI<C>>(&mut self, api: &mut B) -> [Variable; SHA256LEN] {
         let mut digest = [api.constant(0); SHA256LEN];
 
         big_endian_m31_array_put_uint32(api, &mut digest[0..], self.h[0]);
@@ -132,7 +132,7 @@ impl MyDigest {
         digest
     }
 
-    fn block<C: Config, B: RootAPI<C>>(
+    pub fn block<C: Config, B: RootAPI<C>>(
         &mut self,
         api: &mut B,
         h: [[Variable; 2]; 8],
