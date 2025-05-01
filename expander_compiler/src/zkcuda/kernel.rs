@@ -305,12 +305,10 @@ where
     let en0 = r_hint_less.expected_num_output_zeroes;
     let rhl_c0 = r_hint_less.circuits.get_mut(&0).unwrap();
     let tmp = remove_duplicate(en0, &mut rhl_c0.outputs);
-    println!("before: {:?}", rhl_c0.outputs);
     let (mut r_dest_opt, hl_im) =
         compile_step_2::<C, NormalInputType>(r_hint_less, CompileOptions::default())?;
     let en0 = r_dest_opt.expected_num_output_zeroes;
     let rd_c0 = r_dest_opt.circuits.get_mut(&0).unwrap();
-    println!("after: {:?}", rd_c0.outputs);
     add_duplicate(en0, &mut rd_c0.outputs, &tmp);
     for (i, x) in hl_im.mapping().iter().enumerate() {
         assert_eq!(i, *x);
