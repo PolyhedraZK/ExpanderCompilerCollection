@@ -60,3 +60,4 @@ sumcheck = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 gkr_engine = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 gkr_hashers = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+expander_utils = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "utils" }

@@ -15,6 +15,7 @@ macros = { path = "./macros" }
 ethnum.workspace = true
 expander_circuit.workspace = true
 expander_transcript.workspace = true
+expander_utils.workspace = true
 gf2.workspace = true
 gkr.workspace = true
 gkr_engine.workspace = true

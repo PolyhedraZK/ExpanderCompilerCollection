@@ -19,6 +19,7 @@ use expander_compiler::zkcuda::proving_system::{
     max_n_vars, prepare_inputs, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof,
     ExpanderGKRProverSetup,
 };
+use expander_utils::timer::Timer;
 
 use gkr::gkr_prove;
 use gkr_engine::{
@@ -58,6 +59,7 @@ fn prove<C: Config>() {
         println!("Expander Prove Exec Called with world size {}", world_size);
     }
 
+    let timer = Timer::new("reading circuit", mpi_config.is_root());
     let pcs_setup = read_pcs_setup_from_shared_memory::<C>();
     let ecc_circuit = read_ecc_circuit_from_shared_memory::<C>();
     let partition_info = read_partition_info_from_shared_memory();
@@ -70,7 +72,9 @@ fn prove<C: Config>() {
         .map(|commitment| &commitment[..])
         .collect::<Vec<_>>();
     let broadcast_info = read_broadcast_info_from_shared_memory();
+    timer.stop();
 
+    let timer = Timer::new("gkr prove", mpi_config.is_root());
     let mut expander_circuit = ecc_circuit.export_to_expander().flatten::<C>();
     expander_circuit.pre_process_gkr::<C>();
     let (max_num_input_var, max_num_output_var) = max_n_vars(&expander_circuit);
@@ -98,7 +102,9 @@ fn prove<C: Config>() {
         claimed_v,
         <C::FieldConfig as FieldEngine>::ChallengeField::from(0)
     );
+    timer.stop();
 
+    let timer = Timer::new("pcs opening", mpi_config.is_root());
     prove_input_claim(
         &mpi_config,
         &commitment_values_refs,
@@ -119,6 +125,7 @@ fn prove<C: Config>() {
             &mut transcript,
         );
     }
+    timer.stop();
 
     let proof = transcript.finalize_and_get_proof();
     if world_rank == 0 {
