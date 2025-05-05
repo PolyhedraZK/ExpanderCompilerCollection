@@ -26,6 +26,7 @@ serdes.workspace = true
 sha2.workspace = true
 tiny-keccak.workspace = true
 ethnum.workspace = true
+gkr_engine.workspace = true
 
 [dev-dependencies]
 ark-serialize.workspace = true
