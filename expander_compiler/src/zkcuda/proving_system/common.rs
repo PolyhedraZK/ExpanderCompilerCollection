@@ -1,11 +1,18 @@
-use crate::circuit::config::Config;
+use crate::{
+    circuit::{
+        config::{Config, SIMDField},
+        layered::{Circuit, NormalInputType},
+    },
+    zkcuda::kernel::LayeredCircuitInputVec,
+};
+
 use arith::Field;
 
 use super::super::kernel::Kernel;
 
 pub fn check_inputs<C: Config>(
     kernel: &Kernel<C>,
-    values: &[&[C::DefaultSimdField]],
+    values: &[&[SIMDField<C>]],
     parallel_count: usize,
     is_broadcast: &[bool],
 ) {
@@ -27,18 +34,14 @@ pub fn check_inputs<C: Config>(
 }
 
 pub fn prepare_inputs<C: Config>(
-    kernel: &Kernel<C>,
-    values: &[&[C::DefaultSimdField]],
+    layered_circuit: &Circuit<C, NormalInputType>,
+    partition_info: &[LayeredCircuitInputVec],
+    values: &[&[SIMDField<C>]],
     is_broadcast: &[bool],
     parallel_index: usize,
-) -> Vec<C::DefaultSimdField> {
-    let mut lc_input = vec![C::DefaultSimdField::zero(); kernel.layered_circuit.input_size()];
-    for ((input, value), ib) in kernel
-        .layered_circuit_input
-        .iter()
-        .zip(values.iter())
-        .zip(is_broadcast)
-    {
+) -> Vec<SIMDField<C>> {
+    let mut lc_input = vec![SIMDField::<C>::zero(); layered_circuit.input_size()];
+    for ((input, value), ib) in partition_info.iter().zip(values.iter()).zip(is_broadcast) {
         if *ib {
             for (i, x) in value.iter().enumerate() {
                 lc_input[input.offset + i] = *x;

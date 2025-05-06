@@ -6,7 +6,7 @@ use crate::frontend::{extra, BasicAPI, CompileOptions, Error, RootAPI, Variable,
 use crate::utils::pool::Pool;
 use crate::{
     circuit::{
-        config::Config,
+        config::{CircuitField, Config},
         input_mapping::{InputMapping, EMPTY},
         ir::{self, common::Instruction, expr},
         layered::{Circuit as LayeredCircuit, NormalInputType},
@@ -285,9 +285,9 @@ where
         add_insns.push(ir::hint_less::Instruction::LinComb(expr::LinComb {
             terms: vec![expr::LinCombTerm {
                 var: n_in + i + 1,
-                coef: C::CircuitField::one(),
+                coef: CircuitField::<C>::one(),
             }],
-            constant: C::CircuitField::zero(),
+            constant: CircuitField::<C>::zero(),
         }));
     }
     add_insns.extend_from_slice(&rl_c0.instructions);

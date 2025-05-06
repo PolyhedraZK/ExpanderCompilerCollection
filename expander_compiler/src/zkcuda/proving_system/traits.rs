@@ -2,7 +2,7 @@ use serdes::ExpSerde;
 
 use super::super::{kernel::Kernel, proof::ComputationGraph};
 
-use crate::circuit::config::Config;
+use crate::circuit::config::{Config, SIMDField};
 
 pub trait Commitment<C: Config>: Clone + ExpSerde {
     fn vals_len(&self) -> usize;
@@ -21,7 +21,7 @@ pub trait ProvingSystem<C: Config> {
 
     fn commit(
         prover_setup: &Self::ProverSetup,
-        vals: &[C::DefaultSimdField],
+        vals: &[SIMDField<C>],
         parallel_count: usize,
         is_broadcast: bool,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo);
@@ -31,7 +31,7 @@ pub trait ProvingSystem<C: Config> {
         kernel: &Kernel<C>,
         commitments: &[Self::Commitment],
         commitments_extra_info: &[Self::CommitmentExtraInfo],
-        commitments_values: &[&[C::DefaultSimdField]],
+        commitments_values: &[&[SIMDField<C>]],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> Self::Proof;

@@ -3,7 +3,8 @@ use ethnum::U256;
 use crate::{
     circuit::{config::Config, layered::Coef},
     field::{Field, FieldArith},
-    hints::{self, circom_shift_l_impl, circom_shift_r_impl},
+    frontend::CircuitField,
+    hints::{self, circom_shift_l_impl, circom_shift_r_impl, to_binary},
     utils::error::Error,
 };
 
@@ -58,6 +59,10 @@ pub enum Instruction<C: Config> {
     CustomGate {
         gate_type: usize,
         inputs: Vec<usize>,
+    },
+    ToBinary {
+        x: usize,
+        num_bits: usize,
     },
 }
 
@@ -122,11 +127,11 @@ impl<C: Config> common::Constraint<C> for Constraint {
 }
 
 impl<C: Config> common::ConstraintType<C> for ConstraintType {
-    fn verify(&self, value: &C::CircuitField) -> bool {
+    fn verify(&self, value: &CircuitField<C>) -> bool {
         match self {
             ConstraintType::Zero => value.is_zero(),
             ConstraintType::NonZero => !value.is_zero(),
-            ConstraintType::Bool => value.is_zero() || *value == C::CircuitField::one(),
+            ConstraintType::Bool => value.is_zero() || *value == CircuitField::<C>::one(),
         }
     }
 }
@@ -163,6 +168,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 if_false,
             } => vec![*cond, *if_true, *if_false],
             Instruction::CustomGate { inputs, .. } => inputs.clone(),
+            Instruction::ToBinary { x, .. } => vec![*x],
         }
     }
     fn num_outputs(&self) -> usize {
@@ -179,6 +185,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             Instruction::UnconstrainedBinOp { .. } => 1,
             Instruction::UnconstrainedSelect { .. } => 1,
             Instruction::CustomGate { .. } => 1,
+            Instruction::ToBinary { num_bits, .. } => *num_bits,
         }
     }
     fn as_sub_circuit_call(&self) -> Option<(usize, &Vec<usize>, usize)> {
@@ -253,9 +260,13 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 gate_type: *gate_type,
                 inputs: inputs.iter().map(|i| f(*i)).collect(),
             },
+            Instruction::ToBinary { x, num_bits } => Instruction::ToBinary {
+                x: f(*x),
+                num_bits: *num_bits,
+            },
         }
     }
-    fn from_kx_plus_b(x: usize, k: C::CircuitField, b: C::CircuitField) -> Self {
+    fn from_kx_plus_b(x: usize, k: CircuitField<C>, b: CircuitField<C>) -> Self {
         Instruction::LinComb(expr::LinComb::from_kx_plus_b(x, k, b))
     }
     fn validate(&self, num_public_inputs: usize) -> Result<(), Error> {
@@ -293,14 +304,23 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                     ))
                 }
             }
+            Instruction::ToBinary { num_bits, .. } => {
+                if *num_bits > 0 {
+                    Ok(())
+                } else {
+                    Err(Error::InternalError(
+                        "to_binary instruction must have at least 1 bit".to_string(),
+                    ))
+                }
+            }
             _ => Ok(()),
         }
     }
-    fn eval_unsafe(&self, values: &[C::CircuitField]) -> EvalResult<C> {
+    fn eval_unsafe(&self, values: &[CircuitField<C>]) -> EvalResult<C> {
         match self {
             Instruction::LinComb(lc) => EvalResult::Value(lc.eval(values)),
             Instruction::Mul(inputs) => {
-                let mut res = C::CircuitField::one();
+                let mut res = CircuitField::<C>::one();
                 for &i in inputs.iter() {
                     res *= values[i];
                 }
@@ -311,7 +331,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 let y = values[*y];
                 if y.is_zero() {
                     if x.is_zero() && !checked {
-                        EvalResult::Value(C::CircuitField::zero())
+                        EvalResult::Value(CircuitField::<C>::zero())
                     } else {
                         EvalResult::Error(Error::UserError("division by zero".to_string()))
                     }
@@ -322,22 +342,22 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             Instruction::BoolBinOp { x, y, op } => {
                 let x = values[*x];
                 let y = values[*y];
-                if !x.is_zero() && x != C::CircuitField::one() {
+                if !x.is_zero() && x != CircuitField::<C>::one() {
                     return EvalResult::Error(Error::UserError("invalid bool value".to_string()));
                 }
-                if !y.is_zero() && y != C::CircuitField::one() {
+                if !y.is_zero() && y != CircuitField::<C>::one() {
                     return EvalResult::Error(Error::UserError("invalid bool value".to_string()));
                 }
                 match op {
                     BoolBinOpType::Xor => {
-                        EvalResult::Value(x + y - C::CircuitField::from(2) * x * y)
+                        EvalResult::Value(x + y - CircuitField::<C>::from(2) * x * y)
                     }
                     BoolBinOpType::Or => EvalResult::Value(x + y - x * y),
                     BoolBinOpType::And => EvalResult::Value(x * y),
                 }
             }
             Instruction::IsZero(x) => {
-                EvalResult::Value(C::CircuitField::from(values[*x].is_zero() as u32))
+                EvalResult::Value(CircuitField::<C>::from(values[*x].is_zero() as u32))
             }
             Instruction::Commit(_) => {
                 panic!("commit is not implemented")
@@ -382,6 +402,10 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                     hints::stub_impl(*gate_type, &inputs.iter().map(|i| values[*i]).collect(), 1);
                 EvalResult::Values(outputs)
             }
+            Instruction::ToBinary { x, num_bits } => match to_binary(values[*x], *num_bits) {
+                Ok(outputs) => EvalResult::Values(outputs),
+                Err(e) => EvalResult::Error(e),
+            },
         }
     }
 }

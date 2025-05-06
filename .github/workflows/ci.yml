@@ -76,6 +76,7 @@ jobs:
         run: brew install openmpi
       - if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install libopenmpi-dev -y
+      - run: cargo build --release --bin expander_commit --bin expander_prove
       - run: cargo test -- --skip pairing_random_test
 
   test-rust-avx512:
@@ -90,6 +91,7 @@ jobs:
           workspaces: "expander_compiler -> expander_compiler/target"
           # The prefix cache key, this can be changed to start a new cache manually.
           prefix-key: "mpi-v5.0.5" # update me if brew formula changes to a new version
+      - run: RUSTFLAGS="-C target-cpu=native -C target-feature=+avx512f" cargo build --release --bin expander_commit --bin expander_prove
       - run: RUSTFLAGS="-C target-cpu=native -C target-feature=+avx512f" cargo test
 
   test-go:
