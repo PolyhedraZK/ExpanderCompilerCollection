@@ -9,6 +9,7 @@ use crate::{
     utils::pool::Pool,
 };
 
+use super::vec_shaped::{flatten_shaped_pack_simd, unflatten_shaped_unpack_simd};
 use super::{
     kernel::{shape_prepend, Kernel, Shape},
     proof::{ComputationGraph, ProofTemplate},
@@ -298,6 +299,17 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<CircuitField<C>>> Context<C, 
         )
     }
 
+    pub fn copy_to_device_and_pack_simd<T: VecShaped<CircuitField<C>>>(
+        &mut self,
+        host_memory: &T,
+        is_broadcast: bool,
+    ) -> DeviceMemoryHandle {
+        let (flat, shape) = flatten_shaped_pack_simd(host_memory);
+        let shape = Some(shape);
+        let pad = pad_vec(&flat, dim0_size(&shape, is_broadcast));
+        self.make_device_mem(flat, pad, broadcast_type(&shape, is_broadcast), shape)
+    }
+
     pub fn copy_simd_to_device<T: VecShaped<SIMDField<C>>>(
         &mut self,
         host_memory: &T,
@@ -332,6 +344,17 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<CircuitField<C>>> Context<C, 
         let device_memory_handle = ensure_handle(device_memory_handle);
         unflatten_shaped(
             &unpack_vec::<C>(&self.device_memories[device_memory_handle.id].raw_values),
+            &device_memory_handle.shape.unwrap(),
+        )
+    }
+
+    pub fn copy_to_host_and_unpack_simd<T: VecShaped<CircuitField<C>> + Default>(
+        &self,
+        device_memory_handle: DeviceMemoryHandle,
+    ) -> T {
+        let device_memory_handle = ensure_handle(device_memory_handle);
+        unflatten_shaped_unpack_simd(
+            &self.device_memories[device_memory_handle.id].raw_values,
             &device_memory_handle.shape.unwrap(),
         )
     }

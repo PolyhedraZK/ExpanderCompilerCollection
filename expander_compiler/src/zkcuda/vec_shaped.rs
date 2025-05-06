@@ -1,3 +1,5 @@
+use arith::SimdField;
+
 use crate::field::FieldRaw;
 
 pub trait VecShaped<T: Clone + Default> {
@@ -66,6 +68,52 @@ pub fn unflatten_shaped<T: FieldRaw, V: VecShaped<T> + Default>(mut s: &[T], sha
     let mut v = V::default();
     s = v.unflatten_shaped(s, shape);
     if !s.is_empty() {
+        panic!("Shape mismatch in unflatten");
+    }
+    v
+}
+
+// Auto pack simd
+
+pub fn flatten_shaped_pack_simd<F: FieldRaw, V: VecShaped<F>, SimdF: SimdField<Scalar = F>>(
+    v: &V,
+) -> (Vec<SimdF>, Vec<usize>) {
+    let mut to = Vec::new();
+    let shape: Vec<usize> = v.flatten_shaped(&mut to).into_iter().rev().collect();
+    assert_eq!(shape.first(), Some(&SimdF::PACK_SIZE));
+    let mut to_simd = Vec::new();
+    let len = to.len() / SimdF::PACK_SIZE;
+    for i in 0..len {
+        let mut vals = Vec::with_capacity(SimdF::PACK_SIZE);
+        for j in 0..SimdF::PACK_SIZE {
+            vals.push(to[j * len + i]);
+        }
+        to_simd.push(SimdF::pack(&vals));
+    }
+    (to_simd, shape[1..].to_vec())
+}
+
+pub fn unflatten_shaped_unpack_simd<
+    F: FieldRaw,
+    V: VecShaped<F> + Default,
+    SimdF: SimdField<Scalar = F>,
+>(
+    s: &[SimdF],
+    shape: &[usize],
+) -> V {
+    let mut v = V::default();
+    let mut s2 = vec![F::default(); s.len() * SimdF::PACK_SIZE];
+    let len = s.len();
+    for i in 0..len {
+        let vals = s[i].unpack();
+        for j in 0..SimdF::PACK_SIZE {
+            s2[j * len + i] = vals[j];
+        }
+    }
+    let mut new_shape = vec![SimdF::PACK_SIZE];
+    new_shape.extend_from_slice(shape);
+    let res = v.unflatten_shaped(&s2, &new_shape);
+    if !res.is_empty() {
         panic!("Shape mismatch in unflatten");
     }
     v

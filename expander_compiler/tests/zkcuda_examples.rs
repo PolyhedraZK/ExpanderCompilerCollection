@@ -203,6 +203,44 @@ fn zkcuda_2_simd() {
     assert!(computation_graph2.verify(&proof, &verifier_setup2));
 }
 
+#[test]
+fn zkcuda_2_simd_autopack() {
+    let kernel_add_2_tmp: Kernel<M31Config> = compile_add_2_macro().unwrap();
+    let kernel_add_16: Kernel<M31Config> = compile_add_16_macro().unwrap();
+
+    let mut buf: Vec<u8> = Vec::new();
+    kernel_add_2_tmp.serialize_into(&mut buf).unwrap();
+    let kernel_add_2: Kernel<M31Config> = Kernel::deserialize_from(&mut buf.as_slice()).unwrap();
+
+    let mut ctx: Context<M31Config> = Context::default();
+    let mut a: Vec<Vec<Vec<M31>>> = vec![];
+    for k in 0..16 {
+        a.push(vec![]);
+        for i in 0..16 {
+            a[k].push(vec![]);
+            for j in 0..2 {
+                a[k][i].push(M31::from((i * 2 + j + 1 + k) as u32));
+            }
+        }
+    }
+    let a = ctx.copy_to_device_and_pack_simd(&a, false);
+    let mut b = None;
+    call_kernel!(ctx, kernel_add_2, a, mut b);
+    let b = b.reshape(&[1, 16]);
+    let mut c = None;
+    call_kernel!(ctx, kernel_add_16, b, mut c);
+    let c = c.reshape(&[]);
+    let result: Vec<M31> = ctx.copy_to_host_and_unpack_simd(c);
+    for k in 0..16 {
+        assert_eq!(result[k], M31::from((32 * 33 / 2 + 32 * k) as u32));
+    }
+
+    let computation_graph = ctx.to_computation_graph();
+    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
+    let proof = ctx.to_proof(&prover_setup);
+    assert!(computation_graph.verify(&proof, &verifier_setup));
+}
+
 fn to_binary<C: Config>(api: &mut API<C>, x: Variable, n_bits: usize) -> Vec<Variable> {
     api.new_hint("myhint.tobinary", &[x], n_bits)
 }
