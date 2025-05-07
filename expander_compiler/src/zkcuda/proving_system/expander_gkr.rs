@@ -9,6 +9,7 @@ use super::{check_inputs, prepare_inputs, Commitment, Proof, ProvingSystem};
 
 use arith::Field;
 use expander_circuit::Circuit;
+use expander_utils::timer::{self, Timer};
 use gkr::{gkr_prove, gkr_verify};
 use gkr_engine::{
     ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, MPIConfig, Proof as ExpanderProof,
@@ -224,6 +225,8 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
         parallel_count: usize,
         is_broadcast: bool,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo) {
+        let timer = Timer::new("commit", true);
+
         let vals_to_commit = if is_broadcast {
             vec![vals]
         } else {
@@ -253,7 +256,8 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
                 (commitment, scratch)
             })
             .unzip::<_, _, Vec<_>, Vec<_>>();
-
+        
+        timer.stop();
         (
             Self::Commitment {
                 vals_len: 1 << n_vars,
@@ -272,6 +276,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> Self::Proof {
+        let timer = Timer::new("prove", true);
         check_inputs(kernel, commitments_values, parallel_count, is_broadcast);
 
         let mut expander_circuit = kernel.layered_circuit.export_to_expander().flatten::<C>();
@@ -334,6 +339,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
             proof.data.push(transcript.finalize_and_get_proof());
         }
 
+        timer.stop();
         proof
     }
 
@@ -345,6 +351,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> bool {
+        let timer = Timer::new("verify", true);
         let mut expander_circuit = kernel.layered_circuit.export_to_expander().flatten::<C>();
         expander_circuit.pre_process_gkr::<C>();
 
@@ -401,6 +408,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
                 return false;
             }
         }
+        timer.stop();
         true
     }
 }
