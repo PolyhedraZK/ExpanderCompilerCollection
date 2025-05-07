@@ -1,4 +1,5 @@
 use expander_compiler::frontend::*;
+use expander_compiler::zkcuda::proving_system::{ExpanderGKRProvingSystem, ParallelizedExpanderGKRProvingSystem, ProvingSystem};
 use expander_compiler::zkcuda::{context::*, kernel::*};
 
 /// N * M matrix times M *K matrix
@@ -24,26 +25,26 @@ fn mul_line<C: Config>(
     }
 }
 
-fn zkcuda_matmul_sum() {
-    let kernel_mul_line: Kernel<M31Config> = compile_mul_line().unwrap();
+fn zkcuda_matmul<C: Config, P: ProvingSystem<C>>() {
+    let kernel_mul_line: Kernel<C> = compile_mul_line().unwrap();
 
-    let mut ctx: Context<M31Config> = Context::default();
+    let mut ctx: Context<C, P> = Context::default();
 
-    let mut mat_a: Vec<Vec<M31>> = vec![];
+    let mut mat_a: Vec<Vec<CircuitField<C>>> = vec![];
     for i in 0..N {
         mat_a.push(vec![]);
         for j in 0..M {
-            mat_a[i].push(M31::from((i * 233 + j + 1) as u32));
+            mat_a[i].push(CircuitField::<C>::from((i * 233 + j + 1) as u32));
         }
     }
-    let mut mat_b: Vec<Vec<M31>> = vec![];
+    let mut mat_b: Vec<Vec<CircuitField<C>>> = vec![];
     for i in 0..M {
         mat_b.push(vec![]);
         for j in 0..K {
-            mat_b[i].push(M31::from((i * 2333 + j + 1) as u32));
+            mat_b[i].push(CircuitField::<C>::from((i * 2333 + j + 1) as u32));
         }
     }
-    let mut expected_result = vec![vec![M31::zero(); K]; N];
+    let mut expected_result = vec![vec![CircuitField::<C>::zero(); K]; N];
     for i in 0..N {
         for j in 0..K {
             for k in 0..M {
@@ -58,7 +59,7 @@ fn zkcuda_matmul_sum() {
     call_kernel!(ctx, kernel_mul_line, a, b, mut c);
 
     let c = c.reshape(&[N, K]);
-    let result: Vec<Vec<M31>> = ctx.copy_to_host(c);
+    let result: Vec<Vec<CircuitField<C>>> = ctx.copy_to_host(c);
     assert_eq!(result, expected_result);
 
     let computation_graph = ctx.to_computation_graph();
@@ -68,5 +69,6 @@ fn zkcuda_matmul_sum() {
 }
 
 fn main() {
-    zkcuda_matmul_sum();
+    zkcuda_matmul::<M31Config, ExpanderGKRProvingSystem<M31Config>>();
+    zkcuda_matmul::<M31Config, ParallelizedExpanderGKRProvingSystem<M31Config>>();
 }

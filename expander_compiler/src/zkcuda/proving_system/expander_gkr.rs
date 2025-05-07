@@ -9,7 +9,7 @@ use super::{check_inputs, prepare_inputs, Commitment, Proof, ProvingSystem};
 
 use arith::Field;
 use expander_circuit::Circuit;
-use expander_utils::timer::{self, Timer};
+use expander_utils::timer::Timer;
 use gkr::{gkr_prove, gkr_verify};
 use gkr_engine::{
     ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, MPIConfig, Proof as ExpanderProof,
