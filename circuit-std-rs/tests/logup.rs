@@ -1,7 +1,10 @@
 mod common;
 
 use circuit_std_rs::{
-    logup::{query_count_hint, rangeproof_hint, LogUpRangeProofTable},
+    logup::{
+        query_count_by_key_hint, query_count_hint, rangeproof_hint, LogUpRangeProofTable,
+        LogUpSingleKeyTable,
+    },
     LogUpCircuit, LogUpParams,
 };
 use expander_compiler::{field::BN254Fr, field::Goldilocks, frontend::*};
@@ -51,6 +54,40 @@ fn rangeproof_logup_test() {
     )
     .unwrap();
     let assignment = LogUpRangeproofCircuit { test: M31::from(0) };
+    let witness = compile_result
+        .witness_solver
+        .solve_witness_with_hints(&assignment, &mut hint_registry)
+        .unwrap();
+    let output = compile_result.layered_circuit.run(&witness);
+    assert_eq!(output, vec![true]);
+}
+
+declare_circuit!(LogUpSingleKeyCircuit { test: Variable });
+impl Define<M31Config> for LogUpSingleKeyCircuit<Variable> {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
+        let mut table = LogUpSingleKeyTable::new(8);
+        let key = builder.constant(2);
+        let value: Vec<Variable> = (1..=8).map(|x| builder.constant(x)).collect();
+        table.add_table_row(key, value.clone());
+        let key = builder.constant(3);
+        table.add_table_row(key, value.clone());
+
+        table.query(key, value);
+
+        table.final_check(builder);
+    }
+}
+
+#[test]
+fn rangeproof_logup_singlekey_test() {
+    let mut hint_registry = HintRegistry::<M31>::new();
+    hint_registry.register("myhint.querycounthint", query_count_hint);
+    hint_registry.register("myhint.rangeproofhint", rangeproof_hint);
+    hint_registry.register("myhint.querycountbykeyhint", query_count_by_key_hint);
+    //compile and test
+    let compile_result =
+        compile(&LogUpSingleKeyCircuit::default(), CompileOptions::default()).unwrap();
+    let assignment = LogUpSingleKeyCircuit { test: M31::from(0) };
     let witness = compile_result
         .witness_solver
         .solve_witness_with_hints(&assignment, &mut hint_registry)
