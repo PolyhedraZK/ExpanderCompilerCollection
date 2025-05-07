@@ -250,3 +250,63 @@ fn zkcuda_hashtable_simd() {
     let elapsed = start_time.elapsed();
     println!("Time elapsed in assert!() is: {:?}", elapsed);
 }
+
+
+
+#[test]
+fn zkcuda_hashtable_multi_core_simd() {
+    use arith::SimdField;
+    let kernel_check_sha256_37bytes: Kernel<M31Config> = compile_sha256_37bytes().unwrap();
+    println!("compile_sha256_37bytes() done");
+    let data = [255; 37];
+    let repeat_time = 8;
+    let mut hash = Sha256::new();
+    hash.update(data);
+    let output = hash.finalize();
+    let mut input_vars: Vec<mersenne31::M31x16> = vec![];
+    let mut output_vars = vec![];
+    for i in 0..37 {
+        let mut tmp = Vec::new();
+        for j in 0..16 {
+            tmp.push(M31::from(data[i] as u32));
+        }
+        input_vars.push(mersenne31::M31x16::pack(&tmp));
+    }
+    for i in 0..32 {
+        output_vars.push(M31::from(output[i] as u32));
+    }
+    let mut new_input_vars: Vec<Vec<mersenne31::M31x16>> = vec![];
+    for _ in 0..repeat_time {
+        new_input_vars.push(input_vars.clone());
+    }
+    let mut ctx: Context<M31Config, ParallelizedExpanderGKRProvingSystem<M31Config>, _> = Context::default();
+
+    let a = ctx.copy_simd_to_device(&new_input_vars, false);
+    let mut c = None;
+    let start_time = time::Instant::now();
+    call_kernel!(ctx, kernel_check_sha256_37bytes, a, mut c);
+    let elapsed = start_time.elapsed();
+    println!("Time elapsed in call_kernel!() is: {:?}", elapsed);
+    // let c = c.reshape(&[repeat_time, 32]);
+    let result: Vec<Vec<mersenne31::M31x16>> = ctx.copy_simd_to_host(c);
+    for i in 0..32 {
+        let unpack_output = result[0][i].unpack();
+        for j in 0..8 {
+            assert_eq!(unpack_output[j], output_vars[i]);
+        }
+    }
+
+    let start_time = time::Instant::now();
+    let computation_graph = ctx.to_computation_graph();
+    let elapsed = start_time.elapsed();
+    println!("Time elapsed in computation_graph!() is: {:?}", elapsed);
+    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
+    let elapsed = start_time.elapsed();
+    println!("Time elapsed in proving_system_setup!() is: {:?}", elapsed);
+    let proof = ctx.to_proof(&prover_setup);
+    let elapsed = start_time.elapsed();
+    println!("Time elapsed in to_proof!() is: {:?}", elapsed);
+    assert!(computation_graph.verify(&proof, &verifier_setup));
+    let elapsed = start_time.elapsed();
+    println!("Time elapsed in assert!() is: {:?}", elapsed);
+}
