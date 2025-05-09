@@ -2,7 +2,7 @@ mod common;
 use common::ExpanderExecArgs;
 
 use clap::Parser;
-use std::cmp;
+use std::cmp::max;
 
 use arith::Field;
 use expander_compiler::circuit::config::Config;
@@ -78,8 +78,9 @@ fn prove<C: Config>() {
     let mut expander_circuit = ecc_circuit.export_to_expander().flatten::<C>();
     expander_circuit.pre_process_gkr::<C>();
     let (max_num_input_var, max_num_output_var) = max_n_vars(&expander_circuit);
+    let max_num_var = max(max_num_input_var, max_num_output_var); // temp fix to a bug in Expander, remove this after Expander update.
     let mut prover_scratch =
-        ProverScratchPad::<C::FieldConfig>::new(max_num_input_var, max_num_output_var, world_size);
+        ProverScratchPad::<C::FieldConfig>::new(max_num_var, max_num_var, world_size);
 
     let mut transcript = C::TranscriptConfig::new();
     transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
@@ -180,7 +181,7 @@ fn prove_input_claim<C: Config>(
             &mut vec![<C::FieldConfig as FieldEngine>::Field::ZERO; val_len],
             &mut vec![
                 <C::FieldConfig as FieldEngine>::ChallengeField::ZERO;
-                1 << cmp::max(challenge.r_simd.len(), challenge.r_mpi.len())
+                1 << max(challenge.r_simd.len(), challenge.r_mpi.len())
             ],
             mpi_config,
         );
@@ -192,6 +193,7 @@ fn prove_input_claim<C: Config>(
             mpi_config,
             p_key,
             &poly,
+
             &ExpanderSingleVarChallenge::<C::FieldConfig> {
                 rz: challenge_vars.to_vec(),
                 r_simd: challenge.r_simd.to_vec(),

@@ -3,9 +3,9 @@ use expander_compiler::zkcuda::proving_system::{ExpanderGKRProvingSystem, Parall
 use expander_compiler::zkcuda::{context::*, kernel::*};
 
 /// N * M matrix times M *K matrix
-const N: usize = 16;
-const M: usize = 32;
-const K: usize = 64;
+const N: usize = 8;
+const M: usize = 512;
+const K: usize = 512;
 
 #[kernel]
 fn mul_line<C: Config>(

@@ -224,7 +224,7 @@ pub fn exec_pcs_commit<C: Config>(mpi_size: usize) {
     };
 
     let cmd_str = format!(
-        "mpiexec -n {} {} ../target/release/expander_commit -f {}",
+        "mpiexec -n {} {} ./target/release/expander_commit -f {}",
         mpi_size, oversubscription, field_name,
     );
     exec_command(&cmd_str);
@@ -247,7 +247,7 @@ pub fn exec_gkr_prove_with_pcs<C: Config>(mpi_size: usize) {
     };
 
     let cmd_str = format!(
-        "mpiexec -n {} {} ../target/release/expander_prove -f {}",
+        "mpiexec -n {} {} ./target/release/expander_prove -f {}",
         mpi_size, oversubscription, field_name,
     );
     exec_command(&cmd_str);

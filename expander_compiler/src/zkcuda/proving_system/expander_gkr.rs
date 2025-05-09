@@ -1,3 +1,4 @@
+use std::cmp::max;
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
 
@@ -282,8 +283,9 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
         let mut expander_circuit = kernel.layered_circuit.export_to_expander().flatten::<C>();
         expander_circuit.pre_process_gkr::<C>();
         let (max_num_input_var, max_num_output_var) = max_n_vars(&expander_circuit);
+        let max_num_var = max(max_num_input_var, max_num_output_var);
         let mut prover_scratch =
-            ProverScratchPad::<C::FieldConfig>::new(max_num_input_var, max_num_output_var, 1);
+            ProverScratchPad::<C::FieldConfig>::new(max_num_var, max_num_var, 1);
 
         let mut proof = ExpanderGKRProof { data: vec![] };
 

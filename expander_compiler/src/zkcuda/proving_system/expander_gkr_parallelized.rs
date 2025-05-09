@@ -17,6 +17,7 @@ use super::expander_gkr::{
     ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof,
     ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
 };
+use expander_utils::timer::Timer;
 use super::{Commitment, ExpanderGKRProvingSystem, ProvingSystem};
 
 use arith::Field;
@@ -107,6 +108,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
                 is_broadcast,
             )
         } else {
+            let timer = Timer::new("prove", true);
             init_proof_shared_memory(SINGLE_KERNEL_MAX_PROOF_SIZE);
             write_pcs_setup_to_shared_memory(prover_setup);
             write_ecc_circuit_to_shared_memory(&kernel.layered_circuit);
@@ -116,6 +118,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
             write_commitments_values_to_shared_memory::<C>(commitments_values);
             write_broadcast_info_to_shared_memory(&is_broadcast.to_vec());
             exec_gkr_prove_with_pcs::<C>(parallel_count);
+            timer.stop();
             read_proof_from_shared_memory()
         }
     }
@@ -129,6 +132,8 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> bool {
+        let timer = Timer::new("verify", true);
+
         let mut expander_circuit = kernel.layered_circuit.export_to_expander().flatten::<C>();
         expander_circuit.pre_process_gkr::<C>();
 
@@ -172,6 +177,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
             );
         }
 
+        timer.stop();
         verified
     }
 }
