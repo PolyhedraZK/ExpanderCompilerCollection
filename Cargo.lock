@@ -593,6 +593,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 
 [[package]]
+name = "colored"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "117725a109d387c937a1533ce01b450cbde6b88abceea8473c4d7a85853cda3c"
+dependencies = [
+ "lazy_static",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "config_macros"
 version = "0.1.0"
 source = "git+https://github.com/PolyhedraZK/Expander?branch=main#5622b2bd1831aae35aeb7c0e72191623a348c0aa"
@@ -2742,6 +2752,9 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 name = "utils"
 version = "0.1.0"
 source = "git+https://github.com/PolyhedraZK/Expander?branch=main#5622b2bd1831aae35aeb7c0e72191623a348c0aa"
+dependencies = [
+ "colored",
+]
 
 [[package]]
 name = "version_check"

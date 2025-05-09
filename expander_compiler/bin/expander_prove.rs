@@ -193,7 +193,6 @@ fn prove_input_claim<C: Config>(
             mpi_config,
             p_key,
             &poly,
-
             &ExpanderSingleVarChallenge::<C::FieldConfig> {
                 rz: challenge_vars.to_vec(),
                 r_simd: challenge.r_simd.to_vec(),
