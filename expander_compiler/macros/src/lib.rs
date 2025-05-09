@@ -142,8 +142,8 @@ pub fn memorized(_attr: TokenStream, item: TokenStream) -> TokenStream {
         ReturnType::Default => None,
     };
 
-    eprintln!("Parameter infos: {:#?}", param_infos);
-    eprintln!("Return info: {:#?}", return_info);
+    //eprintln!("Parameter infos: {:#?}", param_infos);
+    //eprintln!("Return info: {:#?}", return_info);
 
     let join_variable_calls = param_infos.iter()
         .filter(|param_info| matches!(param_info.kind, ParamKind::Variable))
@@ -273,7 +273,7 @@ pub fn memorized(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
-    eprintln!("Expanded code: {}", expanded);
+    //eprintln!("Expanded code: {}", expanded);
     TokenStream::from(expanded)
 }
 
