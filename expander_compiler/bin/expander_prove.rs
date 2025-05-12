@@ -5,9 +5,8 @@ use clap::Parser;
 use std::cmp::max;
 
 use arith::Field;
-use expander_compiler::circuit::config::Config;
 use expander_compiler::frontend::{
-    BN254Config, BabyBearConfig, GF2Config, GoldilocksConfig, M31Config, SIMDField,
+    BN254Config, BabyBearConfig, Config, GF2Config, GoldilocksConfig, M31Config, SIMDField,
 };
 use expander_compiler::zkcuda::proving_system::callee_utils::{
     read_broadcast_info_from_shared_memory, read_commitment_extra_info_from_shared_memory,
@@ -23,13 +22,18 @@ use expander_utils::timer::Timer;
 
 use gkr::gkr_prove;
 use gkr_engine::{
-    ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, MPIConfig, MPIEngine, Transcript,
+    ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine,
+    Transcript,
 };
 use polynomials::MultiLinearPoly;
 use serdes::ExpSerde;
 use sumcheck::ProverScratchPad;
 
-fn prove<C: Config>() {
+// Ideally, there will only one ECCConfig generics
+// But we need to implement `Config` for each GKREngine, which remains to be done
+// For now, the GKREngine actually controls the functionality of the prover
+// The ECCConfig is only used where the `Config` trait is required
+fn prove<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>() {
     let mpi_config = MPIConfig::prover_new();
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
@@ -43,13 +47,13 @@ fn prove<C: Config>() {
 
     let timer = Timer::new("reading circuit", mpi_config.is_root());
     let pcs_setup = read_pcs_setup_from_shared_memory::<C::FieldConfig, C::PCSConfig>();
-    let ecc_circuit = read_ecc_circuit_from_shared_memory::<C>();
+    let ecc_circuit = read_ecc_circuit_from_shared_memory::<ECCConfig>();
     let partition_info = read_partition_info_from_shared_memory();
 
     let _commitments = read_commitment_from_shared_memory::<C::FieldConfig, C::PCSConfig>();
     let commitments_extra_info =
         read_commitment_extra_info_from_shared_memory::<C::FieldConfig, C::PCSConfig>();
-    let commitment_values = read_commitment_values_from_shared_memory::<C>();
+    let commitment_values = read_commitment_values_from_shared_memory::<C::FieldConfig>();
     let commitment_values_refs = commitment_values
         .iter()
         .map(|commitment| &commitment[..])
@@ -119,7 +123,7 @@ fn prove<C: Config>() {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn prove_input_claim<C: Config>(
+fn prove_input_claim<C: GKREngine>(
     mpi_config: &MPIConfig,
     commitments_values: &[&[SIMDField<C>]],
     p_keys: &ExpanderGKRProverSetup<C::FieldConfig, C::PCSConfig>,
@@ -198,11 +202,11 @@ fn prove_input_claim<C: Config>(
 fn main() {
     let expander_exec_args = ExpanderExecArgs::parse();
     match expander_exec_args.field_type.as_str() {
-        "M31" => prove::<M31Config>(),
-        "GF2" => prove::<GF2Config>(),
-        "Goldilocks" => prove::<GoldilocksConfig>(),
-        "BabyBear" => prove::<BabyBearConfig>(),
-        "BN254" => prove::<BN254Config>(),
+        "M31" => prove::<M31Config, M31Config>(),
+        "GF2" => prove::<GF2Config, GF2Config>(),
+        "Goldilocks" => prove::<GoldilocksConfig, GoldilocksConfig>(),
+        "BabyBear" => prove::<BabyBearConfig, BabyBearConfig>(),
+        "BN254" => prove::<BN254Config, BN254Config>(),
         _ => panic!("Unsupported field type"),
     }
 }

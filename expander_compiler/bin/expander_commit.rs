@@ -14,22 +14,10 @@ use expander_compiler::zkcuda::proving_system::{
     ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo,
 };
 
-use gkr_engine::{ExpanderPCS, MPIConfig, MPIEngine};
+use gkr_engine::{ExpanderPCS, GKREngine, MPIConfig, MPIEngine};
 use polynomials::MultiLinearPoly;
 
-macro_rules! field {
-    ($config: ident) => {
-        $config::FieldConfig
-    };
-}
-
-macro_rules! pcs {
-    ($config: ident) => {
-        $config::PCSConfig
-    };
-}
-
-fn commit<C: Config>() {
+fn commit<C: GKREngine>() {
     let mpi_config = MPIConfig::prover_new();
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
@@ -41,20 +29,23 @@ fn commit<C: Config>() {
         println!("Expander Commit Exec Called with world size {}", world_size);
     }
 
-    let (local_val_len, p_key) = read_selected_pkey_from_shared_memory::<C>();
+    let (local_val_len, p_key) =
+        read_selected_pkey_from_shared_memory::<C::FieldConfig, C::PCSConfig>();
 
     // TODO: remove the redundancy
-    let global_vals_to_commit = read_commit_vals_from_shared_memory::<C>();
+    let global_vals_to_commit = read_commit_vals_from_shared_memory::<C::FieldConfig>();
     let local_vals_to_commit = global_vals_to_commit
         [local_val_len * world_rank..local_val_len * (world_rank + 1)]
         .to_vec();
     drop(global_vals_to_commit);
 
-    let params = <pcs!(C) as ExpanderPCS<field!(C)>>::gen_params(local_val_len.ilog2() as usize);
+    let params =
+        <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(local_val_len.ilog2() as usize);
 
-    let mut scratch = <pcs!(C) as ExpanderPCS<field!(C)>>::init_scratch_pad(&params, &mpi_config);
+    let mut scratch =
+        <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::init_scratch_pad(&params, &mpi_config);
 
-    let commitment = <pcs!(C) as ExpanderPCS<field!(C)>>::commit(
+    let commitment = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::commit(
         &params,
         &mpi_config,
         &p_key,

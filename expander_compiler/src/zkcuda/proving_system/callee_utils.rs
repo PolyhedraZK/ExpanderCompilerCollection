@@ -7,7 +7,6 @@ use crate::{
         config::Config,
         layered::{Circuit, NormalInputType},
     },
-    frontend::SIMDField,
     zkcuda::kernel::LayeredCircuitInputVec,
 };
 
@@ -16,32 +15,18 @@ use super::{
     ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof, ExpanderGKRProverSetup,
 };
 
-macro_rules! field {
-    ($config: ident) => {
-        $config::FieldConfig
-    };
-}
-
-macro_rules! pcs {
-    ($config: ident) => {
-        $config::PCSConfig
-    };
-}
-
 pub fn read_object_from_shared_memory_name_string<T: ExpSerde>(shared_memory_ref: &str) -> T {
     let shmem = ShmemConf::new().flink(shared_memory_ref).open().unwrap();
     read_object_from_shared_memory(&Some(shmem))
 }
 
 #[allow(clippy::type_complexity)]
-pub fn read_selected_pkey_from_shared_memory<C: Config>() -> (
-    usize,
-    <<pcs!(C) as ExpanderPCS<field!(C)>>::SRS as StructuredReferenceString>::PKey,
-) {
+pub fn read_selected_pkey_from_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
+) -> (usize, <PCS::SRS as StructuredReferenceString>::PKey) {
     read_object_from_shared_memory_name_string("pcs_setup")
 }
 
-pub fn read_commit_vals_from_shared_memory<C: Config>() -> Vec<SIMDField<C>> {
+pub fn read_commit_vals_from_shared_memory<F: FieldEngine>() -> Vec<F::SimdCircuitField> {
     read_object_from_shared_memory_name_string("input_vals")
 }
 
@@ -100,7 +85,8 @@ pub fn read_commitment_extra_info_from_shared_memory<F: FieldEngine, PCS: Expand
     read_object_from_shared_memory_name_string("extra_info")
 }
 
-pub fn read_commitment_values_from_shared_memory<C: Config>() -> Vec<Vec<SIMDField<C>>> {
+pub fn read_commitment_values_from_shared_memory<F: FieldEngine>() -> Vec<Vec<F::SimdCircuitField>>
+{
     read_object_from_shared_memory_name_string("input_vals")
 }
 
