@@ -13,5 +13,5 @@ pub struct ExpanderExecArgs {
 
     /// Polynomial Commitment Scheme: Raw, or Orion
     #[arg(short, long, default_value = "Raw")]
-    pub poly_commitment_scheme: String,
+    pub poly_commit: String,
 }

@@ -244,7 +244,7 @@ pub fn exec_pcs_commit<C: GKREngine>(mpi_size: usize) {
     let (oversubscription, field_name, pcs_name) = parse_config::<C>(mpi_size);
 
     let cmd_str = format!(
-        "mpiexec -n {} {} ./target/release/expander_commit --field_type {} --poly_commitment_scheme {}",
+        "mpiexec -n {} {} ../target/release/expander_commit --field-type {} --poly-commit {}",
         mpi_size, oversubscription, field_name, pcs_name,
     );
     exec_command(&cmd_str);
@@ -254,7 +254,7 @@ pub fn exec_gkr_prove_with_pcs<C: GKREngine>(mpi_size: usize) {
     let (oversubscription, field_name, pcs_name) = parse_config::<C>(mpi_size);
 
     let cmd_str = format!(
-        "mpiexec -n {} {} ./target/release/expander_prove --field_type {} --poly_commitment_scheme {}",
+        "mpiexec -n {} {} ../target/release/expander_prove --field-type {} --poly-commit {}",
         mpi_size, oversubscription, field_name, pcs_name,
     );
     exec_command(&cmd_str);

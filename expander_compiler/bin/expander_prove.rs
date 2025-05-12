@@ -188,15 +188,17 @@ fn prove_input_claim<C: GKREngine>(
             },
             transcript,
             &extra_info.scratch[0],
-        )
-        .unwrap();
+        );
         transcript.unlock_proof();
 
-        let mut buffer = vec![];
-        opening
-            .serialize_into(&mut buffer)
-            .expect("Failed to serialize opening");
-        transcript.append_u8_slice(&buffer);
+        if mpi_config.is_root() {
+            let mut buffer = vec![];
+            opening
+                .unwrap()
+                .serialize_into(&mut buffer)
+                .expect("Failed to serialize opening");
+            transcript.append_u8_slice(&buffer);
+        }
     }
 }
 
@@ -207,8 +209,7 @@ fn main() {
         "Only SHA256 is supported for now"
     );
 
-    let pcs_type =
-        PolynomialCommitmentType::from_str(&expander_exec_args.poly_commitment_scheme).unwrap();
+    let pcs_type = PolynomialCommitmentType::from_str(&expander_exec_args.poly_commit).unwrap();
 
     match (expander_exec_args.field_type.as_str(), pcs_type) {
         ("M31", PolynomialCommitmentType::Raw) => {

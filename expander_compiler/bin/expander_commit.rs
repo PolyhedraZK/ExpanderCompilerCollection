@@ -78,8 +78,7 @@ fn main() {
         "Only SHA256 is supported for now"
     );
 
-    let pcs_type =
-        PolynomialCommitmentType::from_str(&expander_exec_args.poly_commitment_scheme).unwrap();
+    let pcs_type = PolynomialCommitmentType::from_str(&expander_exec_args.poly_commit).unwrap();
 
     match (expander_exec_args.field_type.as_str(), pcs_type) {
         ("M31", PolynomialCommitmentType::Raw) => {
