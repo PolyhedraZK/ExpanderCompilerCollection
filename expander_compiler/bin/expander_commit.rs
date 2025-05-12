@@ -71,8 +71,8 @@ fn commit<C: Config>() {
             scratch: vec![scratch],
         };
 
-        write_commitment_to_shared_memory::<C>(&commitment);
-        write_commitment_extra_info_to_shared_memory::<C>(&extra_info);
+        write_commitment_to_shared_memory::<C::FieldConfig, C::PCSConfig>(&commitment);
+        write_commitment_extra_info_to_shared_memory::<C::FieldConfig, C::PCSConfig>(&extra_info);
     }
 
     MPIConfig::finalize();
@@ -80,6 +80,20 @@ fn commit<C: Config>() {
 
 fn main() {
     let expander_exec_args = ExpanderExecArgs::parse();
+    assert_eq!(
+        expander_exec_args.fiat_shamir_hash, "SHA256",
+        "Only SHA256 is supported for now"
+    );
+
+    // let pcs_type =
+    //     PolynomialCommitmentType::from_str(&expander_exec_args.poly_commitment_scheme).unwrap();
+
+    // match (pcs_type, expander_exec_args.field_type.as_str()) {
+    //     (PolynomialCommitmentType::Raw, "Raw") => {}
+    //     (PolynomialCommitmentType::Orion, "Orion") => {}
+    //     _ => panic!("Unsupported polynomial commitment scheme"),
+    // }
+
     match expander_exec_args.field_type.as_str() {
         "M31" => commit::<M31Config>(),
         "GF2" => commit::<GF2Config>(),

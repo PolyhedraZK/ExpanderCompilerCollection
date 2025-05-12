@@ -21,31 +21,13 @@ use polynomials::{EqPolynomial, MultiLinearPoly};
 use serdes::ExpSerde;
 use sumcheck::ProverScratchPad;
 
-macro_rules! field {
-    ($config: ident) => {
-        $config::FieldConfig
-    };
-}
-
-macro_rules! transcript {
-    ($config: ident) => {
-        $config::TranscriptConfig
-    };
-}
-
-macro_rules! pcs {
-    ($config: ident) => {
-        $config::PCSConfig
-    };
-}
-
 #[allow(clippy::type_complexity)]
-pub struct ExpanderGKRCommitment<C: Config> {
+pub struct ExpanderGKRCommitment<F: FieldEngine, PCS: ExpanderPCS<F>> {
     pub vals_len: usize,
-    pub commitment: Vec<<pcs!(C) as ExpanderPCS<field!(C)>>::Commitment>,
+    pub commitment: Vec<PCS::Commitment>,
 }
 
-impl<C: Config> Clone for ExpanderGKRCommitment<C> {
+impl<F: FieldEngine, PCS: ExpanderPCS<F>> Clone for ExpanderGKRCommitment<F, PCS> {
     fn clone(&self) -> Self {
         Self {
             vals_len: self.vals_len,
@@ -54,7 +36,7 @@ impl<C: Config> Clone for ExpanderGKRCommitment<C> {
     }
 }
 
-impl<C: Config> ExpSerde for ExpanderGKRCommitment<C> {
+impl<F: FieldEngine, PCS: ExpanderPCS<F>> ExpSerde for ExpanderGKRCommitment<F, PCS> {
     const SERIALIZED_SIZE: usize = unimplemented!();
     fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
         self.vals_len.serialize_into(&mut writer)?;
@@ -62,8 +44,7 @@ impl<C: Config> ExpSerde for ExpanderGKRCommitment<C> {
     }
     fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
         let vals_len = usize::deserialize_from(&mut reader)?;
-        let commitment =
-            Vec::<<pcs!(C) as ExpanderPCS<field!(C)>>::Commitment>::deserialize_from(&mut reader)?;
+        let commitment = Vec::<PCS::Commitment>::deserialize_from(&mut reader)?;
         Ok(ExpanderGKRCommitment {
             vals_len,
             commitment,
@@ -71,18 +52,18 @@ impl<C: Config> ExpSerde for ExpanderGKRCommitment<C> {
     }
 }
 
-impl<C: Config> Commitment<C> for ExpanderGKRCommitment<C> {
+impl<C: Config> Commitment<C> for ExpanderGKRCommitment<C::FieldConfig, C::PCSConfig> {
     fn vals_len(&self) -> usize {
         self.vals_len
     }
 }
 
 #[allow(clippy::type_complexity)]
-pub struct ExpanderGKRCommitmentExtraInfo<C: Config> {
-    pub scratch: Vec<<pcs!(C) as ExpanderPCS<field!(C)>>::ScratchPad>,
+pub struct ExpanderGKRCommitmentExtraInfo<F: FieldEngine, PCS: ExpanderPCS<F>> {
+    pub scratch: Vec<PCS::ScratchPad>,
 }
 
-impl<C: Config> Clone for ExpanderGKRCommitmentExtraInfo<C> {
+impl<F: FieldEngine, PCS: ExpanderPCS<F>> Clone for ExpanderGKRCommitmentExtraInfo<F, PCS> {
     fn clone(&self) -> Self {
         Self {
             scratch: self.scratch.clone(),
@@ -90,27 +71,23 @@ impl<C: Config> Clone for ExpanderGKRCommitmentExtraInfo<C> {
     }
 }
 
-impl<C: Config> ExpSerde for ExpanderGKRCommitmentExtraInfo<C> {
+impl<F: FieldEngine, PCS: ExpanderPCS<F>> ExpSerde for ExpanderGKRCommitmentExtraInfo<F, PCS> {
     const SERIALIZED_SIZE: usize = unimplemented!();
     fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
         self.scratch.serialize_into(&mut writer)
     }
     fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
-        let scratch =
-            Vec::<<pcs!(C) as ExpanderPCS<field!(C)>>::ScratchPad>::deserialize_from(&mut reader)?;
+        let scratch = Vec::<PCS::ScratchPad>::deserialize_from(&mut reader)?;
         Ok(ExpanderGKRCommitmentExtraInfo { scratch })
     }
 }
 
 #[allow(clippy::type_complexity)]
-pub struct ExpanderGKRProverSetup<C: Config> {
-    pub p_keys: HashMap<
-        usize,
-        <<pcs!(C) as ExpanderPCS<field!(C)>>::SRS as StructuredReferenceString>::PKey,
-    >,
+pub struct ExpanderGKRProverSetup<F: FieldEngine, PCS: ExpanderPCS<F>> {
+    pub p_keys: HashMap<usize, <PCS::SRS as StructuredReferenceString>::PKey>,
 }
 
-impl<C: Config> Clone for ExpanderGKRProverSetup<C> {
+impl<F: FieldEngine, PCS: ExpanderPCS<F>> Clone for ExpanderGKRProverSetup<F, PCS> {
     fn clone(&self) -> Self {
         Self {
             p_keys: self.p_keys.clone(),
@@ -118,7 +95,7 @@ impl<C: Config> Clone for ExpanderGKRProverSetup<C> {
     }
 }
 
-impl<C: Config> ExpSerde for ExpanderGKRProverSetup<C> {
+impl<F: FieldEngine, PCS: ExpanderPCS<F>> ExpSerde for ExpanderGKRProverSetup<F, PCS> {
     const SERIALIZED_SIZE: usize = unimplemented!();
     fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
         self.p_keys.serialize_into(&mut writer)
@@ -130,14 +107,11 @@ impl<C: Config> ExpSerde for ExpanderGKRProverSetup<C> {
 }
 
 #[allow(clippy::type_complexity)]
-pub struct ExpanderGKRVerifierSetup<C: Config> {
-    pub v_keys: HashMap<
-        usize,
-        <<pcs!(C) as ExpanderPCS<field!(C)>>::SRS as StructuredReferenceString>::VKey,
-    >,
+pub struct ExpanderGKRVerifierSetup<F: FieldEngine, PCS: ExpanderPCS<F>> {
+    pub v_keys: HashMap<usize, <PCS::SRS as StructuredReferenceString>::VKey>,
 }
 
-impl<C: Config> Clone for ExpanderGKRVerifierSetup<C> {
+impl<F: FieldEngine, PCS: ExpanderPCS<F>> Clone for ExpanderGKRVerifierSetup<F, PCS> {
     fn clone(&self) -> Self {
         Self {
             v_keys: self.v_keys.clone(),
@@ -145,7 +119,7 @@ impl<C: Config> Clone for ExpanderGKRVerifierSetup<C> {
     }
 }
 
-impl<C: Config> ExpSerde for ExpanderGKRVerifierSetup<C> {
+impl<F: FieldEngine, PCS: ExpanderPCS<F>> ExpSerde for ExpanderGKRVerifierSetup<F, PCS> {
     const SERIALIZED_SIZE: usize = unimplemented!();
     fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
         self.v_keys.serialize_into(&mut writer)
@@ -179,11 +153,11 @@ pub struct ExpanderGKRProvingSystem<C: Config> {
 }
 
 impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
-    type ProverSetup = ExpanderGKRProverSetup<C>;
-    type VerifierSetup = ExpanderGKRVerifierSetup<C>;
+    type ProverSetup = ExpanderGKRProverSetup<C::FieldConfig, C::PCSConfig>;
+    type VerifierSetup = ExpanderGKRVerifierSetup<C::FieldConfig, C::PCSConfig>;
     type Proof = ExpanderGKRProof;
-    type Commitment = ExpanderGKRCommitment<C>;
-    type CommitmentExtraInfo = ExpanderGKRCommitmentExtraInfo<C>;
+    type Commitment = ExpanderGKRCommitment<C::FieldConfig, C::PCSConfig>;
+    type CommitmentExtraInfo = ExpanderGKRCommitmentExtraInfo<C::FieldConfig, C::PCSConfig>;
 
     fn setup(
         computation_graph: &crate::zkcuda::proof::ComputationGraph<C>,
@@ -205,10 +179,11 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
                 if p_keys.contains_key(&val_actual_len) {
                     continue;
                 }
-                let (_params, p_key, v_key, _scratch) =
-                    pcs_testing_setup_fixed_seed::<field!(C), transcript!(C), pcs!(C)>(
-                        val_actual_len,
-                    );
+                let (_params, p_key, v_key, _scratch) = pcs_testing_setup_fixed_seed::<
+                    C::FieldConfig,
+                    C::TranscriptConfig,
+                    C::PCSConfig,
+                >(val_actual_len);
                 p_keys.insert(val_actual_len, p_key);
                 v_keys.insert(val_actual_len, v_key);
             }
@@ -235,18 +210,18 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
         };
 
         let n_vars = vals_to_commit[0].len().ilog2() as usize;
-        let params = <pcs!(C) as ExpanderPCS<field!(C)>>::gen_params(n_vars);
+        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(n_vars);
         let p_key = prover_setup.p_keys.get(&(1 << n_vars)).unwrap();
 
         let (commitment, scratch) = vals_to_commit
             .into_iter()
             .map(|vals| {
-                let mut scratch = <pcs!(C) as ExpanderPCS<field!(C)>>::init_scratch_pad(
+                let mut scratch = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::init_scratch_pad(
                     &params,
                     &MPIConfig::default(),
                 );
 
-                let commitment = <pcs!(C) as ExpanderPCS<field!(C)>>::commit(
+                let commitment = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::commit(
                     &params,
                     &MPIConfig::default(),
                     p_key,
@@ -257,7 +232,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
                 (commitment, scratch)
             })
             .unzip::<_, _, Vec<_>, Vec<_>>();
-        
+
         timer.stop();
         (
             Self::Commitment {
@@ -445,13 +420,13 @@ pub fn max_n_vars<C: FieldEngine>(circuit: &Circuit<C>) -> (usize, usize) {
 fn prove_input_claim<C: Config>(
     _kernel: &Kernel<C>,
     commitments_values: &[&[SIMDField<C>]],
-    p_keys: &ExpanderGKRProverSetup<C>,
-    commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<C>],
+    p_keys: &ExpanderGKRProverSetup<C::FieldConfig, C::PCSConfig>,
+    commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<C::FieldConfig, C::PCSConfig>],
     challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
     is_broadcast: &[bool],
     parallel_index: usize,
     parallel_count: usize,
-    transcript: &mut transcript!(C),
+    transcript: &mut C::TranscriptConfig,
 ) {
     for ((commitment_val, extra_info), ib) in commitments_values
         .iter()
@@ -472,7 +447,7 @@ fn prove_input_claim<C: Config>(
         let nb_challenge_vars = val_len.ilog2() as usize;
         let challenge_vars = challenge.rz[..nb_challenge_vars].to_vec();
 
-        let params = <pcs!(C) as ExpanderPCS<field!(C)>>::gen_params(val_len);
+        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(val_len);
         let p_key = p_keys.p_keys.get(&val_len).unwrap();
 
         // TODO: Remove unnecessary `to_vec` clone
@@ -494,7 +469,7 @@ fn prove_input_claim<C: Config>(
         } else {
             &extra_info.scratch[parallel_index]
         };
-        let opening = <pcs!(C) as ExpanderPCS<field!(C)>>::open(
+        let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::open(
             &params,
             &MPIConfig::default(),
             p_key,
@@ -522,37 +497,42 @@ fn prove_input_claim<C: Config>(
 fn verify_input_claim<C: Config>(
     mut proof_reader: impl Read,
     kernel: &Kernel<C>,
-    v_keys: &ExpanderGKRVerifierSetup<C>,
+    v_keys: &ExpanderGKRVerifierSetup<C::FieldConfig, C::PCSConfig>,
     challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
     y: &<C::FieldConfig as FieldEngine>::ChallengeField,
-    commitments: &[ExpanderGKRCommitment<C>],
+    commitments: &[ExpanderGKRCommitment<C::FieldConfig, C::PCSConfig>],
     is_broadcast: &[bool],
     parallel_index: usize,
     _parallel_count: usize,
-    transcript: &mut transcript!(C),
+    transcript: &mut C::TranscriptConfig,
 ) -> bool {
     let mut target_y = <C::FieldConfig as FieldEngine>::ChallengeField::ZERO;
     for ((input, commitment), ib) in kernel
         .layered_circuit_input
         .iter()
-        .zip(commitments)
+        .zip(commitments.iter())
         .zip(is_broadcast)
     {
-        let commitment_len = commitment.vals_len();
+        let commitment_len = <ExpanderGKRCommitment<C::FieldConfig, C::PCSConfig> as Commitment<
+            C,
+        >>::vals_len(&commitment);
         let nb_challenge_vars = commitment_len.ilog2() as usize;
         let challenge_vars = challenge.rz[..nb_challenge_vars].to_vec();
 
-        let params =
-            <pcs!(C) as ExpanderPCS<field!(C)>>::gen_params(commitment_len.ilog2() as usize);
+        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(
+            commitment_len.ilog2() as usize,
+        );
         let v_key = v_keys.v_keys.get(&commitment_len).unwrap();
 
-        let claim = <field!(C) as FieldEngine>::ChallengeField::deserialize_from(&mut proof_reader)
-            .unwrap();
+        let claim =
+            <C::FieldConfig as FieldEngine>::ChallengeField::deserialize_from(&mut proof_reader)
+                .unwrap();
         transcript.append_field_element(&claim);
 
-        let opening =
-            <pcs!(C) as ExpanderPCS<field!(C)>>::Opening::deserialize_from(&mut proof_reader)
-                .unwrap();
+        let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::Opening::deserialize_from(
+            &mut proof_reader,
+        )
+        .unwrap();
 
         transcript.lock_proof();
         let commitment_for_parallel_index = if *ib {
@@ -560,7 +540,7 @@ fn verify_input_claim<C: Config>(
         } else {
             &commitment.commitment[parallel_index]
         };
-        let verified = <pcs!(C) as ExpanderPCS<field!(C)>>::verify(
+        let verified = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::verify(
             &params,
             v_key,
             commitment_for_parallel_index,

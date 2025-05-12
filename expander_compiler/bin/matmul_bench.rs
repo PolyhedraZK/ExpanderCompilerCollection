@@ -1,5 +1,7 @@
 use expander_compiler::frontend::*;
-use expander_compiler::zkcuda::proving_system::{ExpanderGKRProvingSystem, ParallelizedExpanderGKRProvingSystem, ProvingSystem};
+use expander_compiler::zkcuda::proving_system::{
+    ExpanderGKRProvingSystem, ParallelizedExpanderGKRProvingSystem, ProvingSystem,
+};
 use expander_compiler::zkcuda::{context::*, kernel::*};
 
 /// N * M matrix times M *K matrix

@@ -17,8 +17,8 @@ use super::expander_gkr::{
     ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof,
     ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
 };
-use expander_utils::timer::Timer;
 use super::{Commitment, ExpanderGKRProvingSystem, ProvingSystem};
+use expander_utils::timer::Timer;
 
 use arith::Field;
 use gkr::gkr_verify;
@@ -27,24 +27,6 @@ use serdes::ExpSerde;
 
 use polynomials::EqPolynomial;
 
-macro_rules! field {
-    ($config: ident) => {
-        $config::FieldConfig
-    };
-}
-
-macro_rules! transcript {
-    ($config: ident) => {
-        $config::TranscriptConfig
-    };
-}
-
-macro_rules! pcs {
-    ($config: ident) => {
-        $config::PCSConfig
-    };
-}
-
 const SINGLE_KERNEL_MAX_PROOF_SIZE: usize = 10 * 1024 * 1024; // 10MB
 
 pub struct ParallelizedExpanderGKRProvingSystem<C: Config> {
@@ -52,11 +34,11 @@ pub struct ParallelizedExpanderGKRProvingSystem<C: Config> {
 }
 
 impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
-    type ProverSetup = ExpanderGKRProverSetup<C>;
-    type VerifierSetup = ExpanderGKRVerifierSetup<C>;
+    type ProverSetup = ExpanderGKRProverSetup<C::FieldConfig, C::PCSConfig>;
+    type VerifierSetup = ExpanderGKRVerifierSetup<C::FieldConfig, C::PCSConfig>;
     type Proof = ExpanderGKRProof;
-    type Commitment = ExpanderGKRCommitment<C>;
-    type CommitmentExtraInfo = ExpanderGKRCommitmentExtraInfo<C>;
+    type Commitment = ExpanderGKRCommitment<C::FieldConfig, C::PCSConfig>;
+    type CommitmentExtraInfo = ExpanderGKRCommitmentExtraInfo<C::FieldConfig, C::PCSConfig>;
 
     fn setup(
         computation_graph: &crate::zkcuda::proof::ComputationGraph<C>,
@@ -186,13 +168,13 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
 fn verify_input_claim<C: Config>(
     mut proof_reader: impl Read,
     kernel: &Kernel<C>,
-    v_keys: &ExpanderGKRVerifierSetup<C>,
+    v_keys: &ExpanderGKRVerifierSetup<C::FieldConfig, C::PCSConfig>,
     challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
     y: &<C::FieldConfig as FieldEngine>::ChallengeField,
-    commitments: &[ExpanderGKRCommitment<C>],
+    commitments: &[ExpanderGKRCommitment<C::FieldConfig, C::PCSConfig>],
     is_broadcast: &[bool],
     parallel_count: usize,
-    transcript: &mut transcript!(C),
+    transcript: &mut C::TranscriptConfig,
 ) -> bool {
     assert_eq!(1 << challenge.r_mpi.len(), parallel_count);
     let mut target_y = <C::FieldConfig as FieldEngine>::ChallengeField::ZERO;
@@ -202,24 +184,28 @@ fn verify_input_claim<C: Config>(
         .zip(commitments)
         .zip(is_broadcast)
     {
-        let local_vals_len = commitment.vals_len();
+        let local_vals_len = <ExpanderGKRCommitment<C::FieldConfig, C::PCSConfig> as Commitment<
+            C,
+        >>::vals_len(commitment);
         let nb_challenge_vars = local_vals_len.ilog2() as usize;
         let challenge_vars = challenge.rz[..nb_challenge_vars].to_vec();
 
-        let params = <pcs!(C) as ExpanderPCS<field!(C)>>::gen_params(nb_challenge_vars);
+        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(nb_challenge_vars);
         let v_key = v_keys.v_keys.get(&local_vals_len).unwrap();
 
-        let claim = <field!(C) as FieldEngine>::ChallengeField::deserialize_from(&mut proof_reader)
-            .unwrap();
+        let claim =
+            <C::FieldConfig as FieldEngine>::ChallengeField::deserialize_from(&mut proof_reader)
+                .unwrap();
         transcript.append_field_element(&claim);
 
-        let opening =
-            <pcs!(C) as ExpanderPCS<field!(C)>>::Opening::deserialize_from(&mut proof_reader)
-                .unwrap();
+        let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::Opening::deserialize_from(
+            &mut proof_reader,
+        )
+        .unwrap();
 
         transcript.lock_proof();
         // individual pcs verification
-        let verified = <pcs!(C) as ExpanderPCS<field!(C)>>::verify(
+        let verified = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::verify(
             &params,
             v_key,
             &commitment.commitment[0],

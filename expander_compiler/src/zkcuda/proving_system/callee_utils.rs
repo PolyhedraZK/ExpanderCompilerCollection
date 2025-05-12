@@ -1,4 +1,4 @@
-use gkr_engine::{ExpanderPCS, StructuredReferenceString};
+use gkr_engine::{ExpanderPCS, FieldEngine, StructuredReferenceString};
 use serdes::ExpSerde;
 use shared_memory::ShmemConf;
 
@@ -65,17 +65,20 @@ pub fn write_object_to_shared_memory_name_string<T: ExpSerde>(object: &T, shared
     }
 }
 
-pub fn write_commitment_to_shared_memory<C: Config>(commitment: &ExpanderGKRCommitment<C>) {
+pub fn write_commitment_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
+    commitment: &ExpanderGKRCommitment<F, PCS>,
+) {
     write_object_to_shared_memory_name_string(commitment, "commitment");
 }
 
-pub fn write_commitment_extra_info_to_shared_memory<C: Config>(
-    extra_info: &ExpanderGKRCommitmentExtraInfo<C>,
+pub fn write_commitment_extra_info_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
+    extra_info: &ExpanderGKRCommitmentExtraInfo<F, PCS>,
 ) {
     write_object_to_shared_memory_name_string(extra_info, "extra_info");
 }
 
-pub fn read_pcs_setup_from_shared_memory<C: Config>() -> ExpanderGKRProverSetup<C> {
+pub fn read_pcs_setup_from_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
+) -> ExpanderGKRProverSetup<F, PCS> {
     read_object_from_shared_memory_name_string("pcs_setup")
 }
 
@@ -87,12 +90,13 @@ pub fn read_partition_info_from_shared_memory() -> Vec<LayeredCircuitInputVec> {
     read_object_from_shared_memory_name_string("input_partition")
 }
 
-pub fn read_commitment_from_shared_memory<C: Config>() -> Vec<ExpanderGKRCommitment<C>> {
+pub fn read_commitment_from_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
+) -> Vec<ExpanderGKRCommitment<F, PCS>> {
     read_object_from_shared_memory_name_string("commitment")
 }
 
-pub fn read_commitment_extra_info_from_shared_memory<C: Config>(
-) -> Vec<ExpanderGKRCommitmentExtraInfo<C>> {
+pub fn read_commitment_extra_info_from_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
+) -> Vec<ExpanderGKRCommitmentExtraInfo<F, PCS>> {
     read_object_from_shared_memory_name_string("extra_info")
 }
 

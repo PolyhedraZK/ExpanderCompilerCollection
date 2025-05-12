@@ -29,24 +29,6 @@ use polynomials::MultiLinearPoly;
 use serdes::ExpSerde;
 use sumcheck::ProverScratchPad;
 
-macro_rules! field {
-    ($config: ident) => {
-        $config::FieldConfig
-    };
-}
-
-macro_rules! transcript {
-    ($config: ident) => {
-        $config::TranscriptConfig
-    };
-}
-
-macro_rules! pcs {
-    ($config: ident) => {
-        $config::PCSConfig
-    };
-}
-
 fn prove<C: Config>() {
     let mpi_config = MPIConfig::prover_new();
     let world_rank = mpi_config.world_rank();
@@ -60,12 +42,13 @@ fn prove<C: Config>() {
     }
 
     let timer = Timer::new("reading circuit", mpi_config.is_root());
-    let pcs_setup = read_pcs_setup_from_shared_memory::<C>();
+    let pcs_setup = read_pcs_setup_from_shared_memory::<C::FieldConfig, C::PCSConfig>();
     let ecc_circuit = read_ecc_circuit_from_shared_memory::<C>();
     let partition_info = read_partition_info_from_shared_memory();
 
-    let _commitments = read_commitment_from_shared_memory::<C>();
-    let commitments_extra_info = read_commitment_extra_info_from_shared_memory::<C>();
+    let _commitments = read_commitment_from_shared_memory::<C::FieldConfig, C::PCSConfig>();
+    let commitments_extra_info =
+        read_commitment_extra_info_from_shared_memory::<C::FieldConfig, C::PCSConfig>();
     let commitment_values = read_commitment_values_from_shared_memory::<C>();
     let commitment_values_refs = commitment_values
         .iter()
@@ -106,7 +89,7 @@ fn prove<C: Config>() {
     timer.stop();
 
     let timer = Timer::new("pcs opening", mpi_config.is_root());
-    prove_input_claim(
+    prove_input_claim::<C>(
         &mpi_config,
         &commitment_values_refs,
         &pcs_setup,
@@ -116,7 +99,7 @@ fn prove<C: Config>() {
         &mut transcript,
     );
     if challenge.rz_1.is_some() {
-        prove_input_claim(
+        prove_input_claim::<C>(
             &mpi_config,
             &commitment_values_refs,
             &pcs_setup,
@@ -139,11 +122,11 @@ fn prove<C: Config>() {
 fn prove_input_claim<C: Config>(
     mpi_config: &MPIConfig,
     commitments_values: &[&[SIMDField<C>]],
-    p_keys: &ExpanderGKRProverSetup<C>,
-    commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<C>],
+    p_keys: &ExpanderGKRProverSetup<C::FieldConfig, C::PCSConfig>,
+    commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<C::FieldConfig, C::PCSConfig>],
     challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
     is_broadcast: &[bool],
-    transcript: &mut transcript!(C),
+    transcript: &mut C::TranscriptConfig,
 ) {
     let parallel_count = mpi_config.world_size();
     let parallel_index = mpi_config.world_rank();
@@ -167,7 +150,7 @@ fn prove_input_claim<C: Config>(
         let nb_challenge_vars = val_len.ilog2() as usize;
         let challenge_vars = challenge.rz[..nb_challenge_vars].to_vec();
 
-        let params = <pcs!(C) as ExpanderPCS<field!(C)>>::gen_params(val_len);
+        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(val_len);
         let p_key = p_keys.p_keys.get(&val_len).unwrap();
 
         let poly = MultiLinearPoly::new(vals_to_open.to_vec());
@@ -188,7 +171,7 @@ fn prove_input_claim<C: Config>(
         transcript.append_field_element(&v);
 
         transcript.lock_proof();
-        let opening = <pcs!(C) as ExpanderPCS<field!(C)>>::open(
+        let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::open(
             &params,
             mpi_config,
             p_key,

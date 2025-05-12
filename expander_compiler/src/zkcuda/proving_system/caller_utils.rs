@@ -5,7 +5,7 @@ use std::{io::Cursor, process::Command};
 use crate::{
     circuit::layered::Circuit, frontend::SIMDField, zkcuda::kernel::LayeredCircuitInputVec,
 };
-use gkr_engine::{FieldEngine, FieldType};
+use gkr_engine::{ExpanderPCS, FieldEngine, FieldType};
 use serdes::ExpSerde;
 use shared_memory::{Shmem, ShmemConf};
 
@@ -113,8 +113,8 @@ fn write_object_to_shared_memory<T: ExpSerde>(
     }
 }
 
-pub fn write_selected_pkey_to_shared_memory<C: Config>(
-    pcs_setup: &ExpanderGKRProverSetup<C>,
+pub fn write_selected_pkey_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
+    pcs_setup: &ExpanderGKRProverSetup<F, PCS>,
     actual_local_len: usize,
 ) {
     let setup = pcs_setup.p_keys.get(&actual_local_len).unwrap().clone();
@@ -127,7 +127,9 @@ pub fn write_commit_vals_to_shared_memory<C: Config>(vals: &Vec<SIMDField<C>>) {
     write_object_to_shared_memory(vals, unsafe { &mut SHARED_MEMORY.input_vals }, "input_vals");
 }
 
-pub fn write_pcs_setup_to_shared_memory<C: Config>(pcs_setup: &ExpanderGKRProverSetup<C>) {
+pub fn write_pcs_setup_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
+    pcs_setup: &ExpanderGKRProverSetup<F, PCS>,
+) {
     write_object_to_shared_memory(
         pcs_setup,
         unsafe { &mut SHARED_MEMORY.pcs_setup },
@@ -155,7 +157,9 @@ pub fn write_input_partition_info_to_shared_memory(input_partition: &Vec<Layered
     );
 }
 
-pub fn write_commitments_to_shared_memory<C: Config>(commitments: &Vec<ExpanderGKRCommitment<C>>) {
+pub fn write_commitments_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
+    commitments: &Vec<ExpanderGKRCommitment<F, PCS>>,
+) {
     write_object_to_shared_memory(
         commitments,
         unsafe { &mut SHARED_MEMORY.commitment },
@@ -163,8 +167,8 @@ pub fn write_commitments_to_shared_memory<C: Config>(commitments: &Vec<ExpanderG
     );
 }
 
-pub fn write_commitments_extra_info_to_shared_memory<C: Config>(
-    commitments_extra_info: &Vec<ExpanderGKRCommitmentExtraInfo<C>>,
+pub fn write_commitments_extra_info_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
+    commitments_extra_info: &Vec<ExpanderGKRCommitmentExtraInfo<F, PCS>>,
 ) {
     write_object_to_shared_memory(
         commitments_extra_info,
@@ -264,8 +268,10 @@ pub fn read_object_from_shared_memory<T: ExpSerde>(shared_memory_ref: &Option<Sh
     T::deserialize_from(&mut Cursor::new(buffer)).unwrap()
 }
 
-pub fn read_commitment_and_extra_info_from_shared_memory<C: Config>(
-) -> (ExpanderGKRCommitment<C>, ExpanderGKRCommitmentExtraInfo<C>) {
+pub fn read_commitment_and_extra_info_from_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>() -> (
+    ExpanderGKRCommitment<F, PCS>,
+    ExpanderGKRCommitmentExtraInfo<F, PCS>,
+) {
     let commitment = read_object_from_shared_memory(unsafe { &SHARED_MEMORY.commitment });
     let extra_info = read_object_from_shared_memory(unsafe { &SHARED_MEMORY.extra_info });
     (commitment, extra_info)
