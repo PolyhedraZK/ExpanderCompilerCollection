@@ -54,10 +54,11 @@ fn example<C: Config>() {
 
     // prove
     expander_circuit.evaluate();
-    let (claimed_v, proof) = gkr::executor::prove::<C>(&mut expander_circuit, mpi_config.clone());
+    let (claimed_v, proof) =
+        expander_bin::executor::prove::<C>(&mut expander_circuit, mpi_config.clone());
 
     // verify
-    assert!(gkr::executor::verify::<C>(
+    assert!(expander_bin::executor::verify::<C>(
         &mut expander_circuit,
         mpi_config,
         &proof,

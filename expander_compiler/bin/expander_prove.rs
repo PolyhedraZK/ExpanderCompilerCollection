@@ -103,13 +103,13 @@ fn prove<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>() {
         &broadcast_info,
         &mut transcript,
     );
-    if challenge.rz_1.is_some() {
+    if let Some(challenge_y) = challenge.challenge_y() {
         prove_input_claim::<C>(
             &mpi_config,
             &commitment_values_refs,
             &pcs_setup,
             &commitments_extra_info,
-            &challenge.challenge_y(),
+            &challenge_y,
             &broadcast_info,
             &mut transcript,
         );

@@ -1,3 +1,6 @@
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::ptr_arg)]
+
 use expander_compiler::frontend::{
     BasicAPI, CircuitField, Config, Error, FieldArith, M31Config, Variable, API,
 };
@@ -24,6 +27,7 @@ fn mul_line<C: Config>(
     for j in 0..K {
         c[j] = api.constant(0);
     }
+
     for i in 0..M {
         for j in 0..K {
             let t = api.mul(a[i], b[i][j]);

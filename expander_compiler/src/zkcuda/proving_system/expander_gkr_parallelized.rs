@@ -152,12 +152,12 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
             parallel_count,
             &mut transcript,
         );
-        if challenge.rz_1.is_some() {
+        if let Some(challenge_y) = challenge.challenge_y() {
             verified &= verify_input_claim::<C, ECCConfig>(
                 &mut cursor,
                 kernel,
                 verifier_setup,
-                &challenge.challenge_y(),
+                &challenge_y,
                 &claimed_v1.unwrap(),
                 commitments,
                 is_broadcast,

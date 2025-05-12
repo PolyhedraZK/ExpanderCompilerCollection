@@ -279,10 +279,7 @@ fn keccak_gf2_full_crosslayer() {
     println!("{} {}", simd_input.len(), simd_public_input.len());
     assert_eq!(simd_public_input.len(), 0); // public input is not supported in current virgo++
 
-    let mut transcript = BytesHashTranscript::<
-        <gkr_engine::GF2ExtConfig as gkr_engine::FieldEngine>::ChallengeField,
-        SHA256hasher,
-    >::new();
+    let mut transcript = BytesHashTranscript::<SHA256hasher>::new();
 
     let connections = crosslayer_prototype::CrossLayerConnections::parse_circuit(&expander_circuit);
 

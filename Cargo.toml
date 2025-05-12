@@ -43,21 +43,22 @@ sha2 = "0.10.8"
 stacker = "0.1.17"
 tiny-keccak = { version = "2.0", features = ["keccak"] }
 
-arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-babybear = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "circuit" }
-expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "transcript" }
-gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-poly_commit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "poly_commit" }
-polynomials = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-sumcheck = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-gkr_engine = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-gkr_hashers = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-expander_utils = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "utils" }
+arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "zhiyong1997-patch-1" }
+mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "zhiyong1997-patch-1" }
+gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "zhiyong1997-patch-1" }
+babybear = { git = "https://github.com/PolyhedraZK/Expander", branch = "zhiyong1997-patch-1" }
+crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "zhiyong1997-patch-1" }
+expander_bin = { git = "https://github.com/PolyhedraZK/Expander", branch = "zhiyong1997-patch-1", package = "bin" }
+expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "zhiyong1997-patch-1", package = "circuit" }
+expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "zhiyong1997-patch-1", package = "transcript" }
+gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "zhiyong1997-patch-1" }
+gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "zhiyong1997-patch-1" }
+mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "zhiyong1997-patch-1" }
+goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "zhiyong1997-patch-1" }
+poly_commit = { git = "https://github.com/PolyhedraZK/Expander", branch = "zhiyong1997-patch-1", package = "poly_commit" }
+polynomials = { git = "https://github.com/PolyhedraZK/Expander", branch = "zhiyong1997-patch-1" }
+sumcheck = { git = "https://github.com/PolyhedraZK/Expander", branch = "zhiyong1997-patch-1" }
+serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "zhiyong1997-patch-1" }
+gkr_engine = { git = "https://github.com/PolyhedraZK/Expander", branch = "zhiyong1997-patch-1" }
+gkr_hashers = { git = "https://github.com/PolyhedraZK/Expander", branch = "zhiyong1997-patch-1" }
+expander_utils = { git = "https://github.com/PolyhedraZK/Expander", branch = "zhiyong1997-patch-1", package = "utils" }
