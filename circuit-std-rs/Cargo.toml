@@ -5,7 +5,7 @@ edition = "2021"
 
 
 [dependencies]
-expander_compiler = { path = "../expander_compiler"}
+expander_compiler = { path = "../expander_compiler" }
 
 arith.workspace = true
 ark-bls12-381.workspace = true
