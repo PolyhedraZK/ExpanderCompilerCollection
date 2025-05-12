@@ -5,7 +5,7 @@ use std::{io::Cursor, process::Command};
 use crate::{
     circuit::layered::Circuit, frontend::SIMDField, zkcuda::kernel::LayeredCircuitInputVec,
 };
-use gkr_engine::{ExpanderPCS, FieldEngine, FieldType};
+use gkr_engine::{ExpanderPCS, FieldEngine, FieldType, GKREngine, PolynomialCommitmentType};
 use serdes::ExpSerde;
 use shared_memory::{Shmem, ShmemConf};
 
@@ -177,8 +177,8 @@ pub fn write_commitments_extra_info_to_shared_memory<F: FieldEngine, PCS: Expand
     );
 }
 
-pub fn write_commitments_values_to_shared_memory<C: Config>(
-    commitments_values: &[&[SIMDField<C>]],
+pub fn write_commitments_values_to_shared_memory<F: FieldEngine>(
+    commitments_values: &[&[F::SimdCircuitField]],
 ) {
     let commitments_values = commitments_values
         .iter()
@@ -211,7 +211,7 @@ fn exec_command(cmd: &str) {
     let _ = child.wait();
 }
 
-pub fn exec_pcs_commit<C: Config>(mpi_size: usize) {
+fn parse_config<C: GKREngine>(mpi_size: usize) -> (String, String, String) {
     let oversubscription = if mpi_size > num_cpus::get() {
         println!("Warning: Not enough cores available for the requested number of processes. Using oversubscription.");
         "--oversubscribe"
@@ -227,32 +227,35 @@ pub fn exec_pcs_commit<C: Config>(mpi_size: usize) {
         FieldType::BN254 => "BN254",
     };
 
+    let pcs_name = match <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::PCS_TYPE {
+        PolynomialCommitmentType::Raw => "Raw",
+        PolynomialCommitmentType::Hyrax => "Hyrax",
+        _ => panic!("Unsupported PCS type"),
+    };
+
+    (
+        oversubscription.to_string(),
+        field_name.to_string(),
+        pcs_name.to_string(),
+    )
+}
+
+pub fn exec_pcs_commit<C: GKREngine>(mpi_size: usize) {
+    let (oversubscription, field_name, pcs_name) = parse_config::<C>(mpi_size);
+
     let cmd_str = format!(
-        "mpiexec -n {} {} ./target/release/expander_commit -f {}",
-        mpi_size, oversubscription, field_name,
+        "mpiexec -n {} {} ./target/release/expander_commit --field_type {} --poly_commitment_scheme {}",
+        mpi_size, oversubscription, field_name, pcs_name,
     );
     exec_command(&cmd_str);
 }
 
-pub fn exec_gkr_prove_with_pcs<C: Config>(mpi_size: usize) {
-    let oversubscription = if mpi_size > num_cpus::get() {
-        println!("Warning: Not enough cores available for the requested number of processes. Using oversubscription.");
-        "--oversubscribe"
-    } else {
-        ""
-    };
-
-    let field_name = match <C::FieldConfig as FieldEngine>::FIELD_TYPE {
-        FieldType::M31 => "M31",
-        FieldType::GF2 => "GF2",
-        FieldType::Goldilocks => "Goldilocks",
-        FieldType::BabyBear => "BabyBear",
-        FieldType::BN254 => "BN254",
-    };
+pub fn exec_gkr_prove_with_pcs<C: GKREngine>(mpi_size: usize) {
+    let (oversubscription, field_name, pcs_name) = parse_config::<C>(mpi_size);
 
     let cmd_str = format!(
-        "mpiexec -n {} {} ./target/release/expander_prove -f {}",
-        mpi_size, oversubscription, field_name,
+        "mpiexec -n {} {} ./target/release/expander_prove --field_type {} --poly_commitment_scheme {}",
+        mpi_size, oversubscription, field_name, pcs_name,
     );
     exec_command(&cmd_str);
 }

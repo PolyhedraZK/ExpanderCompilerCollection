@@ -22,18 +22,20 @@ use expander_utils::timer::Timer;
 
 use arith::Field;
 use gkr::gkr_verify;
-use gkr_engine::{ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, Transcript};
+use gkr_engine::{ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, Transcript};
 use serdes::ExpSerde;
 
 use polynomials::EqPolynomial;
 
 const SINGLE_KERNEL_MAX_PROOF_SIZE: usize = 10 * 1024 * 1024; // 10MB
 
-pub struct ParallelizedExpanderGKRProvingSystem<C: Config> {
+pub struct ParallelizedExpanderGKRProvingSystem<C: GKREngine> {
     _config: std::marker::PhantomData<C>,
 }
 
-impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
+impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSystem<ECCConfig>
+    for ParallelizedExpanderGKRProvingSystem<C>
+{
     type ProverSetup = ExpanderGKRProverSetup<C::FieldConfig, C::PCSConfig>;
     type VerifierSetup = ExpanderGKRVerifierSetup<C::FieldConfig, C::PCSConfig>;
     type Proof = ExpanderGKRProof;
@@ -41,7 +43,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
     type CommitmentExtraInfo = ExpanderGKRCommitmentExtraInfo<C::FieldConfig, C::PCSConfig>;
 
     fn setup(
-        computation_graph: &crate::zkcuda::proof::ComputationGraph<C>,
+        computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
         // All of currently supported PCSs(Raw, Orion, Hyrax) do not require the multi-core information in the step of `setup`
         // So we can simply reuse the setup function from the non-parallelized version
@@ -56,14 +58,19 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
         is_broadcast: bool,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo) {
         if is_broadcast || parallel_count == 1 {
-            ExpanderGKRProvingSystem::<C>::commit(prover_setup, vals, parallel_count, is_broadcast)
+            <ExpanderGKRProvingSystem<C> as ProvingSystem<ECCConfig>>::commit(
+                prover_setup,
+                vals,
+                parallel_count,
+                is_broadcast,
+            )
         } else {
             let actual_local_len = vals.len() / parallel_count;
 
             // TODO: The size here is for the raw commitment, add an function in the pcs trait to get the size of the commitment
             init_commitment_and_extra_info_shared_memory(SINGLE_KERNEL_MAX_PROOF_SIZE, 8);
             write_selected_pkey_to_shared_memory(prover_setup, actual_local_len);
-            write_commit_vals_to_shared_memory::<C>(&vals.to_vec());
+            write_commit_vals_to_shared_memory::<ECCConfig>(&vals.to_vec());
             exec_pcs_commit::<C>(parallel_count);
             let (commitment, extra_info) = read_commitment_and_extra_info_from_shared_memory();
             (commitment, extra_info)
@@ -72,7 +79,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
 
     fn prove(
         prover_setup: &Self::ProverSetup,
-        kernel: &Kernel<C>,
+        kernel: &Kernel<ECCConfig>,
         commitments: &[Self::Commitment],
         commitments_extra_info: &[Self::CommitmentExtraInfo],
         commitments_values: &[&[SIMDField<C>]],
@@ -97,7 +104,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
             write_input_partition_info_to_shared_memory(&kernel.layered_circuit_input);
             write_commitments_to_shared_memory(&commitments.to_vec());
             write_commitments_extra_info_to_shared_memory(&commitments_extra_info.to_vec());
-            write_commitments_values_to_shared_memory::<C>(commitments_values);
+            write_commitments_values_to_shared_memory::<C::FieldConfig>(commitments_values);
             write_broadcast_info_to_shared_memory(&is_broadcast.to_vec());
             exec_gkr_prove_with_pcs::<C>(parallel_count);
             timer.stop();
@@ -108,7 +115,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
     // For verification, we don't need the mpi executor and shared memory, it's always run by a single party
     fn verify(
         verifier_setup: &Self::VerifierSetup,
-        kernel: &Kernel<C>,
+        kernel: &Kernel<ECCConfig>,
         proof: &Self::Proof,
         commitments: &[Self::Commitment],
         parallel_count: usize,
@@ -134,7 +141,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
             &mut cursor,
         );
 
-        verified &= verify_input_claim(
+        verified &= verify_input_claim::<C, ECCConfig>(
             &mut cursor,
             kernel,
             verifier_setup,
@@ -146,7 +153,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
             &mut transcript,
         );
         if challenge.rz_1.is_some() {
-            verified &= verify_input_claim(
+            verified &= verify_input_claim::<C, ECCConfig>(
                 &mut cursor,
                 kernel,
                 verifier_setup,
@@ -165,9 +172,9 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn verify_input_claim<C: Config>(
+fn verify_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     mut proof_reader: impl Read,
-    kernel: &Kernel<C>,
+    kernel: &Kernel<ECCConfig>,
     v_keys: &ExpanderGKRVerifierSetup<C::FieldConfig, C::PCSConfig>,
     challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
     y: &<C::FieldConfig as FieldEngine>::ChallengeField,
@@ -185,7 +192,7 @@ fn verify_input_claim<C: Config>(
         .zip(is_broadcast)
     {
         let local_vals_len = <ExpanderGKRCommitment<C::FieldConfig, C::PCSConfig> as Commitment<
-            C,
+            ECCConfig,
         >>::vals_len(commitment);
         let nb_challenge_vars = local_vals_len.ilog2() as usize;
         let challenge_vars = challenge.rz[..nb_challenge_vars].to_vec();

@@ -13,8 +13,8 @@ use expander_circuit::Circuit;
 use expander_utils::timer::Timer;
 use gkr::{gkr_prove, gkr_verify};
 use gkr_engine::{
-    ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, MPIConfig, Proof as ExpanderProof,
-    StructuredReferenceString, Transcript,
+    ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig,
+    Proof as ExpanderProof, StructuredReferenceString, Transcript,
 };
 use poly_commit::expander_pcs_init_testing_only;
 use polynomials::{EqPolynomial, MultiLinearPoly};
@@ -52,7 +52,9 @@ impl<F: FieldEngine, PCS: ExpanderPCS<F>> ExpSerde for ExpanderGKRCommitment<F, 
     }
 }
 
-impl<C: Config> Commitment<C> for ExpanderGKRCommitment<C::FieldConfig, C::PCSConfig> {
+impl<F: FieldEngine, PCS: ExpanderPCS<F>, ECCConfig: Config<FieldConfig = F>> Commitment<ECCConfig>
+    for ExpanderGKRCommitment<F, PCS>
+{
     fn vals_len(&self) -> usize {
         self.vals_len
     }
@@ -148,11 +150,13 @@ impl ExpSerde for ExpanderGKRProof {
 
 impl Proof for ExpanderGKRProof {}
 
-pub struct ExpanderGKRProvingSystem<C: Config> {
+pub struct ExpanderGKRProvingSystem<C: GKREngine> {
     _config: std::marker::PhantomData<C>,
 }
 
-impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
+impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSystem<ECCConfig>
+    for ExpanderGKRProvingSystem<C>
+{
     type ProverSetup = ExpanderGKRProverSetup<C::FieldConfig, C::PCSConfig>;
     type VerifierSetup = ExpanderGKRVerifierSetup<C::FieldConfig, C::PCSConfig>;
     type Proof = ExpanderGKRProof;
@@ -160,7 +164,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
     type CommitmentExtraInfo = ExpanderGKRCommitmentExtraInfo<C::FieldConfig, C::PCSConfig>;
 
     fn setup(
-        computation_graph: &crate::zkcuda::proof::ComputationGraph<C>,
+        computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
         let mut p_keys = HashMap::new();
         let mut v_keys = HashMap::new();
@@ -245,7 +249,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
 
     fn prove(
         prover_setup: &Self::ProverSetup,
-        kernel: &Kernel<C>,
+        kernel: &Kernel<ECCConfig>,
         _commitments: &[Self::Commitment],
         commitments_extra_info: &[Self::CommitmentExtraInfo],
         commitments_values: &[&[SIMDField<C>]],
@@ -288,7 +292,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
                 <C::FieldConfig as FieldEngine>::ChallengeField::from(0)
             );
 
-            prove_input_claim(
+            prove_input_claim::<C, ECCConfig>(
                 kernel,
                 commitments_values,
                 prover_setup,
@@ -300,7 +304,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
                 &mut transcript,
             );
             if challenge.rz_1.is_some() {
-                prove_input_claim(
+                prove_input_claim::<C, ECCConfig>(
                     kernel,
                     commitments_values,
                     prover_setup,
@@ -322,7 +326,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
 
     fn verify(
         verifier_setup: &Self::VerifierSetup,
-        kernel: &Kernel<C>,
+        kernel: &Kernel<ECCConfig>,
         proof: &Self::Proof,
         commitments: &[Self::Commitment],
         parallel_count: usize,
@@ -353,7 +357,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
                 return false;
             }
 
-            verified &= verify_input_claim(
+            verified &= verify_input_claim::<C, ECCConfig>(
                 &mut cursor,
                 kernel,
                 verifier_setup,
@@ -366,7 +370,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
                 &mut transcript,
             );
             if challenge.rz_1.is_some() {
-                verified &= verify_input_claim(
+                verified &= verify_input_claim::<C, ECCConfig>(
                     &mut cursor,
                     kernel,
                     verifier_setup,
@@ -417,8 +421,8 @@ pub fn max_n_vars<C: FieldEngine>(circuit: &Circuit<C>) -> (usize, usize) {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn prove_input_claim<C: Config>(
-    _kernel: &Kernel<C>,
+fn prove_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
+    _kernel: &Kernel<ECCConfig>,
     commitments_values: &[&[SIMDField<C>]],
     p_keys: &ExpanderGKRProverSetup<C::FieldConfig, C::PCSConfig>,
     commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<C::FieldConfig, C::PCSConfig>],
@@ -494,9 +498,9 @@ fn prove_input_claim<C: Config>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn verify_input_claim<C: Config>(
+fn verify_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     mut proof_reader: impl Read,
-    kernel: &Kernel<C>,
+    kernel: &Kernel<ECCConfig>,
     v_keys: &ExpanderGKRVerifierSetup<C::FieldConfig, C::PCSConfig>,
     challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
     y: &<C::FieldConfig as FieldEngine>::ChallengeField,
@@ -514,7 +518,7 @@ fn verify_input_claim<C: Config>(
         .zip(is_broadcast)
     {
         let commitment_len = <ExpanderGKRCommitment<C::FieldConfig, C::PCSConfig> as Commitment<
-            C,
+            ECCConfig,
         >>::vals_len(commitment);
         let nb_challenge_vars = commitment_len.ilog2() as usize;
         let challenge_vars = challenge.rz[..nb_challenge_vars].to_vec();

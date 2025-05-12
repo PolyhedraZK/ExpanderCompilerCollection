@@ -1,8 +1,9 @@
 mod common;
 
+use std::str::FromStr;
+
 use clap::Parser;
 use common::ExpanderExecArgs;
-use expander_compiler::circuit::config::Config;
 use expander_compiler::frontend::{
     BN254Config, BabyBearConfig, GF2Config, GoldilocksConfig, M31Config,
 };
@@ -14,7 +15,8 @@ use expander_compiler::zkcuda::proving_system::{
     ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo,
 };
 
-use gkr_engine::{ExpanderPCS, GKREngine, MPIConfig, MPIEngine};
+use gkr::BN254ConfigSha2Hyrax;
+use gkr_engine::{ExpanderPCS, GKREngine, MPIConfig, MPIEngine, PolynomialCommitmentType};
 use polynomials::MultiLinearPoly;
 
 fn commit<C: GKREngine>() {
@@ -76,21 +78,31 @@ fn main() {
         "Only SHA256 is supported for now"
     );
 
-    // let pcs_type =
-    //     PolynomialCommitmentType::from_str(&expander_exec_args.poly_commitment_scheme).unwrap();
+    let pcs_type =
+        PolynomialCommitmentType::from_str(&expander_exec_args.poly_commitment_scheme).unwrap();
 
-    // match (pcs_type, expander_exec_args.field_type.as_str()) {
-    //     (PolynomialCommitmentType::Raw, "Raw") => {}
-    //     (PolynomialCommitmentType::Orion, "Orion") => {}
-    //     _ => panic!("Unsupported polynomial commitment scheme"),
-    // }
-
-    match expander_exec_args.field_type.as_str() {
-        "M31" => commit::<M31Config>(),
-        "GF2" => commit::<GF2Config>(),
-        "Goldilocks" => commit::<GoldilocksConfig>(),
-        "BabyBear" => commit::<BabyBearConfig>(),
-        "BN254" => commit::<BN254Config>(),
-        _ => panic!("Unsupported field type"),
+    match (expander_exec_args.field_type.as_str(), pcs_type) {
+        ("M31", PolynomialCommitmentType::Raw) => {
+            commit::<M31Config>();
+        }
+        ("GF2", PolynomialCommitmentType::Raw) => {
+            commit::<GF2Config>();
+        }
+        ("Goldilocks", PolynomialCommitmentType::Raw) => {
+            commit::<GoldilocksConfig>();
+        }
+        ("BabyBear", PolynomialCommitmentType::Raw) => {
+            commit::<BabyBearConfig>();
+        }
+        ("BN254", PolynomialCommitmentType::Raw) => {
+            commit::<BN254Config>();
+        }
+        ("BN254", PolynomialCommitmentType::Hyrax) => {
+            commit::<BN254ConfigSha2Hyrax>();
+        }
+        (field_type, pcs_type) => panic!(
+            "Combination of {:?} and {:?} not supported",
+            field_type, pcs_type
+        ),
     }
 }

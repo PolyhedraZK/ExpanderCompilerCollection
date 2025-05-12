@@ -3,6 +3,7 @@ use common::ExpanderExecArgs;
 
 use clap::Parser;
 use std::cmp::max;
+use std::str::FromStr;
 
 use arith::Field;
 use expander_compiler::frontend::{
@@ -20,10 +21,10 @@ use expander_compiler::zkcuda::proving_system::{
 };
 use expander_utils::timer::Timer;
 
-use gkr::gkr_prove;
+use gkr::{gkr_prove, BN254ConfigSha2Hyrax};
 use gkr_engine::{
     ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine,
-    Transcript,
+    PolynomialCommitmentType, Transcript,
 };
 use polynomials::MultiLinearPoly;
 use serdes::ExpSerde;
@@ -201,12 +202,36 @@ fn prove_input_claim<C: GKREngine>(
 
 fn main() {
     let expander_exec_args = ExpanderExecArgs::parse();
-    match expander_exec_args.field_type.as_str() {
-        "M31" => prove::<M31Config, M31Config>(),
-        "GF2" => prove::<GF2Config, GF2Config>(),
-        "Goldilocks" => prove::<GoldilocksConfig, GoldilocksConfig>(),
-        "BabyBear" => prove::<BabyBearConfig, BabyBearConfig>(),
-        "BN254" => prove::<BN254Config, BN254Config>(),
-        _ => panic!("Unsupported field type"),
+    assert_eq!(
+        expander_exec_args.fiat_shamir_hash, "SHA256",
+        "Only SHA256 is supported for now"
+    );
+
+    let pcs_type =
+        PolynomialCommitmentType::from_str(&expander_exec_args.poly_commitment_scheme).unwrap();
+
+    match (expander_exec_args.field_type.as_str(), pcs_type) {
+        ("M31", PolynomialCommitmentType::Raw) => {
+            prove::<M31Config, M31Config>();
+        }
+        ("GF2", PolynomialCommitmentType::Raw) => {
+            prove::<GF2Config, GF2Config>();
+        }
+        ("Goldilocks", PolynomialCommitmentType::Raw) => {
+            prove::<GoldilocksConfig, GoldilocksConfig>();
+        }
+        ("BabyBear", PolynomialCommitmentType::Raw) => {
+            prove::<BabyBearConfig, BabyBearConfig>();
+        }
+        ("BN254", PolynomialCommitmentType::Raw) => {
+            prove::<BN254Config, BN254Config>();
+        }
+        ("BN254", PolynomialCommitmentType::Hyrax) => {
+            prove::<BN254ConfigSha2Hyrax, BN254Config>();
+        }
+        (field_type, pcs_type) => panic!(
+            "Combination of {:?} and {:?} not supported",
+            field_type, pcs_type
+        ),
     }
 }
