@@ -515,7 +515,7 @@ fn verify_input_claim<C: Config>(
     {
         let commitment_len = <ExpanderGKRCommitment<C::FieldConfig, C::PCSConfig> as Commitment<
             C,
-        >>::vals_len(&commitment);
+        >>::vals_len(commitment);
         let nb_challenge_vars = commitment_len.ilog2() as usize;
         let challenge_vars = challenge.rz[..nb_challenge_vars].to_vec();
 

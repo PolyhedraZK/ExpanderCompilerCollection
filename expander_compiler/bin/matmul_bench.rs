@@ -1,8 +1,8 @@
-use expander_compiler::frontend::*;
+use expander_compiler::frontend::{API, BasicAPI, CircuitField, Config, Error, FieldArith, M31Config, Variable};
 use expander_compiler::zkcuda::proving_system::{
     ExpanderGKRProvingSystem, ParallelizedExpanderGKRProvingSystem, ProvingSystem,
 };
-use expander_compiler::zkcuda::{context::*, kernel::*};
+use expander_compiler::zkcuda::{context::{Context, Reshape, call_kernel}, kernel::{IOVecSpec, Kernel, compile_with_spec_and_shapes, kernel}};
 
 /// N * M matrix times M *K matrix
 const N: usize = 8;
