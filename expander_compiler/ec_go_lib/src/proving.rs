@@ -1,6 +1,7 @@
 use std::ptr;
 use std::slice;
 
+use expander_binary::executor;
 use expander_compiler::frontend::ChallengeField;
 use expander_compiler::frontend::SIMDField;
 
@@ -31,8 +32,8 @@ fn prove_circuit_file_inner<C: config::Config>(
     circuit.layers[0].input_vals = simd_input;
     circuit.public_input = simd_public_input;
     circuit.evaluate();
-    let (claimed_v, proof) = gkr::executor::prove::<C>(&mut circuit, mpi_config.clone());
-    gkr::executor::dump_proof_and_claimed_v(&proof, &claimed_v).map_err(|e| e.to_string())
+    let (claimed_v, proof) = executor::prove::<C>(&mut circuit, mpi_config.clone());
+    executor::dump_proof_and_claimed_v(&proof, &claimed_v).map_err(|e| e.to_string())
 }
 
 fn verify_circuit_file_inner<C: config::Config>(
@@ -49,13 +50,13 @@ fn verify_circuit_file_inner<C: config::Config>(
     circuit.layers[0].input_vals = simd_input;
     circuit.public_input = simd_public_input.clone();
     let (proof, claimed_v) =
-        match gkr::executor::load_proof_and_claimed_v::<ChallengeField<C>>(proof_and_claimed_v) {
+        match executor::load_proof_and_claimed_v::<ChallengeField<C>>(proof_and_claimed_v) {
             Ok((proof, claimed_v)) => (proof, claimed_v),
             Err(_) => {
                 return Ok(0);
             }
         };
-    Ok(gkr::executor::verify::<C>(&mut circuit, mpi_config, &proof, &claimed_v) as u8)
+    Ok(executor::verify::<C>(&mut circuit, mpi_config, &proof, &claimed_v) as u8)
 }
 
 #[no_mangle]

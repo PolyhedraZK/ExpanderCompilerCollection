@@ -13,6 +13,7 @@ clap.workspace = true
 crosslayer_prototype.workspace = true
 macros = { path = "./macros" }
 ethnum.workspace = true
+expander_binary.workspace = true
 expander_circuit.workspace = true
 expander_transcript.workspace = true
 gf2.workspace = true
