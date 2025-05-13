@@ -65,6 +65,7 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
                 is_broadcast,
             )
         } else {
+            let timer = Timer::new("commit", true);
             let actual_local_len = vals.len() / parallel_count;
 
             // TODO: The size here is for the raw commitment, add an function in the pcs trait to get the size of the commitment
@@ -73,6 +74,7 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
             write_commit_vals_to_shared_memory::<ECCConfig>(&vals.to_vec());
             exec_pcs_commit::<C>(parallel_count);
             let (commitment, extra_info) = read_commitment_and_extra_info_from_shared_memory();
+            timer.stop();
             (commitment, extra_info)
         }
     }

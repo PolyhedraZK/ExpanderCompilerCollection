@@ -8,7 +8,7 @@ use expander_compiler::frontend::{
     BN254Config, BabyBearConfig, GF2Config, GoldilocksConfig, M31Config,
 };
 use expander_compiler::zkcuda::proving_system::callee_utils::{
-    read_commit_vals_from_shared_memory, read_selected_pkey_from_shared_memory,
+    read_local_vals_to_commit_from_shared_memory, read_selected_pkey_from_shared_memory,
     write_commitment_extra_info_to_shared_memory, write_commitment_to_shared_memory,
 };
 use expander_compiler::zkcuda::proving_system::{
@@ -34,12 +34,7 @@ fn commit<C: GKREngine>() {
     let (local_val_len, p_key) =
         read_selected_pkey_from_shared_memory::<C::FieldConfig, C::PCSConfig>();
 
-    // TODO: remove the redundancy
-    let global_vals_to_commit = read_commit_vals_from_shared_memory::<C::FieldConfig>();
-    let local_vals_to_commit = global_vals_to_commit
-        [local_val_len * world_rank..local_val_len * (world_rank + 1)]
-        .to_vec();
-    drop(global_vals_to_commit);
+    let local_vals_to_commit = read_local_vals_to_commit_from_shared_memory::<C::FieldConfig>(world_rank, world_size);
 
     let params =
         <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(local_val_len.ilog2() as usize);

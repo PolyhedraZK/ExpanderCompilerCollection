@@ -27,15 +27,21 @@ pub fn read_selected_pkey_from_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>
     read_object_from_shared_memory_name_string("pcs_setup", 0)
 }
 
-pub fn read_commit_vals_from_shared_memory<F: FieldEngine>(world_rank: usize, world_size: usize) -> Vec<F::SimdCircuitField> {
+pub fn read_local_vals_to_commit_from_shared_memory<F: FieldEngine>(world_rank: usize, world_size: usize) -> Vec<F::SimdCircuitField> {
     let shmem = ShmemConf::new().flink("input_vals").open().unwrap();
     let ptr = shmem.as_ptr();
     let total_len: usize = usize::deserialize_from(unsafe {std::slice::from_raw_parts(ptr, size_of::<usize>())}).unwrap();
-
     
     let local_len = total_len / world_size;
     let offset = size_of::<usize>() + world_rank * local_len * <F::SimdCircuitField as Field>::SIZE;
-    read_object_from_shared_memory_name_string("input_vals", 0)
+    let ptr = unsafe { ptr.add(offset) };
+    let mut cursor = std::io::Cursor::new(unsafe { std::slice::from_raw_parts(ptr, local_len * <F::SimdCircuitField as Field>::SIZE) });
+
+    (0..local_len)
+        .map(|_| {
+            F::SimdCircuitField::deserialize_from(&mut cursor).unwrap()
+        })
+        .collect()
 }
 
 pub fn write_object_to_shared_memory_name_string<T: ExpSerde>(object: &T, shared_memory_ref: &str) {
