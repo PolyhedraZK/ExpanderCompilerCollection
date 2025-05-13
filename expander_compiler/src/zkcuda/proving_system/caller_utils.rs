@@ -1,6 +1,6 @@
 #![allow(static_mut_refs)]
 
-use std::{io::Cursor, process::Command};
+use std::process::Command;
 
 use crate::{
     circuit::layered::Circuit, frontend::SIMDField, zkcuda::kernel::LayeredCircuitInputVec,
@@ -260,11 +260,18 @@ pub fn exec_gkr_prove_with_pcs<C: GKREngine>(mpi_size: usize) {
     exec_command(&cmd_str);
 }
 
-pub fn read_object_from_shared_memory<T: ExpSerde>(shared_memory_ref: &Option<Shmem>) -> T {
+pub fn deserialize_from_ptr<T: ExpSerde>(ptr: *const u8, len: usize) -> T {
+    let buffer = unsafe { std::slice::from_raw_parts(ptr, len) };
+    T::deserialize_from(buffer).unwrap()
+}
+
+pub fn read_object_from_shared_memory<T: ExpSerde>(shared_memory_ref: &Option<Shmem>, offset: usize) -> T {
     let shmem = shared_memory_ref.as_ref().unwrap();
     let object_ptr = shmem.as_ptr() as *const u8;
     let object_len = shmem.len();
-    let buffer = unsafe { std::slice::from_raw_parts(object_ptr, object_len) };
+    let buffer = unsafe {
+        std::slice::from_raw_parts(object_ptr.add(offset), object_len - offset)
+    };
     T::deserialize_from(buffer).unwrap()
 }
 
@@ -272,11 +279,11 @@ pub fn read_commitment_and_extra_info_from_shared_memory<F: FieldEngine, PCS: Ex
     ExpanderGKRCommitment<F, PCS>,
     ExpanderGKRCommitmentExtraInfo<F, PCS>,
 ) {
-    let commitment = read_object_from_shared_memory(unsafe { &SHARED_MEMORY.commitment });
-    let extra_info = read_object_from_shared_memory(unsafe { &SHARED_MEMORY.extra_info });
+    let commitment = read_object_from_shared_memory(unsafe { &SHARED_MEMORY.commitment }, 0);
+    let extra_info = read_object_from_shared_memory(unsafe { &SHARED_MEMORY.extra_info }, 0);
     (commitment, extra_info)
 }
 
 pub fn read_proof_from_shared_memory() -> ExpanderGKRProof {
-    read_object_from_shared_memory(unsafe { &SHARED_MEMORY.proof })
+    read_object_from_shared_memory(unsafe { &SHARED_MEMORY.proof }, 0)
 }
