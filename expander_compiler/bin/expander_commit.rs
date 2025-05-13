@@ -17,7 +17,7 @@ use expander_compiler::zkcuda::proving_system::{
 
 use gkr::BN254ConfigSha2Hyrax;
 use gkr_engine::{ExpanderPCS, GKREngine, MPIConfig, MPIEngine, PolynomialCommitmentType};
-use polynomials::MultiLinearPoly;
+use polynomials::RefMultiLinearPoly;
 
 fn commit<C: GKREngine>() {
     let mpi_config = MPIConfig::prover_new();
@@ -46,7 +46,7 @@ fn commit<C: GKREngine>() {
         &params,
         &mpi_config,
         &p_key,
-        &MultiLinearPoly::new(local_vals_to_commit),
+        &RefMultiLinearPoly::from_ref(&local_vals_to_commit),
         &mut scratch,
     );
 
