@@ -1,0 +1,7 @@
+#!/bin/sh
+
+diff expander_compiler/circuit_babybear.txt expander_compiler/circuit_babybear2.txt
+diff expander_compiler/circuit_bn254.txt expander_compiler/circuit_bn2542.txt
+diff expander_compiler/circuit_gf2.txt expander_compiler/circuit_gf22.txt
+diff expander_compiler/circuit_m31.txt expander_compiler/circuit_m312.txt
+diff expander_compiler/circuit_goldilocks.txt expander_compiler/circuit_goldilocks2.txt

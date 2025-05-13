@@ -15,7 +15,9 @@ pub mod serde;
 pub mod stats;
 pub mod witness;
 
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+// #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, ExpSerde)]
 pub enum Coef<C: Config> {
     Constant(CircuitField<C>),
     Random,
