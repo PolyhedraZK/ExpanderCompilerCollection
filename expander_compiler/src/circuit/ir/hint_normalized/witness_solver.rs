@@ -105,14 +105,3 @@ impl<C: Config> WitnessSolver<C> {
         })
     }
 }
-
-// impl<C: Config> ExpSerde for WitnessSolver<C> {
-//     fn deserialize_from<R: std::io::Read>(mut reader: R) -> SerdeResult<Self> {
-//         let circuit = RootCircuit::<C>::deserialize_from(&mut reader)?;
-//         Ok(Self { circuit })
-//     }
-
-//     fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> SerdeResult<()> {
-//         self.circuit.serialize_into(&mut writer)
-//     }
-// }

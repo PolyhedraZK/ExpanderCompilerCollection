@@ -48,59 +48,6 @@ impl<C: Config> ExpSerde for Coef<C> {
     }
 }
 
-// impl ExpSerde for CrossLayerInput {
-
-//     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
-//         self.layer.serialize_into(&mut writer)?;
-//         self.offset.serialize_into(&mut writer)?;
-//         Ok(())
-//     }
-
-//     fn deserialize_from<R: Read>(mut reader: R) -> SerdeResult<Self> {
-//         let layer = usize::deserialize_from(&mut reader)?;
-//         let offset = usize::deserialize_from(&mut reader)?;
-//         Ok(CrossLayerInput { layer, offset })
-//     }
-// }
-
-// impl ExpSerde for NormalInput {
-
-//     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
-//         self.offset.serialize_into(&mut writer)?;
-//         Ok(())
-//     }
-
-//     fn deserialize_from<R: Read>(mut reader: R) -> SerdeResult<Self> {
-//         let offset = usize::deserialize_from(&mut reader)?;
-//         Ok(NormalInput { offset })
-//     }
-// }
-
-// impl ExpSerde for CrossLayerInputUsize {
-
-//     fn serialize_into<W: Write>(&self, writer: W) -> SerdeResult<()> {
-//         self.v.serialize_into(writer)
-//     }
-
-//     fn deserialize_from<R: Read>(reader: R) -> SerdeResult<Self> {
-//         Ok(CrossLayerInputUsize {
-//             v: Vec::<usize>::deserialize_from(reader)?,
-//         })
-//     }
-// }
-
-// impl ExpSerde for NormalInputUsize {
-
-//     fn serialize_into<W: Write>(&self, writer: W) -> SerdeResult<()> {
-//         self.v.serialize_into(writer)
-//     }
-//     fn deserialize_from<R: Read>(reader: R) -> SerdeResult<Self> {
-//         Ok(NormalInputUsize {
-//             v: usize::deserialize_from(reader)?,
-//         })
-//     }
-// }
-
 impl<C: Config, I: InputType, const INPUT_NUM: usize> ExpSerde for Gate<C, I, INPUT_NUM> {
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         for input in &self.inputs {
@@ -124,23 +71,6 @@ impl<C: Config, I: InputType, const INPUT_NUM: usize> ExpSerde for Gate<C, I, IN
         })
     }
 }
-
-// impl<I: InputType> ExpSerde for Allocation<I> {
-
-//     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
-//         self.input_offset.serialize_into(&mut writer)?;
-//         self.output_offset.serialize_into(&mut writer)?;
-//         Ok(())
-//     }
-//     fn deserialize_from<R: Read>(mut reader: R) -> SerdeResult<Self> {
-//         let input_offset = I::InputUsize::deserialize_from(&mut reader)?;
-//         let output_offset = usize::deserialize_from(&mut reader)?;
-//         Ok(Allocation {
-//             input_offset,
-//             output_offset,
-//         })
-//     }
-// }
 
 impl<C: Config, I: InputType> ExpSerde for GateCustom<C, I> {
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
