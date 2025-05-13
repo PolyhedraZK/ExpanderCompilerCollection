@@ -1,10 +1,9 @@
 use std::{
     fmt,
-    io::{Read, Write},
     ops::{Deref, DerefMut},
 };
 
-use serdes::{ExpSerde, SerdeResult};
+use serdes::ExpSerde;
 
 use crate::circuit::config::Config;
 use crate::field::FieldArith;
