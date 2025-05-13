@@ -264,11 +264,8 @@ pub fn read_object_from_shared_memory<T: ExpSerde>(shared_memory_ref: &Option<Sh
     let shmem = shared_memory_ref.as_ref().unwrap();
     let object_ptr = shmem.as_ptr() as *const u8;
     let object_len = shmem.len();
-    let mut buffer = vec![0u8; object_len];
-    unsafe {
-        std::ptr::copy_nonoverlapping(object_ptr, buffer.as_mut_ptr(), object_len);
-    }
-    T::deserialize_from(&mut Cursor::new(buffer)).unwrap()
+    let buffer = unsafe { std::slice::from_raw_parts(object_ptr, object_len) };
+    T::deserialize_from(buffer).unwrap()
 }
 
 pub fn read_commitment_and_extra_info_from_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>() -> (
