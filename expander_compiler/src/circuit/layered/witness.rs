@@ -2,7 +2,7 @@ use std::any::{Any, TypeId};
 use std::mem;
 
 use arith::{Field, SimdField as ExpSimdField};
-use serdes::{ExpSerde, SerdeResult};
+use serdes::{ExpSerde, };
 
 use super::{Circuit, InputType};
 use crate::circuit::config::Config;
@@ -175,7 +175,7 @@ impl<C: Config> Witness<C> {
         }
     }
 
-    fn convert_to_simd(&mut self) {
+    fn _convert_to_simd(&mut self) {
         let values = match &self.values {
             WitnessValues::Scalar(values) => values,
             WitnessValues::Simd(_) => {

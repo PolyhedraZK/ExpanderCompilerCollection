@@ -4,7 +4,7 @@ use serdes::{ExpSerde, SerdeResult};
 
 use crate::circuit::{config::Config, ir::expr::LinComb, layered::Coef};
 
-use super::{BoolBinOpType, Constraint, ConstraintType, Instruction, UnconstrainedBinOpType};
+use super::{BoolBinOpType,  Instruction, UnconstrainedBinOpType};
 
 impl<C: Config> ExpSerde for Instruction<C> {
 
