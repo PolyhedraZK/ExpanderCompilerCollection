@@ -13,7 +13,6 @@ where
     Irc::Instruction: ExpSerde,
     Irc::Constraint: ExpSerde,
 {
-
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         self.instructions.serialize_into(&mut writer)?;
         self.constraints.serialize_into(&mut writer)?;

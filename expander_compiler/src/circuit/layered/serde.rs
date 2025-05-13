@@ -6,13 +6,11 @@ use serdes::{ExpSerde, SerdeResult};
 use crate::frontend::CircuitField;
 
 use super::{
-     ChildSpec, Circuit, Coef, Config, Gate,
-    GateAdd, GateConst, GateCustom, GateMul, InputType, Segment,
+    ChildSpec, Circuit, Coef, Config, Gate, GateAdd, GateConst, GateCustom, GateMul, InputType,
+    Segment,
 };
 
 impl<C: Config> ExpSerde for Coef<C> {
-
-
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         match self {
             Coef::Constant(c) => {
@@ -104,7 +102,6 @@ impl<C: Config> ExpSerde for Coef<C> {
 // }
 
 impl<C: Config, I: InputType, const INPUT_NUM: usize> ExpSerde for Gate<C, I, INPUT_NUM> {
-
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         for input in &self.inputs {
             input.serialize_into(&mut writer)?;
@@ -146,7 +143,6 @@ impl<C: Config, I: InputType, const INPUT_NUM: usize> ExpSerde for Gate<C, I, IN
 // }
 
 impl<C: Config, I: InputType> ExpSerde for GateCustom<C, I> {
-
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         self.gate_type.serialize_into(&mut writer)?;
         self.inputs.serialize_into(&mut writer)?;
@@ -169,7 +165,6 @@ impl<C: Config, I: InputType> ExpSerde for GateCustom<C, I> {
 }
 
 impl<C: Config, I: InputType> ExpSerde for Segment<C, I> {
-
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         self.num_inputs.serialize_into(&mut writer)?;
         self.num_outputs.serialize_into(&mut writer)?;
@@ -204,7 +199,6 @@ impl<C: Config, I: InputType> ExpSerde for Segment<C, I> {
 const MAGIC: usize = 3914834606642317635;
 
 impl<C: Config, I: InputType> ExpSerde for Circuit<C, I> {
-
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         MAGIC.serialize_into(&mut writer)?;
         CircuitField::<C>::MODULUS.serialize_into(&mut writer)?;

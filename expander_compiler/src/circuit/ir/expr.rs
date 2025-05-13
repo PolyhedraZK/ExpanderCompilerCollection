@@ -1,10 +1,9 @@
 use std::{
     fmt,
-    io::{Read, Write},
     ops::{Deref, DerefMut},
 };
 
-use serdes::{ExpSerde, SerdeResult};
+use serdes::ExpSerde;
 
 use crate::circuit::config::Config;
 use crate::field::FieldArith;
@@ -382,13 +381,13 @@ impl<C: Config> Expression<C> {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, ExpSerde)]
 pub struct LinCombTerm<C: Config> {
     pub var: usize,
     pub coef: CircuitField<C>,
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, ExpSerde)]
 pub struct LinComb<C: Config> {
     pub terms: Vec<LinCombTerm<C>>,
     pub constant: CircuitField<C>,
@@ -468,33 +467,33 @@ impl<C: Config> fmt::Display for LinComb<C> {
     }
 }
 
-impl<C: Config> ExpSerde for LinComb<C> {
-    fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
-        self.terms.len().serialize_into(&mut writer)?;
-        for term in self.terms.iter() {
-            term.var.serialize_into(&mut writer)?;
-        }
-        for term in self.terms.iter() {
-            term.coef.serialize_into(&mut writer)?;
-        }
-        self.constant.serialize_into(&mut writer)?;
-        Ok(())
-    }
+// impl<C: Config> ExpSerde for LinComb<C> {
+//     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
+//         self.terms.len().serialize_into(&mut writer)?;
+//         for term in self.terms.iter() {
+//             term.var.serialize_into(&mut writer)?;
+//         }
+//         for term in self.terms.iter() {
+//             term.coef.serialize_into(&mut writer)?;
+//         }
+//         self.constant.serialize_into(&mut writer)?;
+//         Ok(())
+//     }
 
-    fn deserialize_from<R: Read>(mut reader: R) -> SerdeResult<Self> {
-        let len = usize::deserialize_from(&mut reader)?;
-        let mut terms = Vec::with_capacity(len);
-        for _ in 0..len {
-            let var = usize::deserialize_from(&mut reader)?;
-            terms.push(LinCombTerm {
-                var,
-                coef: CircuitField::<C>::zero(),
-            });
-        }
-        for term in terms.iter_mut() {
-            term.coef = CircuitField::<C>::deserialize_from(&mut reader)?;
-        }
-        let constant = CircuitField::<C>::deserialize_from(&mut reader)?;
-        Ok(LinComb { terms, constant })
-    }
-}
+//     fn deserialize_from<R: Read>(mut reader: R) -> SerdeResult<Self> {
+//         let len = usize::deserialize_from(&mut reader)?;
+//         let mut terms = Vec::with_capacity(len);
+//         for _ in 0..len {
+//             let var = usize::deserialize_from(&mut reader)?;
+//             terms.push(LinCombTerm {
+//                 var,
+//                 coef: CircuitField::<C>::zero(),
+//             });
+//         }
+//         for term in terms.iter_mut() {
+//             term.coef = CircuitField::<C>::deserialize_from(&mut reader)?;
+//         }
+//         let constant = CircuitField::<C>::deserialize_from(&mut reader)?;
+//         Ok(LinComb { terms, constant })
+//     }
+// }

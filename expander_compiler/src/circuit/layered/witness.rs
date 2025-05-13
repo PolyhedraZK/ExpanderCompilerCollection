@@ -2,7 +2,7 @@ use std::any::{Any, TypeId};
 use std::mem;
 
 use arith::{Field, SimdField as ExpSimdField};
-use serdes::{ExpSerde, };
+use serdes::{ExpSerde, SerdeResult};
 
 use super::{Circuit, InputType};
 use crate::circuit::config::Config;
@@ -14,7 +14,7 @@ pub enum WitnessValues<C: Config> {
     Simd(Vec<SIMDField<C>>),
 }
 
-#[derive(Clone, Debug, ExpSerde)]
+#[derive(Clone, Debug)]
 pub struct Witness<C: Config> {
     pub num_witnesses: usize,
     pub num_inputs_per_witness: usize,
@@ -175,7 +175,7 @@ impl<C: Config> Witness<C> {
         }
     }
 
-    fn _convert_to_simd(&mut self) {
+    fn convert_to_simd(&mut self) {
         let values = match &self.values {
             WitnessValues::Scalar(values) => values,
             WitnessValues::Simd(_) => {
@@ -294,62 +294,62 @@ impl<C: Config> Witness<C> {
     }
 }
 
-// impl<C: Config> ExpSerde for Witness<C> {
-//     fn deserialize_from<R: std::io::Read>(mut reader: R) -> SerdeResult<Self> {
-//         let num_witnesses = usize::deserialize_from(&mut reader)?;
-//         let num_inputs_per_witness = usize::deserialize_from(&mut reader)?;
-//         let num_public_inputs_per_witness = usize::deserialize_from(&mut reader)?;
-//         let modulus = ethnum::U256::deserialize_from(&mut reader)?;
-//         if modulus != CircuitField::<C>::MODULUS {
-//             return Err(std::io::Error::new(
-//                 std::io::ErrorKind::InvalidData,
-//                 "invalid modulus",
-//             ))?;
-//         }
-//         let mut values = Vec::with_capacity(
-//             num_witnesses * (num_inputs_per_witness + num_public_inputs_per_witness),
-//         );
-//         for _ in 0..num_witnesses * (num_inputs_per_witness + num_public_inputs_per_witness) {
-//             values.push(CircuitField::<C>::deserialize_from(&mut reader)?);
-//         }
-//         let mut res = Self {
-//             num_witnesses,
-//             num_inputs_per_witness,
-//             num_public_inputs_per_witness,
-//             values: WitnessValues::Scalar(values),
-//         };
-//         if use_simd::<C>(num_witnesses) {
-//             res.convert_to_simd();
-//         }
-//         Ok(res)
-//     }
+impl<C: Config> ExpSerde for Witness<C> {
+    fn deserialize_from<R: std::io::Read>(mut reader: R) -> SerdeResult<Self> {
+        let num_witnesses = usize::deserialize_from(&mut reader)?;
+        let num_inputs_per_witness = usize::deserialize_from(&mut reader)?;
+        let num_public_inputs_per_witness = usize::deserialize_from(&mut reader)?;
+        let modulus = ethnum::U256::deserialize_from(&mut reader)?;
+        if modulus != CircuitField::<C>::MODULUS {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "invalid modulus",
+            ))?;
+        }
+        let mut values = Vec::with_capacity(
+            num_witnesses * (num_inputs_per_witness + num_public_inputs_per_witness),
+        );
+        for _ in 0..num_witnesses * (num_inputs_per_witness + num_public_inputs_per_witness) {
+            values.push(CircuitField::<C>::deserialize_from(&mut reader)?);
+        }
+        let mut res = Self {
+            num_witnesses,
+            num_inputs_per_witness,
+            num_public_inputs_per_witness,
+            values: WitnessValues::Scalar(values),
+        };
+        if use_simd::<C>(num_witnesses) {
+            res.convert_to_simd();
+        }
+        Ok(res)
+    }
 
-//     fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> SerdeResult<()> {
-//         self.num_witnesses.serialize_into(&mut writer)?;
-//         self.num_inputs_per_witness.serialize_into(&mut writer)?;
-//         self.num_public_inputs_per_witness
-//             .serialize_into(&mut writer)?;
-//         CircuitField::<C>::MODULUS.serialize_into(&mut writer)?;
-//         match &self.values {
-//             WitnessValues::Scalar(values) => {
-//                 for v in values {
-//                     v.serialize_into(&mut writer)?;
-//                 }
-//             }
-//             WitnessValues::Simd(_) => {
-//                 for (a, b) in self.iter_scalar() {
-//                     for v in a {
-//                         v.serialize_into(&mut writer)?;
-//                     }
-//                     for v in b {
-//                         v.serialize_into(&mut writer)?;
-//                     }
-//                 }
-//             }
-//         }
-//         Ok(())
-//     }
-// }
+    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> SerdeResult<()> {
+        self.num_witnesses.serialize_into(&mut writer)?;
+        self.num_inputs_per_witness.serialize_into(&mut writer)?;
+        self.num_public_inputs_per_witness
+            .serialize_into(&mut writer)?;
+        CircuitField::<C>::MODULUS.serialize_into(&mut writer)?;
+        match &self.values {
+            WitnessValues::Scalar(values) => {
+                for v in values {
+                    v.serialize_into(&mut writer)?;
+                }
+            }
+            WitnessValues::Simd(_) => {
+                for (a, b) in self.iter_scalar() {
+                    for v in a {
+                        v.serialize_into(&mut writer)?;
+                    }
+                    for v in b {
+                        v.serialize_into(&mut writer)?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {

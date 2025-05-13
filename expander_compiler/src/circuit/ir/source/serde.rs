@@ -4,10 +4,9 @@ use serdes::{ExpSerde, SerdeResult};
 
 use crate::circuit::{config::Config, ir::expr::LinComb, layered::Coef};
 
-use super::{BoolBinOpType,  Instruction, UnconstrainedBinOpType};
+use super::{BoolBinOpType, Instruction, UnconstrainedBinOpType};
 
 impl<C: Config> ExpSerde for Instruction<C> {
-
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         match self {
             Instruction::LinComb(lin_comb) => {

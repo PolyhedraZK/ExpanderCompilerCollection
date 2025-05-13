@@ -4,7 +4,7 @@ use crate::{
 };
 
 use arith::SimdField;
-use serdes::{ExpSerde, };
+use serdes::ExpSerde;
 
 use super::{Config, Error, FieldArith, HintCaller, RootCircuit};
 
