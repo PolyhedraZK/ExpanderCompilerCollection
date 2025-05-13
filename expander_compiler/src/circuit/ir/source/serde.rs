@@ -185,7 +185,6 @@ impl<C: Config> ExpSerde for Instruction<C> {
 }
 
 impl ExpSerde for Constraint {
-
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         (self.typ as u8).serialize_into(&mut writer)?;
         self.var.serialize_into(&mut writer)?;
