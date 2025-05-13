@@ -1,8 +1,8 @@
 use std::{fmt::Debug, hash::Hash};
 
 pub use gkr::{
-    BN254ConfigMIMC5Raw, BabyBearExtConfigSha2Raw, GF2ExtConfigSha2Raw, GoldilocksExtConfigSha2Raw,
-    M31ExtConfigSha2RawVanilla,
+    BN254ConfigMIMC5Raw, BabyBearx16ConfigSha2Raw, GF2ExtConfigSha2Raw, Goldilocksx8ConfigSha2Raw,
+    M31x16ConfigSha2RawVanilla,
 };
 use gkr_engine::{FieldEngine, GKREngine};
 
@@ -36,10 +36,10 @@ pub type ChallengeField<C> = <<C as GKREngine>::FieldConfig as FieldEngine>::Cha
 pub type SIMDField<C> = <<C as GKREngine>::FieldConfig as FieldEngine>::SimdCircuitField;
 
 pub type BN254Config = BN254ConfigMIMC5Raw;
-pub type M31Config = M31ExtConfigSha2RawVanilla;
+pub type M31Config = M31x16ConfigSha2RawVanilla;
 pub type GF2Config = GF2ExtConfigSha2Raw;
-pub type GoldilocksConfig = GoldilocksExtConfigSha2Raw;
-pub type BabyBearConfig = BabyBearExtConfigSha2Raw;
+pub type GoldilocksConfig = Goldilocksx8ConfigSha2Raw;
+pub type BabyBearConfig = BabyBearx16ConfigSha2Raw;
 
 impl Config for M31Config {
     const CONFIG_ID: usize = 1;
