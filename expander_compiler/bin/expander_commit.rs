@@ -30,6 +30,7 @@ macro_rules! pcs {
 }
 
 fn commit<C: Config>() {
+    let start_time = std::time::Instant::now();
     let mpi_config = MPIConfig::prover_new();
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
@@ -40,6 +41,7 @@ fn commit<C: Config>() {
     if world_rank == 0 {
         println!("Expander Commit Exec Called with world size {}", world_size);
     }
+    println!("commit mpi :{:?} -- initial time: {:?}", world_rank, start_time.elapsed());
 
     let (local_val_len, p_key) = read_selected_pkey_from_shared_memory::<C>();
 
@@ -76,9 +78,11 @@ fn commit<C: Config>() {
     }
 
     MPIConfig::finalize();
+    println!("commit mpi :{:?} -- finalize time: {:?}", world_rank, start_time.elapsed());
 }
 
 fn main() {
+    let start_time = std::time::Instant::now();
     let expander_exec_args = ExpanderExecArgs::parse();
     match expander_exec_args.field_type.as_str() {
         "M31" => commit::<M31Config>(),
@@ -88,4 +92,5 @@ fn main() {
         "BN254" => commit::<BN254Config>(),
         _ => panic!("Unsupported field type"),
     }
+    println!("expander commit main time: {:?}", start_time.elapsed());
 }

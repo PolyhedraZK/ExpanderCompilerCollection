@@ -44,7 +44,7 @@ macro_rules! pcs {
     };
 }
 
-const SINGLE_KERNEL_MAX_PROOF_SIZE: usize = 10 * 1024 * 1024; // 10MB
+const SINGLE_KERNEL_MAX_PROOF_SIZE: usize = 10 * 1024 * 1024 * 1024; // 10MB
 
 pub struct ParallelizedExpanderGKRProvingSystem<C: Config> {
     _config: std::marker::PhantomData<C>,
@@ -96,6 +96,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> Self::Proof {
+        let start_time = std::time::Instant::now();
         if parallel_count == 1 {
             ExpanderGKRProvingSystem::<C>::prove(
                 prover_setup,
@@ -108,15 +109,26 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
             )
         } else {
             init_proof_shared_memory(SINGLE_KERNEL_MAX_PROOF_SIZE);
+            println!("init_proof_shared_memory time: {:?}", start_time.elapsed());
             write_pcs_setup_to_shared_memory(prover_setup);
+            println!("write_pcs_setup_to_shared_memory time: {:?}", start_time.elapsed());
             write_ecc_circuit_to_shared_memory(&kernel.layered_circuit);
+            println!("write_ecc_circuit_to_shared_memory time: {:?}", start_time.elapsed());
             write_input_partition_info_to_shared_memory(&kernel.layered_circuit_input);
+            println!("write_input_partition_info_to_shared_memory time: {:?}", start_time.elapsed());
             write_commitments_to_shared_memory(&commitments.to_vec());
+            println!("write_commitments_to_shared_memory time: {:?}", start_time.elapsed());
             write_commitments_extra_info_to_shared_memory(&commitments_extra_info.to_vec());
+            println!("write_commitments_extra_info_to_shared_memory time: {:?}", start_time.elapsed());
             write_commitments_values_to_shared_memory::<C>(commitments_values);
+            println!("write_commitments_values_to_shared_memory time: {:?}", start_time.elapsed());
             write_broadcast_info_to_shared_memory(&is_broadcast.to_vec());
+            println!("write_broadcast_info_to_shared_memory time: {:?}", start_time.elapsed());
             exec_gkr_prove_with_pcs::<C>(parallel_count);
-            read_proof_from_shared_memory()
+            println!("exec_gkr_prove_with_pcs time: {:?}", start_time.elapsed());
+            let res = read_proof_from_shared_memory();
+            println!("read_proof_from_shared_memory time: {:?}", start_time.elapsed());
+            res
         }
     }
 

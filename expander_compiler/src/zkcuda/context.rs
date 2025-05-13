@@ -576,6 +576,7 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<CircuitField<C>>> Context<C, 
     }
 
     pub fn to_proof(self, prover_setup: &P::ProverSetup) -> CombinedProof<C, P> {
+        let start_time = std::time::Instant::now();
         let commitments = self
             .proof_templates
             .iter()
@@ -595,32 +596,51 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<CircuitField<C>>> Context<C, 
                     .unzip::<_, _, Vec<_>, Vec<_>>()
             })
             .collect::<Vec<_>>();
+        let elapsed = start_time.elapsed();
+        println!("Time elapsed in commitments!() is: {:?}", elapsed);
 
+        let start_time = std::time::Instant::now();
         let proofs: Vec<P::Proof> = self
             .proof_templates
             .iter()
             .zip(commitments.iter())
             .map(|(template, commitments_kernel)| {
-                P::prove(
+                println!("inner prove");
+                let test_start_time = std::time::Instant::now();
+                let kernel = self.kernels.get(template.kernel_id);
+                println!("inner prove kernel time: {:?}", test_start_time.elapsed());
+                let commitments_values = &template
+                    .commitment_indices
+                    .iter()
+                    .map(|x| &self.device_memories[*x].values[..])
+                    .collect::<Vec<_>>();
+                println!("inner prove commitments time: {:?}", test_start_time.elapsed());
+                let parallel_count = next_power_of_two(template.parallel_count);
+                println!("inner prove parallel count time: {:?}", test_start_time.elapsed());
+                let res = P::prove(
                     prover_setup,
-                    self.kernels.get(template.kernel_id),
+                    kernel,
                     &commitments_kernel.0,
                     &commitments_kernel.1,
-                    &template
-                        .commitment_indices
-                        .iter()
-                        .map(|x| &self.device_memories[*x].values[..])
-                        .collect::<Vec<_>>(),
-                    next_power_of_two(template.parallel_count),
+                    commitments_values,
+                    parallel_count,
                     &template.is_broadcast,
-                )
+                );
+                println!("inner prove time: {:?}", test_start_time.elapsed());
+                res
             })
             .collect::<Vec<_>>();
+        let elapsed = start_time.elapsed();
+        println!("Time elapsed in proofs!() is: {:?}", elapsed);
 
-        CombinedProof {
+        let start_time = std::time::Instant::now();
+        let res = CombinedProof {
             commitments: commitments.into_iter().map(|x| x.0).collect(),
             proofs,
-        }
+        };
+        let elapsed = start_time.elapsed();
+        println!("Time elapsed in CombinedProof!() is: {:?}", elapsed);
+        res
     }
 }
 

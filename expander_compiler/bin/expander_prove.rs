@@ -47,9 +47,12 @@ macro_rules! pcs {
 }
 
 fn prove<C: Config>() {
+    let start_time = std::time::Instant::now();
     let mpi_config = MPIConfig::prover_new();
+    println!("GKR mpi -- MPIConfig initial time: {:?}", start_time.elapsed());
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
+    println!("test!!!");
     assert!(
         world_size > 1,
         "In case world_size is 1, we should not use the mpi version of the prover"
@@ -57,28 +60,42 @@ fn prove<C: Config>() {
     if world_rank == 0 {
         println!("Expander Prove Exec Called with world size {}", world_size);
     }
+    println!("GKR mpi :{:?} -- prover initial time: {:?}", world_rank, start_time.elapsed());
 
     let pcs_setup = read_pcs_setup_from_shared_memory::<C>();
+    println!("GKR mpi :{:?} -- read_pcs_setup time: {:?}", world_rank, start_time.elapsed());
     let ecc_circuit = read_ecc_circuit_from_shared_memory::<C>();
+    println!("GKR mpi :{:?} -- read_ecc_circuit time: {:?}", world_rank, start_time.elapsed());
     let partition_info = read_partition_info_from_shared_memory();
+    println!("GKR mpi :{:?} -- read_partition_info time: {:?}", world_rank, start_time.elapsed());
 
     let _commitments = read_commitment_from_shared_memory::<C>();
+    println!("GKR mpi :{:?} -- read_commitment time: {:?}", world_rank, start_time.elapsed());
     let commitments_extra_info = read_commitment_extra_info_from_shared_memory::<C>();
+    println!("GKR mpi :{:?} -- read_commitment_extra_info time: {:?}", world_rank, start_time.elapsed());
     let commitment_values = read_commitment_values_from_shared_memory::<C>();
+    println!("GKR mpi :{:?} -- read_commitment_values time: {:?}", world_rank, start_time.elapsed());
     let commitment_values_refs = commitment_values
         .iter()
         .map(|commitment| &commitment[..])
         .collect::<Vec<_>>();
+    println!("GKR mpi :{:?} -- read_commitment_values_refs time: {:?}", world_rank, start_time.elapsed());
     let broadcast_info = read_broadcast_info_from_shared_memory();
+    println!("GKR mpi :{:?} -- read_broadcast_info time: {:?}", world_rank, start_time.elapsed());
 
     let mut expander_circuit = ecc_circuit.export_to_expander().flatten::<C>();
+    println!("GKR mpi :{:?} -- export_to_expander time: {:?}", world_rank, start_time.elapsed());
     expander_circuit.pre_process_gkr::<C>();
+    println!("GKR mpi :{:?} -- pre_process_gkr time: {:?}", world_rank, start_time.elapsed());
     let (max_num_input_var, max_num_output_var) = max_n_vars(&expander_circuit);
+    println!("GKR mpi :{:?} -- max_n_vars time: {:?}", world_rank, start_time.elapsed());
     let mut prover_scratch =
         ProverScratchPad::<C::FieldConfig>::new(max_num_input_var, max_num_output_var, world_size);
+    println!("GKR mpi :{:?} -- prover_scratch time: {:?}", world_rank, start_time.elapsed());
 
     let mut transcript = C::TranscriptConfig::new();
     transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
+    println!("GKR mpi :{:?} -- append_u8_slice time: {:?}", world_rank, start_time.elapsed());
     expander_circuit.layers[0].input_vals = prepare_inputs(
         &ecc_circuit,
         &partition_info,
@@ -86,18 +103,24 @@ fn prove<C: Config>() {
         &broadcast_info,
         world_rank,
     );
+    println!("GKR mpi :{:?} -- prepare_inputs time: {:?}", world_rank, start_time.elapsed());
+
     expander_circuit.fill_rnd_coefs(&mut transcript);
+    println!("GKR mpi :{:?} -- fill_rnd_coefs time: {:?}", world_rank, start_time.elapsed());
     expander_circuit.evaluate();
+    println!("GKR mpi :{:?} -- evaluate time: {:?}", world_rank, start_time.elapsed());
     let (claimed_v, challenge) = gkr_prove(
         &expander_circuit,
         &mut prover_scratch,
         &mut transcript,
         &mpi_config,
     );
+    println!("GKR mpi :{:?} -- gkr_prove time: {:?}", world_rank, start_time.elapsed());
     assert_eq!(
         claimed_v,
         <C::FieldConfig as FieldEngine>::ChallengeField::from(0)
     );
+    println!("GKR mpi :{:?} -- assert_eq time: {:?}", world_rank, start_time.elapsed());
 
     prove_input_claim(
         &mpi_config,
@@ -108,6 +131,7 @@ fn prove<C: Config>() {
         &broadcast_info,
         &mut transcript,
     );
+    println!("GKR mpi :{:?} -- prove_input_claim time: {:?}", world_rank, start_time.elapsed());
     if challenge.rz_1.is_some() {
         prove_input_claim(
             &mpi_config,
@@ -119,12 +143,16 @@ fn prove<C: Config>() {
             &mut transcript,
         );
     }
+    println!("GKR mpi :{:?} -- prove_input_claim rz_1 time: {:?}", world_rank, start_time.elapsed());
 
     let proof = transcript.finalize_and_get_proof();
+    println!("GKR mpi :{:?} -- finalize_and_get_proof time: {:?}", world_rank, start_time.elapsed());
     if world_rank == 0 {
         write_proof_to_shared_memory(&ExpanderGKRProof { data: vec![proof] });
+        println!("GKR mpi :{:?} -- write_proof_to_shared_memory time: {:?}", world_rank, start_time.elapsed());
     }
     MPIConfig::finalize();
+    println!("GKR mpi :{:?} -- finalize time: {:?}", world_rank, start_time.elapsed());
 }
 
 #[allow(clippy::too_many_arguments)]

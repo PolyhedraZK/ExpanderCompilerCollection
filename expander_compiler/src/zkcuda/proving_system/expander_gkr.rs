@@ -272,20 +272,25 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> Self::Proof {
+        let start_time = std::time::Instant::now();
         check_inputs(kernel, commitments_values, parallel_count, is_broadcast);
-
+        println!("check_inputs time: {:?}", start_time.elapsed());
         let mut expander_circuit = kernel.layered_circuit.export_to_expander().flatten::<C>();
+        println!("export_to_expander time: {:?}", start_time.elapsed());
         expander_circuit.pre_process_gkr::<C>();
+        println!("pre_process_gkr time: {:?}", start_time.elapsed());
         let (max_num_input_var, max_num_output_var) = max_n_vars(&expander_circuit);
+        println!("max_n_vars time: {:?}", start_time.elapsed());
         let mut prover_scratch =
             ProverScratchPad::<C::FieldConfig>::new(max_num_input_var, max_num_output_var, 1);
-
+        println!("new scratch time: {:?}", start_time.elapsed());
         let mut proof = ExpanderGKRProof { data: vec![] };
-
+        println!("initial proof time: {:?}", start_time.elapsed());
         // For each parallel index, prove the GKR proof
         for i in 0..parallel_count {
             let mut transcript = C::TranscriptConfig::new();
             transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
+            println!("append_u8_slice time: {:?}", start_time.elapsed());
             expander_circuit.layers[0].input_vals = prepare_inputs(
                 &kernel.layered_circuit,
                 &kernel.layered_circuit_input,
@@ -293,18 +298,23 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
                 is_broadcast,
                 i,
             );
+            println!("prepare_inputs time: {:?}", start_time.elapsed());
             expander_circuit.fill_rnd_coefs(&mut transcript);
+            println!("fill_rnd_coefs time: {:?}", start_time.elapsed());
             expander_circuit.evaluate();
+            println!("evaluate time: {:?}", start_time.elapsed());
             let (claimed_v, challenge) = gkr_prove(
                 &expander_circuit,
                 &mut prover_scratch,
                 &mut transcript,
                 &MPIConfig::default(),
             );
+            println!("gkr_prove time: {:?}", start_time.elapsed());
             assert_eq!(
                 claimed_v,
                 <C::FieldConfig as FieldEngine>::ChallengeField::from(0)
             );
+            println!("assert claimed_v time: {:?}", start_time.elapsed());
 
             prove_input_claim(
                 kernel,
@@ -317,6 +327,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
                 parallel_count,
                 &mut transcript,
             );
+            println!("prove_input_claim x time: {:?}", start_time.elapsed());
             if challenge.rz_1.is_some() {
                 prove_input_claim(
                     kernel,
@@ -330,9 +341,12 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
                     &mut transcript,
                 );
             }
+            println!("prove_input_claim y time: {:?}", start_time.elapsed());
 
             proof.data.push(transcript.finalize_and_get_proof());
+            println!("finalize_and_get_proof time: {:?}", start_time.elapsed());
         }
+        println!("total prove time: {:?}", start_time.elapsed());
 
         proof
     }

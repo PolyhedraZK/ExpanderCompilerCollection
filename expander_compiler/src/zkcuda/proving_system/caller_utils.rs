@@ -204,7 +204,12 @@ fn exec_command(cmd: &str) {
         .args(args)
         .spawn()
         .expect("Failed to start child process");
+    let start_time = std::time::Instant::now();
     let _ = child.wait();
+    println!(
+        "Command executed in {:?}",
+        start_time.elapsed()
+    );
 }
 
 pub fn exec_pcs_commit<C: Config>(mpi_size: usize) {
@@ -231,12 +236,14 @@ pub fn exec_pcs_commit<C: Config>(mpi_size: usize) {
 }
 
 pub fn exec_gkr_prove_with_pcs<C: Config>(mpi_size: usize) {
+    let start_time = std::time::Instant::now();
     let oversubscription = if mpi_size > num_cpus::get() {
         println!("Warning: Not enough cores available for the requested number of processes. Using oversubscription.");
         "--oversubscribe"
     } else {
         ""
     };
+    println!("oversubscription time: {:?}", start_time.elapsed());
 
     let field_name = match <C::FieldConfig as FieldEngine>::FIELD_TYPE {
         FieldType::M31 => "M31",
@@ -245,11 +252,12 @@ pub fn exec_gkr_prove_with_pcs<C: Config>(mpi_size: usize) {
         FieldType::BabyBear => "BabyBear",
         FieldType::BN254 => "BN254",
     };
-
+    println!("field_name time: {:?}", start_time.elapsed());
     let cmd_str = format!(
         "mpiexec -n {} {} ../target/release/expander_prove -f {}",
         mpi_size, oversubscription, field_name,
     );
+    println!("cmd_str time: {:?}", start_time.elapsed());
     exec_command(&cmd_str);
 }
 
