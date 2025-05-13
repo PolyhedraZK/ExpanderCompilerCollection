@@ -469,8 +469,6 @@ impl<C: Config> fmt::Display for LinComb<C> {
 }
 
 impl<C: Config> ExpSerde for LinComb<C> {
-    const SERIALIZED_SIZE: usize = unimplemented!();
-
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         self.terms.len().serialize_into(&mut writer)?;
         for term in self.terms.iter() {

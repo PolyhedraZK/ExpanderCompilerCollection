@@ -11,7 +11,7 @@ use super::{
 };
 
 impl<C: Config> ExpSerde for Coef<C> {
-    const SERIALIZED_SIZE: usize = unimplemented!();
+
 
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         match self {
@@ -51,7 +51,6 @@ impl<C: Config> ExpSerde for Coef<C> {
 }
 
 impl ExpSerde for CrossLayerInput {
-    const SERIALIZED_SIZE: usize = unimplemented!();
 
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         self.layer.serialize_into(&mut writer)?;
@@ -67,7 +66,6 @@ impl ExpSerde for CrossLayerInput {
 }
 
 impl ExpSerde for NormalInput {
-    const SERIALIZED_SIZE: usize = unimplemented!();
 
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         self.offset.serialize_into(&mut writer)?;
@@ -81,7 +79,6 @@ impl ExpSerde for NormalInput {
 }
 
 impl ExpSerde for CrossLayerInputUsize {
-    const SERIALIZED_SIZE: usize = unimplemented!();
 
     fn serialize_into<W: Write>(&self, writer: W) -> SerdeResult<()> {
         self.v.serialize_into(writer)
@@ -95,7 +92,6 @@ impl ExpSerde for CrossLayerInputUsize {
 }
 
 impl ExpSerde for NormalInputUsize {
-    const SERIALIZED_SIZE: usize = unimplemented!();
 
     fn serialize_into<W: Write>(&self, writer: W) -> SerdeResult<()> {
         self.v.serialize_into(writer)
@@ -108,7 +104,6 @@ impl ExpSerde for NormalInputUsize {
 }
 
 impl<C: Config, I: InputType, const INPUT_NUM: usize> ExpSerde for Gate<C, I, INPUT_NUM> {
-    const SERIALIZED_SIZE: usize = unimplemented!();
 
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         for input in &self.inputs {
@@ -134,7 +129,6 @@ impl<C: Config, I: InputType, const INPUT_NUM: usize> ExpSerde for Gate<C, I, IN
 }
 
 impl<I: InputType> ExpSerde for Allocation<I> {
-    const SERIALIZED_SIZE: usize = unimplemented!();
 
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         self.input_offset.serialize_into(&mut writer)?;
@@ -152,7 +146,6 @@ impl<I: InputType> ExpSerde for Allocation<I> {
 }
 
 impl<C: Config, I: InputType> ExpSerde for GateCustom<C, I> {
-    const SERIALIZED_SIZE: usize = unimplemented!();
 
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         self.gate_type.serialize_into(&mut writer)?;
@@ -176,7 +169,6 @@ impl<C: Config, I: InputType> ExpSerde for GateCustom<C, I> {
 }
 
 impl<C: Config, I: InputType> ExpSerde for Segment<C, I> {
-    const SERIALIZED_SIZE: usize = unimplemented!();
 
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         self.num_inputs.serialize_into(&mut writer)?;
@@ -212,7 +204,6 @@ impl<C: Config, I: InputType> ExpSerde for Segment<C, I> {
 const MAGIC: usize = 3914834606642317635;
 
 impl<C: Config, I: InputType> ExpSerde for Circuit<C, I> {
-    const SERIALIZED_SIZE: usize = unimplemented!();
 
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         MAGIC.serialize_into(&mut writer)?;

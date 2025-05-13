@@ -106,8 +106,6 @@ impl<C: Config> WitnessSolver<C> {
 }
 
 impl<C: Config> ExpSerde for WitnessSolver<C> {
-    const SERIALIZED_SIZE: usize = unimplemented!();
-
     fn deserialize_from<R: std::io::Read>(mut reader: R) -> SerdeResult<Self> {
         let circuit = RootCircuit::<C>::deserialize_from(&mut reader)?;
         Ok(Self { circuit })
