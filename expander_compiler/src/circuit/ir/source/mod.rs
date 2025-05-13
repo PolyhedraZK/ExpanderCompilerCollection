@@ -101,7 +101,7 @@ pub struct Constraint {
     pub var: usize,
 }
 
-#[derive(Debug, Clone, Hash, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, Copy, PartialEq, Eq, ExpSerde)]
 pub enum ConstraintType {
     Zero = 1,
     NonZero,
