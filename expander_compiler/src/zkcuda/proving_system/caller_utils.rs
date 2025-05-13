@@ -260,13 +260,14 @@ pub fn exec_gkr_prove_with_pcs<C: GKREngine>(mpi_size: usize) {
     exec_command(&cmd_str);
 }
 
-pub fn read_object_from_shared_memory<T: ExpSerde>(shared_memory_ref: &Option<Shmem>, offset: usize) -> T {
+pub fn read_object_from_shared_memory<T: ExpSerde>(
+    shared_memory_ref: &Option<Shmem>,
+    offset: usize,
+) -> T {
     let shmem = shared_memory_ref.as_ref().unwrap();
     let object_ptr = shmem.as_ptr() as *const u8;
     let object_len = shmem.len();
-    let buffer = unsafe {
-        std::slice::from_raw_parts(object_ptr.add(offset), object_len - offset)
-    };
+    let buffer = unsafe { std::slice::from_raw_parts(object_ptr.add(offset), object_len - offset) };
     T::deserialize_from(buffer).unwrap()
 }
 

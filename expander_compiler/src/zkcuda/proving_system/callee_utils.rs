@@ -16,7 +16,10 @@ use super::{
     ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof, ExpanderGKRProverSetup,
 };
 
-pub fn read_object_from_shared_memory_name_string<T: ExpSerde>(shared_memory_ref: &str, offset: usize) -> T {
+pub fn read_object_from_shared_memory_name_string<T: ExpSerde>(
+    shared_memory_ref: &str,
+    offset: usize,
+) -> T {
     let shmem = ShmemConf::new().flink(shared_memory_ref).open().unwrap();
     read_object_from_shared_memory(&Some(shmem), offset)
 }
@@ -27,20 +30,25 @@ pub fn read_selected_pkey_from_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>
     read_object_from_shared_memory_name_string("pcs_setup", 0)
 }
 
-pub fn read_local_vals_to_commit_from_shared_memory<F: FieldEngine>(world_rank: usize, world_size: usize) -> Vec<F::SimdCircuitField> {
+pub fn read_local_vals_to_commit_from_shared_memory<F: FieldEngine>(
+    world_rank: usize,
+    world_size: usize,
+) -> Vec<F::SimdCircuitField> {
     let shmem = ShmemConf::new().flink("input_vals").open().unwrap();
     let ptr = shmem.as_ptr();
-    let total_len: usize = usize::deserialize_from(unsafe {std::slice::from_raw_parts(ptr, size_of::<usize>())}).unwrap();
-    
+    let total_len: usize =
+        usize::deserialize_from(unsafe { std::slice::from_raw_parts(ptr, size_of::<usize>()) })
+            .unwrap();
+
     let local_len = total_len / world_size;
     let offset = size_of::<usize>() + world_rank * local_len * <F::SimdCircuitField as Field>::SIZE;
     let ptr = unsafe { ptr.add(offset) };
-    let mut cursor = std::io::Cursor::new(unsafe { std::slice::from_raw_parts(ptr, local_len * <F::SimdCircuitField as Field>::SIZE) });
+    let mut cursor = std::io::Cursor::new(unsafe {
+        std::slice::from_raw_parts(ptr, local_len * <F::SimdCircuitField as Field>::SIZE)
+    });
 
     (0..local_len)
-        .map(|_| {
-            F::SimdCircuitField::deserialize_from(&mut cursor).unwrap()
-        })
+        .map(|_| F::SimdCircuitField::deserialize_from(&mut cursor).unwrap())
         .collect()
 }
 
@@ -99,9 +107,59 @@ pub fn read_commitment_extra_info_from_shared_memory<F: FieldEngine, PCS: Expand
     read_object_from_shared_memory_name_string("extra_info", 0)
 }
 
-pub fn read_commitment_values_from_shared_memory<F: FieldEngine>() -> Vec<Vec<F::SimdCircuitField>>
-{
-    read_object_from_shared_memory_name_string("input_vals", 0)
+pub fn read_commitment_values_from_shared_memory<F: FieldEngine>(
+    broadcast_info: &[bool],
+    world_rank: usize,
+    world_size: usize,
+) -> Vec<Vec<F::SimdCircuitField>> {
+    let shmem = ShmemConf::new().flink("input_vals").open().unwrap();
+    let mut ptr = shmem.as_ptr();
+    let n_components: usize =
+        usize::deserialize_from(unsafe { std::slice::from_raw_parts(ptr, size_of::<usize>()) })
+            .unwrap();
+    ptr = unsafe { ptr.add(size_of::<usize>()) };
+
+    assert!(
+        n_components == broadcast_info.len(),
+        "n_components and broadcast_info length mismatch"
+    );
+
+    broadcast_info
+        .iter()
+        .map(|is_broadcast| {
+            let total_len_i: usize = usize::deserialize_from(unsafe {
+                std::slice::from_raw_parts(ptr, size_of::<usize>())
+            })
+            .unwrap();
+            let (local_len_i, offset) = if *is_broadcast {
+                (total_len_i, size_of::<usize>())
+            } else {
+                (
+                    total_len_i / world_size,
+                    size_of::<usize>()
+                        + world_rank
+                            * (total_len_i / world_size)
+                            * <F::SimdCircuitField as Field>::SIZE,
+                )
+            };
+
+            let local_ptr = unsafe { ptr.add(offset) };
+            let mut cursor = std::io::Cursor::new(unsafe {
+                std::slice::from_raw_parts(
+                    local_ptr,
+                    local_len_i * <F::SimdCircuitField as Field>::SIZE,
+                )
+            });
+            let vals = (0..local_len_i)
+                .map(|_| F::SimdCircuitField::deserialize_from(&mut cursor).unwrap())
+                .collect::<Vec<_>>();
+
+            ptr = unsafe {
+                ptr.add(size_of::<usize>() + total_len_i * <F::SimdCircuitField as Field>::SIZE)
+            };
+            vals
+        })
+        .collect()
 }
 
 pub fn read_broadcast_info_from_shared_memory() -> Vec<bool> {

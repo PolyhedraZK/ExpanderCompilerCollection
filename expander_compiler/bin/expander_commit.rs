@@ -34,7 +34,8 @@ fn commit<C: GKREngine>() {
     let (local_val_len, p_key) =
         read_selected_pkey_from_shared_memory::<C::FieldConfig, C::PCSConfig>();
 
-    let local_vals_to_commit = read_local_vals_to_commit_from_shared_memory::<C::FieldConfig>(world_rank, world_size);
+    let local_vals_to_commit =
+        read_local_vals_to_commit_from_shared_memory::<C::FieldConfig>(world_rank, world_size);
 
     let params =
         <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(local_val_len.ilog2() as usize);
