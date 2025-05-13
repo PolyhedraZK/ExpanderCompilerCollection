@@ -4,7 +4,7 @@ use serdes::{ExpSerde, SerdeResult};
 
 use crate::circuit::{config::Config, ir::expr::LinComb, layered::Coef};
 
-use super::{BoolBinOpType, Instruction, UnconstrainedBinOpType};
+use super::{BoolBinOpType, Constraint, ConstraintType, Instruction, UnconstrainedBinOpType};
 
 impl<C: Config> ExpSerde for Instruction<C> {
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
@@ -184,28 +184,28 @@ impl<C: Config> ExpSerde for Instruction<C> {
     }
 }
 
-// impl ExpSerde for Constraint {
+impl ExpSerde for Constraint {
 
-//     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
-//         (self.typ as u8).serialize_into(&mut writer)?;
-//         self.var.serialize_into(&mut writer)?;
-//         Ok(())
-//     }
+    fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
+        (self.typ as u8).serialize_into(&mut writer)?;
+        self.var.serialize_into(&mut writer)?;
+        Ok(())
+    }
 
-//     fn deserialize_from<R: Read>(mut reader: R) -> SerdeResult<Self> {
-//         Ok(Constraint {
-//             typ: match u8::deserialize_from(&mut reader)? {
-//                 1 => ConstraintType::Zero,
-//                 2 => ConstraintType::NonZero,
-//                 3 => ConstraintType::Bool,
-//                 _ => {
-//                     return Err(IoError::new(
-//                         std::io::ErrorKind::InvalidData,
-//                         "invalid ConstraintType",
-//                     ))?
-//                 }
-//             },
-//             var: usize::deserialize_from(&mut reader)?,
-//         })
-//     }
-// }
+    fn deserialize_from<R: Read>(mut reader: R) -> SerdeResult<Self> {
+        Ok(Constraint {
+            typ: match u8::deserialize_from(&mut reader)? {
+                1 => ConstraintType::Zero,
+                2 => ConstraintType::NonZero,
+                3 => ConstraintType::Bool,
+                _ => {
+                    return Err(IoError::new(
+                        std::io::ErrorKind::InvalidData,
+                        "invalid ConstraintType",
+                    ))?
+                }
+            },
+            var: usize::deserialize_from(&mut reader)?,
+        })
+    }
+}

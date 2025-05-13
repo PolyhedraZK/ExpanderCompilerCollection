@@ -1,5 +1,4 @@
 use ethnum::U256;
-use serdes::ExpSerde;
 
 use crate::{
     circuit::{config::Config, layered::Coef},
@@ -95,13 +94,13 @@ pub enum UnconstrainedBinOpType {
     BitXor,
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, ExpSerde)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Constraint {
     pub typ: ConstraintType,
     pub var: usize,
 }
 
-#[derive(Debug, Clone, Hash, Copy, PartialEq, Eq, ExpSerde)]
+#[derive(Debug, Clone, Hash, Copy, PartialEq, Eq)]
 pub enum ConstraintType {
     Zero = 1,
     NonZero,

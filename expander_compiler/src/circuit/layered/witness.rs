@@ -8,7 +8,7 @@ use super::{Circuit, InputType};
 use crate::circuit::config::Config;
 use crate::frontend::{CircuitField, SIMDField};
 
-#[derive(Clone, Debug, ExpSerde)]
+#[derive(Clone, Debug)]
 pub enum WitnessValues<C: Config> {
     Scalar(Vec<CircuitField<C>>),
     Simd(Vec<SIMDField<C>>),
