@@ -212,7 +212,7 @@ fn exec_command(cmd: &str) {
 }
 
 fn parse_config<C: GKREngine>(mpi_size: usize) -> (String, String, String) {
-    let oversubscription = if mpi_size > num_cpus::get() {
+    let oversubscription = if mpi_size > num_cpus::get_physical() {
         println!("Warning: Not enough cores available for the requested number of processes. Using oversubscription.");
         "--oversubscribe"
     } else {
