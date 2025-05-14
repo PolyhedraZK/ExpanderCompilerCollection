@@ -143,6 +143,7 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
             &mut cursor,
         );
 
+        let pcs_verification_timer = Timer::new("pcs verification", true);
         verified &= verify_input_claim::<C, ECCConfig>(
             &mut cursor,
             kernel,
@@ -167,6 +168,7 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
                 &mut transcript,
             );
         }
+        pcs_verification_timer.stop();
 
         timer.stop();
         verified
