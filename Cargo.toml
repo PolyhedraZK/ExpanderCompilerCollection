@@ -5,7 +5,7 @@ members = [
     "expander_compiler",
     "expander_compiler/ec_go_lib",
     "expander_compiler/macros",
-    "rsa_circuit"
+    "rsa_circuit",
 ]
 
 [profile.test]
@@ -42,15 +42,20 @@ stacker = "0.1.17"
 tiny-keccak = { version = "2.0", features = ["keccak"] }
 
 arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 babybear = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "circuit" }
 expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "transcript" }
 expander_binary = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "bin" }
-gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-gkr_engine = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "gkr_engine" }
-gkr_hashers = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+poly_commit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "poly_commit" }
+polynomials = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+sumcheck = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+gkr_engine = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+gkr_hashers = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }

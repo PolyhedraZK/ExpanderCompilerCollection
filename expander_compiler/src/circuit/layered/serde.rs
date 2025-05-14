@@ -3,7 +3,7 @@ use std::io::{Error as IoError, Read, Write};
 use arith::Field;
 use serdes::{ExpSerde, SerdeResult};
 
-use crate::frontend::CircuitField;
+use crate::circuit::config::CircuitField;
 
 use super::{
     ChildSpec, Circuit, Coef, Config, Gate, GateAdd, GateConst, GateCustom, GateMul, InputType,
@@ -174,12 +174,10 @@ impl<C: Config, I: InputType> ExpSerde for Circuit<C, I> {
 mod tests {
 
     use super::*;
-    use crate::{
-        circuit::{
-            ir::{common::rand_gen::*, dest::RootCircuit},
-            layered::{CrossLayerInputType, NormalInputType},
-        },
-        frontend::{BN254Config, GF2Config, GoldilocksConfig, M31Config},
+    use crate::circuit::{
+        config::{BN254Config, GF2Config, GoldilocksConfig, M31Config},
+        ir::{common::rand_gen::*, dest::RootCircuit},
+        layered::{CrossLayerInputType, NormalInputType},
     };
 
     fn test_serde_for_field<C: Config, I: InputType>() {
@@ -197,7 +195,12 @@ mod tests {
             config.seed = i + 10000;
             let root = RootCircuit::<C>::random(&config);
             assert_eq!(root.validate(), Ok(()));
-            let (circuit, _) = crate::layering::compile(&root);
+            let (circuit, _) = crate::layering::compile(
+                &root,
+                crate::layering::CompileOptions {
+                    allow_input_reorder: true,
+                },
+            );
             assert_eq!(circuit.validate(), Ok(()));
             let mut buf = Vec::new();
             circuit.serialize_into(&mut buf).unwrap();

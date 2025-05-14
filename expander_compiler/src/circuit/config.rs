@@ -6,10 +6,9 @@ pub use gkr::{
 };
 use gkr_engine::{FieldEngine, GKREngine};
 
-use crate::field::Field;
+use crate::field::{Field, FieldRaw};
 
-pub trait Config:
-    Default
+pub trait Config: Default
     + Clone
     + Debug
     + PartialEq
@@ -18,7 +17,7 @@ pub trait Config:
     + Hash
     + Copy
     + 'static
-    + GKREngine<FieldConfig: FieldEngine<CircuitField: Field>>
+    + GKREngine<FieldConfig: FieldEngine<CircuitField: Field + FieldRaw, SimdCircuitField: FieldRaw>>
 {
     const CONFIG_ID: usize;
 
