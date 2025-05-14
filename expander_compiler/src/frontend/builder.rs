@@ -464,6 +464,70 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
             VariableOrValue::Value(v) => Some(v),
         }
     }
+
+    // return 1 if x > y; 0 otherwise
+    //
+    fn gt(
+        &mut self,
+        x: impl ToVariableOrValue<CircuitField<C>>,
+        y: impl ToVariableOrValue<CircuitField<C>>,
+    ) -> Variable {
+        let one = self.constant(CircuitField::<C>::one());
+
+        let x = self.convert_to_variable(x);
+        let y = self.convert_to_variable(y);
+
+        // Decompose both numbers to bits
+        let num_bits = match CircuitField::<C>::FIELD_SIZE {
+            256 => 254, // BN254's field size was set to 256
+            32 => 31,   // M31's field size was set to 31
+            _ => panic!("Unsupported field size"),
+        };
+        let x_bits = self.to_binary(x, num_bits);
+        let y_bits = self.to_binary(y, num_bits);
+
+        for (i, x_bit) in x_bits.iter().enumerate() {
+            self.display(format!("x[{}]", i).as_ref(), x_bit);
+        }
+
+        // Compare bit by bit from MSB to LSB
+        let mut result = self.constant(CircuitField::<C>::zero());
+        let mut still_equal = self.constant(CircuitField::<C>::one());
+
+        for i in (0..num_bits).rev() {
+            let x_bit = x_bits[i];
+            let y_bit = y_bits[i];
+
+            // x_bit > y_bit when x_bit=1 and y_bit=0
+            let not_y_bit = self.sub(one, y_bit);
+            let x_greater_at_bit = self.and(x_bit, not_y_bit);
+
+            // Set result to 1 if still equal and x > y at this bit
+            let should_set_result = self.and(still_equal, x_greater_at_bit);
+            result = self.or(result, should_set_result);
+
+            // Check if bits are equal
+            let bits_different = self.xor(x_bit, y_bit);
+            let bits_equal = self.sub(one, bits_different);
+
+            // Update still_equal: remains 1 only if bits are equal
+            still_equal = self.and(still_equal, bits_equal);
+        }
+
+        result
+    }
+
+    // return 1 if x >= y; 0 otherwise
+    fn geq(
+        &mut self,
+        x: impl ToVariableOrValue<CircuitField<C>>,
+        y: impl ToVariableOrValue<CircuitField<C>>,
+    ) -> Variable {
+        // x >= y is equivalent to NOT(y > x)
+        let y_gt_x = self.gt(y, x);
+        let one = self.constant(CircuitField::<C>::one());
+        self.sub(one, y_gt_x)
+    }
 }
 
 // write macro rules for unconstrained binary op definition
@@ -623,6 +687,22 @@ impl<C: Config> BasicAPI<C> for RootBuilder<C> {
         x: impl ToVariableOrValue<CircuitField<C>>,
     ) -> Option<CircuitField<C>> {
         self.last_builder().constant_value(x)
+    }
+
+    fn gt(
+        &mut self,
+        x: impl ToVariableOrValue<CircuitField<C>>,
+        y: impl ToVariableOrValue<CircuitField<C>>,
+    ) -> Variable {
+        self.last_builder().gt(x, y)
+    }
+
+    fn geq(
+        &mut self,
+        x: impl ToVariableOrValue<CircuitField<C>>,
+        y: impl ToVariableOrValue<CircuitField<C>>,
+    ) -> Variable {
+        self.last_builder().geq(x, y)
     }
 }
 
