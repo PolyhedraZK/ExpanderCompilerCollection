@@ -388,7 +388,7 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
         )
     }
 
-    pub fn has_duplicate_sub_circuit_outputs(&self) -> bool {
+    fn has_duplicate_sub_circuit_outputs(&self) -> bool {
         for circuit in self.circuits.values() {
             let out_set: HashSet<usize> = circuit.outputs.iter().cloned().collect();
             if out_set.len() != circuit.outputs.len() {
