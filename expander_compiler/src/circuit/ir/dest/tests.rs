@@ -487,7 +487,7 @@ fn adjust_for_layering_and_reassign_duplicate_sub_circuit_outputs() {
             .collect();
         let (out1, cond1) = root.eval_unsafe(inputs.clone());
         let mut roota = root.clone();
-        roota.reassign_duplicate_sub_circuit_outputs();
+        roota.reassign_duplicate_sub_circuit_outputs(false);
         assert_eq!(roota.validate(), Ok(()));
         let (out2, cond2) = roota.eval_unsafe(inputs.clone());
         assert_eq!(out1, out2);

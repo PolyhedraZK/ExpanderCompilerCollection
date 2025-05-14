@@ -731,7 +731,7 @@ mod tests {
     ) -> Option<layered::Circuit<C, I>> {
         let root = ir::dest::RootCircuitRelaxed::<C>::random(rcc);
         let mut root = root.export_constraints();
-        root.reassign_duplicate_sub_circuit_outputs();
+        root.reassign_duplicate_sub_circuit_outputs(false);
         let root = root.remove_unreachable().0;
         let root = root.solve_duplicates();
         assert_eq!(root.validate(), Ok(()));
