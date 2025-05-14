@@ -120,11 +120,19 @@ pub fn write_selected_pkey_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>
     let setup = pcs_setup.p_keys.get(&actual_local_len).unwrap().clone();
     let pair = (actual_local_len, setup);
 
-    write_object_to_shared_memory(&pair, unsafe { &mut SHARED_MEMORY.pcs_setup }, "/tmp/pcs_setup");
+    write_object_to_shared_memory(
+        &pair,
+        unsafe { &mut SHARED_MEMORY.pcs_setup },
+        "/tmp/pcs_setup",
+    );
 }
 
 pub fn write_commit_vals_to_shared_memory<C: Config>(vals: &Vec<SIMDField<C>>) {
-    write_object_to_shared_memory(vals, unsafe { &mut SHARED_MEMORY.input_vals }, "/tmp/input_vals");
+    write_object_to_shared_memory(
+        vals,
+        unsafe { &mut SHARED_MEMORY.input_vals },
+        "/tmp/input_vals",
+    );
 }
 
 pub fn write_pcs_setup_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
