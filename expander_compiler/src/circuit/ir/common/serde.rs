@@ -13,8 +13,6 @@ where
     Irc::Instruction: ExpSerde,
     Irc::Constraint: ExpSerde,
 {
-    const SERIALIZED_SIZE: usize = unimplemented!();
-
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         self.instructions.serialize_into(&mut writer)?;
         self.constraints.serialize_into(&mut writer)?;
@@ -41,8 +39,6 @@ where
     Irc::Instruction: ExpSerde,
     Irc::Constraint: ExpSerde,
 {
-    const SERIALIZED_SIZE: usize = unimplemented!();
-
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         Irc::Config::CONFIG_ID.serialize_into(&mut writer)?;
         self.num_public_inputs.serialize_into(&mut writer)?;

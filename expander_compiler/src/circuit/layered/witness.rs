@@ -294,8 +294,6 @@ impl<C: Config> Witness<C> {
 }
 
 impl<C: Config> ExpSerde for Witness<C> {
-    const SERIALIZED_SIZE: usize = unimplemented!();
-
     fn deserialize_from<R: std::io::Read>(mut reader: R) -> SerdeResult<Self> {
         let num_witnesses = usize::deserialize_from(&mut reader)?;
         let num_inputs_per_witness = usize::deserialize_from(&mut reader)?;
