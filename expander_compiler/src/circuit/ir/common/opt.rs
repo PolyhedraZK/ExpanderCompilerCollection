@@ -388,7 +388,7 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
         )
     }
 
-    fn has_duplicate_sub_circuit_outputs(&self) -> bool {
+    pub fn has_duplicate_sub_circuit_outputs(&self) -> bool {
         for circuit in self.circuits.values() {
             let out_set: HashSet<usize> = circuit.outputs.iter().cloned().collect();
             if out_set.len() != circuit.outputs.len() {
@@ -398,7 +398,7 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
         false
     }
 
-    pub fn reassign_duplicate_sub_circuit_outputs(&mut self) {
+    pub fn reassign_duplicate_sub_circuit_outputs(&mut self, force: bool) {
         if !self.has_duplicate_sub_circuit_outputs() {
             return;
         }
@@ -435,7 +435,7 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
             for out in circuit.outputs.iter() {
                 om.push(circuit.outputs.iter().position(|x| *x == *out).unwrap());
             }
-            if *circuit_id == 0 {
+            if *circuit_id == 0 || force {
                 let mut var_max = var_map.len() - 1;
                 for (i, x) in om.iter().enumerate() {
                     if *x < i {

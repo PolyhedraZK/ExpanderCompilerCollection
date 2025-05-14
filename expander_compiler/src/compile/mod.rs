@@ -107,14 +107,13 @@ pub fn compile_step_1<C: Config>(
         r_source.detect_chains();
         optimize_until_fixed_point(&r_source, &mut src_im, |r| {
             let (mut r, im) = r.remove_unreachable();
-            r.reassign_duplicate_sub_circuit_outputs();
+            r.reassign_duplicate_sub_circuit_outputs(false);
             r.detect_chains();
             (r, im)
         })
     } else if options.opt_level >= 1 {
         r_source.detect_chains();
-        let (mut r, im) = r_source.remove_unreachable();
-        r.reassign_duplicate_sub_circuit_outputs();
+        let (r, im) = r_source.remove_unreachable();
         src_im.compose_in_place(&im);
         r
     } else {
@@ -130,12 +129,11 @@ pub fn compile_step_1<C: Config>(
     let r_hint_normalized_opt = if options.opt_level >= 2 {
         optimize_until_fixed_point(&r_hint_normalized, &mut src_im, |r| {
             let (mut r, im) = r.remove_unreachable();
-            r.reassign_duplicate_sub_circuit_outputs();
+            r.reassign_duplicate_sub_circuit_outputs(false);
             (r, im)
         })
     } else if options.opt_level >= 1 {
-        let (mut r, im) = r_hint_normalized.remove_unreachable();
-        r.reassign_duplicate_sub_circuit_outputs();
+        let (r, im) = r_hint_normalized.remove_unreachable();
         src_im.compose_in_place(&im);
         r
     } else {
@@ -156,7 +154,7 @@ pub fn compile_step_2<C: Config, I: InputType>(
     let r_hint_less_opt = if options.opt_level >= 2 {
         optimize_until_fixed_point(&r_hint_less, &mut hl_im, |r| {
             let (mut r, im) = r.remove_unreachable();
-            r.reassign_duplicate_sub_circuit_outputs();
+            r.reassign_duplicate_sub_circuit_outputs(false);
             (r, im)
         })
     } else {
@@ -172,12 +170,11 @@ pub fn compile_step_2<C: Config, I: InputType>(
     let r_dest_relaxed_opt = if options.opt_level >= 2 {
         optimize_until_fixed_point(&r_dest_relaxed, &mut hl_im, |r| {
             let (mut r, im) = r.remove_unreachable();
-            r.reassign_duplicate_sub_circuit_outputs();
+            r.reassign_duplicate_sub_circuit_outputs(false);
             (r, im)
         })
     } else if options.opt_level >= 1 {
-        let (mut r, im) = r_dest_relaxed.remove_unreachable();
-        r.reassign_duplicate_sub_circuit_outputs();
+        let (r, im) = r_dest_relaxed.remove_unreachable();
         hl_im.compose_in_place(&im);
         r
     } else {
@@ -200,7 +197,7 @@ pub fn compile_step_2<C: Config, I: InputType>(
         r_dest_relaxed_opt
     } else {
         let mut r1 = r_dest_relaxed_opt.export_constraints();
-        r1.reassign_duplicate_sub_circuit_outputs();
+        r1.reassign_duplicate_sub_circuit_outputs(false);
         let (r2, im) = r1.remove_unreachable();
         hl_im.compose_in_place(&im);
         r2.validate()
@@ -208,7 +205,7 @@ pub fn compile_step_2<C: Config, I: InputType>(
         r2
     };
 
-    let r_dest_relaxed_p3 = if I::CROSS_LAYER_RELAY {
+    let mut r_dest_relaxed_p3 = if I::CROSS_LAYER_RELAY {
         r_dest_relaxed_p2
     } else {
         let r = layering::ir_split::split_to_single_layer(&r_dest_relaxed_p2);
@@ -218,12 +215,11 @@ pub fn compile_step_2<C: Config, I: InputType>(
         if options.opt_level >= 2 {
             optimize_until_fixed_point(&r, &mut hl_im, |r| {
                 let (mut r, im) = r.remove_unreachable();
-                r.reassign_duplicate_sub_circuit_outputs();
+                r.reassign_duplicate_sub_circuit_outputs(false);
                 (r, im)
             })
         } else if options.opt_level >= 1 {
-            let (mut r, im) = r.remove_unreachable();
-            r.reassign_duplicate_sub_circuit_outputs();
+            let (r, im) = r.remove_unreachable();
             hl_im.compose_in_place(&im);
             r
         } else {
@@ -231,17 +227,20 @@ pub fn compile_step_2<C: Config, I: InputType>(
         }
     };
 
+    if options.opt_level == 1 {
+        r_dest_relaxed_p3.reassign_duplicate_sub_circuit_outputs(true);
+    }
+
     let r_dest = r_dest_relaxed_p3.solve_duplicates();
 
     let r_dest_opt = if options.opt_level >= 2 {
         optimize_until_fixed_point(&r_dest, &mut hl_im, |r| {
             let (mut r, im) = r.remove_unreachable();
-            r.reassign_duplicate_sub_circuit_outputs();
+            r.reassign_duplicate_sub_circuit_outputs(false);
             (r, im)
         })
     } else if options.opt_level >= 1 {
-        let (mut r, im) = r_dest.remove_unreachable();
-        r.reassign_duplicate_sub_circuit_outputs();
+        let (r, im) = r_dest.remove_unreachable();
         hl_im.compose_in_place(&im);
         r
     } else {
