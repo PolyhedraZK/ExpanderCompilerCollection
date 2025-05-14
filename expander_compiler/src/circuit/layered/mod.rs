@@ -128,14 +128,14 @@ impl<C: Config> Coef<C> {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord, ExpSerde)]
 pub struct CrossLayerInput {
     // the actual layer of the input is (output_layer-1-layer)
     pub layer: usize,
     pub offset: usize,
 }
 
-#[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord, ExpSerde)]
 pub struct NormalInput {
     pub offset: usize,
 }
@@ -192,12 +192,12 @@ impl Input for NormalInput {
     }
 }
 
-#[derive(Debug, Default, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, ExpSerde)]
 pub struct CrossLayerInputUsize {
     v: Vec<usize>,
 }
 
-#[derive(Debug, Default, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, ExpSerde)]
 pub struct NormalInputUsize {
     v: usize,
 }
@@ -344,7 +344,7 @@ pub struct GateCustom<C: Config, I: InputType> {
     pub coef: Coef<C>,
 }
 
-#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, ExpSerde)]
 pub struct Allocation<I: InputType> {
     pub input_offset: I::InputUsize,
     pub output_offset: usize,

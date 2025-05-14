@@ -7,8 +7,6 @@ use crate::circuit::{config::Config, ir::expr::LinComb, layered::Coef};
 use super::{BoolBinOpType, Constraint, ConstraintType, Instruction, UnconstrainedBinOpType};
 
 impl<C: Config> ExpSerde for Instruction<C> {
-    const SERIALIZED_SIZE: usize = unimplemented!();
-
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         match self {
             Instruction::LinComb(lin_comb) => {
@@ -187,8 +185,6 @@ impl<C: Config> ExpSerde for Instruction<C> {
 }
 
 impl ExpSerde for Constraint {
-    const SERIALIZED_SIZE: usize = unimplemented!();
-
     fn serialize_into<W: Write>(&self, mut writer: W) -> SerdeResult<()> {
         (self.typ as u8).serialize_into(&mut writer)?;
         self.var.serialize_into(&mut writer)?;
