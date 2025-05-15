@@ -21,7 +21,7 @@ use expander_compiler::zkcuda::proving_system::{
 };
 use expander_utils::timer::Timer;
 
-use gkr::{gkr_prove, BN254ConfigSha2Hyrax};
+use gkr::{gkr_prove, BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
 use gkr_engine::{
     ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine,
     PolynomialCommitmentType, SharedMemory, Transcript,
@@ -248,6 +248,9 @@ fn main() {
         }
         ("BN254", PolynomialCommitmentType::Hyrax) => {
             prove::<BN254ConfigSha2Hyrax, BN254Config>();
+        }
+        ("BN254", PolynomialCommitmentType::KZG) => {
+            prove::<BN254ConfigSha2KZG, BN254Config>();
         }
         (field_type, pcs_type) => panic!(
             "Combination of {:?} and {:?} not supported",
