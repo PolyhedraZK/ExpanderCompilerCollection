@@ -8,6 +8,7 @@ crate-type = ["dylib"]
 
 [dependencies]
 arith.workspace = true
+expander_binary.workspace = true
 expander_circuit.workspace = true
 expander_transcript.workspace = true
 gkr.workspace = true
@@ -15,6 +16,6 @@ gkr_engine.workspace = true
 rand.workspace = true
 serdes.workspace = true
 
-expander_compiler = {path = "../" }
+expander_compiler = { path = "../" }
 
 libc = "0.2.155"

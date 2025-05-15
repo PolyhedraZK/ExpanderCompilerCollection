@@ -34,7 +34,7 @@ impl ByteDecompCircuit<Fr> {
             input: Fr::from_raw(input),
             bytes: bytes
                 .into_iter()
-                .map(Fr::from_raw)
+                .map(|b| Fr::from_raw(b))
                 .collect::<Vec<_>>()
                 .try_into()
                 .unwrap(),

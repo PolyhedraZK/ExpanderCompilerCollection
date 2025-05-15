@@ -50,6 +50,7 @@ babybear = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "circuit" }
 expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "transcript" }
+expander_binary = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "bin" }
 gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
