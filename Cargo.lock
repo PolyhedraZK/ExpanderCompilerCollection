@@ -555,6 +555,7 @@ dependencies = [
  "expander_compiler",
  "gf2",
  "gkr",
+ "gkr_engine",
  "gkr_hashers",
  "halo2curves",
  "mersenne31",

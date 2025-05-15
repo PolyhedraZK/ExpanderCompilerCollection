@@ -27,7 +27,7 @@ use serdes::ExpSerde;
 
 use polynomials::EqPolynomial;
 
-const SINGLE_KERNEL_MAX_PROOF_SIZE: usize = 10 * 1024 * 1024; // 10MB
+const SINGLE_KERNEL_MAX_PROOF_SIZE: usize = 10 * 1024 * 1024 * 1024; // 10MB
 
 pub struct ParallelizedExpanderGKRProvingSystem<C: GKREngine> {
     _config: std::marker::PhantomData<C>,
