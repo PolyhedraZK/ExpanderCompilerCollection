@@ -16,3 +16,13 @@ libec_go_lib.*
 *.txt
 *.json
 *.witness
+
+# mpi generated
+broadcast_info
+circuit
+commitment
+extra_info
+input_partition
+input_vals
+pcs_setup
+proof

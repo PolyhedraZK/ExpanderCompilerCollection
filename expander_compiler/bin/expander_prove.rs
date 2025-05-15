@@ -120,7 +120,7 @@ fn prove<C: Config>() {
             &commitment_values_refs,
             &pcs_setup,
             &commitments_extra_info,
-            &challenge.challenge_y(),
+            &challenge.challenge_y().unwrap(),
             &broadcast_info,
             &mut transcript,
         );

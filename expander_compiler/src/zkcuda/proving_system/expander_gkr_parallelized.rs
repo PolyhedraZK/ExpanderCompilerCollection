@@ -163,7 +163,7 @@ impl<C: Config> ProvingSystem<C> for ParallelizedExpanderGKRProvingSystem<C> {
                 &mut cursor,
                 kernel,
                 verifier_setup,
-                &challenge.challenge_y(),
+                &challenge.challenge_y().unwrap(),
                 &claimed_v1.unwrap(),
                 commitments,
                 is_broadcast,

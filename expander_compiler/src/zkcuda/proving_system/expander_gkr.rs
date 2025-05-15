@@ -38,6 +38,7 @@ macro_rules! pcs {
 }
 
 #[allow(clippy::type_complexity)]
+#[derive(ExpSerde)]
 pub struct ExpanderGKRCommitment<C: Config> {
     pub vals_len: usize,
     pub commitment: Vec<<pcs!(C) as ExpanderPCS<field!(C)>>::Commitment>,
@@ -52,23 +53,6 @@ impl<C: Config> Clone for ExpanderGKRCommitment<C> {
     }
 }
 
-impl<C: Config> ExpSerde for ExpanderGKRCommitment<C> {
-    const SERIALIZED_SIZE: usize = unimplemented!();
-    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
-        self.vals_len.serialize_into(&mut writer)?;
-        self.commitment.serialize_into(&mut writer)
-    }
-    fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
-        let vals_len = usize::deserialize_from(&mut reader)?;
-        let commitment =
-            Vec::<<pcs!(C) as ExpanderPCS<field!(C)>>::Commitment>::deserialize_from(&mut reader)?;
-        Ok(ExpanderGKRCommitment {
-            vals_len,
-            commitment,
-        })
-    }
-}
-
 impl<C: Config> Commitment<C> for ExpanderGKRCommitment<C> {
     fn vals_len(&self) -> usize {
         self.vals_len
@@ -76,6 +60,7 @@ impl<C: Config> Commitment<C> for ExpanderGKRCommitment<C> {
 }
 
 #[allow(clippy::type_complexity)]
+#[derive(ExpSerde)]
 pub struct ExpanderGKRCommitmentExtraInfo<C: Config> {
     pub scratch: Vec<<pcs!(C) as ExpanderPCS<field!(C)>>::ScratchPad>,
 }
@@ -88,19 +73,8 @@ impl<C: Config> Clone for ExpanderGKRCommitmentExtraInfo<C> {
     }
 }
 
-impl<C: Config> ExpSerde for ExpanderGKRCommitmentExtraInfo<C> {
-    const SERIALIZED_SIZE: usize = unimplemented!();
-    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
-        self.scratch.serialize_into(&mut writer)
-    }
-    fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
-        let scratch =
-            Vec::<<pcs!(C) as ExpanderPCS<field!(C)>>::ScratchPad>::deserialize_from(&mut reader)?;
-        Ok(ExpanderGKRCommitmentExtraInfo { scratch })
-    }
-}
-
 #[allow(clippy::type_complexity)]
+#[derive(ExpSerde)]
 pub struct ExpanderGKRProverSetup<C: Config> {
     pub p_keys: HashMap<
         usize,
@@ -116,18 +90,8 @@ impl<C: Config> Clone for ExpanderGKRProverSetup<C> {
     }
 }
 
-impl<C: Config> ExpSerde for ExpanderGKRProverSetup<C> {
-    const SERIALIZED_SIZE: usize = unimplemented!();
-    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
-        self.p_keys.serialize_into(&mut writer)
-    }
-    fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
-        let p_keys = HashMap::<_, _>::deserialize_from(&mut reader)?;
-        Ok(ExpanderGKRProverSetup { p_keys })
-    }
-}
-
 #[allow(clippy::type_complexity)]
+#[derive(ExpSerde)]
 pub struct ExpanderGKRVerifierSetup<C: Config> {
     pub v_keys: HashMap<
         usize,
@@ -143,31 +107,9 @@ impl<C: Config> Clone for ExpanderGKRVerifierSetup<C> {
     }
 }
 
-impl<C: Config> ExpSerde for ExpanderGKRVerifierSetup<C> {
-    const SERIALIZED_SIZE: usize = unimplemented!();
-    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
-        self.v_keys.serialize_into(&mut writer)
-    }
-    fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
-        let v_keys = HashMap::<_, _>::deserialize_from(&mut reader)?;
-        Ok(ExpanderGKRVerifierSetup { v_keys })
-    }
-}
-
-#[derive(Clone)]
+#[derive(Clone, ExpSerde)]
 pub struct ExpanderGKRProof {
     pub data: Vec<ExpanderProof>,
-}
-
-impl ExpSerde for ExpanderGKRProof {
-    const SERIALIZED_SIZE: usize = unimplemented!();
-    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
-        self.data.serialize_into(&mut writer)
-    }
-    fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
-        let data = Vec::<ExpanderProof>::deserialize_from(&mut reader)?;
-        Ok(ExpanderGKRProof { data })
-    }
 }
 
 impl Proof for ExpanderGKRProof {}
@@ -204,9 +146,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
                     continue;
                 }
                 let (_params, p_key, v_key, _scratch) =
-                    pcs_testing_setup_fixed_seed::<field!(C), transcript!(C), pcs!(C)>(
-                        val_actual_len,
-                    );
+                    pcs_testing_setup_fixed_seed::<field!(C), pcs!(C)>(val_actual_len);
                 p_keys.insert(val_actual_len, p_key);
                 v_keys.insert(val_actual_len, v_key);
             }
@@ -323,7 +263,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
                     commitments_values,
                     prover_setup,
                     commitments_extra_info,
-                    &challenge.challenge_y(),
+                    &challenge.challenge_y().unwrap(),
                     is_broadcast,
                     i,
                     parallel_count,
@@ -386,7 +326,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
                     &mut cursor,
                     kernel,
                     verifier_setup,
-                    &challenge.challenge_y(),
+                    &challenge.challenge_y().unwrap(),
                     &claimed_v1.unwrap(),
                     commitments,
                     is_broadcast,
@@ -406,11 +346,7 @@ impl<C: Config> ProvingSystem<C> for ExpanderGKRProvingSystem<C> {
 }
 
 #[allow(clippy::type_complexity)]
-pub fn pcs_testing_setup_fixed_seed<
-    FConfig: FieldEngine,
-    T: Transcript<FConfig::ChallengeField>,
-    PCS: ExpanderPCS<FConfig>,
->(
+pub fn pcs_testing_setup_fixed_seed<FConfig: FieldEngine, PCS: ExpanderPCS<FConfig>>(
     vals_len: usize,
 ) -> (
     PCS::Params,

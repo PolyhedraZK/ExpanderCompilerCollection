@@ -16,9 +16,9 @@ use crate::{
 };
 pub use macros::kernel;
 
-use serdes::{ExpSerde, SerdeResult};
+use serdes::ExpSerde;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, ExpSerde)]
 pub struct Kernel<C: Config> {
     pub witness_solver: ir::hint_normalized::RootCircuit<C>,
     pub layered_circuit: LayeredCircuit<C, NormalInputType>,
@@ -26,36 +26,6 @@ pub struct Kernel<C: Config> {
     pub witness_solver_io: Vec<WitnessSolverIOVec>,
     pub witness_solver_hint_input: Option<WitnessSolverIOVec>,
     pub layered_circuit_input: Vec<LayeredCircuitInputVec>,
-}
-
-impl<C: Config> ExpSerde for Kernel<C> {
-    const SERIALIZED_SIZE: usize = unimplemented!();
-
-    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> SerdeResult<()> {
-        self.witness_solver.serialize_into(&mut writer)?;
-        self.layered_circuit.serialize_into(&mut writer)?;
-        self.io_shapes.serialize_into(&mut writer)?;
-        self.witness_solver_io.serialize_into(&mut writer)?;
-        self.witness_solver_hint_input.serialize_into(&mut writer)?;
-        self.layered_circuit_input.serialize_into(&mut writer)
-    }
-    fn deserialize_from<R: std::io::Read>(mut reader: R) -> SerdeResult<Self> {
-        let witness_solver = ir::hint_normalized::RootCircuit::<C>::deserialize_from(&mut reader)?;
-        let layered_circuit = LayeredCircuit::<C, NormalInputType>::deserialize_from(&mut reader)?;
-        let io_shapes = Vec::<Shape>::deserialize_from(&mut reader)?;
-        let witness_solver_io = Vec::<WitnessSolverIOVec>::deserialize_from(&mut reader)?;
-        let witness_solver_hint_input =
-            Option::<WitnessSolverIOVec>::deserialize_from(&mut reader)?;
-        let layered_circuit_input = Vec::<LayeredCircuitInputVec>::deserialize_from(&mut reader)?;
-        Ok(Self {
-            witness_solver,
-            layered_circuit,
-            io_shapes,
-            witness_solver_io,
-            witness_solver_hint_input,
-            layered_circuit_input,
-        })
-    }
 }
 
 pub type Shape = Option<Vec<usize>>;
@@ -71,51 +41,17 @@ pub fn shape_prepend(shape: &Shape, x: usize) -> Shape {
     }
 }
 
-#[derive(Default, Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Hash, PartialEq, Eq, ExpSerde)]
 pub struct WitnessSolverIOVec {
     pub len: usize,
     pub input_offset: Option<usize>,
     pub output_offset: Option<usize>,
 }
 
-impl ExpSerde for WitnessSolverIOVec {
-    const SERIALIZED_SIZE: usize = unimplemented!();
-
-    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> SerdeResult<()> {
-        self.len.serialize_into(&mut writer)?;
-        self.input_offset.serialize_into(&mut writer)?;
-        self.output_offset.serialize_into(&mut writer)
-    }
-    fn deserialize_from<R: std::io::Read>(mut reader: R) -> SerdeResult<Self> {
-        let len = usize::deserialize_from(&mut reader)?;
-        let input_offset = Option::<usize>::deserialize_from(&mut reader)?;
-        let output_offset = Option::<usize>::deserialize_from(&mut reader)?;
-        Ok(Self {
-            len,
-            input_offset,
-            output_offset,
-        })
-    }
-}
-
-#[derive(Default, Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Hash, PartialEq, Eq, ExpSerde)]
 pub struct LayeredCircuitInputVec {
     pub len: usize,
     pub offset: usize,
-}
-
-impl ExpSerde for LayeredCircuitInputVec {
-    const SERIALIZED_SIZE: usize = <usize as ExpSerde>::SERIALIZED_SIZE * 2;
-
-    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> SerdeResult<()> {
-        self.len.serialize_into(&mut writer)?;
-        self.offset.serialize_into(&mut writer)
-    }
-    fn deserialize_from<R: std::io::Read>(mut reader: R) -> SerdeResult<Self> {
-        let len = usize::deserialize_from(&mut reader)?;
-        let offset = usize::deserialize_from(&mut reader)?;
-        Ok(Self { len, offset })
-    }
 }
 
 pub struct IOVecSpec {

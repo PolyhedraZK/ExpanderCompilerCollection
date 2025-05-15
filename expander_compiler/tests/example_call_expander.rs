@@ -1,9 +1,6 @@
 use arith::Field;
 use arith::SimdField as _SimdField;
-<<<<<<< HEAD
-=======
 use expander_binary::executor;
->>>>>>> 3b58769
 use expander_compiler::frontend::*;
 use gkr_engine::{MPIConfig, MPIEngine};
 use rand::SeedableRng;

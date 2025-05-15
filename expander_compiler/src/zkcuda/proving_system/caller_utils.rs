@@ -216,11 +216,12 @@ pub fn exec_pcs_commit<C: Config>(mpi_size: usize) {
     };
 
     let field_name = match <C::FieldConfig as FieldEngine>::FIELD_TYPE {
-        FieldType::M31 => "M31",
-        FieldType::GF2 => "GF2",
-        FieldType::Goldilocks => "Goldilocks",
-        FieldType::BabyBear => "BabyBear",
+        FieldType::M31x16 => "M31",
+        FieldType::GF2Ext128 => "GF2",
+        FieldType::Goldilocksx8 => "Goldilocks",
+        FieldType::BabyBearx16 => "BabyBear",
         FieldType::BN254 => "BN254",
+        _ => panic!("Unsupported field type"),
     };
 
     let cmd_str = format!(
@@ -239,11 +240,12 @@ pub fn exec_gkr_prove_with_pcs<C: Config>(mpi_size: usize) {
     };
 
     let field_name = match <C::FieldConfig as FieldEngine>::FIELD_TYPE {
-        FieldType::M31 => "M31",
-        FieldType::GF2 => "GF2",
-        FieldType::Goldilocks => "Goldilocks",
-        FieldType::BabyBear => "BabyBear",
+        FieldType::M31x16 => "M31",
+        FieldType::GF2Ext128 => "GF2",
+        FieldType::Goldilocksx8 => "Goldilocks",
+        FieldType::BabyBearx16 => "BabyBear",
         FieldType::BN254 => "BN254",
+        _ => panic!("Unsupported field type"),
     };
 
     let cmd_str = format!(
