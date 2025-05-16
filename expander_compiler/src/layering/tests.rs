@@ -176,3 +176,39 @@ fn cross_layer_circuit() {
         assert!(lc.segments[*i].gate_adds.len() <= 10);
     }
 }
+
+#[test]
+fn ensure_circuit_is_minimal() {
+    let mut root1 = IrRootCircuit::<C>::default();
+    root1.circuits.insert(
+        0,
+        IrCircuit {
+            instructions: vec![],
+            constraints: vec![1],
+            outputs: vec![],
+            num_inputs: 1,
+        },
+    );
+    let mut root2 = IrRootCircuit::<C>::default();
+    root2.circuits.insert(
+        0,
+        IrCircuit {
+            instructions: vec![IrInstruction::InternalVariable {
+                expr: Expression::from_terms(vec![Term::new_random_linear(1)]),
+            }],
+            constraints: vec![],
+            outputs: vec![2],
+            num_inputs: 1,
+        },
+    );
+    assert_eq!(root1.validate(), Ok(()));
+    assert_eq!(root2.validate(), Ok(()));
+    let (lc1n, _) = compile_and_random_test::<_, NormalInputType>(&root1, 5);
+    let (lc2n, _) = compile_and_random_test::<_, NormalInputType>(&root2, 0); // random value will mismatch if >0
+    let (lc1c, _) = compile_and_random_test::<_, CrossLayerInputType>(&root1, 5);
+    let (lc2c, _) = compile_and_random_test::<_, CrossLayerInputType>(&root2, 0);
+    assert_eq!(lc1n.layer_ids.len(), 1);
+    assert_eq!(lc2n.layer_ids.len(), 1);
+    assert_eq!(lc1c.layer_ids.len(), 1);
+    assert_eq!(lc2c.layer_ids.len(), 1);
+}

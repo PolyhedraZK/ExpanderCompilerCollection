@@ -5,7 +5,7 @@ use crate::{
     circuit::ir::{
         common::Instruction as _,
         dest::{CircuitRelaxed as IrCircuit, Instruction, RootCircuitRelaxed as IrRootCircuit},
-        expr::{Expression, Term},
+        expr::{Expression, Term, VarSpec},
     },
     field::FieldArith,
     frontend::{CircuitField, Config},
@@ -238,12 +238,14 @@ impl<'a, C: Config> SplitContext<'a, C> {
         let mut add_outputs = Vec::new();
 
         if C::ENABLE_RANDOM_COMBINATION {
-            let n_layers = min_layers.iter().max().unwrap() + 3;
+            let n_layers = min_layers.iter().max().unwrap() + 10;
             sub_combined_constraints.sort_by(|a, b| min_layers[*a].cmp(&min_layers[*b]));
             let mut constraints = std::mem::take(&mut circuit.constraints);
             constraints.sort_by(|a, b| min_layers[*a].cmp(&min_layers[*b]));
             let mut j = 0;
             let mut k = 0;
+            let mut lst = None;
+            let mut lst_terms = None;
             for i in 0..n_layers {
                 let mut terms = Vec::new();
                 while j < sub_combined_constraints.len()
@@ -267,11 +269,23 @@ impl<'a, C: Config> SplitContext<'a, C> {
                     k += 1;
                 }
                 if !terms.is_empty() {
+                    if terms.len() == 1
+                        && terms[0].coef == CircuitField::<C>::one()
+                        && lst_terms.is_some()
+                    {
+                        if let VarSpec::Linear(x) = terms[0].vars {
+                            if lst == Some(x) {
+                                terms = lst_terms.clone().unwrap();
+                            }
+                        }
+                    }
                     circuit.instructions.push(Instruction::InternalVariable {
-                        expr: Expression::from_terms(terms),
+                        expr: Expression::from_terms(terms.clone()),
                     });
                     min_layers.push(i + 1);
                     add_outputs.push(min_layers.len() - 1);
+                    lst = Some(min_layers.len() - 1);
+                    lst_terms = Some(terms);
                 }
             }
         }
