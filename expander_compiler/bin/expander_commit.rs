@@ -1,35 +1,25 @@
 mod common;
 
+use std::str::FromStr;
+
 use clap::Parser;
 use common::ExpanderExecArgs;
-use expander_compiler::circuit::config::Config;
 use expander_compiler::frontend::{
     BN254Config, BabyBearConfig, GF2Config, GoldilocksConfig, M31Config,
 };
 use expander_compiler::zkcuda::proving_system::callee_utils::{
-    read_commit_vals_from_shared_memory, read_selected_pkey_from_shared_memory,
+    read_local_vals_to_commit_from_shared_memory, read_selected_pkey_from_shared_memory,
     write_commitment_extra_info_to_shared_memory, write_commitment_to_shared_memory,
 };
 use expander_compiler::zkcuda::proving_system::{
     ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo,
 };
 
-use gkr_engine::{ExpanderPCS, MPIConfig, MPIEngine};
-use polynomials::MultiLinearPoly;
+use gkr::BN254ConfigSha2Hyrax;
+use gkr_engine::{ExpanderPCS, GKREngine, MPIConfig, MPIEngine, PolynomialCommitmentType};
+use polynomials::RefMultiLinearPoly;
 
-macro_rules! field {
-    ($config: ident) => {
-        $config::FieldConfig
-    };
-}
-
-macro_rules! pcs {
-    ($config: ident) => {
-        $config::PCSConfig
-    };
-}
-
-fn commit<C: Config>() {
+fn commit<C: GKREngine>() {
     let mpi_config = MPIConfig::prover_new();
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
@@ -41,24 +31,23 @@ fn commit<C: Config>() {
         println!("Expander Commit Exec Called with world size {}", world_size);
     }
 
-    let (local_val_len, p_key) = read_selected_pkey_from_shared_memory::<C>();
+    let (local_val_len, p_key) =
+        read_selected_pkey_from_shared_memory::<C::FieldConfig, C::PCSConfig>();
 
-    // TODO: remove the redundancy
-    let global_vals_to_commit = read_commit_vals_from_shared_memory::<C>();
-    let local_vals_to_commit = global_vals_to_commit
-        [local_val_len * world_rank..local_val_len * (world_rank + 1)]
-        .to_vec();
-    drop(global_vals_to_commit);
+    let local_vals_to_commit =
+        read_local_vals_to_commit_from_shared_memory::<C::FieldConfig>(world_rank, world_size);
 
-    let params = <pcs!(C) as ExpanderPCS<field!(C)>>::gen_params(local_val_len.ilog2() as usize);
+    let params =
+        <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(local_val_len.ilog2() as usize);
 
-    let mut scratch = <pcs!(C) as ExpanderPCS<field!(C)>>::init_scratch_pad(&params, &mpi_config);
+    let mut scratch =
+        <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::init_scratch_pad(&params, &mpi_config);
 
-    let commitment = <pcs!(C) as ExpanderPCS<field!(C)>>::commit(
+    let commitment = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::commit(
         &params,
         &mpi_config,
         &p_key,
-        &MultiLinearPoly::new(local_vals_to_commit),
+        &RefMultiLinearPoly::from_ref(&local_vals_to_commit),
         &mut scratch,
     );
 
@@ -71,8 +60,8 @@ fn commit<C: Config>() {
             scratch: vec![scratch],
         };
 
-        write_commitment_to_shared_memory::<C>(&commitment);
-        write_commitment_extra_info_to_shared_memory::<C>(&extra_info);
+        write_commitment_to_shared_memory::<C::FieldConfig, C::PCSConfig>(&commitment);
+        write_commitment_extra_info_to_shared_memory::<C::FieldConfig, C::PCSConfig>(&extra_info);
     }
 
     MPIConfig::finalize();
@@ -80,12 +69,38 @@ fn commit<C: Config>() {
 
 fn main() {
     let expander_exec_args = ExpanderExecArgs::parse();
-    match expander_exec_args.field_type.as_str() {
-        "M31" => commit::<M31Config>(),
-        "GF2" => commit::<GF2Config>(),
-        "Goldilocks" => commit::<GoldilocksConfig>(),
-        "BabyBear" => commit::<BabyBearConfig>(),
-        "BN254" => commit::<BN254Config>(),
-        _ => panic!("Unsupported field type"),
+    assert_eq!(
+        expander_exec_args.fiat_shamir_hash, "SHA256",
+        "Only SHA256 is supported for now"
+    );
+
+    let pcs_type = PolynomialCommitmentType::from_str(&expander_exec_args.poly_commit).unwrap();
+
+    match (expander_exec_args.field_type.as_str(), pcs_type) {
+        ("M31", PolynomialCommitmentType::Raw) => {
+            commit::<M31Config>();
+        }
+        ("GF2", PolynomialCommitmentType::Raw) => {
+            commit::<GF2Config>();
+        }
+        ("Goldilocks", PolynomialCommitmentType::Raw) => {
+            commit::<GoldilocksConfig>();
+        }
+        ("BabyBear", PolynomialCommitmentType::Raw) => {
+            commit::<BabyBearConfig>();
+        }
+        ("BN254", PolynomialCommitmentType::Raw) => {
+            commit::<BN254Config>();
+        }
+        ("BN254", PolynomialCommitmentType::Hyrax) => {
+            commit::<BN254ConfigSha2Hyrax>();
+        }
+        // ("BN254", PolynomialCommitmentType::KZG) => {
+        //     commit::<BN254ConfigSha2KZG>();
+        // }
+        (field_type, pcs_type) => panic!(
+            "Combination of {:?} and {:?} not supported",
+            field_type, pcs_type
+        ),
     }
 }

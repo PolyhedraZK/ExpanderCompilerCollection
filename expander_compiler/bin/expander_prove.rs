@@ -2,12 +2,13 @@ mod common;
 use common::ExpanderExecArgs;
 
 use clap::Parser;
-use std::cmp;
+use expander_compiler::zkcuda::kernel::LayeredCircuitInputVec;
+use std::cmp::max;
+use std::str::FromStr;
 
 use arith::Field;
-use expander_compiler::circuit::config::Config;
 use expander_compiler::frontend::{
-    BN254Config, BabyBearConfig, GF2Config, GoldilocksConfig, M31Config, SIMDField,
+    BN254Config, BabyBearConfig, Config, GF2Config, GoldilocksConfig, M31Config, SIMDField,
 };
 use expander_compiler::zkcuda::proving_system::callee_utils::{
     read_broadcast_info_from_shared_memory, read_commitment_extra_info_from_shared_memory,
@@ -16,38 +17,24 @@ use expander_compiler::zkcuda::proving_system::callee_utils::{
     read_pcs_setup_from_shared_memory, write_proof_to_shared_memory,
 };
 use expander_compiler::zkcuda::proving_system::{
-    max_n_vars, prepare_inputs, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof,
-    ExpanderGKRProverSetup,
+    max_n_vars, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof, ExpanderGKRProverSetup,
 };
 use expander_utils::timer::Timer;
 
-use gkr::gkr_prove;
+use gkr::{gkr_prove, BN254ConfigSha2Hyrax};
 use gkr_engine::{
-    ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, MPIConfig, MPIEngine, Transcript,
+    ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine,
+    PolynomialCommitmentType, SharedMemory, Transcript,
 };
-use polynomials::MultiLinearPoly;
+use polynomials::RefMultiLinearPoly;
 use serdes::ExpSerde;
 use sumcheck::ProverScratchPad;
 
-macro_rules! field {
-    ($config: ident) => {
-        $config::FieldConfig
-    };
-}
-
-macro_rules! transcript {
-    ($config: ident) => {
-        $config::TranscriptConfig
-    };
-}
-
-macro_rules! pcs {
-    ($config: ident) => {
-        $config::PCSConfig
-    };
-}
-
-fn prove<C: Config>() {
+// Ideally, there will only one ECCConfig generics
+// But we need to implement `Config` for each GKREngine, which remains to be done
+// For now, the GKREngine actually controls the functionality of the prover
+// The ECCConfig is only used where the `Config` trait is required
+fn prove<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>() {
     let mpi_config = MPIConfig::prover_new();
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
@@ -59,36 +46,53 @@ fn prove<C: Config>() {
         println!("Expander Prove Exec Called with world size {}", world_size);
     }
 
-    let timer = Timer::new("reading circuit", mpi_config.is_root());
-    let pcs_setup = read_pcs_setup_from_shared_memory::<C>();
-    let ecc_circuit = read_ecc_circuit_from_shared_memory::<C>();
+    let timer = Timer::new("one time cost: read setup&circuit", mpi_config.is_root());
+    let pcs_setup = read_pcs_setup_from_shared_memory::<C::FieldConfig, C::PCSConfig>();
+    let (mut expander_circuit, mut window) = if mpi_config.is_root() {
+        let ecc_circuit = read_ecc_circuit_from_shared_memory::<ECCConfig>();
+        let expander_circuit = ecc_circuit.export_to_expander().flatten::<C>();
+        mpi_config.consume_obj_and_create_shared(Some(expander_circuit))
+    } else {
+        mpi_config.consume_obj_and_create_shared(None)
+    };
+    expander_circuit.pre_process_gkr::<C>();
     let partition_info = read_partition_info_from_shared_memory();
-
-    let _commitments = read_commitment_from_shared_memory::<C>();
-    let commitments_extra_info = read_commitment_extra_info_from_shared_memory::<C>();
-    let commitment_values = read_commitment_values_from_shared_memory::<C>();
-    let commitment_values_refs = commitment_values
-        .iter()
-        .map(|commitment| &commitment[..])
-        .collect::<Vec<_>>();
     let broadcast_info = read_broadcast_info_from_shared_memory();
     timer.stop();
 
+    let timer = Timer::new(
+        "recurring cost: read witness&commitment",
+        mpi_config.is_root(),
+    );
+    let _commitments = if mpi_config.is_root() {
+        Some(read_commitment_from_shared_memory::<
+            C::FieldConfig,
+            C::PCSConfig,
+        >())
+    } else {
+        None
+    };
+    let commitments_extra_info =
+        read_commitment_extra_info_from_shared_memory::<C::FieldConfig, C::PCSConfig>();
+    let local_commitment_values = read_commitment_values_from_shared_memory::<C::FieldConfig>(
+        &broadcast_info,
+        world_rank,
+        world_size,
+    );
+    timer.stop();
+
     let timer = Timer::new("gkr prove", mpi_config.is_root());
-    let mut expander_circuit = ecc_circuit.export_to_expander().flatten::<C>();
-    expander_circuit.pre_process_gkr::<C>();
     let (max_num_input_var, max_num_output_var) = max_n_vars(&expander_circuit);
+    let max_num_var = max(max_num_input_var, max_num_output_var); // temp fix to a bug in Expander, remove this after Expander update.
     let mut prover_scratch =
-        ProverScratchPad::<C::FieldConfig>::new(max_num_input_var, max_num_output_var, world_size);
+        ProverScratchPad::<C::FieldConfig>::new(max_num_var, max_num_var, world_size);
 
     let mut transcript = C::TranscriptConfig::new();
     transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
     expander_circuit.layers[0].input_vals = prepare_inputs(
-        &ecc_circuit,
+        1usize << expander_circuit.log_input_size(),
         &partition_info,
-        &commitment_values_refs,
-        &broadcast_info,
-        world_rank,
+        &local_commitment_values,
     );
     expander_circuit.fill_rnd_coefs(&mut transcript);
     expander_circuit.evaluate();
@@ -105,22 +109,22 @@ fn prove<C: Config>() {
     timer.stop();
 
     let timer = Timer::new("pcs opening", mpi_config.is_root());
-    prove_input_claim(
+    prove_input_claim::<C>(
         &mpi_config,
-        &commitment_values_refs,
+        &local_commitment_values,
         &pcs_setup,
         &commitments_extra_info,
         &challenge.challenge_x(),
         &broadcast_info,
         &mut transcript,
     );
-    if challenge.rz_1.is_some() {
-        prove_input_claim(
+    if let Some(challenge_y) = challenge.challenge_y() {
+        prove_input_claim::<C>(
             &mpi_config,
-            &commitment_values_refs,
+            &local_commitment_values,
             &pcs_setup,
             &commitments_extra_info,
-            &challenge.challenge_y().unwrap(),
+            &challenge_y,
             &broadcast_info,
             &mut transcript,
         );
@@ -131,45 +135,36 @@ fn prove<C: Config>() {
     if world_rank == 0 {
         write_proof_to_shared_memory(&ExpanderGKRProof { data: vec![proof] });
     }
+    expander_circuit.discard_control_of_shared_mem();
+    mpi_config.free_shared_mem(&mut window);
     MPIConfig::finalize();
 }
 
 #[allow(clippy::too_many_arguments)]
-fn prove_input_claim<C: Config>(
+fn prove_input_claim<C: GKREngine>(
     mpi_config: &MPIConfig,
-    commitments_values: &[&[SIMDField<C>]],
-    p_keys: &ExpanderGKRProverSetup<C>,
-    commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<C>],
+    local_commitments_values: &[Vec<SIMDField<C>>],
+    p_keys: &ExpanderGKRProverSetup<C::FieldConfig, C::PCSConfig>,
+    commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<C::FieldConfig, C::PCSConfig>],
     challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
     is_broadcast: &[bool],
-    transcript: &mut transcript!(C),
+    transcript: &mut C::TranscriptConfig,
 ) {
-    let parallel_count = mpi_config.world_size();
-    let parallel_index = mpi_config.world_rank();
-
-    for ((commitment_val, extra_info), ib) in commitments_values
+    for ((local_commitment_val, extra_info), _ib) in local_commitments_values
         .iter()
         .zip(commitments_extra_info)
         .zip(is_broadcast)
     {
-        let val_len = if *ib {
-            commitment_val.len()
-        } else {
-            commitment_val.len() / parallel_count
-        };
-        let vals_to_open = if *ib {
-            *commitment_val
-        } else {
-            &commitment_val[val_len * parallel_index..val_len * (parallel_index + 1)]
-        };
+        let val_len = local_commitment_val.len();
+        let vals_to_open = local_commitment_val;
 
         let nb_challenge_vars = val_len.ilog2() as usize;
         let challenge_vars = challenge.rz[..nb_challenge_vars].to_vec();
 
-        let params = <pcs!(C) as ExpanderPCS<field!(C)>>::gen_params(val_len);
+        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(val_len);
         let p_key = p_keys.p_keys.get(&val_len).unwrap();
 
-        let poly = MultiLinearPoly::new(vals_to_open.to_vec());
+        let poly = RefMultiLinearPoly::from_ref(vals_to_open);
         let v = C::FieldConfig::collectively_eval_circuit_vals_at_expander_challenge(
             vals_to_open,
             &ExpanderSingleVarChallenge::<C::FieldConfig> {
@@ -180,14 +175,14 @@ fn prove_input_claim<C: Config>(
             &mut vec![<C::FieldConfig as FieldEngine>::Field::ZERO; val_len],
             &mut vec![
                 <C::FieldConfig as FieldEngine>::ChallengeField::ZERO;
-                1 << cmp::max(challenge.r_simd.len(), challenge.r_mpi.len())
+                1 << max(challenge.r_simd.len(), challenge.r_mpi.len())
             ],
             mpi_config,
         );
         transcript.append_field_element(&v);
 
         transcript.lock_proof();
-        let opening = <pcs!(C) as ExpanderPCS<field!(C)>>::open(
+        let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::open(
             &params,
             mpi_config,
             p_key,
@@ -199,26 +194,67 @@ fn prove_input_claim<C: Config>(
             },
             transcript,
             &extra_info.scratch[0],
-        )
-        .unwrap();
+        );
         transcript.unlock_proof();
 
-        let mut buffer = vec![];
-        opening
-            .serialize_into(&mut buffer)
-            .expect("Failed to serialize opening");
-        transcript.append_u8_slice(&buffer);
+        if mpi_config.is_root() {
+            let mut buffer = vec![];
+            opening
+                .unwrap()
+                .serialize_into(&mut buffer)
+                .expect("Failed to serialize opening");
+            transcript.append_u8_slice(&buffer);
+        }
     }
+}
+
+fn prepare_inputs<F: Field>(
+    input_len: usize,
+    partition_info: &[LayeredCircuitInputVec],
+    local_commitment_values: &[Vec<F>],
+) -> Vec<F> {
+    let mut input_vals = vec![F::ZERO; input_len];
+    for (partition, val) in partition_info.iter().zip(local_commitment_values.iter()) {
+        assert!(partition.len == val.len());
+        input_vals[partition.offset..partition.offset + partition.len].copy_from_slice(val);
+    }
+    input_vals
 }
 
 fn main() {
     let expander_exec_args = ExpanderExecArgs::parse();
-    match expander_exec_args.field_type.as_str() {
-        "M31" => prove::<M31Config>(),
-        "GF2" => prove::<GF2Config>(),
-        "Goldilocks" => prove::<GoldilocksConfig>(),
-        "BabyBear" => prove::<BabyBearConfig>(),
-        "BN254" => prove::<BN254Config>(),
-        _ => panic!("Unsupported field type"),
+    assert_eq!(
+        expander_exec_args.fiat_shamir_hash, "SHA256",
+        "Only SHA256 is supported for now"
+    );
+
+    let pcs_type = PolynomialCommitmentType::from_str(&expander_exec_args.poly_commit).unwrap();
+
+    match (expander_exec_args.field_type.as_str(), pcs_type) {
+        ("M31", PolynomialCommitmentType::Raw) => {
+            prove::<M31Config, M31Config>();
+        }
+        ("GF2", PolynomialCommitmentType::Raw) => {
+            prove::<GF2Config, GF2Config>();
+        }
+        ("Goldilocks", PolynomialCommitmentType::Raw) => {
+            prove::<GoldilocksConfig, GoldilocksConfig>();
+        }
+        ("BabyBear", PolynomialCommitmentType::Raw) => {
+            prove::<BabyBearConfig, BabyBearConfig>();
+        }
+        ("BN254", PolynomialCommitmentType::Raw) => {
+            prove::<BN254Config, BN254Config>();
+        }
+        ("BN254", PolynomialCommitmentType::Hyrax) => {
+            prove::<BN254ConfigSha2Hyrax, BN254Config>();
+        }
+        // ("BN254", PolynomialCommitmentType::KZG) => {
+        //     prove::<BN254ConfigSha2KZG, BN254Config>();
+        // }
+        (field_type, pcs_type) => panic!(
+            "Combination of {:?} and {:?} not supported",
+            field_type, pcs_type
+        ),
     }
 }
