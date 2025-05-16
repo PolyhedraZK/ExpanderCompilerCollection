@@ -73,7 +73,6 @@ impl<F: FieldEngine, PCS: ExpanderPCS<F>> Clone for ExpanderGKRProverSetup<F, PC
     }
 }
 
-
 #[allow(clippy::type_complexity)]
 #[derive(ExpSerde)]
 pub struct ExpanderGKRVerifierSetup<F: FieldEngine, PCS: ExpanderPCS<F>> {
