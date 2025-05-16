@@ -7,20 +7,9 @@ use super::{check_inputs, prepare_inputs, Commitment, Proof, ProvingSystem};
 
 // dummy implementation of these traits
 
-#[derive(Clone)]
+#[derive(Clone, ExpSerde)]
 pub struct DummyCommitment<C: Config> {
     vals: Vec<SIMDField<C>>,
-}
-
-impl<C: Config> ExpSerde for DummyCommitment<C> {
-    const SERIALIZED_SIZE: usize = unimplemented!();
-    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
-        self.vals.serialize_into(&mut writer)
-    }
-    fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
-        let vals = Vec::<SIMDField<C>>::deserialize_from(&mut reader)?;
-        Ok(DummyCommitment { vals })
-    }
 }
 
 impl<C: Config> Commitment<C> for DummyCommitment<C> {
@@ -29,20 +18,9 @@ impl<C: Config> Commitment<C> for DummyCommitment<C> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, ExpSerde)]
 pub struct DummyProof {
     cond: Vec<Vec<bool>>,
-}
-
-impl ExpSerde for DummyProof {
-    const SERIALIZED_SIZE: usize = unimplemented!();
-    fn serialize_into<W: std::io::Write>(&self, mut writer: W) -> serdes::SerdeResult<()> {
-        self.cond.serialize_into(&mut writer)
-    }
-    fn deserialize_from<R: std::io::Read>(mut reader: R) -> serdes::SerdeResult<Self> {
-        let cond = Vec::<Vec<bool>>::deserialize_from(&mut reader)?;
-        Ok(DummyProof { cond })
-    }
 }
 
 impl Proof for DummyProof {}

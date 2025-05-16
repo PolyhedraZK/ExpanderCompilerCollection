@@ -1,3 +1,4 @@
+use expander_binary::executor;
 use expander_compiler::frontend::*;
 use gkr_engine::{MPIConfig, MPIEngine};
 use rand::{Rng, SeedableRng};
@@ -295,10 +296,10 @@ fn keccak_gf2_full() {
     expander_circuit.evaluate();
     let mpi_config = MPIConfig::prover_new();
     let (claimed_v, proof) =
-        expander_bin::executor::prove::<GF2Config>(&mut expander_circuit, mpi_config.clone());
+        executor::prove::<GF2Config>(&mut expander_circuit, mpi_config.clone());
 
     // verify
-    assert!(expander_bin::executor::verify::<GF2Config>(
+    assert!(executor::verify::<GF2Config>(
         &mut expander_circuit,
         mpi_config,
         &proof,

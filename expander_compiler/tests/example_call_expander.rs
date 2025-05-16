@@ -1,5 +1,6 @@
 use arith::Field;
 use arith::SimdField as _SimdField;
+use expander_binary::executor;
 use expander_compiler::frontend::*;
 use gkr_engine::{MPIConfig, MPIEngine};
 use rand::SeedableRng;
@@ -54,11 +55,10 @@ fn example<C: Config>() {
 
     // prove
     expander_circuit.evaluate();
-    let (claimed_v, proof) =
-        expander_bin::executor::prove::<C>(&mut expander_circuit, mpi_config.clone());
+    let (claimed_v, proof) = executor::prove::<C>(&mut expander_circuit, mpi_config.clone());
 
     // verify
-    assert!(expander_bin::executor::verify::<C>(
+    assert!(executor::verify::<C>(
         &mut expander_circuit,
         mpi_config,
         &proof,
