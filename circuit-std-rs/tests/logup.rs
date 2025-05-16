@@ -4,7 +4,12 @@ use circuit_std_rs::{
     logup::{query_count_hint, rangeproof_hint, LogUpRangeProofTable},
     LogUpCircuit, LogUpParams,
 };
-use expander_compiler::{field::BN254Fr, field::Goldilocks, frontend::*};
+use expander_compiler::{
+    field::BN254Fr,
+    field::Goldilocks,
+    frontend::*,
+    zkcuda::{context::*, kernel::*, proving_system::*},
+};
 
 #[test]
 fn logup_test() {
@@ -130,4 +135,55 @@ fn rangeproof_bn254_test() {
         .unwrap();
     let output = compile_result.layered_circuit.run(&witness);
     assert_eq!(output, vec![true]);
+}
+
+#[kernel]
+fn rangeproof_test_kernel<C: Config>(builder: &mut API<C>, test: &InputVariable) {
+    let mut table = LogUpRangeProofTable::new(8);
+    table.initial(builder);
+    table.rangeproof(builder, *test, 10);
+    table.final_check(builder);
+}
+
+#[test]
+fn rangeproof_zkcuda_test() {
+    let mut hint_registry = HintRegistry::<M31>::new();
+    hint_registry.register("myhint.querycounthint", query_count_hint);
+    hint_registry.register("myhint.rangeproofhint", rangeproof_hint);
+    //compile and test
+    let kernel: Kernel<M31Config> = compile_rangeproof_test_kernel().unwrap();
+    let mut ctx: Context<M31Config, ExpanderGKRProvingSystem<M31Config>, _> =
+        Context::new(hint_registry);
+
+    let a = M31::from(1 << 9);
+    let a = ctx.copy_to_device(&a, false);
+    let a = a.reshape(&[1]);
+    call_kernel!(ctx, kernel, a);
+
+    let computation_graph = ctx.to_computation_graph();
+    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
+    let proof = ctx.to_proof(&prover_setup);
+    assert!(computation_graph.verify(&proof, &verifier_setup));
+}
+
+#[test]
+#[should_panic]
+fn rangeproof_zkcuda_test_fail() {
+    let mut hint_registry = HintRegistry::<M31>::new();
+    hint_registry.register("myhint.querycounthint", query_count_hint);
+    hint_registry.register("myhint.rangeproofhint", rangeproof_hint);
+    //compile and test
+    let kernel: Kernel<M31Config> = compile_rangeproof_test_kernel().unwrap();
+    let mut ctx: Context<M31Config, ExpanderGKRProvingSystem<M31Config>, _> =
+        Context::new(hint_registry);
+
+    let a = M31::from(1 << 11);
+    let a = ctx.copy_to_device(&a, false);
+    let a = a.reshape(&[1]);
+    call_kernel!(ctx, kernel, a);
+
+    let computation_graph = ctx.to_computation_graph();
+    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
+    let proof = ctx.to_proof(&prover_setup);
+    assert!(computation_graph.verify(&proof, &verifier_setup));
 }
