@@ -77,7 +77,7 @@ jobs:
       - if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install libopenmpi-dev -y
       - run: cargo build --release --bin expander_commit --bin expander_prove
-      - run: cargo test -- --skip pairing_random_test
+      - run: cargo test
 
   test-rust-avx512:
     runs-on: 7950x3d
