@@ -179,6 +179,28 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> BasicAPI<C> for DebugBuilder<C, 
     ) -> Option<CircuitField<C>> {
         Some(self.convert_to_value(x))
     }
+
+    // return 1 if x > y; 0 otherwise
+    fn gt(
+        &mut self,
+        x: impl ToVariableOrValue<CircuitField<C>>,
+        y: impl ToVariableOrValue<CircuitField<C>>,
+    ) -> Variable {
+        let x = self.convert_to_value(x);
+        let y = self.convert_to_value(y);
+        self.return_as_variable(CircuitField::<C>::from((x > y) as u32))
+    }
+
+    // return 1 if x >= y; 0 otherwise
+    fn geq(
+        &mut self,
+        x: impl ToVariableOrValue<CircuitField<C>>,
+        y: impl ToVariableOrValue<CircuitField<C>>,
+    ) -> Variable {
+        let x = self.convert_to_value(x);
+        let y = self.convert_to_value(y);
+        self.return_as_variable(CircuitField::<C>::from((x >= y) as u32))
+    }
 }
 
 impl<C: Config, H: HintCaller<CircuitField<C>>> UnconstrainedAPI<C> for DebugBuilder<C, H> {

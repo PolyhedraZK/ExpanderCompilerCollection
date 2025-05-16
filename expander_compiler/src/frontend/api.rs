@@ -42,6 +42,22 @@ pub trait BasicAPI<C: Config> {
         x: impl ToVariableOrValue<CircuitField<C>>,
         num_bits: usize,
     ) -> Vec<Variable>;
+    /// return 1 if x > y; 0 otherwise
+    /// this is a very expensive operation -- it uses bit decompositions for comparison
+    /// consider use lookup table for better performance
+    fn gt(
+        &mut self,
+        x: impl ToVariableOrValue<CircuitField<C>>,
+        y: impl ToVariableOrValue<CircuitField<C>>,
+    ) -> Variable;
+    /// return 1 if x >= y; 0 otherwise
+    /// this is a very expensive operation -- it uses bit decompositions for comparison
+    /// consider use lookup table for better performance
+    fn geq(
+        &mut self,
+        x: impl ToVariableOrValue<CircuitField<C>>,
+        y: impl ToVariableOrValue<CircuitField<C>>,
+    ) -> Variable;
     fn assert_is_zero(&mut self, x: impl ToVariableOrValue<CircuitField<C>>);
     fn assert_is_non_zero(&mut self, x: impl ToVariableOrValue<CircuitField<C>>);
     fn assert_is_bool(&mut self, x: impl ToVariableOrValue<CircuitField<C>>);
