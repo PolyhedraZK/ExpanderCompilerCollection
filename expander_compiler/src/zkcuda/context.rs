@@ -648,23 +648,37 @@ impl<C: Config> ComputationGraph<C> {
         //         return false;
         //     }
         // }
+
+        // Note: temporarily swtich to a mode where failed verification does not affect the efficiency
+        // Should swtich back to the original mode after fix KZG PCS
+        let mut verified = vec![];
         for ((proof, template), commitments_kernel) in combined_proof
             .proofs
             .iter()
             .zip(self.proof_templates.iter())
             .zip(combined_proof.commitments.iter())
         {
-            if !P::verify(
+            // if !P::verify(
+            //     verifier_setup,
+            //     &self.kernels[template.kernel_id],
+            //     proof,
+            //     commitments_kernel,
+            //     next_power_of_two(template.parallel_count),
+            //     &template.is_broadcast,
+            // ) {
+            //     return false;
+            // }
+            verified.push(P::verify(
                 verifier_setup,
                 &self.kernels[template.kernel_id],
                 proof,
                 commitments_kernel,
                 next_power_of_two(template.parallel_count),
                 &template.is_broadcast,
-            ) {
-                return false;
-            }
+            ));
         }
-        true
+
+        // true
+        verified.iter().all(|x| *x)
     }
 }

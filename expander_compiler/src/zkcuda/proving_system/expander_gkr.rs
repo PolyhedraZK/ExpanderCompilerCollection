@@ -13,7 +13,7 @@ use expander_circuit::Circuit;
 use expander_utils::timer::Timer;
 use gkr::{gkr_prove, gkr_verify};
 use gkr_engine::{
-    ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig,
+    ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine,
     Proof as ExpanderProof, StructuredReferenceString, Transcript,
 };
 use poly_commit::expander_pcs_init_testing_only;
@@ -131,7 +131,9 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
                     C::FieldConfig,
                     C::TranscriptConfig,
                     C::PCSConfig,
-                >(val_actual_len);
+                >(
+                    val_actual_len, template.parallel_count
+                );
                 p_keys.insert(val_actual_len, p_key);
                 v_keys.insert(val_actual_len, v_key);
             }
@@ -345,13 +347,17 @@ pub fn pcs_testing_setup_fixed_seed<
     PCS: ExpanderPCS<FConfig>,
 >(
     vals_len: usize,
+    parallel_count: usize,
 ) -> (
     PCS::Params,
     <PCS::SRS as StructuredReferenceString>::PKey,
     <PCS::SRS as StructuredReferenceString>::VKey,
     PCS::ScratchPad,
 ) {
-    expander_pcs_init_testing_only::<FConfig, PCS>(vals_len.ilog2() as usize, &MPIConfig::default())
+    expander_pcs_init_testing_only::<FConfig, PCS>(
+        vals_len.ilog2() as usize,
+        &MPIConfig::verifier_new(parallel_count as i32),
+    )
 }
 
 pub fn max_n_vars<C: FieldEngine>(circuit: &Circuit<C>) -> (usize, usize) {
