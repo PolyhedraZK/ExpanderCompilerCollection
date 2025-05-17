@@ -239,6 +239,7 @@ fn parse_config<C: GKREngine>(mpi_size: usize) -> (String, String, String) {
     let pcs_name = match <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::PCS_TYPE {
         PolynomialCommitmentType::Raw => "Raw",
         PolynomialCommitmentType::Hyrax => "Hyrax",
+        PolynomialCommitmentType::KZG => "KZG",
         _ => panic!("Unsupported PCS type"),
     };
 
