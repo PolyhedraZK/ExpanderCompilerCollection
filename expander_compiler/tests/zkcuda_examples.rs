@@ -1,10 +1,12 @@
+use std::panic;
+
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::proof::ComputationGraph;
 use expander_compiler::zkcuda::proving_system::{
     ExpanderGKRProvingSystem, ParallelizedExpanderGKRProvingSystem, ProvingSystem,
 };
 use expander_compiler::zkcuda::{context::*, kernel::*};
-use gkr::BN254ConfigSha2Hyrax;
+use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
 use gkr_engine::FieldEngine;
 use serdes::ExpSerde;
 
@@ -93,6 +95,7 @@ fn zkcuda_1_single_core() {
     zkcuda_1_expander::<BabyBearConfig, ExpanderGKRProvingSystem<BabyBearConfig>>();
     zkcuda_1_expander::<BN254Config, ExpanderGKRProvingSystem<BN254Config>>();
     zkcuda_1_expander::<BN254Config, ExpanderGKRProvingSystem<BN254ConfigSha2Hyrax>>();
+    zkcuda_1_expander::<BN254Config, ExpanderGKRProvingSystem<BN254ConfigSha2KZG>>();
 }
 
 #[test]
@@ -103,6 +106,12 @@ fn zkcuda_1_multi_core() {
     zkcuda_1_expander::<BabyBearConfig, ParallelizedExpanderGKRProvingSystem<BabyBearConfig>>();
     zkcuda_1_expander::<BN254Config, ParallelizedExpanderGKRProvingSystem<BN254Config>>();
     zkcuda_1_expander::<BN254Config, ParallelizedExpanderGKRProvingSystem<BN254ConfigSha2Hyrax>>();
+
+    // The setup phase is now called in an incorrect way for KZG. This does not affect efficiency
+    let result = panic::catch_unwind(|| {
+        zkcuda_1_expander::<BN254Config, ParallelizedExpanderGKRProvingSystem<BN254ConfigSha2KZG>>()
+    });
+    assert!(result.is_err());
 }
 
 #[kernel]

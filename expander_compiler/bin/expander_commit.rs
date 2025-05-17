@@ -15,7 +15,7 @@ use expander_compiler::zkcuda::proving_system::{
     ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo,
 };
 
-use gkr::BN254ConfigSha2Hyrax;
+use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
 use gkr_engine::{ExpanderPCS, GKREngine, MPIConfig, MPIEngine, PolynomialCommitmentType};
 use polynomials::RefMultiLinearPoly;
 
@@ -95,9 +95,9 @@ fn main() {
         ("BN254", PolynomialCommitmentType::Hyrax) => {
             commit::<BN254ConfigSha2Hyrax>();
         }
-        // ("BN254", PolynomialCommitmentType::KZG) => {
-        //     commit::<BN254ConfigSha2KZG>();
-        // }
+        ("BN254", PolynomialCommitmentType::KZG) => {
+            commit::<BN254ConfigSha2KZG>();
+        }
         (field_type, pcs_type) => panic!(
             "Combination of {:?} and {:?} not supported",
             field_type, pcs_type
