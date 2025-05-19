@@ -32,11 +32,13 @@ halo2curves = { git = "https://github.com/PolyhedraZK/halo2curves", default-feat
 ] }
 hex = "0.4"
 num-bigint = "0.4.6"
+num_cpus = "1.16.0"
 num-traits = "0.2.19"
 rand = "0.8.5"
 rayon = "1.10.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+shared_memory = "0.12.4"
 sha2 = "0.10.8"
 stacker = "0.1.17"
 tiny-keccak = { version = "2.0", features = ["keccak"] }
@@ -59,3 +61,4 @@ sumcheck = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 gkr_engine = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 gkr_hashers = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+expander_utils = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "utils" }
