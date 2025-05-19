@@ -161,7 +161,10 @@ fn prove_input_claim<C: GKREngine>(
         let nb_challenge_vars = val_len.ilog2() as usize;
         let challenge_vars = challenge.rz[..nb_challenge_vars].to_vec();
 
-        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(val_len);
+        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(
+            val_len,
+            mpi_config.world_size(),
+        );
         let p_key = p_keys.p_keys.get(&val_len).unwrap();
 
         let poly = RefMultiLinearPoly::from_ref(vals_to_open);

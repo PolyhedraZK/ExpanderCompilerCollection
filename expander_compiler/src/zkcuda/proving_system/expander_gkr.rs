@@ -160,7 +160,7 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
         };
 
         let n_vars = vals_to_commit[0].len().ilog2() as usize;
-        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(n_vars);
+        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(n_vars, 1);
         let p_key = prover_setup.p_keys.get(&(1 << n_vars)).unwrap();
 
         let (commitment, scratch) = vals_to_commit
@@ -401,7 +401,7 @@ fn prove_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfi
         let nb_challenge_vars = val_len.ilog2() as usize;
         let challenge_vars = challenge.rz[..nb_challenge_vars].to_vec();
 
-        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(val_len);
+        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(val_len, 1);
         let p_key = p_keys.p_keys.get(&val_len).unwrap();
 
         // TODO: Remove unnecessary `to_vec` clone
@@ -475,6 +475,7 @@ fn verify_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConf
 
         let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(
             commitment_len.ilog2() as usize,
+            1,
         );
         let v_key = v_keys.v_keys.get(&commitment_len).unwrap();
 

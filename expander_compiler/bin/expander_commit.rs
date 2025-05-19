@@ -37,8 +37,10 @@ fn commit<C: GKREngine>() {
     let local_vals_to_commit =
         read_local_vals_to_commit_from_shared_memory::<C::FieldConfig>(world_rank, world_size);
 
-    let params =
-        <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(local_val_len.ilog2() as usize);
+    let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(
+        local_val_len.ilog2() as usize,
+        mpi_config.world_size(),
+    );
 
     let mut scratch =
         <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::init_scratch_pad(&params, &mpi_config);

@@ -201,7 +201,10 @@ fn verify_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConf
         let nb_challenge_vars = local_vals_len.ilog2() as usize;
         let challenge_vars = challenge.rz[..nb_challenge_vars].to_vec();
 
-        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(nb_challenge_vars);
+        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(
+            nb_challenge_vars,
+            parallel_count,
+        );
         let v_key = v_keys.v_keys.get(&local_vals_len).unwrap();
 
         let claim =
