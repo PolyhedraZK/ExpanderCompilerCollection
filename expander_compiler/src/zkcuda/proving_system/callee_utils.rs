@@ -30,10 +30,10 @@ pub fn read_selected_pkey_from_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>
     read_object_from_shared_memory_name_string("/tmp/pcs_setup", 0)
 }
 
-pub fn read_local_vals_to_commit_from_shared_memory<F: FieldEngine>(
+pub fn read_local_vals_to_commit_from_shared_memory<'a, F: FieldEngine>(
     world_rank: usize,
     world_size: usize,
-) -> Vec<F::SimdCircuitField> {
+) -> &'a [F::SimdCircuitField] {
     let shmem = ShmemConf::new().flink("/tmp/input_vals").open().unwrap();
     let ptr = shmem.as_ptr();
     let total_len: usize =
@@ -43,13 +43,7 @@ pub fn read_local_vals_to_commit_from_shared_memory<F: FieldEngine>(
     let local_len = total_len / world_size;
     let offset = size_of::<usize>() + world_rank * local_len * <F::SimdCircuitField as Field>::SIZE;
     let ptr = unsafe { ptr.add(offset) };
-    let mut cursor = std::io::Cursor::new(unsafe {
-        std::slice::from_raw_parts(ptr, local_len * <F::SimdCircuitField as Field>::SIZE)
-    });
-
-    (0..local_len)
-        .map(|_| F::SimdCircuitField::deserialize_from(&mut cursor).unwrap())
-        .collect()
+    unsafe { std::slice::from_raw_parts(ptr as *const F::SimdCircuitField, local_len) }
 }
 
 pub fn write_object_to_shared_memory_name_string<T: ExpSerde>(object: &T, shared_memory_ref: &str) {
@@ -107,11 +101,11 @@ pub fn read_commitment_extra_info_from_shared_memory<F: FieldEngine, PCS: Expand
     read_object_from_shared_memory_name_string("/tmp/extra_info", 0)
 }
 
-pub fn read_commitment_values_from_shared_memory<F: FieldEngine>(
+pub fn read_commitment_values_from_shared_memory<'a, F: FieldEngine>(
     broadcast_info: &[bool],
     world_rank: usize,
     world_size: usize,
-) -> Vec<Vec<F::SimdCircuitField>> {
+) -> Vec<&'a [F::SimdCircuitField]> {
     let shmem = ShmemConf::new().flink("/tmp/input_vals").open().unwrap();
     let mut ptr = shmem.as_ptr();
     let n_components: usize =
@@ -144,15 +138,9 @@ pub fn read_commitment_values_from_shared_memory<F: FieldEngine>(
             };
 
             let local_ptr = unsafe { ptr.add(offset) };
-            let mut cursor = std::io::Cursor::new(unsafe {
-                std::slice::from_raw_parts(
-                    local_ptr,
-                    local_len_i * <F::SimdCircuitField as Field>::SIZE,
-                )
-            });
-            let vals = (0..local_len_i)
-                .map(|_| F::SimdCircuitField::deserialize_from(&mut cursor).unwrap())
-                .collect::<Vec<_>>();
+            let vals = unsafe {
+                std::slice::from_raw_parts(local_ptr as *const F::SimdCircuitField, local_len_i)
+            };
 
             ptr = unsafe {
                 ptr.add(size_of::<usize>() + total_len_i * <F::SimdCircuitField as Field>::SIZE)

@@ -143,7 +143,7 @@ fn prove<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>() {
 #[allow(clippy::too_many_arguments)]
 fn prove_input_claim<C: GKREngine>(
     mpi_config: &MPIConfig,
-    local_commitments_values: &[Vec<SIMDField<C>>],
+    local_commitments_values: &[&[SIMDField<C>]],
     p_keys: &ExpanderGKRProverSetup<C::FieldConfig, C::PCSConfig>,
     commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<C::FieldConfig, C::PCSConfig>],
     challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
@@ -214,7 +214,7 @@ fn prove_input_claim<C: GKREngine>(
 fn prepare_inputs<F: Field>(
     input_len: usize,
     partition_info: &[LayeredCircuitInputVec],
-    local_commitment_values: &[Vec<F>],
+    local_commitment_values: &[&[F]],
 ) -> Vec<F> {
     let mut input_vals = vec![F::ZERO; input_len];
     for (partition, val) in partition_info.iter().zip(local_commitment_values.iter()) {

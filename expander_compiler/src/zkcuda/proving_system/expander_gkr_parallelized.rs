@@ -71,7 +71,7 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
             // TODO: The size here is for the raw commitment, add an function in the pcs trait to get the size of the commitment
             init_commitment_and_extra_info_shared_memory(SINGLE_KERNEL_MAX_PROOF_SIZE, 8);
             write_selected_pkey_to_shared_memory(prover_setup, actual_local_len);
-            write_commit_vals_to_shared_memory::<ECCConfig>(&vals.to_vec());
+            write_commit_vals_to_shared_memory::<ECCConfig>(vals);
             exec_pcs_commit::<C>(parallel_count);
             let (commitment, extra_info) = read_commitment_and_extra_info_from_shared_memory();
             timer.stop();

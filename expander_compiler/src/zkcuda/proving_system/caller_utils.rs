@@ -38,49 +38,42 @@ pub static mut SHARED_MEMORY: SharedMemory = SharedMemory {
     proof: None,
 };
 
+unsafe fn allocate_shared_memory(handle: &mut Option<Shmem>, name: &str, target_size: usize) {
+    if handle.is_some() && handle.as_ref().unwrap().len() >= target_size {
+        return;
+    }
+    *handle = None;
+    *handle = Some(
+        ShmemConf::new()
+            .size(target_size)
+            .flink(name)
+            .force_create_flink()
+            .create()
+            .unwrap(),
+    );
+}
+
 pub fn init_commitment_and_extra_info_shared_memory(
     commitment_size: usize,
     extra_info_size: usize,
 ) {
-    if unsafe { SHARED_MEMORY.commitment.is_some() && SHARED_MEMORY.extra_info.is_some() } {
-        // TODO: Check if the sizes suffice
-        return;
-    }
-
     unsafe {
-        SHARED_MEMORY.commitment = Some(
-            ShmemConf::new()
-                .size(commitment_size)
-                .flink("/tmp/commitment")
-                .force_create_flink()
-                .create()
-                .unwrap(),
+        allocate_shared_memory(
+            &mut SHARED_MEMORY.commitment,
+            "/tmp/commitment",
+            commitment_size,
         );
-        SHARED_MEMORY.extra_info = Some(
-            ShmemConf::new()
-                .size(extra_info_size)
-                .flink("/tmp/extra_info")
-                .force_create_flink()
-                .create()
-                .unwrap(),
+        allocate_shared_memory(
+            &mut SHARED_MEMORY.extra_info,
+            "/tmp/extra_info",
+            extra_info_size,
         );
     }
 }
 
 pub fn init_proof_shared_memory(max_proof_size: usize) {
-    if unsafe { SHARED_MEMORY.proof.is_some() } {
-        return;
-    }
-
     unsafe {
-        SHARED_MEMORY.proof = Some(
-            ShmemConf::new()
-                .size(max_proof_size)
-                .flink("/tmp/proof")
-                .force_create_flink()
-                .create()
-                .unwrap(),
-        );
+        allocate_shared_memory(&mut SHARED_MEMORY.proof, "/tmp/proof", max_proof_size);
     }
 }
 
@@ -127,12 +120,25 @@ pub fn write_selected_pkey_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>
     );
 }
 
-pub fn write_commit_vals_to_shared_memory<C: Config>(vals: &Vec<SIMDField<C>>) {
-    write_object_to_shared_memory(
-        vals,
-        unsafe { &mut SHARED_MEMORY.input_vals },
-        "/tmp/input_vals",
-    );
+pub fn write_commit_vals_to_shared_memory<C: Config>(vals: &[SIMDField<C>]) {
+    // Field implements Copy, so we can just copy the data
+    // The first usize is the length of the vector
+    let vals_size = std::mem::size_of_val(vals);
+    let total_size = std::mem::size_of::<usize>() + vals_size;
+    unsafe {
+        allocate_shared_memory(&mut SHARED_MEMORY.input_vals, "/tmp/input_vals", total_size);
+
+        let mut ptr = SHARED_MEMORY.input_vals.as_mut().unwrap().as_ptr();
+
+        // Copy the length of the vector
+        let len = vals.len();
+        let len_ptr = &len as *const usize as *const u8;
+        std::ptr::copy_nonoverlapping(len_ptr, ptr, std::mem::size_of::<usize>());
+
+        // Copy the values
+        ptr = ptr.add(std::mem::size_of::<usize>());
+        std::ptr::copy_nonoverlapping(vals.as_ptr() as *const u8, ptr, vals_size);
+    }
 }
 
 pub fn write_pcs_setup_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
@@ -188,15 +194,34 @@ pub fn write_commitments_extra_info_to_shared_memory<F: FieldEngine, PCS: Expand
 pub fn write_commitments_values_to_shared_memory<F: FieldEngine>(
     commitments_values: &[&[F::SimdCircuitField]],
 ) {
-    let commitments_values = commitments_values
-        .iter()
-        .map(|&commitment| commitment.to_vec())
-        .collect::<Vec<_>>();
-    write_object_to_shared_memory(
-        &commitments_values,
-        unsafe { &mut SHARED_MEMORY.input_vals },
-        "/tmp/input_vals",
-    );
+    let total_size = std::mem::size_of::<usize>()
+        + commitments_values
+            .iter()
+            .map(|v| std::mem::size_of::<usize>() + std::mem::size_of_val(*v))
+            .sum::<usize>();
+
+    unsafe {
+        allocate_shared_memory(&mut SHARED_MEMORY.input_vals, "/tmp/input_vals", total_size);
+
+        let mut ptr = SHARED_MEMORY.input_vals.as_mut().unwrap().as_ptr();
+
+        // Copy the length of the vector
+        let len = commitments_values.len();
+        let len_ptr = &len as *const usize as *const u8;
+        std::ptr::copy_nonoverlapping(len_ptr, ptr, std::mem::size_of::<usize>());
+        ptr = ptr.add(std::mem::size_of::<usize>());
+
+        for vals in commitments_values {
+            let vals_size = std::mem::size_of_val(*vals);
+            let vals_len = vals.len();
+            let len_ptr = &vals_len as *const usize as *const u8;
+            std::ptr::copy_nonoverlapping(len_ptr, ptr, std::mem::size_of::<usize>());
+            ptr = ptr.add(std::mem::size_of::<usize>());
+
+            std::ptr::copy_nonoverlapping(vals.as_ptr() as *const u8, ptr, vals_size);
+            ptr = ptr.add(vals_size);
+        }
+    }
 }
 
 pub fn write_broadcast_info_to_shared_memory(is_broadcast: &Vec<bool>) {

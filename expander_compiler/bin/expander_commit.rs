@@ -49,7 +49,7 @@ fn commit<C: GKREngine>() {
         &params,
         &mpi_config,
         &p_key,
-        &RefMultiLinearPoly::from_ref(&local_vals_to_commit),
+        &RefMultiLinearPoly::from_ref(local_vals_to_commit),
         &mut scratch,
     );
 
