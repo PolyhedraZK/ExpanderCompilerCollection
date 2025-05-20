@@ -43,7 +43,13 @@ pub fn read_local_vals_to_commit_from_shared_memory<F: FieldEngine>(
     let local_len = total_len / world_size;
     let offset = size_of::<usize>() + world_rank * local_len * <F::SimdCircuitField as Field>::SIZE;
     let ptr = unsafe { ptr.add(offset) };
-    unsafe { std::slice::from_raw_parts(ptr as *const F::SimdCircuitField, local_len).to_vec() }
+
+    let mut v = Vec::with_capacity(local_len);
+    unsafe {
+        std::ptr::copy_nonoverlapping(ptr as *const F::SimdCircuitField, v.as_mut_ptr(), local_len);
+        v.set_len(local_len);
+    }
+    v
 }
 
 pub fn write_object_to_shared_memory_name_string<T: ExpSerde>(object: &T, shared_memory_ref: &str) {
@@ -138,10 +144,15 @@ pub fn read_commitment_values_from_shared_memory<F: FieldEngine>(
             };
 
             let local_ptr = unsafe { ptr.add(offset) };
-            let vals = unsafe {
-                std::slice::from_raw_parts(local_ptr as *const F::SimdCircuitField, local_len_i)
-                    .to_vec()
-            };
+            let mut vals = Vec::with_capacity(local_len_i);
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    local_ptr as *const F::SimdCircuitField,
+                    vals.as_mut_ptr(),
+                    local_len_i,
+                );
+                vals.set_len(local_len_i);
+            }
 
             ptr = unsafe {
                 ptr.add(size_of::<usize>() + total_len_i * <F::SimdCircuitField as Field>::SIZE)
