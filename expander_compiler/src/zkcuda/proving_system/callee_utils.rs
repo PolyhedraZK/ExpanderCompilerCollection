@@ -30,10 +30,10 @@ pub fn read_selected_pkey_from_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>
     read_object_from_shared_memory_name_string("/tmp/pcs_setup", 0)
 }
 
-pub fn read_local_vals_to_commit_from_shared_memory<'a, F: FieldEngine>(
+pub fn read_local_vals_to_commit_from_shared_memory<F: FieldEngine>(
     world_rank: usize,
     world_size: usize,
-) -> &'a [F::SimdCircuitField] {
+) -> Vec<F::SimdCircuitField> {
     let shmem = ShmemConf::new().flink("/tmp/input_vals").open().unwrap();
     let ptr = shmem.as_ptr();
     let total_len: usize =
@@ -43,7 +43,7 @@ pub fn read_local_vals_to_commit_from_shared_memory<'a, F: FieldEngine>(
     let local_len = total_len / world_size;
     let offset = size_of::<usize>() + world_rank * local_len * <F::SimdCircuitField as Field>::SIZE;
     let ptr = unsafe { ptr.add(offset) };
-    unsafe { std::slice::from_raw_parts(ptr as *const F::SimdCircuitField, local_len) }
+    unsafe { std::slice::from_raw_parts(ptr as *const F::SimdCircuitField, local_len).to_vec() }
 }
 
 pub fn write_object_to_shared_memory_name_string<T: ExpSerde>(object: &T, shared_memory_ref: &str) {
@@ -101,11 +101,11 @@ pub fn read_commitment_extra_info_from_shared_memory<F: FieldEngine, PCS: Expand
     read_object_from_shared_memory_name_string("/tmp/extra_info", 0)
 }
 
-pub fn read_commitment_values_from_shared_memory<'a, F: FieldEngine>(
+pub fn read_commitment_values_from_shared_memory<F: FieldEngine>(
     broadcast_info: &[bool],
     world_rank: usize,
     world_size: usize,
-) -> Vec<&'a [F::SimdCircuitField]> {
+) -> Vec<Vec<F::SimdCircuitField>> {
     let shmem = ShmemConf::new().flink("/tmp/input_vals").open().unwrap();
     let mut ptr = shmem.as_ptr();
     let n_components: usize =
@@ -140,6 +140,7 @@ pub fn read_commitment_values_from_shared_memory<'a, F: FieldEngine>(
             let local_ptr = unsafe { ptr.add(offset) };
             let vals = unsafe {
                 std::slice::from_raw_parts(local_ptr as *const F::SimdCircuitField, local_len_i)
+                    .to_vec()
             };
 
             ptr = unsafe {
