@@ -9,9 +9,10 @@ use crate::{
     utils::pool::Pool,
 };
 
+use super::proving_system::compute_bit_position;
 use super::vec_shaped::{flatten_shaped_pack_simd, unflatten_shaped_unpack_simd};
 use super::{
-    kernel::{shape_prepend, Kernel, Shape},
+    kernel::{shape_prepend, BitOrder, Kernel, Shape},
     proof::{ComputationGraph, ProofTemplate},
     proving_system::{ExpanderGKRProvingSystem, ProvingSystem},
     vec_shaped::{flatten_shaped, unflatten_shaped, VecShaped},
@@ -30,6 +31,7 @@ pub struct DeviceMemoryHandleRaw {
     pub id: usize,
     pub broadcast_type: BroadcastType,
     pub shape: Shape,
+    pub bit_order: BitOrder,
 }
 
 pub type DeviceMemoryHandle = Option<DeviceMemoryHandleRaw>;
@@ -198,6 +200,9 @@ fn check_reshape_compat(shape: &[usize], new_shape: &[usize]) {
 
 pub trait Reshape {
     fn reshape(&self, new_shape: &[usize]) -> Self;
+
+    // THIS IS A TEMPORARY SOLUTION, WILL CHANGE API IN THE FUTURE
+    fn reorder_bits(&self, bit_order: &[usize]) -> Self;
 }
 
 impl Reshape for DeviceMemoryHandle {
@@ -211,6 +216,27 @@ impl Reshape for DeviceMemoryHandle {
             id: handle.id,
             broadcast_type: handle.broadcast_type,
             shape: Some(new_shape.to_vec()),
+            bit_order: handle.bit_order,
+        })
+    }
+
+    fn reorder_bits(&self, bit_order: &[usize]) -> Self {
+        let handle = ensure_handle(self.clone());
+        let combined_bit_order = match handle.bit_order {
+            Some(ref x) => {
+                let mut new_bit_order = vec![0; x.len()];
+                for i in 0..x.len() {
+                    new_bit_order[i] = x[bit_order[i]];
+                }
+                Some(new_bit_order)
+            }
+            None => Some(bit_order.to_vec()),
+        };
+        Some(DeviceMemoryHandleRaw {
+            id: handle.id,
+            broadcast_type: handle.broadcast_type,
+            shape: handle.shape,
+            bit_order: combined_bit_order,
         })
     }
 }
@@ -242,6 +268,7 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<CircuitField<C>>> Context<C, 
             id: self.device_memories.len() - 1,
             broadcast_type,
             shape,
+            bit_order: None,
         })
     }
 
@@ -479,18 +506,34 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<CircuitField<C>>> Context<C, 
                 let device_memory = &self.device_memories[input.as_ref().unwrap().id];
                 let offset = ws_input.input_offset.unwrap();
                 if is_broadcast[i] {
-                    for (i, x) in device_memory.values.iter().enumerate() {
-                        ws_inputs[offset + i] = *x;
+                    if let Some(bit_order) = input.as_ref().unwrap().bit_order.clone() {
+                        for i in 0..ws_input.len {
+                            ws_inputs[offset + i] =
+                                device_memory.values[compute_bit_position(&bit_order, i)];
+                        }
+                    } else {
+                        for (i, x) in device_memory.values.iter().enumerate() {
+                            ws_inputs[offset + i] = *x;
+                        }
                     }
                 } else {
-                    for (i, x) in device_memory
-                        .values
-                        .iter()
-                        .skip(parallel_i * next_power_of_two(ws_input.len))
-                        .take(ws_input.len)
-                        .enumerate()
-                    {
-                        ws_inputs[offset + i] = *x;
+                    if let Some(bit_order) = input.as_ref().unwrap().bit_order.clone() {
+                        for i in 0..ws_input.len {
+                            ws_inputs[offset + i] = device_memory.values[compute_bit_position(
+                                &bit_order,
+                                i + parallel_i * next_power_of_two(ws_input.len),
+                            )];
+                        }
+                    } else {
+                        for (i, x) in device_memory
+                            .values
+                            .iter()
+                            .skip(parallel_i * next_power_of_two(ws_input.len))
+                            .take(ws_input.len)
+                            .enumerate()
+                        {
+                            ws_inputs[offset + i] = *x;
+                        }
                     }
                 }
             }
@@ -559,6 +602,10 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<CircuitField<C>>> Context<C, 
         self.proof_templates.push(ProofTemplate {
             kernel_id,
             commitment_indices: handles.iter().map(|x| x.id).collect(),
+            commitment_bit_orders: handles
+                .iter()
+                .map(|x| x.bit_order.clone())
+                .collect::<Vec<_>>(),
             parallel_count,
             is_broadcast: lc_is_broadcast,
         });
@@ -619,6 +666,7 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<CircuitField<C>>> Context<C, 
                         .iter()
                         .map(|x| &self.device_memories[*x].values[..])
                         .collect::<Vec<_>>(),
+                    &template.commitment_bit_orders,
                     next_power_of_two(template.parallel_count),
                     &template.is_broadcast,
                 )
@@ -659,6 +707,7 @@ impl<C: Config> ComputationGraph<C> {
                 &self.kernels[template.kernel_id],
                 proof,
                 commitments_kernel,
+                &template.commitment_bit_orders,
                 next_power_of_two(template.parallel_count),
                 &template.is_broadcast,
             ) {

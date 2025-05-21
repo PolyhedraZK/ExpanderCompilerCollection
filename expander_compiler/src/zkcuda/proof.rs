@@ -1,6 +1,6 @@
 use serdes::ExpSerde;
 
-use super::kernel::Kernel;
+use super::kernel::{BitOrder, Kernel};
 
 use crate::circuit::config::Config;
 
@@ -8,6 +8,7 @@ use crate::circuit::config::Config;
 pub struct ProofTemplate {
     pub kernel_id: usize,
     pub commitment_indices: Vec<usize>,
+    pub commitment_bit_orders: Vec<BitOrder>,
     pub parallel_count: usize,
     pub is_broadcast: Vec<bool>,
 }
