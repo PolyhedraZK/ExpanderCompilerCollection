@@ -32,6 +32,7 @@ pub trait ProvingSystem<C: Config> {
         commitments: &[Self::Commitment],
         commitments_extra_info: &[Self::CommitmentExtraInfo],
         commitments_values: &[&[SIMDField<C>]],
+        commitments_bit_order: &[Option<Vec<usize>>],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> Self::Proof;
@@ -41,6 +42,7 @@ pub trait ProvingSystem<C: Config> {
         kernel: &Kernel<C>,
         proof: &Self::Proof,
         commitments: &[Self::Commitment],
+        commitments_bit_order: &[Option<Vec<usize>>],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> bool;

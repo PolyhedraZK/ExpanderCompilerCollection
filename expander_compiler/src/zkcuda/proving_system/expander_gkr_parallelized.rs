@@ -85,6 +85,7 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
         commitments: &[Self::Commitment],
         commitments_extra_info: &[Self::CommitmentExtraInfo],
         commitments_values: &[&[SIMDField<C>]],
+        _commitments_bit_order: &[Option<Vec<usize>>],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> Self::Proof {
@@ -95,6 +96,7 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
                 commitments,
                 commitments_extra_info,
                 commitments_values,
+                _commitments_bit_order,
                 parallel_count,
                 is_broadcast,
             )
@@ -120,6 +122,7 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
         kernel: &Kernel<ECCConfig>,
         proof: &Self::Proof,
         commitments: &[Self::Commitment],
+        _commitments_bit_order: &[Option<Vec<usize>>],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> bool {
