@@ -112,7 +112,7 @@ dependencies = [
 [[package]]
 name = "arith"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#88e8a34acd52b5404aa39f134e3881593787ae19"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#cd69c114c38158670a1fa5fded8b94dec8719452"
 dependencies = [
  "ark-std",
  "criterion",
@@ -264,7 +264,7 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 [[package]]
 name = "babybear"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#88e8a34acd52b5404aa39f134e3881593787ae19"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#cd69c114c38158670a1fa5fded8b94dec8719452"
 dependencies = [
  "arith",
  "ark-std",
@@ -317,7 +317,7 @@ dependencies = [
 [[package]]
 name = "bin"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#88e8a34acd52b5404aa39f134e3881593787ae19"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#cd69c114c38158670a1fa5fded8b94dec8719452"
 dependencies = [
  "arith",
  "babybear",
@@ -523,7 +523,7 @@ dependencies = [
 [[package]]
 name = "circuit"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#88e8a34acd52b5404aa39f134e3881593787ae19"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#cd69c114c38158670a1fa5fded8b94dec8719452"
 dependencies = [
  "arith",
  "ark-std",
@@ -636,7 +636,7 @@ dependencies = [
 [[package]]
 name = "config_macros"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#88e8a34acd52b5404aa39f134e3881593787ae19"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#cd69c114c38158670a1fa5fded8b94dec8719452"
 dependencies = [
  "gkr_engine",
  "gkr_hashers",
@@ -741,7 +741,7 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 [[package]]
 name = "crosslayer_prototype"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#88e8a34acd52b5404aa39f134e3881593787ae19"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#cd69c114c38158670a1fa5fded8b94dec8719452"
 dependencies = [
  "arith",
  "env_logger",
@@ -1027,7 +1027,7 @@ dependencies = [
 [[package]]
 name = "gf2"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#88e8a34acd52b5404aa39f134e3881593787ae19"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#cd69c114c38158670a1fa5fded8b94dec8719452"
 dependencies = [
  "arith",
  "ark-std",
@@ -1044,7 +1044,7 @@ dependencies = [
 [[package]]
 name = "gf2_128"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#88e8a34acd52b5404aa39f134e3881593787ae19"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#cd69c114c38158670a1fa5fded8b94dec8719452"
 dependencies = [
  "arith",
  "ark-std",
@@ -1063,7 +1063,7 @@ checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 [[package]]
 name = "gkr"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#88e8a34acd52b5404aa39f134e3881593787ae19"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#cd69c114c38158670a1fa5fded8b94dec8719452"
 dependencies = [
  "arith",
  "ark-std",
@@ -1096,7 +1096,7 @@ dependencies = [
 [[package]]
 name = "gkr_engine"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#88e8a34acd52b5404aa39f134e3881593787ae19"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#cd69c114c38158670a1fa5fded8b94dec8719452"
 dependencies = [
  "arith",
  "babybear",
@@ -1115,7 +1115,7 @@ dependencies = [
 [[package]]
 name = "gkr_hashers"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#88e8a34acd52b5404aa39f134e3881593787ae19"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#cd69c114c38158670a1fa5fded8b94dec8719452"
 dependencies = [
  "arith",
  "halo2curves",
@@ -1133,7 +1133,7 @@ checksum = "a8d1add55171497b4705a648c6b583acafb01d58050a51727785f0b2c8e0a2b2"
 [[package]]
 name = "goldilocks"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#88e8a34acd52b5404aa39f134e3881593787ae19"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#cd69c114c38158670a1fa5fded8b94dec8719452"
 dependencies = [
  "arith",
  "ark-std",
@@ -1534,9 +1534,9 @@ checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 
 [[package]]
 name = "jiff"
-version = "0.2.13"
+version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f02000660d30638906021176af16b17498bd0d12813dbfe7b276d8bc7f3c0806"
+checksum = "a194df1107f33c79f4f93d02c80798520551949d59dfad22b6157048a88cca93"
 dependencies = [
  "jiff-static",
  "log",
@@ -1547,9 +1547,9 @@ dependencies = [
 
 [[package]]
 name = "jiff-static"
-version = "0.2.13"
+version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3c30758ddd7188629c6713fc45d1188af4f44c90582311d0c8d8c9907f60c48"
+checksum = "6c6e1db7ed32c6c71b759497fae34bf7933636f75a251b9e736555da426f6442"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1671,7 +1671,7 @@ dependencies = [
 [[package]]
 name = "mersenne31"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#88e8a34acd52b5404aa39f134e3881593787ae19"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#cd69c114c38158670a1fa5fded8b94dec8719452"
 dependencies = [
  "arith",
  "ark-std",
@@ -1982,7 +1982,7 @@ dependencies = [
 [[package]]
 name = "poly_commit"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#88e8a34acd52b5404aa39f134e3881593787ae19"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#cd69c114c38158670a1fa5fded8b94dec8719452"
 dependencies = [
  "arith",
  "ark-std",
@@ -2005,7 +2005,7 @@ dependencies = [
 [[package]]
 name = "polynomials"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#88e8a34acd52b5404aa39f134e3881593787ae19"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#cd69c114c38158670a1fa5fded8b94dec8719452"
 dependencies = [
  "arith",
  "ark-std",
@@ -2315,7 +2315,7 @@ dependencies = [
 [[package]]
 name = "serdes"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#88e8a34acd52b5404aa39f134e3881593787ae19"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#cd69c114c38158670a1fa5fded8b94dec8719452"
 dependencies = [
  "ethnum",
  "halo2curves",
@@ -2326,7 +2326,7 @@ dependencies = [
 [[package]]
 name = "serdes_derive"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#88e8a34acd52b5404aa39f134e3881593787ae19"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#cd69c114c38158670a1fa5fded8b94dec8719452"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2453,7 +2453,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 [[package]]
 name = "sumcheck"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#88e8a34acd52b5404aa39f134e3881593787ae19"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#cd69c114c38158670a1fa5fded8b94dec8719452"
 dependencies = [
  "arith",
  "circuit",
@@ -2636,7 +2636,7 @@ dependencies = [
 [[package]]
 name = "transcript"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#88e8a34acd52b5404aa39f134e3881593787ae19"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#cd69c114c38158670a1fa5fded8b94dec8719452"
 dependencies = [
  "arith",
  "gkr_engine",
@@ -2659,7 +2659,7 @@ dependencies = [
 [[package]]
 name = "tree"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#88e8a34acd52b5404aa39f134e3881593787ae19"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#cd69c114c38158670a1fa5fded8b94dec8719452"
 dependencies = [
  "arith",
  "ark-std",
@@ -2761,7 +2761,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 [[package]]
 name = "utils"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#88e8a34acd52b5404aa39f134e3881593787ae19"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fpcs_minimum_num_vars_refactor#cd69c114c38158670a1fa5fded8b94dec8719452"
 dependencies = [
  "colored",
 ]
