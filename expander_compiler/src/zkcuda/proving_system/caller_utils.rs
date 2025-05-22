@@ -5,6 +5,7 @@ use std::process::Command;
 use crate::{
     circuit::layered::Circuit, frontend::SIMDField, zkcuda::kernel::LayeredCircuitInputVec,
 };
+use arith::Field;
 use gkr_engine::{ExpanderPCS, FieldEngine, FieldType, GKREngine, PolynomialCommitmentType};
 use serdes::ExpSerde;
 use shared_memory::{Shmem, ShmemConf};
@@ -38,49 +39,42 @@ pub static mut SHARED_MEMORY: SharedMemory = SharedMemory {
     proof: None,
 };
 
+unsafe fn allocate_shared_memory(handle: &mut Option<Shmem>, name: &str, target_size: usize) {
+    if handle.is_some() && handle.as_ref().unwrap().len() >= target_size {
+        return;
+    }
+    *handle = None;
+    *handle = Some(
+        ShmemConf::new()
+            .size(target_size)
+            .flink(name)
+            .force_create_flink()
+            .create()
+            .unwrap(),
+    );
+}
+
 pub fn init_commitment_and_extra_info_shared_memory(
     commitment_size: usize,
     extra_info_size: usize,
 ) {
-    if unsafe { SHARED_MEMORY.commitment.is_some() && SHARED_MEMORY.extra_info.is_some() } {
-        // TODO: Check if the sizes suffice
-        return;
-    }
-
     unsafe {
-        SHARED_MEMORY.commitment = Some(
-            ShmemConf::new()
-                .size(commitment_size)
-                .flink("/tmp/commitment")
-                .force_create_flink()
-                .create()
-                .unwrap(),
+        allocate_shared_memory(
+            &mut SHARED_MEMORY.commitment,
+            "/tmp/commitment",
+            commitment_size,
         );
-        SHARED_MEMORY.extra_info = Some(
-            ShmemConf::new()
-                .size(extra_info_size)
-                .flink("/tmp/extra_info")
-                .force_create_flink()
-                .create()
-                .unwrap(),
+        allocate_shared_memory(
+            &mut SHARED_MEMORY.extra_info,
+            "/tmp/extra_info",
+            extra_info_size,
         );
     }
 }
 
 pub fn init_proof_shared_memory(max_proof_size: usize) {
-    if unsafe { SHARED_MEMORY.proof.is_some() } {
-        return;
-    }
-
     unsafe {
-        SHARED_MEMORY.proof = Some(
-            ShmemConf::new()
-                .size(max_proof_size)
-                .flink("/tmp/proof")
-                .force_create_flink()
-                .create()
-                .unwrap(),
-        );
+        allocate_shared_memory(&mut SHARED_MEMORY.proof, "/tmp/proof", max_proof_size);
     }
 }
 
@@ -113,8 +107,12 @@ fn write_object_to_shared_memory<T: ExpSerde>(
     }
 }
 
-pub fn write_selected_pkey_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
-    pcs_setup: &ExpanderGKRProverSetup<F, PCS>,
+pub fn write_selected_pkey_to_shared_memory<
+    PCSField: Field,
+    F: FieldEngine,
+    PCS: ExpanderPCS<F, PCSField>,
+>(
+    pcs_setup: &ExpanderGKRProverSetup<PCSField, F, PCS>,
     actual_local_len: usize,
 ) {
     let setup = pcs_setup.p_keys.get(&actual_local_len).unwrap().clone();
@@ -127,16 +125,33 @@ pub fn write_selected_pkey_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>
     );
 }
 
-pub fn write_commit_vals_to_shared_memory<C: Config>(vals: &Vec<SIMDField<C>>) {
-    write_object_to_shared_memory(
-        vals,
-        unsafe { &mut SHARED_MEMORY.input_vals },
-        "/tmp/input_vals",
-    );
+pub fn write_commit_vals_to_shared_memory<C: Config>(vals: &[SIMDField<C>]) {
+    // Field implements Copy, so we can just copy the data
+    // The first usize is the length of the vector
+    let vals_size = std::mem::size_of_val(vals);
+    let total_size = std::mem::size_of::<usize>() + vals_size;
+    unsafe {
+        allocate_shared_memory(&mut SHARED_MEMORY.input_vals, "/tmp/input_vals", total_size);
+
+        let mut ptr = SHARED_MEMORY.input_vals.as_mut().unwrap().as_ptr();
+
+        // Copy the length of the vector
+        let len = vals.len();
+        let len_ptr = &len as *const usize as *const u8;
+        std::ptr::copy_nonoverlapping(len_ptr, ptr, std::mem::size_of::<usize>());
+
+        // Copy the values
+        ptr = ptr.add(std::mem::size_of::<usize>());
+        std::ptr::copy_nonoverlapping(vals.as_ptr() as *const u8, ptr, vals_size);
+    }
 }
 
-pub fn write_pcs_setup_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
-    pcs_setup: &ExpanderGKRProverSetup<F, PCS>,
+pub fn write_pcs_setup_to_shared_memory<
+    PCSField: Field,
+    F: FieldEngine,
+    PCS: ExpanderPCS<F, PCSField>,
+>(
+    pcs_setup: &ExpanderGKRProverSetup<PCSField, F, PCS>,
 ) {
     write_object_to_shared_memory(
         pcs_setup,
@@ -165,8 +180,12 @@ pub fn write_input_partition_info_to_shared_memory(input_partition: &Vec<Layered
     );
 }
 
-pub fn write_commitments_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
-    commitments: &Vec<ExpanderGKRCommitment<F, PCS>>,
+pub fn write_commitments_to_shared_memory<
+    PCSField: Field,
+    F: FieldEngine,
+    PCS: ExpanderPCS<F, PCSField>,
+>(
+    commitments: &Vec<ExpanderGKRCommitment<PCSField, F, PCS>>,
 ) {
     write_object_to_shared_memory(
         commitments,
@@ -175,8 +194,12 @@ pub fn write_commitments_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
     );
 }
 
-pub fn write_commitments_extra_info_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
-    commitments_extra_info: &Vec<ExpanderGKRCommitmentExtraInfo<F, PCS>>,
+pub fn write_commitments_extra_info_to_shared_memory<
+    PCSField: Field,
+    F: FieldEngine,
+    PCS: ExpanderPCS<F, PCSField>,
+>(
+    commitments_extra_info: &Vec<ExpanderGKRCommitmentExtraInfo<PCSField, F, PCS>>,
 ) {
     write_object_to_shared_memory(
         commitments_extra_info,
@@ -188,15 +211,34 @@ pub fn write_commitments_extra_info_to_shared_memory<F: FieldEngine, PCS: Expand
 pub fn write_commitments_values_to_shared_memory<F: FieldEngine>(
     commitments_values: &[&[F::SimdCircuitField]],
 ) {
-    let commitments_values = commitments_values
-        .iter()
-        .map(|&commitment| commitment.to_vec())
-        .collect::<Vec<_>>();
-    write_object_to_shared_memory(
-        &commitments_values,
-        unsafe { &mut SHARED_MEMORY.input_vals },
-        "/tmp/input_vals",
-    );
+    let total_size = std::mem::size_of::<usize>()
+        + commitments_values
+            .iter()
+            .map(|v| std::mem::size_of::<usize>() + std::mem::size_of_val(*v))
+            .sum::<usize>();
+
+    unsafe {
+        allocate_shared_memory(&mut SHARED_MEMORY.input_vals, "/tmp/input_vals", total_size);
+
+        let mut ptr = SHARED_MEMORY.input_vals.as_mut().unwrap().as_ptr();
+
+        // Copy the length of the vector
+        let len = commitments_values.len();
+        let len_ptr = &len as *const usize as *const u8;
+        std::ptr::copy_nonoverlapping(len_ptr, ptr, std::mem::size_of::<usize>());
+        ptr = ptr.add(std::mem::size_of::<usize>());
+
+        for vals in commitments_values {
+            let vals_size = std::mem::size_of_val(*vals);
+            let vals_len = vals.len();
+            let len_ptr = &vals_len as *const usize as *const u8;
+            std::ptr::copy_nonoverlapping(len_ptr, ptr, std::mem::size_of::<usize>());
+            ptr = ptr.add(std::mem::size_of::<usize>());
+
+            std::ptr::copy_nonoverlapping(vals.as_ptr() as *const u8, ptr, vals_size);
+            ptr = ptr.add(vals_size);
+        }
+    }
 }
 
 pub fn write_broadcast_info_to_shared_memory(is_broadcast: &Vec<bool>) {
@@ -219,7 +261,10 @@ fn exec_command(cmd: &str) {
     let _ = child.wait();
 }
 
-fn parse_config<C: GKREngine>(mpi_size: usize) -> (String, String, String) {
+fn parse_config<C: GKREngine>(mpi_size: usize) -> (String, String, String)
+where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
     let oversubscription = if mpi_size > num_cpus::get_physical() {
         println!("Warning: Not enough cores available for the requested number of processes. Using oversubscription.");
         "--oversubscribe"
@@ -236,9 +281,10 @@ fn parse_config<C: GKREngine>(mpi_size: usize) -> (String, String, String) {
         _ => panic!("Unsupported field type"),
     };
 
-    let pcs_name = match <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::PCS_TYPE {
+    let pcs_name = match <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::PCS_TYPE {
         PolynomialCommitmentType::Raw => "Raw",
         PolynomialCommitmentType::Hyrax => "Hyrax",
+        PolynomialCommitmentType::KZG => "KZG",
         _ => panic!("Unsupported PCS type"),
     };
 
@@ -249,7 +295,10 @@ fn parse_config<C: GKREngine>(mpi_size: usize) -> (String, String, String) {
     )
 }
 
-pub fn exec_pcs_commit<C: GKREngine>(mpi_size: usize) {
+pub fn exec_pcs_commit<C: GKREngine>(mpi_size: usize)
+where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
     let (oversubscription, field_name, pcs_name) = parse_config::<C>(mpi_size);
 
     let cmd_str = format!(
@@ -259,7 +308,10 @@ pub fn exec_pcs_commit<C: GKREngine>(mpi_size: usize) {
     exec_command(&cmd_str);
 }
 
-pub fn exec_gkr_prove_with_pcs<C: GKREngine>(mpi_size: usize) {
+pub fn exec_gkr_prove_with_pcs<C: GKREngine>(mpi_size: usize)
+where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
     let (oversubscription, field_name, pcs_name) = parse_config::<C>(mpi_size);
 
     let cmd_str = format!(
@@ -280,9 +332,13 @@ pub fn read_object_from_shared_memory<T: ExpSerde>(
     T::deserialize_from(buffer).unwrap()
 }
 
-pub fn read_commitment_and_extra_info_from_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>() -> (
-    ExpanderGKRCommitment<F, PCS>,
-    ExpanderGKRCommitmentExtraInfo<F, PCS>,
+pub fn read_commitment_and_extra_info_from_shared_memory<
+    PCSField: Field,
+    F: FieldEngine,
+    PCS: ExpanderPCS<F, PCSField>,
+>() -> (
+    ExpanderGKRCommitment<PCSField, F, PCS>,
+    ExpanderGKRCommitmentExtraInfo<PCSField, F, PCS>,
 ) {
     let commitment = read_object_from_shared_memory(unsafe { &SHARED_MEMORY.commitment }, 0);
     let extra_info = read_object_from_shared_memory(unsafe { &SHARED_MEMORY.extra_info }, 0);

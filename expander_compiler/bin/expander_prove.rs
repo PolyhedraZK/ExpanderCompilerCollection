@@ -21,7 +21,7 @@ use expander_compiler::zkcuda::proving_system::{
 };
 use expander_utils::timer::Timer;
 
-use gkr::{gkr_prove, BN254ConfigSha2Hyrax};
+use gkr::{gkr_prove, BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
 use gkr_engine::{
     ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine,
     PolynomialCommitmentType, SharedMemory, Transcript,
@@ -34,7 +34,10 @@ use sumcheck::ProverScratchPad;
 // But we need to implement `Config` for each GKREngine, which remains to be done
 // For now, the GKREngine actually controls the functionality of the prover
 // The ECCConfig is only used where the `Config` trait is required
-fn prove<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>() {
+fn prove<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>()
+where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
     let mpi_config = MPIConfig::prover_new();
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
@@ -47,7 +50,8 @@ fn prove<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>() {
     }
 
     let timer = Timer::new("one time cost: read setup&circuit", mpi_config.is_root());
-    let pcs_setup = read_pcs_setup_from_shared_memory::<C::FieldConfig, C::PCSConfig>();
+    let pcs_setup =
+        read_pcs_setup_from_shared_memory::<C::PCSField, C::FieldConfig, C::PCSConfig>();
     let (mut expander_circuit, mut window) = if mpi_config.is_root() {
         let ecc_circuit = read_ecc_circuit_from_shared_memory::<ECCConfig>();
         let expander_circuit = ecc_circuit.export_to_expander().flatten::<C>();
@@ -66,6 +70,7 @@ fn prove<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>() {
     );
     let _commitments = if mpi_config.is_root() {
         Some(read_commitment_from_shared_memory::<
+            C::PCSField,
             C::FieldConfig,
             C::PCSConfig,
         >())
@@ -73,7 +78,8 @@ fn prove<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>() {
         None
     };
     let commitments_extra_info =
-        read_commitment_extra_info_from_shared_memory::<C::FieldConfig, C::PCSConfig>();
+        read_commitment_extra_info_from_shared_memory::<C::PCSField, C::FieldConfig, C::PCSConfig>(
+        );
     let local_commitment_values = read_commitment_values_from_shared_memory::<C::FieldConfig>(
         &broadcast_info,
         world_rank,
@@ -144,12 +150,18 @@ fn prove<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>() {
 fn prove_input_claim<C: GKREngine>(
     mpi_config: &MPIConfig,
     local_commitments_values: &[Vec<SIMDField<C>>],
-    p_keys: &ExpanderGKRProverSetup<C::FieldConfig, C::PCSConfig>,
-    commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<C::FieldConfig, C::PCSConfig>],
+    p_keys: &ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<
+        C::PCSField,
+        C::FieldConfig,
+        C::PCSConfig,
+    >],
     challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
     is_broadcast: &[bool],
     transcript: &mut C::TranscriptConfig,
-) {
+) where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
     for ((local_commitment_val, extra_info), _ib) in local_commitments_values
         .iter()
         .zip(commitments_extra_info)
@@ -161,7 +173,10 @@ fn prove_input_claim<C: GKREngine>(
         let nb_challenge_vars = val_len.ilog2() as usize;
         let challenge_vars = challenge.rz[..nb_challenge_vars].to_vec();
 
-        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(val_len);
+        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
+            val_len,
+            mpi_config.world_size(),
+        );
         let p_key = p_keys.p_keys.get(&val_len).unwrap();
 
         let poly = RefMultiLinearPoly::from_ref(vals_to_open);
@@ -182,7 +197,7 @@ fn prove_input_claim<C: GKREngine>(
         transcript.append_field_element(&v);
 
         transcript.lock_proof();
-        let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::open(
+        let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::open(
             &params,
             mpi_config,
             p_key,
@@ -249,9 +264,9 @@ fn main() {
         ("BN254", PolynomialCommitmentType::Hyrax) => {
             prove::<BN254ConfigSha2Hyrax, BN254Config>();
         }
-        // ("BN254", PolynomialCommitmentType::KZG) => {
-        //     prove::<BN254ConfigSha2KZG, BN254Config>();
-        // }
+        ("BN254", PolynomialCommitmentType::KZG) => {
+            prove::<BN254ConfigSha2KZG, BN254Config>();
+        }
         (field_type, pcs_type) => panic!(
             "Combination of {:?} and {:?} not supported",
             field_type, pcs_type

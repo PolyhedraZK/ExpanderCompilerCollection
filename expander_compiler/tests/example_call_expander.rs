@@ -1,7 +1,8 @@
 use arith::Field;
-use arith::SimdField as _SimdField;
+use arith::SimdField;
 use expander_binary::executor;
 use expander_compiler::frontend::*;
+use gkr_engine::FieldEngine;
 use gkr_engine::{MPIConfig, MPIEngine};
 use rand::SeedableRng;
 
@@ -20,7 +21,11 @@ impl<C: Config> Define<C> for Circuit<Variable> {
     }
 }
 
-fn example<C: Config>() {
+fn example<C: Config>()
+where
+    C::PCSField: SimdField<Scalar = <C::FieldConfig as FieldEngine>::CircuitField>,
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
     let n_witnesses = SIMDField::<C>::PACK_SIZE;
     println!("n_witnesses: {}", n_witnesses);
     let compile_result: CompileResult<C> =

@@ -1,10 +1,12 @@
 use std::ptr;
 use std::slice;
 
+use arith::SimdField;
 use expander_binary::executor;
 use expander_compiler::frontend::ChallengeField;
 use expander_compiler::frontend::SIMDField;
 
+use gkr_engine::FieldEngine;
 use libc::{c_uchar, c_ulong, malloc};
 
 use expander_compiler::circuit::config;
@@ -19,7 +21,11 @@ use super::{match_config_id, ByteArray, Config};
 fn prove_circuit_file_inner<C: config::Config>(
     circuit_filename: &str,
     witness: &[u8],
-) -> Result<Vec<u8>, String> {
+) -> Result<Vec<u8>, String>
+where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+    C::PCSField: SimdField<Scalar = <C::FieldConfig as FieldEngine>::CircuitField>,
+{
     let mpi_config = MPIConfig::prover_new();
 
     let mut circuit =
