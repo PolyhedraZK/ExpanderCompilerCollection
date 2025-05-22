@@ -25,8 +25,11 @@ pub fn read_object_from_shared_memory_name_string<T: ExpSerde>(
 }
 
 #[allow(clippy::type_complexity)]
-pub fn read_selected_pkey_from_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
-) -> (usize, <PCS::SRS as StructuredReferenceString>::PKey) {
+pub fn read_selected_pkey_from_shared_memory<
+    PCSField: Field,
+    F: FieldEngine,
+    PCS: ExpanderPCS<F, PCSField>,
+>() -> (usize, <PCS::SRS as StructuredReferenceString>::PKey) {
     read_object_from_shared_memory_name_string("/tmp/pcs_setup", 0)
 }
 
@@ -72,20 +75,31 @@ pub fn write_object_to_shared_memory_name_string<T: ExpSerde>(object: &T, shared
     }
 }
 
-pub fn write_commitment_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
-    commitment: &ExpanderGKRCommitment<F, PCS>,
+pub fn write_commitment_to_shared_memory<
+    PCSField: Field,
+    F: FieldEngine,
+    PCS: ExpanderPCS<F, PCSField>,
+>(
+    commitment: &ExpanderGKRCommitment<PCSField, F, PCS>,
 ) {
     write_object_to_shared_memory_name_string(commitment, "/tmp/commitment");
 }
 
-pub fn write_commitment_extra_info_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
-    extra_info: &ExpanderGKRCommitmentExtraInfo<F, PCS>,
+pub fn write_commitment_extra_info_to_shared_memory<
+    PCSField: Field,
+    F: FieldEngine,
+    PCS: ExpanderPCS<F, PCSField>,
+>(
+    extra_info: &ExpanderGKRCommitmentExtraInfo<PCSField, F, PCS>,
 ) {
     write_object_to_shared_memory_name_string(extra_info, "/tmp/extra_info");
 }
 
-pub fn read_pcs_setup_from_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
-) -> ExpanderGKRProverSetup<F, PCS> {
+pub fn read_pcs_setup_from_shared_memory<
+    PCSField: Field,
+    F: FieldEngine,
+    PCS: ExpanderPCS<F, PCSField>,
+>() -> ExpanderGKRProverSetup<PCSField, F, PCS> {
     read_object_from_shared_memory_name_string("/tmp/pcs_setup", 0)
 }
 
@@ -97,13 +111,19 @@ pub fn read_partition_info_from_shared_memory() -> Vec<LayeredCircuitInputVec> {
     read_object_from_shared_memory_name_string("/tmp/input_partition", 0)
 }
 
-pub fn read_commitment_from_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
-) -> Vec<ExpanderGKRCommitment<F, PCS>> {
+pub fn read_commitment_from_shared_memory<
+    PCSField: Field,
+    F: FieldEngine,
+    PCS: ExpanderPCS<F, PCSField>,
+>() -> Vec<ExpanderGKRCommitment<PCSField, F, PCS>> {
     read_object_from_shared_memory_name_string("/tmp/commitment", 0)
 }
 
-pub fn read_commitment_extra_info_from_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
-) -> Vec<ExpanderGKRCommitmentExtraInfo<F, PCS>> {
+pub fn read_commitment_extra_info_from_shared_memory<
+    PCSField: Field,
+    F: FieldEngine,
+    PCS: ExpanderPCS<F, PCSField>,
+>() -> Vec<ExpanderGKRCommitmentExtraInfo<PCSField, F, PCS>> {
     read_object_from_shared_memory_name_string("/tmp/extra_info", 0)
 }
 

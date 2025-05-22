@@ -5,6 +5,7 @@ use std::process::Command;
 use crate::{
     circuit::layered::Circuit, frontend::SIMDField, zkcuda::kernel::LayeredCircuitInputVec,
 };
+use arith::Field;
 use gkr_engine::{ExpanderPCS, FieldEngine, FieldType, GKREngine, PolynomialCommitmentType};
 use serdes::ExpSerde;
 use shared_memory::{Shmem, ShmemConf};
@@ -106,8 +107,12 @@ fn write_object_to_shared_memory<T: ExpSerde>(
     }
 }
 
-pub fn write_selected_pkey_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
-    pcs_setup: &ExpanderGKRProverSetup<F, PCS>,
+pub fn write_selected_pkey_to_shared_memory<
+    PCSField: Field,
+    F: FieldEngine,
+    PCS: ExpanderPCS<F, PCSField>,
+>(
+    pcs_setup: &ExpanderGKRProverSetup<PCSField, F, PCS>,
     actual_local_len: usize,
 ) {
     let setup = pcs_setup.p_keys.get(&actual_local_len).unwrap().clone();
@@ -141,8 +146,12 @@ pub fn write_commit_vals_to_shared_memory<C: Config>(vals: &[SIMDField<C>]) {
     }
 }
 
-pub fn write_pcs_setup_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
-    pcs_setup: &ExpanderGKRProverSetup<F, PCS>,
+pub fn write_pcs_setup_to_shared_memory<
+    PCSField: Field,
+    F: FieldEngine,
+    PCS: ExpanderPCS<F, PCSField>,
+>(
+    pcs_setup: &ExpanderGKRProverSetup<PCSField, F, PCS>,
 ) {
     write_object_to_shared_memory(
         pcs_setup,
@@ -171,8 +180,12 @@ pub fn write_input_partition_info_to_shared_memory(input_partition: &Vec<Layered
     );
 }
 
-pub fn write_commitments_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
-    commitments: &Vec<ExpanderGKRCommitment<F, PCS>>,
+pub fn write_commitments_to_shared_memory<
+    PCSField: Field,
+    F: FieldEngine,
+    PCS: ExpanderPCS<F, PCSField>,
+>(
+    commitments: &Vec<ExpanderGKRCommitment<PCSField, F, PCS>>,
 ) {
     write_object_to_shared_memory(
         commitments,
@@ -181,8 +194,12 @@ pub fn write_commitments_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
     );
 }
 
-pub fn write_commitments_extra_info_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
-    commitments_extra_info: &Vec<ExpanderGKRCommitmentExtraInfo<F, PCS>>,
+pub fn write_commitments_extra_info_to_shared_memory<
+    PCSField: Field,
+    F: FieldEngine,
+    PCS: ExpanderPCS<F, PCSField>,
+>(
+    commitments_extra_info: &Vec<ExpanderGKRCommitmentExtraInfo<PCSField, F, PCS>>,
 ) {
     write_object_to_shared_memory(
         commitments_extra_info,
@@ -244,7 +261,10 @@ fn exec_command(cmd: &str) {
     let _ = child.wait();
 }
 
-fn parse_config<C: GKREngine>(mpi_size: usize) -> (String, String, String) {
+fn parse_config<C: GKREngine>(mpi_size: usize) -> (String, String, String)
+where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
     let oversubscription = if mpi_size > num_cpus::get_physical() {
         println!("Warning: Not enough cores available for the requested number of processes. Using oversubscription.");
         "--oversubscribe"
@@ -261,7 +281,7 @@ fn parse_config<C: GKREngine>(mpi_size: usize) -> (String, String, String) {
         _ => panic!("Unsupported field type"),
     };
 
-    let pcs_name = match <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::PCS_TYPE {
+    let pcs_name = match <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::PCS_TYPE {
         PolynomialCommitmentType::Raw => "Raw",
         PolynomialCommitmentType::Hyrax => "Hyrax",
         PolynomialCommitmentType::KZG => "KZG",
@@ -275,7 +295,10 @@ fn parse_config<C: GKREngine>(mpi_size: usize) -> (String, String, String) {
     )
 }
 
-pub fn exec_pcs_commit<C: GKREngine>(mpi_size: usize) {
+pub fn exec_pcs_commit<C: GKREngine>(mpi_size: usize)
+where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
     let (oversubscription, field_name, pcs_name) = parse_config::<C>(mpi_size);
 
     let cmd_str = format!(
@@ -285,7 +308,10 @@ pub fn exec_pcs_commit<C: GKREngine>(mpi_size: usize) {
     exec_command(&cmd_str);
 }
 
-pub fn exec_gkr_prove_with_pcs<C: GKREngine>(mpi_size: usize) {
+pub fn exec_gkr_prove_with_pcs<C: GKREngine>(mpi_size: usize)
+where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
     let (oversubscription, field_name, pcs_name) = parse_config::<C>(mpi_size);
 
     let cmd_str = format!(
@@ -306,9 +332,13 @@ pub fn read_object_from_shared_memory<T: ExpSerde>(
     T::deserialize_from(buffer).unwrap()
 }
 
-pub fn read_commitment_and_extra_info_from_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>() -> (
-    ExpanderGKRCommitment<F, PCS>,
-    ExpanderGKRCommitmentExtraInfo<F, PCS>,
+pub fn read_commitment_and_extra_info_from_shared_memory<
+    PCSField: Field,
+    F: FieldEngine,
+    PCS: ExpanderPCS<F, PCSField>,
+>() -> (
+    ExpanderGKRCommitment<PCSField, F, PCS>,
+    ExpanderGKRCommitmentExtraInfo<PCSField, F, PCS>,
 ) {
     let commitment = read_object_from_shared_memory(unsafe { &SHARED_MEMORY.commitment }, 0);
     let extra_info = read_object_from_shared_memory(unsafe { &SHARED_MEMORY.extra_info }, 0);

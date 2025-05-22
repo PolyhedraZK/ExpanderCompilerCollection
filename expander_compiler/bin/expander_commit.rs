@@ -16,10 +16,15 @@ use expander_compiler::zkcuda::proving_system::{
 };
 
 use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
-use gkr_engine::{ExpanderPCS, GKREngine, MPIConfig, MPIEngine, PolynomialCommitmentType};
+use gkr_engine::{
+    ExpanderPCS, FieldEngine, GKREngine, MPIConfig, MPIEngine, PolynomialCommitmentType,
+};
 use polynomials::RefMultiLinearPoly;
 
-fn commit<C: GKREngine>() {
+fn commit<C: GKREngine>()
+where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
     let mpi_config = MPIConfig::prover_new();
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
@@ -32,20 +37,22 @@ fn commit<C: GKREngine>() {
     }
 
     let (local_val_len, p_key) =
-        read_selected_pkey_from_shared_memory::<C::FieldConfig, C::PCSConfig>();
+        read_selected_pkey_from_shared_memory::<C::PCSField, C::FieldConfig, C::PCSConfig>();
 
     let local_vals_to_commit =
         read_local_vals_to_commit_from_shared_memory::<C::FieldConfig>(world_rank, world_size);
 
-    let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(
+    let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
         local_val_len.ilog2() as usize,
         mpi_config.world_size(),
     );
 
-    let mut scratch =
-        <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::init_scratch_pad(&params, &mpi_config);
+    let mut scratch = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::init_scratch_pad(
+        &params,
+        &mpi_config,
+    );
 
-    let commitment = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::commit(
+    let commitment = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::commit(
         &params,
         &mpi_config,
         &p_key,
@@ -62,8 +69,10 @@ fn commit<C: GKREngine>() {
             scratch: vec![scratch],
         };
 
-        write_commitment_to_shared_memory::<C::FieldConfig, C::PCSConfig>(&commitment);
-        write_commitment_extra_info_to_shared_memory::<C::FieldConfig, C::PCSConfig>(&extra_info);
+        write_commitment_to_shared_memory::<C::PCSField, C::FieldConfig, C::PCSConfig>(&commitment);
+        write_commitment_extra_info_to_shared_memory::<C::PCSField, C::FieldConfig, C::PCSConfig>(
+            &extra_info,
+        );
     }
 
     MPIConfig::finalize();
