@@ -11,11 +11,11 @@ pub trait Commitment<C: Config>: Clone + ExpSerde {
 pub trait Proof: Clone + ExpSerde {}
 
 pub trait ProvingSystem<C: Config> {
-    type ProverSetup: Clone;
-    type VerifierSetup: Clone;
-    type Proof: Proof;
-    type Commitment: Commitment<C>;
-    type CommitmentExtraInfo: Clone;
+    type ProverSetup: Clone + Send + Sync;
+    type VerifierSetup: Clone + Send + Sync;
+    type Proof: Proof + Send + Sync;
+    type Commitment: Commitment<C> + Send + Sync;
+    type CommitmentExtraInfo: Clone + Send + Sync;
 
     fn setup(computation_graph: &ComputationGraph<C>) -> (Self::ProverSetup, Self::VerifierSetup);
 

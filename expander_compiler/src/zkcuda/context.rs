@@ -1,4 +1,6 @@
 use arith::SimdField;
+use expander_utils::timer::Timer;
+use rayon::prelude::*;
 use serdes::ExpSerde;
 
 use crate::field::FieldArith;
@@ -648,23 +650,26 @@ impl<C: Config> ComputationGraph<C> {
         //         return false;
         //     }
         // }
-        for ((proof, template), commitments_kernel) in combined_proof
+
+        let timer = Timer::new("Total Verification Time", true);
+        let verified = combined_proof
             .proofs
-            .iter()
-            .zip(self.proof_templates.iter())
-            .zip(combined_proof.commitments.iter())
-        {
-            if !P::verify(
-                verifier_setup,
-                &self.kernels[template.kernel_id],
-                proof,
-                commitments_kernel,
-                next_power_of_two(template.parallel_count),
-                &template.is_broadcast,
-            ) {
-                return false;
-            }
-        }
-        true
+            .par_iter()
+            .zip(self.proof_templates.par_iter())
+            .zip(combined_proof.commitments.par_iter())
+            .map(|((proof, template), commitments_kernel)| {
+                P::verify(
+                    verifier_setup,
+                    &self.kernels[template.kernel_id],
+                    proof,
+                    commitments_kernel,
+                    next_power_of_two(template.parallel_count),
+                    &template.is_broadcast,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        timer.stop();
+        verified.iter().all(|x| *x)
     }
 }
