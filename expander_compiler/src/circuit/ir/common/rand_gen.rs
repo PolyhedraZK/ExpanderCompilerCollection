@@ -19,6 +19,7 @@ impl RandomConstraintType for RawConstraintType {
     fn random(_r: impl RngCore) -> Self {}
 }
 
+#[derive(Clone)]
 pub struct RandomRange {
     pub min: usize,
     pub max: usize,
@@ -30,6 +31,7 @@ impl RandomRange {
     }
 }
 
+#[derive(Clone)]
 pub struct RandomCircuitConfig {
     pub seed: usize,
     pub num_circuits: RandomRange,

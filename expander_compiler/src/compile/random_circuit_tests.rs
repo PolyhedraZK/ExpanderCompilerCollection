@@ -7,18 +7,24 @@ use crate::{
         },
         layered::{CrossLayerInputType, InputType, NormalInputType},
     },
-    compile::compile,
+    compile::{compile, compile_with_options},
     field::FieldArith,
     frontend::BabyBearConfig,
     utils::error::Error,
 };
 
-fn do_test<C: Config, I: InputType>(mut config: RandomCircuitConfig, seed: RandomRange) {
+use super::CompileOptions;
+
+fn do_test_with_options<C: Config, I: InputType>(
+    mut config: RandomCircuitConfig,
+    seed: RandomRange,
+    compile_options: CompileOptions,
+) {
     for i in seed.min..seed.max {
         config.seed = i;
         let root = IrSourceRoot::<C>::random(&config);
         assert_eq!(root.validate(), Ok(()));
-        let res = compile::<_, I>(&root);
+        let res = compile_with_options::<_, I>(&root, compile_options.clone());
         match res {
             Ok((ir_hint_normalized, layered_circuit)) => {
                 assert_eq!(ir_hint_normalized.validate(), Ok(()));
@@ -60,6 +66,24 @@ fn do_test<C: Config, I: InputType>(mut config: RandomCircuitConfig, seed: Rando
             },
         }
     }
+}
+
+fn do_test<C: Config, I: InputType>(config: RandomCircuitConfig, seed: RandomRange) {
+    do_test_with_options::<C, I>(
+        config.clone(),
+        seed.clone(),
+        CompileOptions::default().with_opt_level(1),
+    );
+    do_test_with_options::<C, I>(
+        config.clone(),
+        seed.clone(),
+        CompileOptions::default().with_opt_level(2),
+    );
+    do_test_with_options::<C, I>(
+        config.clone(),
+        seed.clone(),
+        CompileOptions::default().with_opt_level(3),
+    );
 }
 
 fn do_tests<C: Config, I: InputType>(seed: usize) {
