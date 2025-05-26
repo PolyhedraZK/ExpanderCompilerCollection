@@ -38,7 +38,9 @@ fn prove<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>()
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    let mpi_config = MPIConfig::prover_new();
+    let universe = MPIConfig::init();
+    let world = universe.as_ref().map(|u| u.world());
+    let mpi_config = MPIConfig::prover_new(universe.as_ref(), world.as_ref());
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
     assert!(
@@ -143,7 +145,6 @@ where
     }
     expander_circuit.discard_control_of_shared_mem();
     mpi_config.free_shared_mem(&mut window);
-    MPIConfig::finalize();
 }
 
 #[allow(clippy::too_many_arguments)]

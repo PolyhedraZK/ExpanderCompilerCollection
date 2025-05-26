@@ -25,7 +25,9 @@ fn commit<C: GKREngine>()
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    let mpi_config = MPIConfig::prover_new();
+    let universe = MPIConfig::init();
+    let world = universe.as_ref().map(|u| u.world());
+    let mpi_config = MPIConfig::prover_new(universe.as_ref(), world.as_ref());
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
     assert!(
@@ -74,8 +76,6 @@ where
             &extra_info,
         );
     }
-
-    MPIConfig::finalize();
 }
 
 fn main() {
