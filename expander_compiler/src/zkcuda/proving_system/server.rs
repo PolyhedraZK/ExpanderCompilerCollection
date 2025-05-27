@@ -39,11 +39,11 @@ unsafe impl<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> 
 {
 }
 
-fn root_main<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>>(
+async fn root_main<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>>(
     State(state): State<ServerState<'a, PCSField, F, PCS>>,
     Json(request_type): Json<RequestType>,
 ) -> Json<bool> {
-    // let _lock = state.lock.lock().await; // Ensure only one request is processed at a time
+    let _lock = state.lock.lock().await; // Ensure only one request is processed at a time
     match request_type {
         RequestType::PCSSetup(local_val_len, mpi_world_size) => {
             println!(
@@ -81,7 +81,12 @@ fn root_main<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>>
             state
                 .global_mpi_config
                 .root_broadcast_bytes(&mut vec![255u8; 1]);
-            return axum::Json(false); // Indicate that the server should stop
+            state
+                .shutdown_tx
+                .lock()
+                .await
+                .take()
+                .map(|tx| tx.send(()).ok());
         }
     }
 
@@ -140,12 +145,18 @@ async fn main() {
     };
 
     if global_mpi_config.is_root() {
-        let app = Router::new().route("/", post(root_main)).with_state(state);
+        let app = Router::new()
+            .route("/", post(root_main))
+            .with_state(state);
 
         let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
         println!("Server running at http://{}", addr);
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
         axum::serve(listener, app.into_make_service())
+            .with_graceful_shutdown(async {
+                rx.await.ok();
+                println!("Shutting down server...");
+            })
             .await
             .unwrap();
     } else {
