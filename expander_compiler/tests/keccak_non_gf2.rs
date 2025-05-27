@@ -2,7 +2,7 @@ use ethnum::U256;
 use expander_compiler::field::FieldArith;
 use expander_compiler::frontend::*;
 use rand::{Rng, SeedableRng};
-use exp_serde::ExpSerde;
+use serdes::ExpSerde;
 use tiny_keccak::Hasher;
 
 const N_HASHES: usize = 2;

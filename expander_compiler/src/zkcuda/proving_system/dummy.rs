@@ -1,4 +1,4 @@
-use exp_serde::ExpSerde;
+use serdes::ExpSerde;
 
 use crate::circuit::config::{Config, SIMDField};
 

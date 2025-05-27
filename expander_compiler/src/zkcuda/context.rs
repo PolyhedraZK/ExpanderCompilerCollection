@@ -1,7 +1,7 @@
 use arith::SimdField;
 use expander_utils::timer::Timer;
 use rayon::prelude::*;
-use exp_serde::ExpSerde;
+use serdes::ExpSerde;
 
 use crate::field::FieldArith;
 use crate::hints::registry::{EmptyHintCaller, HintCaller};

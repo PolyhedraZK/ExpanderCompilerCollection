@@ -61,7 +61,7 @@ goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi
 poly_commit = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor", package = "poly_commit" }
 polynomials = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor" }
 sumcheck = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor" }
-exp_serde = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor" }
+serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor", package = "serdes" }
 gkr_engine = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor" }
 gkr_hashers = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor" }
 expander_utils = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor", package = "utils" }

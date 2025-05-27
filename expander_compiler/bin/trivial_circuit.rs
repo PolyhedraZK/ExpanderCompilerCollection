@@ -15,7 +15,7 @@ use expander_compiler::{
     declare_circuit,
     frontend::{Config, Variable},
 };
-use exp_serde::ExpSerde;
+use serdes::ExpSerde;
 
 /// Arguments for the command line
 /// - field: field identifier

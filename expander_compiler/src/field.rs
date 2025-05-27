@@ -3,7 +3,7 @@ use babybear::{BabyBear, BabyBearx16};
 pub use gf2::{GF2x8, GF2};
 pub use goldilocks::{Goldilocks, Goldilocksx8};
 pub use mersenne31::{M31x16, M31};
-use exp_serde::ExpSerde;
+use serdes::ExpSerde;
 
 pub trait Field: FieldArith + ExpSerde {}
 

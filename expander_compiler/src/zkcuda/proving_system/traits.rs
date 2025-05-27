@@ -1,4 +1,4 @@
-use exp_serde::ExpSerde;
+use serdes::ExpSerde;
 
 use super::super::{kernel::Kernel, proof::ComputationGraph};
 

@@ -27,7 +27,7 @@ use gkr_engine::{
     PolynomialCommitmentType, SharedMemory, Transcript,
 };
 use polynomials::RefMultiLinearPoly;
-use exp_serde::ExpSerde;
+use serdes::ExpSerde;
 use sumcheck::ProverScratchPad;
 
 // Ideally, there will only one ECCConfig generics

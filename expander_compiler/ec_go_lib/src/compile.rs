@@ -5,7 +5,7 @@ use std::slice;
 use expander_compiler::circuit::layered::NormalInputType;
 use expander_compiler::circuit::{config, ir};
 use expander_compiler::frontend::{BN254Config, GF2Config, GoldilocksConfig, M31Config};
-use exp_serde::ExpSerde;
+use serdes::ExpSerde;
 
 use super::{match_config_id, ByteArray, Config};
 

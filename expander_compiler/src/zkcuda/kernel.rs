@@ -16,7 +16,7 @@ use crate::{
 };
 pub use macros::kernel;
 
-use exp_serde::ExpSerde;
+use serdes::ExpSerde;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, ExpSerde)]
 pub struct Kernel<C: Config> {
