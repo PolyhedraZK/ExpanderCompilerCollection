@@ -1,5 +1,5 @@
 use expander_compiler::frontend::*;
-use serdes::ExpSerde;
+use exp_serde::ExpSerde;
 
 declare_circuit!(Circuit {
     x: Variable,

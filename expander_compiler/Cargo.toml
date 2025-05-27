@@ -7,6 +7,7 @@ edition = "2021"
 [dependencies]
 arith.workspace = true
 ark-std.workspace = true
+axum.workspace = true
 babybear.workspace = true
 chrono.workspace = true
 clap.workspace = true
@@ -29,10 +30,14 @@ poly_commit.workspace = true
 polynomials.workspace = true
 rand.workspace = true
 rayon.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+exp_serde.workspace = true
+serde_json.workspace = true
 sumcheck.workspace = true
-serdes.workspace = true
-tiny-keccak.workspace = true
 shared_memory.workspace = true
+tiny-keccak.workspace = true
+tokio.workspace = true
 
 [dev-dependencies]
 rayon = "1.9"

@@ -7,7 +7,7 @@ use crate::{
 };
 use arith::Field;
 use gkr_engine::{ExpanderPCS, FieldEngine, FieldType, GKREngine, PolynomialCommitmentType};
-use serdes::ExpSerde;
+use exp_serde::ExpSerde;
 use shared_memory::{Shmem, ShmemConf};
 
 use crate::circuit::{config::Config, layered::InputType};

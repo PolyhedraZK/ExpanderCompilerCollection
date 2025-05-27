@@ -23,7 +23,7 @@ use expander_utils::timer::Timer;
 use arith::Field;
 use gkr::gkr_verify;
 use gkr_engine::{ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, Transcript};
-use serdes::ExpSerde;
+use exp_serde::ExpSerde;
 
 use polynomials::EqPolynomial;
 

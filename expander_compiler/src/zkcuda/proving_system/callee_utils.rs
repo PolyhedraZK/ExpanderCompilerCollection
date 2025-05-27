@@ -1,6 +1,6 @@
 use arith::Field;
 use gkr_engine::{ExpanderPCS, FieldEngine, StructuredReferenceString};
-use serdes::ExpSerde;
+use exp_serde::ExpSerde;
 use shared_memory::ShmemConf;
 
 use crate::{

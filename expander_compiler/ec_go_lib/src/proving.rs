@@ -13,7 +13,7 @@ use expander_compiler::circuit::config;
 use expander_compiler::circuit::layered;
 use expander_compiler::frontend::{BN254Config, GF2Config, GoldilocksConfig, M31Config};
 use gkr_engine::MPIConfig;
-use serdes::ExpSerde;
+use exp_serde::ExpSerde;
 
 use super::{match_config_id, ByteArray, Config};
 

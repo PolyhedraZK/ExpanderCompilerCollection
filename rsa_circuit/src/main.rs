@@ -15,7 +15,7 @@ use halo2curves::bn256::Fr;
 use native::RSAFieldElement;
 use num_bigint::BigUint;
 use rand::RngCore;
-use serdes::ExpSerde;
+use exp_serde::ExpSerde;
 use sha2::Digest;
 
 // see explanation in circuit declaration

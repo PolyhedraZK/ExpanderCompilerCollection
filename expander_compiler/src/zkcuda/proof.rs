@@ -1,4 +1,4 @@
-use serdes::ExpSerde;
+use exp_serde::ExpSerde;
 
 use super::kernel::Kernel;
 

@@ -1,7 +1,7 @@
 use circuit_std_rs::StdCircuit;
 use expander_compiler::frontend::*;
 use rand::thread_rng;
-use serdes::ExpSerde;
+use exp_serde::ExpSerde;
 
 pub fn circuit_test_helper<Cfg, Cir>(params: &Cir::Params)
 where

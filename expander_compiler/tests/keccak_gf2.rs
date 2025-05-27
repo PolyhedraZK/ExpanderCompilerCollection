@@ -1,7 +1,7 @@
 use expander_compiler::{circuit::layered::InputType, frontend::*};
 use extra::*;
 use rand::{Rng, SeedableRng};
-use serdes::ExpSerde;
+use exp_serde::ExpSerde;
 use tiny_keccak::Hasher;
 
 const N_HASHES: usize = 1;

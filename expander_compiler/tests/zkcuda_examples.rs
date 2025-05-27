@@ -8,7 +8,7 @@ use expander_compiler::zkcuda::proving_system::{
 use expander_compiler::zkcuda::{context::*, kernel::*};
 use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
 use gkr_engine::FieldEngine;
-use serdes::ExpSerde;
+use exp_serde::ExpSerde;
 
 fn add_2<C: Config>(api: &mut API<C>, inputs: &mut Vec<Vec<Variable>>) {
     let a = inputs[0][0];
