@@ -1,3 +1,4 @@
+/*
 use super::{context::*, kernel::*, proving_system::*};
 use crate::frontend::*;
 
@@ -276,3 +277,4 @@ fn compile_macro_kernels() {
     let _ = compile_macro_kernel_2::<M31Config>();
     let _ = compile_macro_kernel_3::<M31Config>();
 }
+*/

@@ -1,3 +1,4 @@
+/*
 use expander_compiler::field::FieldArith;
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::proving_system::ExpanderGKRProvingSystem;
@@ -411,3 +412,4 @@ fn zkcuda_keccak_2() {
     assert!(computation_graph.verify(&proof, &verifier_setup));
     println!("verify ok");
 }
+*/

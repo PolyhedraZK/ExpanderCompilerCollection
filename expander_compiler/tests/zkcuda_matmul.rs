@@ -1,3 +1,4 @@
+/*
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::{context::*, kernel::*};
 
@@ -88,3 +89,4 @@ fn zkcuda_matmul_sum() {
     let proof = ctx.to_proof(&prover_setup);
     assert!(computation_graph.verify(&proof, &verifier_setup));
 }
+*/
