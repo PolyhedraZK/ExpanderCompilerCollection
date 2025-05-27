@@ -15,4 +15,5 @@ pub use expander_gkr_parallelized::*;
 
 pub mod callee_utils;
 mod caller_utils;
+pub mod client;
 pub mod server;

@@ -17,7 +17,7 @@ use gkr_engine::{
     Proof as ExpanderProof, StructuredReferenceString, Transcript,
 };
 use poly_commit::expander_pcs_init_testing_only;
-use polynomials::{EqPolynomial, MultiLinearPoly};
+use polynomials::{EqPolynomial, MultiLinearPoly, RefMultiLinearPoly};
 use serdes::ExpSerde;
 use sumcheck::ProverScratchPad;
 
@@ -433,8 +433,7 @@ fn prove_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfi
             <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(val_len, 1);
         let p_key = p_keys.p_keys.get(&val_len).unwrap();
 
-        // TODO: Remove unnecessary `to_vec` clone
-        let poly = MultiLinearPoly::new(vals_to_open.to_vec());
+        let poly = RefMultiLinearPoly::from_ref(vals_to_open);
         let v =
             <C::FieldConfig as FieldEngine>::single_core_eval_circuit_vals_at_expander_challenge(
                 vals_to_open,

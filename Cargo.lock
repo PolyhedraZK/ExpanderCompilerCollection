@@ -992,6 +992,7 @@ dependencies = [
  "halo2curves",
  "macros",
  "mersenne31",
+ "mpi",
  "num_cpus",
  "poly_commit",
  "polynomials",
