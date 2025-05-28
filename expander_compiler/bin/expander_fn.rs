@@ -4,6 +4,7 @@ use std::cmp::max;
 use std::str::FromStr;
 
 use arith::Field;
+use expander_circuit::Circuit as ExpCircuit;
 use expander_compiler::frontend::{
     BN254Config, BabyBearConfig, Config, GF2Config, GoldilocksConfig, M31Config, SIMDField,
 };
@@ -18,9 +19,10 @@ use expander_compiler::zkcuda::proving_system::callee_utils::{
     write_commitment_extra_info_to_shared_memory, write_commitment_to_shared_memory,
 };
 use expander_compiler::zkcuda::proving_system::{
-    max_n_vars, pcs_testing_setup_fixed_seed, ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof, ExpanderGKRProverSetup, ExpanderGKRVerifierSetup
+    max_n_vars, pcs_testing_setup_fixed_seed, ExpanderGKRCommitment,
+    ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof, ExpanderGKRProverSetup,
+    ExpanderGKRVerifierSetup,
 };
-use expander_circuit::Circuit as ExpCircuit;
 use expander_utils::timer::Timer;
 
 use gkr::{gkr_prove, BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
@@ -98,8 +100,7 @@ where
     );
 
     let mut scratch = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::init_scratch_pad(
-        &params,
-        mpi_config,
+        &params, mpi_config,
     );
 
     let commitment = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::commit(
@@ -134,8 +135,7 @@ pub fn prove<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     mpi_config: &MPIConfig,
     pcs_setup: &ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
     expander_circuit: &mut ExpCircuit<C::FieldConfig>, // mut to allow filling rnd coefs and circuit inputs
-)
-where
+) where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let world_rank = mpi_config.world_rank();

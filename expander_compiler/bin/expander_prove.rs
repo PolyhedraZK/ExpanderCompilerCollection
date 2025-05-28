@@ -6,8 +6,8 @@ mod expander_fn;
 use clap::Parser;
 use expander_compiler::zkcuda::proving_system::ExpanderGKRVerifierSetup;
 use mpi::environment::Universe;
-use mpi::topology::SimpleCommunicator;
 use mpi::ffi::MPI_Win;
+use mpi::topology::SimpleCommunicator;
 use std::str::FromStr;
 
 use arith::Field;
@@ -111,7 +111,10 @@ where
                 .global_mpi_config
                 .root_broadcast_bytes(&mut vec![1u8; 1]);
 
-            expander_fn::register_kernel::<C, ECCConfig>(&state.global_mpi_config, &mut state.kernels);
+            expander_fn::register_kernel::<C, ECCConfig>(
+                &state.global_mpi_config,
+                &mut state.kernels,
+            );
         }
         RequestType::CommitInput => {
             // Handle input commitment logic here
@@ -187,7 +190,10 @@ fn worker_main<'a, C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>
                 );
             }
             1 => {
-                expander_fn::register_kernel::<C, ECCConfig>(&state.global_mpi_config, &mut state.kernels);
+                expander_fn::register_kernel::<C, ECCConfig>(
+                    &state.global_mpi_config,
+                    &mut state.kernels,
+                );
             }
             2 => {
                 expander_fn::commit::<C>(&state.global_mpi_config);
