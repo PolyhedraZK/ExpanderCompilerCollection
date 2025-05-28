@@ -53,12 +53,8 @@ name = "trivial_circuit"
 path = "bin/trivial_circuit.rs"
 
 [[bin]]
-name = "expander_commit"
-path = "bin/expander_commit.rs"
-
-[[bin]]
-name = "expander_prove"
-path = "bin/expander_prove.rs"
+name = "expander_serve"
+path = "bin/expander_serve.rs"
 
 [[bin]]
 name = "matmul_bench"
