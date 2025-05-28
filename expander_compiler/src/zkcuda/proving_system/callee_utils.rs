@@ -22,6 +22,8 @@ pub fn read_object_from_shared_memory_name_string<T: ExpSerde>(
 ) -> T {
     println!("[DEBUG] ====== Starting to open shared memory ======");
     println!("[DEBUG] Attempting to open: {}", shared_memory_ref);
+    println!("[DEBUG] Current directory: {:?}", std::env::current_dir());
+    
     let shmem = ShmemConf::new()
         .flink(shared_memory_ref)
         .open()
@@ -31,10 +33,9 @@ pub fn read_object_from_shared_memory_name_string<T: ExpSerde>(
             if let Ok(entries) = std::fs::read_dir("/dev/shm") {
                 for entry in entries.flatten() {
                     if let Ok(metadata) = entry.metadata() {
-                        println!("[DEBUG] Found file: {} (size: {} bytes, created: {:?})", 
+                        println!("[DEBUG] Found file: {} (size: {} bytes)", 
                             entry.path().display(),
-                            metadata.len(),
-                            metadata.created().unwrap_or_else(|_| std::time::SystemTime::UNIX_EPOCH)
+                            metadata.len()
                         );
                     }
                 }
@@ -43,8 +44,8 @@ pub fn read_object_from_shared_memory_name_string<T: ExpSerde>(
             e
         })
         .unwrap();
-        println!("[DEBUG] Successfully opened shared memory of size: {} bytes", shmem.len());
-        println!("[DEBUG] ====== Finished opening shared memory ======");
+    println!("[DEBUG] Successfully opened shared memory of size: {} bytes", shmem.len());
+    println!("[DEBUG] ====== Finished opening shared memory ======");
     read_object_from_shared_memory(&Some(shmem), offset)
 }
 
