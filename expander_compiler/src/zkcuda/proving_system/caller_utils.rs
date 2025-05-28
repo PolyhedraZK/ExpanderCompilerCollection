@@ -1,6 +1,7 @@
 #![allow(static_mut_refs)]
 
 use std::process::Command;
+use std::path::PathBuf;
 
 use crate::{
     circuit::layered::Circuit, frontend::SIMDField, zkcuda::kernel::LayeredCircuitInputVec,
@@ -54,6 +55,22 @@ unsafe fn allocate_shared_memory(handle: &mut Option<Shmem>, name: &str, target_
     );
 }
 
+/// Get temporary file path
+/// 
+/// # Arguments
+/// * `filename` - Name of the temporary file
+/// 
+/// # Returns
+/// Complete temporary file path
+pub fn get_temp_path(filename: &str) -> String {
+    let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/".to_string());
+    //println!("home_dir: {}", home_dir);
+    let mut path = PathBuf::from(home_dir);
+    path.push("tmp");
+    path.push(filename);
+    path.to_string_lossy().into_owned()
+}
+
 pub fn init_commitment_and_extra_info_shared_memory(
     commitment_size: usize,
     extra_info_size: usize,
@@ -61,12 +78,12 @@ pub fn init_commitment_and_extra_info_shared_memory(
     unsafe {
         allocate_shared_memory(
             &mut SHARED_MEMORY.commitment,
-            "/home/dream/tmp/commitment",
+            &get_temp_path("commitment"),
             commitment_size,
         );
         allocate_shared_memory(
             &mut SHARED_MEMORY.extra_info,
-            "/home/dream/tmp/extra_info",
+            &get_temp_path("extra_info"),
             extra_info_size,
         );
     }
@@ -74,7 +91,7 @@ pub fn init_commitment_and_extra_info_shared_memory(
 
 pub fn init_proof_shared_memory(max_proof_size: usize) {
     unsafe {
-        allocate_shared_memory(&mut SHARED_MEMORY.proof, "/home/dream/tmp/proof", max_proof_size);
+        allocate_shared_memory(&mut SHARED_MEMORY.proof, &get_temp_path("proof"), max_proof_size);
     }
 }
 
@@ -121,7 +138,7 @@ pub fn write_selected_pkey_to_shared_memory<
     write_object_to_shared_memory(
         &pair,
         unsafe { &mut SHARED_MEMORY.pcs_setup },
-        "/home/dream/tmp/pcs_setup",
+        &get_temp_path("pcs_setup"),
     );
 }
 
@@ -131,7 +148,7 @@ pub fn write_commit_vals_to_shared_memory<C: Config>(vals: &[SIMDField<C>]) {
     let vals_size = std::mem::size_of_val(vals);
     let total_size = std::mem::size_of::<usize>() + vals_size;
     unsafe {
-        allocate_shared_memory(&mut SHARED_MEMORY.input_vals, "/home/dream/tmp/input_vals", total_size);
+        allocate_shared_memory(&mut SHARED_MEMORY.input_vals, &get_temp_path("input_vals"), total_size);
 
         let mut ptr = SHARED_MEMORY.input_vals.as_mut().unwrap().as_ptr();
 
@@ -156,7 +173,7 @@ pub fn write_pcs_setup_to_shared_memory<
     write_object_to_shared_memory(
         pcs_setup,
         unsafe { &mut SHARED_MEMORY.pcs_setup },
-        "/home/dream/tmp/pcs_setup",
+        &get_temp_path("pcs_setup"),
     );
 }
 
@@ -164,7 +181,7 @@ pub fn write_ecc_circuit_to_shared_memory<C: Config, I: InputType>(ecc_circuit: 
     write_object_to_shared_memory(
         ecc_circuit,
         unsafe { &mut SHARED_MEMORY.circuit },
-        "/home/dream/tmp/circuit",
+        &get_temp_path("circuit"),
     );
 }
 
@@ -172,7 +189,7 @@ pub fn write_input_partition_info_to_shared_memory(input_partition: &Vec<Layered
     write_object_to_shared_memory(
         input_partition,
         unsafe { &mut SHARED_MEMORY.input_partition },
-        "/home/dream/tmp/input_partition",
+        &get_temp_path("input_partition"),
     );
 }
 
@@ -186,7 +203,7 @@ pub fn write_commitments_to_shared_memory<
     write_object_to_shared_memory(
         commitments,
         unsafe { &mut SHARED_MEMORY.commitment },
-        "/home/dream/tmp/commitment",
+        &get_temp_path("commitment"),
     );
 }
 
@@ -200,7 +217,7 @@ pub fn write_commitments_extra_info_to_shared_memory<
     write_object_to_shared_memory(
         commitments_extra_info,
         unsafe { &mut SHARED_MEMORY.extra_info },
-        "/home/dream/tmp/extra_info",
+        &get_temp_path("extra_info"),
     );
 }
 
@@ -214,7 +231,7 @@ pub fn write_commitments_values_to_shared_memory<F: FieldEngine>(
             .sum::<usize>();
 
     unsafe {
-        allocate_shared_memory(&mut SHARED_MEMORY.input_vals, "/home/dream/tmp/input_vals", total_size);
+        allocate_shared_memory(&mut SHARED_MEMORY.input_vals, &get_temp_path("input_vals"), total_size);
 
         let mut ptr = SHARED_MEMORY.input_vals.as_mut().unwrap().as_ptr();
 
@@ -241,7 +258,7 @@ pub fn write_broadcast_info_to_shared_memory(is_broadcast: &Vec<bool>) {
     write_object_to_shared_memory(
         is_broadcast,
         unsafe { &mut SHARED_MEMORY.broadcast_info },
-        "/home/dream/tmp/broadcast_info",
+        &get_temp_path("broadcast_info"),
     );
 }
 
