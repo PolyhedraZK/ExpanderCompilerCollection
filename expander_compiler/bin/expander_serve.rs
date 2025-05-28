@@ -33,7 +33,7 @@ struct ServerState<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSF
     global_mpi_config: MPIConfig<'a>,
     prover_setup: ExpanderGKRProverSetup<PCSField, F, PCS>,
     verifier_setup: ExpanderGKRVerifierSetup<PCSField, F, PCS>,
-    kernels: Vec<(ExpCircuit<F>, MPI_Win)>,
+    kernels: HashMap<usize, (ExpCircuit<F>, MPI_Win)>,
     shutdown_tx: Arc<Mutex<Option<oneshot::Sender<()>>>>,
 }
 
@@ -90,15 +90,17 @@ where
                 &mut state.verifier_setup,
             )
         }
-        RequestType::RegisterKernel => {
+        RequestType::RegisterKernel(mut kernel_id) => {
             // Handle kernel registration logic here
             println!("Registering kernel");
             state
                 .global_mpi_config
                 .root_broadcast_bytes(&mut vec![1u8; 1]);
 
+            state.global_mpi_config.root_broadcast_f(&mut kernel_id);
             expander_fn::register_kernel::<C, ECCConfig>(
                 &state.global_mpi_config,
+                kernel_id,
                 &mut state.kernels,
             );
         }
@@ -120,7 +122,7 @@ where
             expander_fn::prove::<C, ECCConfig>(
                 &state.global_mpi_config,
                 &state.prover_setup,
-                &mut state.kernels[kernel_id].0,
+                &mut state.kernels.get_mut(&kernel_id).expect("Kernel not found").0,
             );
         }
         RequestType::Exit => {
@@ -155,7 +157,7 @@ fn worker_main<'a, C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>
         verifier_setup: ExpanderGKRVerifierSetup {
             v_keys: HashMap::new(),
         },
-        kernels: Vec::new(),
+        kernels: HashMap::new(),
         shutdown_tx: Arc::new(Mutex::new(None)),
     };
 
@@ -176,8 +178,11 @@ fn worker_main<'a, C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>
                 );
             }
             1 => {
+                let mut kernel_id = 0;
+                state.global_mpi_config.root_broadcast_f(&mut kernel_id);
                 expander_fn::register_kernel::<C, ECCConfig>(
                     &state.global_mpi_config,
+                    kernel_id,
                     &mut state.kernels,
                 );
             }
@@ -191,7 +196,10 @@ fn worker_main<'a, C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>
                 expander_fn::prove::<C, ECCConfig>(
                     &state.global_mpi_config,
                     &state.prover_setup,
-                    &mut state.kernels[kernel_id].0,
+                    &mut state.kernels
+                        .get_mut(&kernel_id)
+                        .expect("Kernel not found")
+                        .0,
                 );
             }
             255 => {
@@ -227,7 +235,7 @@ where
         verifier_setup: ExpanderGKRVerifierSetup {
             v_keys: HashMap::new(),
         },
-        kernels: Vec::new(),
+        kernels: HashMap::new(),
         shutdown_tx: Arc::new(Mutex::new(Some(tx))),
     };
 

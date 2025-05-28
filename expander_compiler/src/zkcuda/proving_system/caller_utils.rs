@@ -261,6 +261,14 @@ fn exec_command(cmd: &str) {
     let _ = child.wait();
 }
 
+pub fn start_server(max_parallel_count: usize) {
+    let cmd_str = format!(
+        "mpiexec -n {} ../target/release/expander_serve",
+        max_parallel_count
+    );
+    exec_command(&cmd_str);
+}
+
 fn parse_config<C: GKREngine>(mpi_size: usize) -> (String, String, String)
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,

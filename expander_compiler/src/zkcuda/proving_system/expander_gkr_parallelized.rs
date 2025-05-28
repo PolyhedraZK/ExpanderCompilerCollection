@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::{Cursor, Read};
 
 use crate::circuit::config::Config;
@@ -5,13 +6,7 @@ use crate::frontend::SIMDField;
 
 use super::super::kernel::Kernel;
 use super::caller_utils::{
-    exec_gkr_prove_with_pcs, exec_pcs_commit, init_commitment_and_extra_info_shared_memory,
-    init_proof_shared_memory, read_commitment_and_extra_info_from_shared_memory,
-    read_proof_from_shared_memory, write_broadcast_info_to_shared_memory,
-    write_commit_vals_to_shared_memory, write_commitments_extra_info_to_shared_memory,
-    write_commitments_to_shared_memory, write_commitments_values_to_shared_memory,
-    write_ecc_circuit_to_shared_memory, write_input_partition_info_to_shared_memory,
-    write_pcs_setup_to_shared_memory, write_selected_pkey_to_shared_memory,
+    exec_gkr_prove_with_pcs, exec_pcs_commit, init_commitment_and_extra_info_shared_memory, init_proof_shared_memory, read_commitment_and_extra_info_from_shared_memory, read_proof_from_shared_memory, start_server, write_broadcast_info_to_shared_memory, write_commit_vals_to_shared_memory, write_commitments_extra_info_to_shared_memory, write_commitments_to_shared_memory, write_commitments_values_to_shared_memory, write_ecc_circuit_to_shared_memory, write_input_partition_info_to_shared_memory, write_pcs_setup_to_shared_memory, write_selected_pkey_to_shared_memory
 };
 use super::expander_gkr::{
     ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof,
@@ -48,10 +43,19 @@ where
     fn setup(
         computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
-        // All of currently supported PCSs(Raw, Orion, Hyrax) do not require the multi-core information in the step of `setup`
-        // So we can simply reuse the setup function from the non-parallelized version
-        // TODO: Do this properly in supporting future mpi-info-awared PCSs
-        ExpanderGKRProvingSystem::<C>::setup(computation_graph)
+        let max_parallel_count = computation_graph.proof_templates.iter().map(|t| t.parallel_count).max().unwrap_or(1);
+        start_server(max_parallel_count);
+        
+
+        (
+            Self::ProverSetup {
+                p_keys: HashMap::new(),
+            },
+            Self::VerifierSetup {
+                v_keys: HashMap::new(),
+            
+            },
+        )
     }
 
     fn commit(

@@ -23,8 +23,8 @@ pub async fn request_pcs_setup(
     }
 }
 
-pub async fn request_register_kernel(client: &Client, server_url: &str) {
-    let request = RequestType::RegisterKernel;
+pub async fn request_register_kernel(client: &Client, server_url: &str, kernel_id: usize) {
+    let request = RequestType::RegisterKernel(kernel_id);
     let res = client
         .post(server_url)
         .json(&request)

@@ -1,6 +1,7 @@
 use expander_compiler::zkcuda::kernel::LayeredCircuitInputVec;
 use mpi::ffi::MPI_Win;
 use std::cmp::max;
+use std::collections::HashMap;
 
 use arith::Field;
 use expander_circuit::Circuit as ExpCircuit;
@@ -58,7 +59,8 @@ pub fn setup<C: GKREngine>(
 
 pub fn register_kernel<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     mpi_config: &MPIConfig,
-    kernels: &mut Vec<(ExpCircuit<C::FieldConfig>, MPI_Win)>,
+    kernel_id: usize,
+    kernels: &mut HashMap<usize, (ExpCircuit<C::FieldConfig>, MPI_Win)>,
 ) {
     let (mut expander_circuit, window) = if mpi_config.is_root() {
         let ecc_circuit = read_ecc_circuit_from_shared_memory::<ECCConfig>();
@@ -68,7 +70,7 @@ pub fn register_kernel<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldCon
         mpi_config.consume_obj_and_create_shared(None)
     };
     expander_circuit.pre_process_gkr::<C>();
-    kernels.push((expander_circuit, window));
+    kernels.insert(kernel_id, (expander_circuit, window));
 }
 
 pub fn commit<C: GKREngine>(mpi_config: &MPIConfig)
