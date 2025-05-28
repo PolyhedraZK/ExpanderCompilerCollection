@@ -1,18 +1,15 @@
 use expander_compiler::zkcuda::kernel::LayeredCircuitInputVec;
 use mpi::ffi::MPI_Win;
 use std::cmp::max;
-use std::str::FromStr;
 
 use arith::Field;
 use expander_circuit::Circuit as ExpCircuit;
-use expander_compiler::frontend::{
-    BN254Config, BabyBearConfig, Config, GF2Config, GoldilocksConfig, M31Config, SIMDField,
-};
+use expander_compiler::frontend::{Config, SIMDField};
 use expander_compiler::zkcuda::proving_system::callee_utils::{
     read_broadcast_info_from_shared_memory, read_commitment_extra_info_from_shared_memory,
     read_commitment_from_shared_memory, read_commitment_values_from_shared_memory,
     read_ecc_circuit_from_shared_memory, read_partition_info_from_shared_memory,
-    read_pcs_setup_from_shared_memory, write_proof_to_shared_memory,
+    write_proof_to_shared_memory,
 };
 use expander_compiler::zkcuda::proving_system::callee_utils::{
     read_local_vals_to_commit_from_shared_memory, read_selected_pkey_from_shared_memory,
@@ -25,10 +22,10 @@ use expander_compiler::zkcuda::proving_system::{
 };
 use expander_utils::timer::Timer;
 
-use gkr::{gkr_prove, BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
+use gkr::gkr_prove;
 use gkr_engine::{
     ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine,
-    PolynomialCommitmentType, SharedMemory, Transcript,
+    Transcript,
 };
 use polynomials::RefMultiLinearPoly;
 use serdes::ExpSerde;

@@ -12,30 +12,16 @@ use std::str::FromStr;
 
 use arith::Field;
 use expander_compiler::frontend::{
-    BN254Config, BabyBearConfig, Config, GF2Config, GoldilocksConfig, M31Config, SIMDField,
+    BN254Config, BabyBearConfig, Config, GF2Config, GoldilocksConfig, M31Config,
 };
-use expander_compiler::zkcuda::proving_system::{
-    max_n_vars, server::RequestType, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof,
-    ExpanderGKRProverSetup,
-};
-use expander_utils::timer::Timer;
+use expander_compiler::zkcuda::proving_system::{server::RequestType, ExpanderGKRProverSetup};
 
-use gkr::{gkr_prove, BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
-use gkr_engine::{
-    ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine,
-    PolynomialCommitmentType, SharedMemory, Transcript,
-};
-use polynomials::RefMultiLinearPoly;
-use serdes::ExpSerde;
-use sumcheck::ProverScratchPad;
-
-use axum::{
-    extract::State,
-    routing::{get, post},
-    Json, Router,
-};
+use axum::{extract::State, routing::post, Json, Router};
 use expander_circuit::Circuit as ExpCircuit;
-use serde::{Deserialize, Serialize};
+use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
+use gkr_engine::{
+    ExpanderPCS, FieldEngine, GKREngine, MPIConfig, MPIEngine, PolynomialCommitmentType,
+};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::sync::{oneshot, Mutex};
 
