@@ -151,7 +151,8 @@ where
                     C::TranscriptConfig,
                     C::PCSConfig,
                 >(
-                    val_actual_len, template.parallel_count
+                    val_actual_len,
+                    &MPIConfig::prover_new(None, None),
                 );
                 p_keys.insert(val_actual_len, p_key);
                 v_keys.insert(val_actual_len, v_key);
@@ -364,12 +365,13 @@ where
 
 #[allow(clippy::type_complexity)]
 pub fn pcs_testing_setup_fixed_seed<
+    'a,
     FConfig: FieldEngine,
     T: Transcript,
     PCS: ExpanderPCS<FConfig, FConfig::SimdCircuitField>,
 >(
     vals_len: usize,
-    parallel_count: usize,
+    mpi_config: &MPIConfig<'a>,
 ) -> (
     PCS::Params,
     <PCS::SRS as StructuredReferenceString>::PKey,
@@ -378,7 +380,7 @@ pub fn pcs_testing_setup_fixed_seed<
 ) {
     expander_pcs_init_testing_only::<FConfig, FConfig::SimdCircuitField, PCS>(
         vals_len.ilog2() as usize,
-        &MPIConfig::verifier_new(parallel_count as i32),
+        mpi_config,
     )
 }
 

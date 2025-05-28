@@ -1,7 +1,3 @@
-mod common;
-use common::ExpanderExecArgs;
-
-use clap::Parser;
 use expander_compiler::zkcuda::kernel::LayeredCircuitInputVec;
 use std::cmp::max;
 use std::str::FromStr;
@@ -17,7 +13,8 @@ use expander_compiler::zkcuda::proving_system::callee_utils::{
     read_pcs_setup_from_shared_memory, write_proof_to_shared_memory,
 };
 use expander_compiler::zkcuda::proving_system::{
-    max_n_vars, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof, ExpanderGKRProverSetup,
+    max_n_vars, pcs_testing_setup_fixed_seed, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof,
+    ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
 };
 use expander_utils::timer::Timer;
 
@@ -29,6 +26,31 @@ use gkr_engine::{
 use polynomials::RefMultiLinearPoly;
 use serdes::ExpSerde;
 use sumcheck::ProverScratchPad;
+
+pub fn setup<C: GKREngine>(
+    mpi_config: &MPIConfig,
+    local_val_len: usize,
+    p_keys: &mut ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    v_keys: &mut ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+) where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
+    // There might be a case local_val_len is the same but mpi size is different
+    // TODO: Handle this case
+    if p_keys.p_keys.contains_key(&local_val_len) {
+        // If the key already exists, we can skip the setup
+        return;
+    }
+
+    let (_params, p_key, v_key, _scratch) = pcs_testing_setup_fixed_seed::<
+        C::FieldConfig,
+        C::TranscriptConfig,
+        C::PCSConfig,
+    >(local_val_len, mpi_config);
+
+    p_keys.p_keys.insert(local_val_len, p_key);
+    v_keys.v_keys.insert(local_val_len, v_key);
+}
 
 // Ideally, there will only one ECCConfig generics
 // But we need to implement `Config` for each GKREngine, which remains to be done
@@ -235,42 +257,4 @@ fn prepare_inputs<F: Field>(
         input_vals[partition.offset..partition.offset + partition.len].copy_from_slice(val);
     }
     input_vals
-}
-
-fn main() {
-    let expander_exec_args = ExpanderExecArgs::parse();
-    assert_eq!(
-        expander_exec_args.fiat_shamir_hash, "SHA256",
-        "Only SHA256 is supported for now"
-    );
-
-    let pcs_type = PolynomialCommitmentType::from_str(&expander_exec_args.poly_commit).unwrap();
-
-    match (expander_exec_args.field_type.as_str(), pcs_type) {
-        ("M31", PolynomialCommitmentType::Raw) => {
-            prove::<M31Config, M31Config>();
-        }
-        ("GF2", PolynomialCommitmentType::Raw) => {
-            prove::<GF2Config, GF2Config>();
-        }
-        ("Goldilocks", PolynomialCommitmentType::Raw) => {
-            prove::<GoldilocksConfig, GoldilocksConfig>();
-        }
-        ("BabyBear", PolynomialCommitmentType::Raw) => {
-            prove::<BabyBearConfig, BabyBearConfig>();
-        }
-        ("BN254", PolynomialCommitmentType::Raw) => {
-            prove::<BN254Config, BN254Config>();
-        }
-        ("BN254", PolynomialCommitmentType::Hyrax) => {
-            prove::<BN254ConfigSha2Hyrax, BN254Config>();
-        }
-        ("BN254", PolynomialCommitmentType::KZG) => {
-            prove::<BN254ConfigSha2KZG, BN254Config>();
-        }
-        (field_type, pcs_type) => panic!(
-            "Combination of {:?} and {:?} not supported",
-            field_type, pcs_type
-        ),
-    }
 }

@@ -1,7 +1,10 @@
 mod common;
 use common::ExpanderExecArgs;
 
+mod expander_fn;
+
 use clap::Parser;
+use expander_compiler::zkcuda::proving_system::ExpanderGKRVerifierSetup;
 use mpi::environment::Universe;
 use mpi::topology::SimpleCommunicator;
 use std::str::FromStr;
@@ -41,7 +44,8 @@ static mut GLOBAL_COMMUNICATOR: Option<SimpleCommunicator> = None;
 struct ServerState<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> {
     lock: Arc<Mutex<()>>, // For now we want to ensure that only one request is processed at a time
     global_mpi_config: MPIConfig<'a>,
-    pcs_setup: ExpanderGKRProverSetup<PCSField, F, PCS>,
+    prover_setup: ExpanderGKRProverSetup<PCSField, F, PCS>,
+    verifier_setup: ExpanderGKRVerifierSetup<PCSField, F, PCS>,
     kernels: Vec<ExpCircuit<F>>,
     shutdown_tx: Arc<Mutex<Option<oneshot::Sender<()>>>>,
 }
@@ -53,7 +57,8 @@ impl<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
         ServerState {
             lock: Arc::clone(&self.lock),
             global_mpi_config: self.global_mpi_config.clone(),
-            pcs_setup: self.pcs_setup.clone(),
+            prover_setup: self.prover_setup.clone(),
+            verifier_setup: self.verifier_setup.clone(),
             kernels: self.kernels.clone(),
             shutdown_tx: Arc::clone(&self.shutdown_tx),
         }
@@ -69,20 +74,34 @@ unsafe impl<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> 
 {
 }
 
-async fn root_main<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>>(
-    State(state): State<ServerState<'a, PCSField, F, PCS>>,
+async fn root_main<'a, C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
+    State(mut state): State<ServerState<'a, C::PCSField, C::FieldConfig, C::PCSConfig>>,
     Json(request_type): Json<RequestType>,
-) -> Json<bool> {
+) -> Json<bool>
+where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
     let _lock = state.lock.lock().await; // Ensure only one request is processed at a time
     match request_type {
         RequestType::PCSSetup(local_val_len, mpi_world_size) => {
+            // TODO: We should support the case where mpi_world_size is different from the global mpi world size
+            assert_eq!(mpi_world_size, state.global_mpi_config.world_size());
             println!(
                 "Setting up PCS with local_val_len: {}, mpi_world_size: {}",
                 local_val_len, mpi_world_size
             );
+
             state
                 .global_mpi_config
                 .root_broadcast_bytes(&mut vec![0u8; 1]);
+
+            state.global_mpi_config.root_broadcast_f(&mut local_val_len);
+            expander_fn::setup::<C>(
+                &state.global_mpi_config,
+                local_val_len,
+                &mut state.prover_setup,
+                &mut state.verifier_setup,
+            )
         }
         RequestType::RegisterKernel => {
             // Handle kernel registration logic here
@@ -123,15 +142,39 @@ async fn root_main<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSF
     axum::Json(true)
 }
 
-fn worker_main<'a>(global_mpi_config: MPIConfig<'a>) {
+fn worker_main<'a, C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
+    global_mpi_config: MPIConfig<'a>,
+) where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
+    let mut state = ServerState {
+        lock: Arc::new(Mutex::new(())),
+        global_mpi_config: global_mpi_config.clone(),
+        prover_setup: ExpanderGKRProverSetup {
+            p_keys: HashMap::new(),
+        },
+        verifier_setup: ExpanderGKRVerifierSetup {
+            v_keys: HashMap::new(),
+        },
+        kernels: Vec::new(),
+        shutdown_tx: Arc::new(Mutex::new(None)),
+    };
+
     loop {
         // waiting for work
         let mut bytes = vec![0u8; 1];
         global_mpi_config.root_broadcast_bytes(&mut bytes);
         match bytes[0] {
             0 => {
-                // Handle PCS setup
-                println!("Worker received PCS setup request");
+                let mut local_val_len = 0;
+                state.global_mpi_config.root_broadcast_f(&mut local_val_len);
+                assert_ne!(local_val_len, 0);
+                expander_fn::setup::<C>(
+                    &global_mpi_config,
+                    local_val_len,
+                    &mut state.prover_setup,
+                    &mut state.verifier_setup,
+                );
             }
             1 => {
                 // Handle kernel registration
@@ -158,10 +201,10 @@ fn worker_main<'a>(global_mpi_config: MPIConfig<'a>) {
 }
 
 #[allow(static_mut_refs)]
-async fn serve<
-    C: GKREngine + 'static,
-    ECCConfig: Config<FieldConfig = C::FieldConfig> + 'static,
->() {
+async fn serve<C: GKREngine + 'static, ECCConfig: Config<FieldConfig = C::FieldConfig> + 'static>()
+where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
     let global_mpi_config = unsafe {
         UNIVERSE = MPIConfig::init();
         GLOBAL_COMMUNICATOR = UNIVERSE.as_ref().map(|u| u.world());
@@ -172,15 +215,20 @@ async fn serve<
     let state = ServerState::<'static, C::PCSField, C::FieldConfig, C::PCSConfig> {
         lock: Arc::new(Mutex::new(())),
         global_mpi_config: global_mpi_config.clone(),
-        pcs_setup: ExpanderGKRProverSetup {
+        prover_setup: ExpanderGKRProverSetup {
             p_keys: HashMap::new(),
+        },
+        verifier_setup: ExpanderGKRVerifierSetup {
+            v_keys: HashMap::new(),
         },
         kernels: Vec::new(),
         shutdown_tx: Arc::new(Mutex::new(Some(tx))),
     };
 
     if global_mpi_config.is_root() {
-        let app = Router::new().route("/", post(root_main)).with_state(state);
+        let app = Router::new()
+            .route("/", post(root_main::<C, ECCConfig>))
+            .with_state(state);
 
         let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
         println!("Server running at http://{}", addr);
@@ -193,7 +241,7 @@ async fn serve<
             .await
             .unwrap();
     } else {
-        worker_main(global_mpi_config);
+        worker_main::<C, ECCConfig>(global_mpi_config);
     }
 }
 
