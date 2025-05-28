@@ -20,7 +20,31 @@ pub fn read_object_from_shared_memory_name_string<T: ExpSerde>(
     shared_memory_ref: &str,
     offset: usize,
 ) -> T {
-    let shmem = ShmemConf::new().flink(shared_memory_ref).open().unwrap();
+    println!("[DEBUG] ====== Starting to open shared memory ======");
+    println!("[DEBUG] Attempting to open: {}", shared_memory_ref);
+    let shmem = ShmemConf::new()
+        .flink(shared_memory_ref)
+        .open()
+        .map_err(|e| {
+            println!("[ERROR] Failed to open shared memory at {}: {}", shared_memory_ref, e);
+            println!("[DEBUG] Checking /dev/shm directory contents:");
+            if let Ok(entries) = std::fs::read_dir("/dev/shm") {
+                for entry in entries.flatten() {
+                    if let Ok(metadata) = entry.metadata() {
+                        println!("[DEBUG] Found file: {} (size: {} bytes, created: {:?})", 
+                            entry.path().display(),
+                            metadata.len(),
+                            metadata.created().unwrap_or_else(|_| std::time::SystemTime::UNIX_EPOCH)
+                        );
+                    }
+                }
+            }
+            println!("[DEBUG] ====== End of shared memory check ======");
+            e
+        })
+        .unwrap();
+        println!("[DEBUG] Successfully opened shared memory of size: {} bytes", shmem.len());
+        println!("[DEBUG] ====== Finished opening shared memory ======");
     read_object_from_shared_memory(&Some(shmem), offset)
 }
 
@@ -30,14 +54,14 @@ pub fn read_selected_pkey_from_shared_memory<
     F: FieldEngine,
     PCS: ExpanderPCS<F, PCSField>,
 >() -> (usize, <PCS::SRS as StructuredReferenceString>::PKey) {
-    read_object_from_shared_memory_name_string("/tmp/pcs_setup", 0)
+    read_object_from_shared_memory_name_string("/home/dream/tmp/pcs_setup", 0)
 }
 
 pub fn read_local_vals_to_commit_from_shared_memory<F: FieldEngine>(
     world_rank: usize,
     world_size: usize,
 ) -> Vec<F::SimdCircuitField> {
-    let shmem = ShmemConf::new().flink("/tmp/input_vals").open().unwrap();
+    let shmem = ShmemConf::new().flink("/home/dream/tmp/input_vals").open().unwrap();
     let ptr = shmem.as_ptr();
     let total_len: usize =
         usize::deserialize_from(unsafe { std::slice::from_raw_parts(ptr, size_of::<usize>()) })
@@ -82,7 +106,7 @@ pub fn write_commitment_to_shared_memory<
 >(
     commitment: &ExpanderGKRCommitment<PCSField, F, PCS>,
 ) {
-    write_object_to_shared_memory_name_string(commitment, "/tmp/commitment");
+    write_object_to_shared_memory_name_string(commitment, "/home/dream/tmp/commitment");
 }
 
 pub fn write_commitment_extra_info_to_shared_memory<
@@ -92,7 +116,7 @@ pub fn write_commitment_extra_info_to_shared_memory<
 >(
     extra_info: &ExpanderGKRCommitmentExtraInfo<PCSField, F, PCS>,
 ) {
-    write_object_to_shared_memory_name_string(extra_info, "/tmp/extra_info");
+    write_object_to_shared_memory_name_string(extra_info, "/home/dream/tmp/extra_info");
 }
 
 pub fn read_pcs_setup_from_shared_memory<
@@ -100,15 +124,15 @@ pub fn read_pcs_setup_from_shared_memory<
     F: FieldEngine,
     PCS: ExpanderPCS<F, PCSField>,
 >() -> ExpanderGKRProverSetup<PCSField, F, PCS> {
-    read_object_from_shared_memory_name_string("/tmp/pcs_setup", 0)
+    read_object_from_shared_memory_name_string("/home/dream/tmp/pcs_setup", 0)
 }
 
 pub fn read_ecc_circuit_from_shared_memory<C: Config>() -> Circuit<C, NormalInputType> {
-    read_object_from_shared_memory_name_string("/tmp/circuit", 0)
+    read_object_from_shared_memory_name_string("/home/dream/tmp/circuit", 0)
 }
 
 pub fn read_partition_info_from_shared_memory() -> Vec<LayeredCircuitInputVec> {
-    read_object_from_shared_memory_name_string("/tmp/input_partition", 0)
+    read_object_from_shared_memory_name_string("/home/dream/tmp/input_partition", 0)
 }
 
 pub fn read_commitment_from_shared_memory<
@@ -116,7 +140,7 @@ pub fn read_commitment_from_shared_memory<
     F: FieldEngine,
     PCS: ExpanderPCS<F, PCSField>,
 >() -> Vec<ExpanderGKRCommitment<PCSField, F, PCS>> {
-    read_object_from_shared_memory_name_string("/tmp/commitment", 0)
+    read_object_from_shared_memory_name_string("/home/dream/tmp/commitment", 0)
 }
 
 pub fn read_commitment_extra_info_from_shared_memory<
@@ -124,7 +148,7 @@ pub fn read_commitment_extra_info_from_shared_memory<
     F: FieldEngine,
     PCS: ExpanderPCS<F, PCSField>,
 >() -> Vec<ExpanderGKRCommitmentExtraInfo<PCSField, F, PCS>> {
-    read_object_from_shared_memory_name_string("/tmp/extra_info", 0)
+    read_object_from_shared_memory_name_string("/home/dream/tmp/extra_info", 0)
 }
 
 pub fn read_commitment_values_from_shared_memory<F: FieldEngine>(
@@ -132,7 +156,7 @@ pub fn read_commitment_values_from_shared_memory<F: FieldEngine>(
     world_rank: usize,
     world_size: usize,
 ) -> Vec<Vec<F::SimdCircuitField>> {
-    let shmem = ShmemConf::new().flink("/tmp/input_vals").open().unwrap();
+    let shmem = ShmemConf::new().flink("/home/dream/tmp/input_vals").open().unwrap();
     let mut ptr = shmem.as_ptr();
     let n_components: usize =
         usize::deserialize_from(unsafe { std::slice::from_raw_parts(ptr, size_of::<usize>()) })
@@ -183,9 +207,9 @@ pub fn read_commitment_values_from_shared_memory<F: FieldEngine>(
 }
 
 pub fn read_broadcast_info_from_shared_memory() -> Vec<bool> {
-    read_object_from_shared_memory_name_string("/tmp/broadcast_info", 0)
+    read_object_from_shared_memory_name_string("/home/dream/tmp/broadcast_info", 0)
 }
 
 pub fn write_proof_to_shared_memory(proof: &ExpanderGKRProof) {
-    write_object_to_shared_memory_name_string(proof, "/tmp/proof");
+    write_object_to_shared_memory_name_string(proof, "/home/dream/tmp/proof");
 }

@@ -61,12 +61,12 @@ pub fn init_commitment_and_extra_info_shared_memory(
     unsafe {
         allocate_shared_memory(
             &mut SHARED_MEMORY.commitment,
-            "/tmp/commitment",
+            "/home/dream/tmp/commitment",
             commitment_size,
         );
         allocate_shared_memory(
             &mut SHARED_MEMORY.extra_info,
-            "/tmp/extra_info",
+            "/home/dream/tmp/extra_info",
             extra_info_size,
         );
     }
@@ -74,7 +74,7 @@ pub fn init_commitment_and_extra_info_shared_memory(
 
 pub fn init_proof_shared_memory(max_proof_size: usize) {
     unsafe {
-        allocate_shared_memory(&mut SHARED_MEMORY.proof, "/tmp/proof", max_proof_size);
+        allocate_shared_memory(&mut SHARED_MEMORY.proof, "/home/dream/tmp/proof", max_proof_size);
     }
 }
 
@@ -121,7 +121,7 @@ pub fn write_selected_pkey_to_shared_memory<
     write_object_to_shared_memory(
         &pair,
         unsafe { &mut SHARED_MEMORY.pcs_setup },
-        "/tmp/pcs_setup",
+        "/home/dream/tmp/pcs_setup",
     );
 }
 
@@ -131,7 +131,7 @@ pub fn write_commit_vals_to_shared_memory<C: Config>(vals: &[SIMDField<C>]) {
     let vals_size = std::mem::size_of_val(vals);
     let total_size = std::mem::size_of::<usize>() + vals_size;
     unsafe {
-        allocate_shared_memory(&mut SHARED_MEMORY.input_vals, "/tmp/input_vals", total_size);
+        allocate_shared_memory(&mut SHARED_MEMORY.input_vals, "/home/dream/tmp/input_vals", total_size);
 
         let mut ptr = SHARED_MEMORY.input_vals.as_mut().unwrap().as_ptr();
 
@@ -156,19 +156,15 @@ pub fn write_pcs_setup_to_shared_memory<
     write_object_to_shared_memory(
         pcs_setup,
         unsafe { &mut SHARED_MEMORY.pcs_setup },
-        "/tmp/pcs_setup",
+        "/home/dream/tmp/pcs_setup",
     );
 }
 
-// I think we have ExpSerde implemented for Circuit in the latest version of expander circuit
-// pub fn write_circuit_to_shared_memory<C: Config>(circuit: &Circuit<C::DefaultGKRFieldConfig>) {
-//     write_object_to_shared_memory(circuit, unsafe {&mut SHARED_MEMORY.pcs_setup}, "/tmp/circuit");
-// }
 pub fn write_ecc_circuit_to_shared_memory<C: Config, I: InputType>(ecc_circuit: &Circuit<C, I>) {
     write_object_to_shared_memory(
         ecc_circuit,
         unsafe { &mut SHARED_MEMORY.circuit },
-        "/tmp/circuit",
+        "/home/dream/tmp/circuit",
     );
 }
 
@@ -176,7 +172,7 @@ pub fn write_input_partition_info_to_shared_memory(input_partition: &Vec<Layered
     write_object_to_shared_memory(
         input_partition,
         unsafe { &mut SHARED_MEMORY.input_partition },
-        "/tmp/input_partition",
+        "/home/dream/tmp/input_partition",
     );
 }
 
@@ -190,7 +186,7 @@ pub fn write_commitments_to_shared_memory<
     write_object_to_shared_memory(
         commitments,
         unsafe { &mut SHARED_MEMORY.commitment },
-        "/tmp/commitment",
+        "/home/dream/tmp/commitment",
     );
 }
 
@@ -204,7 +200,7 @@ pub fn write_commitments_extra_info_to_shared_memory<
     write_object_to_shared_memory(
         commitments_extra_info,
         unsafe { &mut SHARED_MEMORY.extra_info },
-        "/tmp/extra_info",
+        "/home/dream/tmp/extra_info",
     );
 }
 
@@ -218,7 +214,7 @@ pub fn write_commitments_values_to_shared_memory<F: FieldEngine>(
             .sum::<usize>();
 
     unsafe {
-        allocate_shared_memory(&mut SHARED_MEMORY.input_vals, "/tmp/input_vals", total_size);
+        allocate_shared_memory(&mut SHARED_MEMORY.input_vals, "/home/dream/tmp/input_vals", total_size);
 
         let mut ptr = SHARED_MEMORY.input_vals.as_mut().unwrap().as_ptr();
 
@@ -245,7 +241,7 @@ pub fn write_broadcast_info_to_shared_memory(is_broadcast: &Vec<bool>) {
     write_object_to_shared_memory(
         is_broadcast,
         unsafe { &mut SHARED_MEMORY.broadcast_info },
-        "/tmp/broadcast_info",
+        "/home/dream/tmp/broadcast_info",
     );
 }
 

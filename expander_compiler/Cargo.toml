@@ -33,6 +33,8 @@ sumcheck.workspace = true
 serdes.workspace = true
 tiny-keccak.workspace = true
 shared_memory.workspace = true
+serde.workspace = true
+stacker.workspace = true
 
 [dev-dependencies]
 rayon = "1.9"
