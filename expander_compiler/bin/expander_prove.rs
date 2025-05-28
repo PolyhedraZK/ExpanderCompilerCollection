@@ -7,6 +7,7 @@ use clap::Parser;
 use expander_compiler::zkcuda::proving_system::ExpanderGKRVerifierSetup;
 use mpi::environment::Universe;
 use mpi::topology::SimpleCommunicator;
+use mpi::ffi::MPI_Win;
 use std::str::FromStr;
 
 use arith::Field;
@@ -46,7 +47,7 @@ struct ServerState<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSF
     global_mpi_config: MPIConfig<'a>,
     prover_setup: ExpanderGKRProverSetup<PCSField, F, PCS>,
     verifier_setup: ExpanderGKRVerifierSetup<PCSField, F, PCS>,
-    kernels: Vec<ExpCircuit<F>>,
+    kernels: Vec<(ExpCircuit<F>, MPI_Win)>,
     shutdown_tx: Arc<Mutex<Option<oneshot::Sender<()>>>>,
 }
 
@@ -83,7 +84,7 @@ where
 {
     let _lock = state.lock.lock().await; // Ensure only one request is processed at a time
     match request_type {
-        RequestType::PCSSetup(local_val_len, mpi_world_size) => {
+        RequestType::PCSSetup(mut local_val_len, mpi_world_size) => {
             // TODO: We should support the case where mpi_world_size is different from the global mpi world size
             assert_eq!(mpi_world_size, state.global_mpi_config.world_size());
             println!(
@@ -109,6 +110,8 @@ where
             state
                 .global_mpi_config
                 .root_broadcast_bytes(&mut vec![1u8; 1]);
+
+            expander_fn::register_kernel::<C, ECCConfig>(&state.global_mpi_config, &mut state.kernels);
         }
         RequestType::CommitInput => {
             // Handle input commitment logic here
@@ -117,12 +120,19 @@ where
                 .global_mpi_config
                 .root_broadcast_bytes(&mut vec![2u8; 1]);
         }
-        RequestType::Prove => {
+        RequestType::Prove(mut kernel_id) => {
             // Handle proving logic here
             println!("Proving");
             state
                 .global_mpi_config
                 .root_broadcast_bytes(&mut vec![3u8; 1]);
+
+            state.global_mpi_config.root_broadcast_f(&mut kernel_id);
+            expander_fn::prove::<C, ECCConfig>(
+                &state.global_mpi_config,
+                &state.prover_setup,
+                &mut state.kernels[kernel_id].0,
+            );
         }
         RequestType::Exit => {
             // Handle exit logic here
@@ -177,16 +187,20 @@ fn worker_main<'a, C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>
                 );
             }
             1 => {
-                // Handle kernel registration
-                println!("Worker received kernel registration request");
+                expander_fn::register_kernel::<C, ECCConfig>(&state.global_mpi_config, &mut state.kernels);
             }
             2 => {
-                // Handle input commitment
-                println!("Worker received input commitment request");
+                expander_fn::commit::<C>(&state.global_mpi_config);
             }
             3 => {
                 // Handle proving
-                println!("Worker received proving request");
+                let mut kernel_id = 0;
+                state.global_mpi_config.root_broadcast_f(&mut kernel_id);
+                expander_fn::prove::<C, ECCConfig>(
+                    &state.global_mpi_config,
+                    &state.prover_setup,
+                    &mut state.kernels[kernel_id].0,
+                );
             }
             255 => {
                 // Exit condition, if needed

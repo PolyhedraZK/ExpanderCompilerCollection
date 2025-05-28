@@ -5,6 +5,6 @@ pub enum RequestType {
     PCSSetup(usize, usize), // (local_val_len, mpi_world_size)
     RegisterKernel,
     CommitInput,
-    Prove,
+    Prove(usize), // kernel_id
     Exit,
 }

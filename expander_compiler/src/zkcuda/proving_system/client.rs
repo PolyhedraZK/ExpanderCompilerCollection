@@ -55,8 +55,8 @@ pub async fn request_commit_input(client: &Client, server_url: &str) {
     }
 }
 
-pub async fn request_prove(client: &Client, server_url: &str) {
-    let request = RequestType::Prove;
+pub async fn request_prove(client: &Client, server_url: &str, kernel_id: usize) {
+    let request = RequestType::Prove(kernel_id);
     let res = client
         .post(server_url)
         .json(&request)

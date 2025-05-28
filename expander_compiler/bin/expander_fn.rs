@@ -1,4 +1,5 @@
 use expander_compiler::zkcuda::kernel::LayeredCircuitInputVec;
+use mpi::ffi::MPI_Win;
 use std::cmp::max;
 use std::str::FromStr;
 
@@ -12,10 +13,14 @@ use expander_compiler::zkcuda::proving_system::callee_utils::{
     read_ecc_circuit_from_shared_memory, read_partition_info_from_shared_memory,
     read_pcs_setup_from_shared_memory, write_proof_to_shared_memory,
 };
-use expander_compiler::zkcuda::proving_system::{
-    max_n_vars, pcs_testing_setup_fixed_seed, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof,
-    ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
+use expander_compiler::zkcuda::proving_system::callee_utils::{
+    read_local_vals_to_commit_from_shared_memory, read_selected_pkey_from_shared_memory,
+    write_commitment_extra_info_to_shared_memory, write_commitment_to_shared_memory,
 };
+use expander_compiler::zkcuda::proving_system::{
+    max_n_vars, pcs_testing_setup_fixed_seed, ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof, ExpanderGKRProverSetup, ExpanderGKRVerifierSetup
+};
+use expander_circuit::Circuit as ExpCircuit;
 use expander_utils::timer::Timer;
 
 use gkr::{gkr_prove, BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
@@ -52,17 +57,87 @@ pub fn setup<C: GKREngine>(
     v_keys.v_keys.insert(local_val_len, v_key);
 }
 
+pub fn register_kernel<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
+    mpi_config: &MPIConfig,
+    kernels: &mut Vec<(ExpCircuit<C::FieldConfig>, MPI_Win)>,
+) {
+    let (mut expander_circuit, window) = if mpi_config.is_root() {
+        let ecc_circuit = read_ecc_circuit_from_shared_memory::<ECCConfig>();
+        let expander_circuit = ecc_circuit.export_to_expander().flatten::<C>();
+        mpi_config.consume_obj_and_create_shared(Some(expander_circuit))
+    } else {
+        mpi_config.consume_obj_and_create_shared(None)
+    };
+    expander_circuit.pre_process_gkr::<C>();
+    kernels.push((expander_circuit, window));
+}
+
+pub fn commit<C: GKREngine>(mpi_config: &MPIConfig)
+where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
+    let world_rank = mpi_config.world_rank();
+    let world_size = mpi_config.world_size();
+    assert!(
+        world_size > 1,
+        "In case world_size is 1, we should not use the mpi version of the prover"
+    );
+    if world_rank == 0 {
+        println!("Expander Commit Exec Called with world size {}", world_size);
+    }
+
+    let (local_val_len, p_key) =
+        read_selected_pkey_from_shared_memory::<C::PCSField, C::FieldConfig, C::PCSConfig>();
+
+    let local_vals_to_commit =
+        read_local_vals_to_commit_from_shared_memory::<C::FieldConfig>(world_rank, world_size);
+
+    let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
+        local_val_len.ilog2() as usize,
+        mpi_config.world_size(),
+    );
+
+    let mut scratch = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::init_scratch_pad(
+        &params,
+        mpi_config,
+    );
+
+    let commitment = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::commit(
+        &params,
+        mpi_config,
+        &p_key,
+        &RefMultiLinearPoly::from_ref(&local_vals_to_commit),
+        &mut scratch,
+    );
+
+    if world_rank == 0 {
+        let commitment = ExpanderGKRCommitment {
+            vals_len: local_val_len,
+            commitment: vec![commitment.unwrap()],
+        };
+        let extra_info = ExpanderGKRCommitmentExtraInfo {
+            scratch: vec![scratch],
+        };
+
+        write_commitment_to_shared_memory::<C::PCSField, C::FieldConfig, C::PCSConfig>(&commitment);
+        write_commitment_extra_info_to_shared_memory::<C::PCSField, C::FieldConfig, C::PCSConfig>(
+            &extra_info,
+        );
+    }
+}
+
 // Ideally, there will only one ECCConfig generics
 // But we need to implement `Config` for each GKREngine, which remains to be done
 // For now, the GKREngine actually controls the functionality of the prover
 // The ECCConfig is only used where the `Config` trait is required
-fn prove<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>()
+pub fn prove<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
+    mpi_config: &MPIConfig,
+    pcs_setup: &ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    expander_circuit: &mut ExpCircuit<C::FieldConfig>, // mut to allow filling rnd coefs and circuit inputs
+)
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    let universe = MPIConfig::init();
-    let world = universe.as_ref().map(|u| u.world());
-    let mpi_config = MPIConfig::prover_new(universe.as_ref(), world.as_ref());
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
     assert!(
@@ -72,21 +147,6 @@ where
     if world_rank == 0 {
         println!("Expander Prove Exec Called with world size {}", world_size);
     }
-
-    let timer = Timer::new("one time cost: read setup&circuit", mpi_config.is_root());
-    let pcs_setup =
-        read_pcs_setup_from_shared_memory::<C::PCSField, C::FieldConfig, C::PCSConfig>();
-    let (mut expander_circuit, mut window) = if mpi_config.is_root() {
-        let ecc_circuit = read_ecc_circuit_from_shared_memory::<ECCConfig>();
-        let expander_circuit = ecc_circuit.export_to_expander().flatten::<C>();
-        mpi_config.consume_obj_and_create_shared(Some(expander_circuit))
-    } else {
-        mpi_config.consume_obj_and_create_shared(None)
-    };
-    expander_circuit.pre_process_gkr::<C>();
-    let partition_info = read_partition_info_from_shared_memory();
-    let broadcast_info = read_broadcast_info_from_shared_memory();
-    timer.stop();
 
     let timer = Timer::new(
         "recurring cost: read witness&commitment",
@@ -101,6 +161,8 @@ where
     } else {
         None
     };
+    let partition_info = read_partition_info_from_shared_memory();
+    let broadcast_info = read_broadcast_info_from_shared_memory();
     let commitments_extra_info =
         read_commitment_extra_info_from_shared_memory::<C::PCSField, C::FieldConfig, C::PCSConfig>(
         );
@@ -165,8 +227,6 @@ where
     if world_rank == 0 {
         write_proof_to_shared_memory(&ExpanderGKRProof { data: vec![proof] });
     }
-    expander_circuit.discard_control_of_shared_mem();
-    mpi_config.free_shared_mem(&mut window);
 }
 
 #[allow(clippy::too_many_arguments)]
