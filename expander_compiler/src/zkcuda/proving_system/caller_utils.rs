@@ -271,9 +271,16 @@ fn exec_command(cmd: &str) {
 
 #[allow(clippy::zombie_processes)]
 pub fn start_server(max_parallel_count: usize) {
+    let overscribe = if max_parallel_count > num_cpus::get_physical() {
+        println!("Warning: Not enough cores available for the requested number of processes. Using oversubscription.");
+        "--oversubscribe"
+    } else {
+        ""
+    };
+
     let cmd_str = format!(
-        "mpiexec -n {} ../target/release/expander_serve",
-        max_parallel_count
+        "mpiexec -n {} {} ../target/release/expander_serve",
+        overscribe, max_parallel_count
     );
     let mut parts = cmd_str.split_whitespace();
     let command = parts.next().unwrap();
