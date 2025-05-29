@@ -18,7 +18,12 @@ pub async fn request_commit_input(client: &Client, server_url: &str, parallel_co
     }
 }
 
-pub async fn request_prove(client: &Client, server_url: &str, parallel_count: usize, kernel_id: usize) {
+pub async fn request_prove(
+    client: &Client,
+    server_url: &str,
+    parallel_count: usize,
+    kernel_id: usize,
+) {
     let request = RequestType::Prove(parallel_count, kernel_id);
     let res = client
         .post(server_url)
@@ -34,7 +39,12 @@ pub async fn request_prove(client: &Client, server_url: &str, parallel_count: us
     }
 }
 
-pub async fn request_verify(client: &Client, server_url: &str, parallel_count: usize, kernel_id: usize) -> bool {
+pub async fn request_verify(
+    client: &Client,
+    server_url: &str,
+    parallel_count: usize,
+    kernel_id: usize,
+) -> bool {
     let request = RequestType::Verify(parallel_count, kernel_id);
     let res = client
         .post(server_url)

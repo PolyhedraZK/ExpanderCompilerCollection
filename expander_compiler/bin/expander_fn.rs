@@ -39,45 +39,47 @@ use sumcheck::ProverScratchPad;
 pub fn setup<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     global_mpi_config: &MPIConfig<'static>,
     computation_graph: Some(&ComputationGraph<ECCConfig>),
-) -> (ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>, ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>)
-where 
+) -> (
+    ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+)
+where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let mut p_keys = HashMap::new();
     let mut v_keys = HashMap::new();
-    
+
     if let Some(computation_graph) = computation_graph {
         for template in computation_graph.proof_templates.iter() {
-        for (x, is_broadcast) in template
-            .commitment_indices
-            .iter()
-            .zip(template.is_broadcast.iter())
-        {
-            let val_total_len = computation_graph.commitments_lens[*x];
-            let val_actual_len = if *is_broadcast {
-                val_total_len
-            } else {
-                val_total_len / template.parallel_count
-            };
-            if p_keys.contains_key(&(val_actual_len, template.parallel_count)) {
-                continue;
+            for (x, is_broadcast) in template
+                .commitment_indices
+                .iter()
+                .zip(template.is_broadcast.iter())
+            {
+                let val_total_len = computation_graph.commitments_lens[*x];
+                let val_actual_len = if *is_broadcast {
+                    val_total_len
+                } else {
+                    val_total_len / template.parallel_count
+                };
+                if p_keys.contains_key(&(val_actual_len, template.parallel_count)) {
+                    continue;
+                }
+
+                global_mpi_config.root_broadcast_f(&mut (val_actual_len, template.parallel_count));
+                let local_mpi_config =
+                    generate_local_mpi_config(&global_mpi_config, template.parallel_count);
+                let (_params, p_key, v_key, _scratch) = pcs_testing_setup_fixed_seed::<
+                    C::FieldConfig,
+                    C::TranscriptConfig,
+                    C::PCSConfig,
+                >(
+                    val_actual_len, &local_mpi_config
+                );
+                p_keys.insert(val_actual_len, p_key);
+                v_keys.insert(val_actual_len, v_key);
             }
-
-            global_mpi_config.root_broadcast_f(&mut (val_actual_len, template.parallel_count));
-            let local_mpi_config =
-                generate_local_mpi_config(&global_mpi_config, template.parallel_count);
-            let (_params, p_key, v_key, _scratch) = pcs_testing_setup_fixed_seed::<
-                C::FieldConfig,
-                C::TranscriptConfig,
-                C::PCSConfig,
-            >(
-                val_actual_len, &local_mpi_config,
-            );
-            p_keys.insert(val_actual_len, p_key);
-            v_keys.insert(val_actual_len, v_key);
         }
-    }
-
     } else {
         loop {
             let mut val_actual_len = 0;
@@ -86,16 +88,14 @@ where
             if val_actual_len == usize::MAX || parallel_count == usize::MAX {
                 break;
             }
-
         }
-}
+    }
 
     (
         ExpanderGKRProverSetup { p_keys },
         ExpanderGKRVerifierSetup { v_keys },
     )
 }
-
 
 pub fn commit<C: GKREngine>(mpi_config: &MPIConfig)
 where
@@ -358,13 +358,15 @@ fn generate_local_mpi_config(
     let color_v = if rank < n_parties { 0 } else { 1 };
     let color = mpi::topology::Color::with_value(color_v);
     unsafe {
-        LOCAL_COMMUNICATOR  = global_mpi_config.world.unwrap().split_by_color_with_key(color, rank as i32);
+        LOCAL_COMMUNICATOR = global_mpi_config
+            .world
+            .unwrap()
+            .split_by_color_with_key(color, rank as i32);
     }
     if color_v == 0 {
-        Some(MPIConfig::prover_new(
-            global_mpi_config.universe,
-            unsafe { LOCAL_COMMUNICATOR.as_ref() },
-        ))
+        Some(MPIConfig::prover_new(global_mpi_config.universe, unsafe {
+            LOCAL_COMMUNICATOR.as_ref()
+        }))
     } else {
         None
     }

@@ -28,7 +28,7 @@ use gkr_engine::{
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::sync::{oneshot, Mutex};
 
-use expander_fn::{UNIVERSE, GLOBAL_COMMUNICATOR};
+use expander_fn::{GLOBAL_COMMUNICATOR, UNIVERSE};
 
 struct ServerState<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> {
     lock: Arc<Mutex<()>>, // For now we want to ensure that only one request is processed at a time
@@ -72,40 +72,6 @@ where
 {
     let _lock = state.lock.lock().await; // Ensure only one request is processed at a time
     match request_type {
-        RequestType::PCSSetup(mut local_val_len, mpi_world_size) => {
-            // TODO: We should support the case where mpi_world_size is different from the global mpi world size
-            assert_eq!(mpi_world_size, state.global_mpi_config.world_size());
-            println!(
-                "Setting up PCS with local_val_len: {}, mpi_world_size: {}",
-                local_val_len, mpi_world_size
-            );
-
-            state
-                .global_mpi_config
-                .root_broadcast_bytes(&mut vec![0u8; 1]);
-
-            state.global_mpi_config.root_broadcast_f(&mut local_val_len);
-            expander_fn::setup::<C>(
-                &state.global_mpi_config,
-                local_val_len,
-                &mut state.prover_setup,
-                &mut state.verifier_setup,
-            )
-        }
-        RequestType::RegisterKernel(mut kernel_id) => {
-            // Handle kernel registration logic here
-            println!("Registering kernel");
-            state
-                .global_mpi_config
-                .root_broadcast_bytes(&mut vec![1u8; 1]);
-
-            state.global_mpi_config.root_broadcast_f(&mut kernel_id);
-            expander_fn::register_kernel::<C, ECCConfig>(
-                &state.global_mpi_config,
-                kernel_id,
-                &mut state.kernels,
-            );
-        }
         RequestType::CommitInput => {
             // Handle input commitment logic here
             println!("Committing input");
@@ -113,7 +79,7 @@ where
                 .global_mpi_config
                 .root_broadcast_bytes(&mut vec![2u8; 1]);
         }
-        RequestType::Prove(mut kernel_id) => {
+        RequestType::Prove(mut parallel_count, mut kernel_id) => {
             // Handle proving logic here
             println!("Proving");
             state
@@ -124,7 +90,11 @@ where
             expander_fn::prove::<C, ECCConfig>(
                 &state.global_mpi_config,
                 &state.prover_setup,
-                &mut state.kernels.get_mut(&kernel_id).expect("Kernel not found").0,
+                &mut state
+                    .kernels
+                    .get_mut(&kernel_id)
+                    .expect("Kernel not found")
+                    .0,
             );
         }
         RequestType::Exit => {
@@ -168,26 +138,6 @@ fn worker_main<'a, C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>
         let mut bytes = vec![0u8; 1];
         global_mpi_config.root_broadcast_bytes(&mut bytes);
         match bytes[0] {
-            0 => {
-                let mut local_val_len = 0;
-                state.global_mpi_config.root_broadcast_f(&mut local_val_len);
-                assert_ne!(local_val_len, 0);
-                expander_fn::setup::<C>(
-                    &global_mpi_config,
-                    local_val_len,
-                    &mut state.prover_setup,
-                    &mut state.verifier_setup,
-                );
-            }
-            1 => {
-                let mut kernel_id = 0;
-                state.global_mpi_config.root_broadcast_f(&mut kernel_id);
-                expander_fn::register_kernel::<C, ECCConfig>(
-                    &state.global_mpi_config,
-                    kernel_id,
-                    &mut state.kernels,
-                );
-            }
             2 => {
                 expander_fn::commit::<C>(&state.global_mpi_config);
             }
@@ -198,7 +148,8 @@ fn worker_main<'a, C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>
                 expander_fn::prove::<C, ECCConfig>(
                     &state.global_mpi_config,
                     &state.prover_setup,
-                    &mut state.kernels
+                    &mut state
+                        .kernels
                         .get_mut(&kernel_id)
                         .expect("Kernel not found")
                         .0,
@@ -235,8 +186,12 @@ where
         // Read the computation graph from file
         let computation_graph_bytes = std::fs::read("/tmp/computation_graph.bin")
             .expect("Failed to read computation graph from file");
-        Some(ComputationGraph::<ECCConfig>::deserialize_from(std::io::Cursor::new(computation_graph_bytes))
-            .expect("Failed to deserialize computation graph"))
+        Some(
+            ComputationGraph::<ECCConfig>::deserialize_from(std::io::Cursor::new(
+                computation_graph_bytes,
+            ))
+            .expect("Failed to deserialize computation graph"),
+        )
     } else {
         None
     };
@@ -244,15 +199,22 @@ where
     // Read the computation graph from file and initialize kernels
     if global_mpi_config.is_root() {
         let computation_graph = computation_graph.expect("Computation graph not found on root");
-        computation_graph.proof_templates.iter().for_each(|template| {
-            global_mpi_config.root_broadcast_f(&mut template.kernel_id.clone());
-            let ecc_circuit = &computation_graph.kernels[template.kernel_id].layered_circuit;
-            let expander_circuit = ecc_circuit.export_to_expander::<ECCConfig::FieldConfig>().flatten::<C>();
-            let (expander_circuit, window) = global_mpi_config.consume_obj_and_create_shared(Some(expander_circuit));
-            server_state.kernels.insert(template.kernel_id, (expander_circuit, window));
-        });
+        computation_graph
+            .proof_templates
+            .iter()
+            .for_each(|template| {
+                global_mpi_config.root_broadcast_f(&mut template.kernel_id.clone());
+                let ecc_circuit = &computation_graph.kernels[template.kernel_id].layered_circuit;
+                let expander_circuit = ecc_circuit
+                    .export_to_expander::<ECCConfig::FieldConfig>()
+                    .flatten::<C>();
+                let (expander_circuit, window) =
+                    global_mpi_config.consume_obj_and_create_shared(Some(expander_circuit));
+                server_state
+                    .kernels
+                    .insert(template.kernel_id, (expander_circuit, window));
+            });
         global_mpi_config.root_broadcast_f(&mut usize::MAX.clone()); // Signal that setup is complete
-
     } else {
         loop {
             let mut kernel_id = 0;
@@ -261,7 +223,9 @@ where
                 break;
             }
             let (expander_circuit, window) = global_mpi_config.consume_obj_and_create_shared(None);
-            server_state.kernels.insert(kernel_id, (expander_circuit, window));
+            server_state
+                .kernels
+                .insert(kernel_id, (expander_circuit, window));
         }
     }
 
@@ -270,7 +234,6 @@ where
 
     server_state
 }
-
 
 #[allow(static_mut_refs)]
 async fn serve<C: GKREngine + 'static, ECCConfig: Config<FieldConfig = C::FieldConfig> + 'static>()

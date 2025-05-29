@@ -7,7 +7,13 @@ use crate::frontend::SIMDField;
 use super::super::kernel::Kernel;
 use super::callee_utils::write_proof_to_shared_memory;
 use super::caller_utils::{
-    init_commitment_and_extra_info_shared_memory, init_proof_shared_memory, read_commitment_and_extra_info_from_shared_memory, read_proof_from_shared_memory, start_server, write_broadcast_info_to_shared_memory, write_commit_vals_to_shared_memory, write_commitments_extra_info_to_shared_memory, write_commitments_to_shared_memory, write_commitments_values_to_shared_memory, write_ecc_circuit_to_shared_memory, write_input_partition_info_to_shared_memory, write_pcs_setup_to_shared_memory, write_selected_pkey_to_shared_memory
+    init_commitment_and_extra_info_shared_memory, init_proof_shared_memory,
+    read_commitment_and_extra_info_from_shared_memory, read_proof_from_shared_memory, start_server,
+    write_broadcast_info_to_shared_memory, write_commit_vals_to_shared_memory,
+    write_commitments_extra_info_to_shared_memory, write_commitments_to_shared_memory,
+    write_commitments_values_to_shared_memory, write_ecc_circuit_to_shared_memory,
+    write_input_partition_info_to_shared_memory, write_pcs_setup_to_shared_memory,
+    write_selected_pkey_to_shared_memory,
 };
 use super::client::{request_commit_input, request_prove, request_verify};
 use super::expander_gkr::{
@@ -48,21 +54,20 @@ where
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
         let mut bytes = vec![];
         computation_graph.serialize_into(&mut bytes).unwrap();
-        fs::write(
-            "/tmp/computation_graph.bin",
-            bytes,
-        )
-        .expect("Failed to write computation graph to file");
+        fs::write("/tmp/computation_graph.bin", bytes)
+            .expect("Failed to write computation graph to file");
 
-        let max_parallel_count = computation_graph.proof_templates.iter().map(|t| t.parallel_count).max().unwrap_or(1);
+        let max_parallel_count = computation_graph
+            .proof_templates
+            .iter()
+            .map(|t| t.parallel_count)
+            .max()
+            .unwrap_or(1);
         start_server(max_parallel_count);
         thread::sleep(std::time::Duration::from_secs(1)); // Give the server some time to start
 
         // We're delegating all the computation to the service, so we don't need to do anything here
-        (
-            Self::ProverSetup::default(),
-            Self::VerifierSetup::default(),
-        )
+        (Self::ProverSetup::default(), Self::VerifierSetup::default())
     }
 
     fn commit(
@@ -74,12 +79,16 @@ where
         // TODO: The size here is for the raw commitment, add an function in the pcs trait to get the size of the commitment
         init_commitment_and_extra_info_shared_memory(SINGLE_KERNEL_MAX_PROOF_SIZE, 8);
         write_commit_vals_to_shared_memory::<ECCConfig>(vals);
-        
-        let client = Client::new(); 
+
+        let client = Client::new();
         let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(request_commit_input(&client, SERVER_URL, if is_broadcast { 1 } else { parallel_count }));
+        rt.block_on(request_commit_input(
+            &client,
+            SERVER_URL,
+            if is_broadcast { 1 } else { parallel_count },
+        ));
         let (commitment, extra_info) = read_commitment_and_extra_info_from_shared_memory();
-        
+
         (commitment, extra_info)
     }
 
@@ -103,7 +112,12 @@ where
 
         let client = Client::new();
         let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(request_prove(&client, SERVER_URL, parallel_count, kernel_id));
+        rt.block_on(request_prove(
+            &client,
+            SERVER_URL,
+            parallel_count,
+            kernel_id,
+        ));
 
         timer.stop();
         read_proof_from_shared_memory()
