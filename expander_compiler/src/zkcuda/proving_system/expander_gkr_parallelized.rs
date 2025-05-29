@@ -1,5 +1,5 @@
+use std::fs;
 use std::io::{Cursor, Read};
-use std::{fs, thread};
 
 use crate::circuit::config::Config;
 use crate::frontend::SIMDField;
@@ -13,7 +13,7 @@ use super::caller_utils::{
     write_commitments_extra_info_to_shared_memory, write_commitments_to_shared_memory,
     write_commitments_values_to_shared_memory, write_input_partition_info_to_shared_memory,
 };
-use super::client::{request_commit_input, request_prove};
+use super::client::{request_commit_input, request_prove, request_setup};
 use super::expander_gkr::{
     ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof,
     ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
@@ -64,9 +64,10 @@ where
             .unwrap_or(1);
         start_server(max_parallel_count);
 
-        // Give the server some time to start
-        // TODO: Replace this with a https GET request to check if the server is ready
-        thread::sleep(std::time::Duration::from_secs(10));
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        let client = Client::new();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(request_setup(&client, SERVER_URL));
 
         read_pcs_setup_from_shared_memory()
     }

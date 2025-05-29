@@ -62,7 +62,7 @@ unsafe impl<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> 
 {
 }
 
-async fn root_main<C: GKREngine>(
+async fn root_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     State(mut state): State<ServerState<'static, C::PCSField, C::FieldConfig, C::PCSConfig>>,
     Json(request_type): Json<RequestType>,
 ) -> Json<bool>
@@ -71,6 +71,23 @@ where
 {
     let _lock = state.lock.lock().await; // Ensure only one request is processed at a time
     match request_type {
+        RequestType::Setup => {
+            // Handle setup logic here
+            println!("Setting up");
+            state
+                .global_mpi_config
+                .root_broadcast_bytes(&mut vec![1u8; 1]);
+            read_circuit_and_setup::<C, ECCConfig>(
+                state.global_mpi_config.clone(),
+                &mut state.kernels,
+                &mut state.prover_setup,
+                &mut state.verifier_setup,
+            );
+            write_pcs_setup_to_shared_memory(&(
+                state.prover_setup.clone(),
+                state.verifier_setup.clone(),
+            ));
+        }
         RequestType::CommitInput(mut parallel_count) => {
             // Handle input commitment logic here
             println!("Committing input");
@@ -158,17 +175,34 @@ where
     axum::Json(true)
 }
 
-fn worker_main<C: GKREngine>(
+fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     global_mpi_config: MPIConfig<'static>,
-    mut state: ServerState<'static, C::PCSField, C::FieldConfig, C::PCSConfig>,
 ) where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
+    let mut state = ServerState {
+        lock: Arc::new(Mutex::new(())),
+        global_mpi_config: global_mpi_config.clone(),
+        prover_setup: ExpanderGKRProverSetup::default(),
+        verifier_setup: ExpanderGKRVerifierSetup::default(),
+        kernels: HashMap::new(),
+        shutdown_tx: Arc::new(Mutex::new(None)),
+    };
+
     loop {
         // waiting for work
         let mut bytes = vec![0u8; 1];
         global_mpi_config.root_broadcast_bytes(&mut bytes);
         match bytes[0] {
+            1 => {
+                // Setup
+                read_circuit_and_setup::<C, ECCConfig>(
+                    global_mpi_config.clone(),
+                    &mut state.kernels,
+                    &mut state.prover_setup,
+                    &mut state.verifier_setup,
+                );
+            }
             2 => {
                 // Commit input
                 let mut parallel_count = 0;
@@ -219,21 +253,14 @@ fn worker_main<C: GKREngine>(
     }
 }
 
-fn init_server_state<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
+fn read_circuit_and_setup<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     global_mpi_config: MPIConfig<'static>,
-) -> ServerState<'static, C::PCSField, C::FieldConfig, C::PCSConfig>
-where
+    circuits: &mut HashMap<usize, (ExpCircuit<C::FieldConfig>, MPI_Win)>,
+    prover_setup: &mut ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    verifier_setup: &mut ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+) where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    let mut server_state = ServerState {
-        lock: Arc::new(Mutex::new(())),
-        global_mpi_config: global_mpi_config.clone(),
-        prover_setup: ExpanderGKRProverSetup::default(),
-        verifier_setup: ExpanderGKRVerifierSetup::default(),
-        kernels: HashMap::new(),
-        shutdown_tx: Arc::new(Mutex::new(None)),
-    };
-
     // Read the computation graph from file
     let computation_graph = if global_mpi_config.is_root() {
         // Read the computation graph from file
@@ -266,9 +293,7 @@ where
                 let (mut expander_circuit, window) =
                     global_mpi_config.consume_obj_and_create_shared(Some(expander_circuit));
                 expander_circuit.pre_process_gkr::<C>();
-                server_state
-                    .kernels
-                    .insert(template.kernel_id, (expander_circuit, window));
+                circuits.insert(template.kernel_id, (expander_circuit, window));
             });
         global_mpi_config.root_broadcast_f(&mut usize::MAX.clone()); // Signal that circuit read is complete
     } else {
@@ -281,16 +306,12 @@ where
             let (mut expander_circuit, window) =
                 global_mpi_config.consume_obj_and_create_shared::<ExpCircuit<C::FieldConfig>>(None);
             expander_circuit.pre_process_gkr::<C>();
-            server_state
-                .kernels
-                .insert(kernel_id, (expander_circuit, window));
+            circuits.insert(kernel_id, (expander_circuit, window));
         }
     }
 
-    (server_state.prover_setup, server_state.verifier_setup) =
+    (*prover_setup, *verifier_setup) =
         expander_fn::setup::<C, ECCConfig>(&global_mpi_config, computation_graph.as_ref());
-
-    server_state
 }
 
 #[allow(static_mut_refs)]
@@ -304,15 +325,21 @@ where
         MPIConfig::prover_new(UNIVERSE.as_ref(), GLOBAL_COMMUNICATOR.as_ref())
     };
 
-    let state = init_server_state::<C, ECCConfig>(global_mpi_config.clone());
-    write_pcs_setup_to_shared_memory(&(state.prover_setup.clone(), state.verifier_setup.clone()));
+    let state = ServerState {
+        lock: Arc::new(Mutex::new(())),
+        global_mpi_config: global_mpi_config.clone(),
+        prover_setup: ExpanderGKRProverSetup::default(),
+        verifier_setup: ExpanderGKRVerifierSetup::default(),
+        kernels: HashMap::new(),
+        shutdown_tx: Arc::new(Mutex::new(None)),
+    };
 
     if global_mpi_config.is_root() {
         let (tx, rx) = oneshot::channel::<()>();
         state.shutdown_tx.lock().await.replace(tx);
 
         let app = Router::new()
-            .route("/", post(root_main::<C>))
+            .route("/", post(root_main::<C, ECCConfig>))
             .with_state(state);
 
         let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
@@ -326,7 +353,7 @@ where
             .await
             .unwrap();
     } else {
-        worker_main::<C>(global_mpi_config, state);
+        worker_main::<C, ECCConfig>(global_mpi_config);
     }
 }
 

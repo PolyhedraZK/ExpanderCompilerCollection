@@ -2,6 +2,22 @@ use super::server::RequestType;
 
 use reqwest::Client;
 
+pub async fn request_setup(client: &Client, server_url: &str) {
+    let request = RequestType::Setup;
+    let res = client
+        .post(server_url)
+        .json(&request)
+        .send()
+        .await
+        .expect("Failed to send setup request");
+
+    if res.status().is_success() {
+        println!("Setup request successful");
+    } else {
+        eprintln!("Setup request failed: {}", res.status());
+    }
+}
+
 pub async fn request_commit_input(client: &Client, server_url: &str, parallel_count: usize) {
     let request = RequestType::CommitInput(parallel_count);
     let res = client
