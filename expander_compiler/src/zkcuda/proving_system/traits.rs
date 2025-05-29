@@ -26,6 +26,7 @@ pub trait ProvingSystem<C: Config> {
         is_broadcast: bool,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo);
 
+    #[allow(clippy::too_many_arguments)]
     fn prove(
         prover_setup: &Self::ProverSetup,
         kernel_id: usize,

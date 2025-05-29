@@ -5,14 +5,7 @@ mod expander_fn;
 
 use clap::Parser;
 use expander_compiler::zkcuda::proof::ComputationGraph;
-use expander_compiler::zkcuda::proving_system::callee_utils::{
-    read_broadcast_info_from_shared_memory, read_commitment_from_shared_memory,
-    read_partition_info_from_shared_memory,
-};
-use expander_compiler::zkcuda::proving_system::caller_utils::{
-    read_proof_from_shared_memory, write_commitments_to_shared_memory,
-    write_pcs_setup_to_shared_memory,
-};
+use expander_compiler::zkcuda::proving_system::caller_utils::write_pcs_setup_to_shared_memory;
 use expander_compiler::zkcuda::proving_system::ExpanderGKRVerifierSetup;
 use mpi::ffi::MPI_Win;
 use serdes::ExpSerde;
@@ -69,7 +62,7 @@ unsafe impl<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> 
 {
 }
 
-async fn root_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
+async fn root_main<C: GKREngine>(
     State(mut state): State<ServerState<'static, C::PCSField, C::FieldConfig, C::PCSConfig>>,
     Json(request_type): Json<RequestType>,
 ) -> Json<bool>
@@ -103,7 +96,7 @@ where
                 .root_broadcast_f(&mut (parallel_count, kernel_id));
             let local_mpi_config =
                 generate_local_mpi_config(&state.global_mpi_config, parallel_count);
-            expander_fn::prove::<C, ECCConfig>(
+            expander_fn::prove::<C>(
                 &local_mpi_config.unwrap(),
                 &state.prover_setup,
                 &mut state
@@ -165,7 +158,7 @@ where
     axum::Json(true)
 }
 
-fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
+fn worker_main<C: GKREngine>(
     global_mpi_config: MPIConfig<'static>,
     mut state: ServerState<'static, C::PCSField, C::FieldConfig, C::PCSConfig>,
 ) where
@@ -196,7 +189,7 @@ fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
                 let local_mpi_config =
                     generate_local_mpi_config(&state.global_mpi_config, parallel_count);
                 if let Some(local_mpi_config) = local_mpi_config {
-                    expander_fn::prove::<C, ECCConfig>(
+                    expander_fn::prove::<C>(
                         &local_mpi_config,
                         &state.prover_setup,
                         &mut state
@@ -319,7 +312,7 @@ where
         state.shutdown_tx.lock().await.replace(tx);
 
         let app = Router::new()
-            .route("/", post(root_main::<C, ECCConfig>))
+            .route("/", post(root_main::<C>))
             .with_state(state);
 
         let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
@@ -333,7 +326,7 @@ where
             .await
             .unwrap();
     } else {
-        worker_main::<C, ECCConfig>(global_mpi_config, state);
+        worker_main::<C>(global_mpi_config, state);
     }
 }
 

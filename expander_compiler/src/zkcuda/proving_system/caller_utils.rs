@@ -269,6 +269,7 @@ fn exec_command(cmd: &str) {
     let _ = child.wait();
 }
 
+#[allow(clippy::zombie_processes)]
 pub fn start_server(max_parallel_count: usize) {
     let cmd_str = format!(
         "mpiexec -n {} ../target/release/expander_serve",
