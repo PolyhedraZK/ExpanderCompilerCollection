@@ -277,7 +277,7 @@ where
     let (overscribe, field_name, pcs_name) = parse_config::<C>(max_parallel_count);
 
     let cmd_str = format!(
-        "mpiexec -n {} {} ../target/release/expander_server --field-type {} --poly-commit {}",
+        "mpiexec -n {} {} ../target/release/expander_serve --field-type {} --poly-commit {}",
         max_parallel_count, overscribe, field_name, pcs_name,
     );
     let mut parts = cmd_str.split_whitespace();

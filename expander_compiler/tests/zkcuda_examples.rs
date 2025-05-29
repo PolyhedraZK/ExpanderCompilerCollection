@@ -6,7 +6,7 @@ use expander_compiler::zkcuda::proving_system::{
     ExpanderGKRProvingSystem, ParallelizedExpanderGKRProvingSystem, ProvingSystem,
 };
 use expander_compiler::zkcuda::{context::*, kernel::*};
-use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG, M31x16ConfigSha2OrionVanilla};
+use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
 use gkr_engine::FieldEngine;
 use serdes::ExpSerde;
 
@@ -101,10 +101,7 @@ fn zkcuda_1_single_core() {
 
 #[test]
 fn zkcuda_1_multi_core() {
-    zkcuda_1_expander::<
-        M31Config,
-        ParallelizedExpanderGKRProvingSystem<M31x16ConfigSha2OrionVanilla>,
-    >();
+    zkcuda_1_expander::<M31Config, ParallelizedExpanderGKRProvingSystem<M31Config>>();
     zkcuda_1_expander::<GF2Config, ParallelizedExpanderGKRProvingSystem<GF2Config>>();
     zkcuda_1_expander::<GoldilocksConfig, ParallelizedExpanderGKRProvingSystem<GoldilocksConfig>>();
     zkcuda_1_expander::<BabyBearConfig, ParallelizedExpanderGKRProvingSystem<BabyBearConfig>>();
