@@ -183,7 +183,7 @@ where
             nb_challenge_vars,
             parallel_count,
         );
-        let v_key = v_keys.v_keys.get(&local_vals_len).unwrap();
+        let v_key = v_keys.v_keys.get(&(local_vals_len, 1)).unwrap();
 
         let claim =
             <C::FieldConfig as FieldEngine>::ChallengeField::deserialize_from(&mut proof_reader)
