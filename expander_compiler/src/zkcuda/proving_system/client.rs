@@ -39,74 +39,31 @@ pub async fn request_prove(
     }
 }
 
-pub async fn request_verify(
-    client: &Client,
-    server_url: &str,
-    parallel_count: usize,
-    kernel_id: usize,
-) -> bool {
-    let request = RequestType::Verify(parallel_count, kernel_id);
-    let res = client
-        .post(server_url)
-        .json(&request)
-        .send()
-        .await
-        .expect("Failed to send verify request");
-
-    if res.status().is_success() {
-        // Assuming the response body contains a boolean indicating success
-        match res.json::<bool>().await {
-            Ok(success) => success,
-            Err(e) => {
-                eprintln!("Failed to parse verify response: {}", e);
-                false
-            }
-        }
-    } else {
-        eprintln!("Verify request failed: {}", res.status());
-        false
-    }
-}
-
-// #[tokio::main]
-// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//     let client = Client::new();
-
-//     // GET request
+// pub async fn request_verify(
+//     client: &Client,
+//     server_url: &str,
+//     parallel_count: usize,
+//     kernel_id: usize,
+// ) -> bool {
+//     let request = RequestType::Verify(parallel_count, kernel_id);
 //     let res = client
-//         .get("http://127.0.0.1:3000/")
+//         .post(server_url)
+//         .json(&request)
 //         .send()
-//         .await?
-//         .text()
-//         .await?;
+//         .await
+//         .expect("Failed to send verify request");
 
-//     println!("GET response: {}", res);
-
-//     let test_size = 10;
-//     for i in 0..test_size {
-//         let request = if i % 2 == 0 {
-//             Request::ADD
-//         } else {
-//             Request::MUL
-//         };
-
-//         let res = client
-//             .post("http://127.0.0.1:3000/compute")
-//             .json(&request)
-//             .send()
-//             .await?;
-
-//         let user_response: UserResponse = res.json().await?;
-//         println!("POST response: {}", user_response.v);
+//     if res.status().is_success() {
+//         // Assuming the response body contains a boolean indicating success
+//         match res.json::<bool>().await {
+//             Ok(success) => success,
+//             Err(e) => {
+//                 eprintln!("Failed to parse verify response: {}", e);
+//                 false
+//             }
+//         }
+//     } else {
+//         eprintln!("Verify request failed: {}", res.status());
+//         false
 //     }
-//     // Exit request
-//     let exit_request = Request::EXIT;
-//     let res = client
-//             .post("http://127.0.0.1:3000/compute")
-//             .json(&exit_request)
-//             .send()
-//             .await?;
-//     let user_response: UserResponse = res.json().await?;
-//     println!("Exit response: {}", user_response.v);
-//     Ok(())
 // }

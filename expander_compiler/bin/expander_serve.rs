@@ -9,7 +9,10 @@ use expander_compiler::zkcuda::proving_system::callee_utils::{
     read_broadcast_info_from_shared_memory, read_commitment_from_shared_memory,
     read_partition_info_from_shared_memory,
 };
-use expander_compiler::zkcuda::proving_system::caller_utils::read_proof_from_shared_memory;
+use expander_compiler::zkcuda::proving_system::caller_utils::{
+    read_proof_from_shared_memory, write_commitments_to_shared_memory,
+    write_pcs_setup_to_shared_memory,
+};
 use expander_compiler::zkcuda::proving_system::ExpanderGKRVerifierSetup;
 use mpi::ffi::MPI_Win;
 use serdes::ExpSerde;
@@ -26,6 +29,7 @@ use expander_circuit::Circuit as ExpCircuit;
 use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
 use gkr_engine::{
     ExpanderPCS, FieldEngine, GKREngine, MPIConfig, MPIEngine, PolynomialCommitmentType,
+    SharedMemory,
 };
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::sync::{oneshot, Mutex};
@@ -87,16 +91,20 @@ where
                 generate_local_mpi_config(&state.global_mpi_config, parallel_count);
             expander_fn::commit::<C>(&local_mpi_config.unwrap());
         }
-        RequestType::Prove(mut _parallel_count, mut kernel_id) => {
+        RequestType::Prove(parallel_count, kernel_id) => {
             // Handle proving logic here
             println!("Proving");
             state
                 .global_mpi_config
                 .root_broadcast_bytes(&mut vec![3u8; 1]);
 
-            state.global_mpi_config.root_broadcast_f(&mut kernel_id);
+            state
+                .global_mpi_config
+                .root_broadcast_f(&mut (parallel_count, kernel_id));
+            let local_mpi_config =
+                generate_local_mpi_config(&state.global_mpi_config, parallel_count);
             expander_fn::prove::<C, ECCConfig>(
-                &state.global_mpi_config,
+                &local_mpi_config.unwrap(),
                 &state.prover_setup,
                 &mut state
                     .kernels
@@ -105,36 +113,46 @@ where
                     .0,
             );
         }
-        RequestType::Verify(parallel_count, kernel_id) => {
-            // Handle verification logic here
-            println!("Verifying");
-            let expander_circuit = &mut state
-                .kernels
-                .get_mut(&kernel_id)
-                .expect("Kernel not found")
-                .0;
-            let proof = read_proof_from_shared_memory();
-            let partition_info = read_partition_info_from_shared_memory();
-            let commitments = read_commitment_from_shared_memory();
-            let broadcast_info = read_broadcast_info_from_shared_memory();
+        // RequestType::Verify(parallel_count, kernel_id) => {
+        //     // Handle verification logic here
+        //     println!("Verifying");
+        //     let expander_circuit = &mut state
+        //         .kernels
+        //         .get_mut(&kernel_id)
+        //         .expect("Kernel not found")
+        //         .0;
+        //     let proof = read_proof_from_shared_memory();
+        //     let partition_info = read_partition_info_from_shared_memory();
+        //     let commitments = read_commitment_from_shared_memory();
+        //     let broadcast_info = read_broadcast_info_from_shared_memory();
 
-            let is_verified = expander_fn::verify::<C, ECCConfig>(
-                &state.verifier_setup,
-                expander_circuit,
-                &proof,
-                &commitments,
-                &partition_info,
-                parallel_count,
-                &broadcast_info,
-            );
-            println!("Verification result: {}", is_verified);
-        }
+        //     let is_verified = expander_fn::verify::<C, ECCConfig>(
+        //         &state.verifier_setup,
+        //         expander_circuit,
+        //         &proof,
+        //         &commitments,
+        //         &partition_info,
+        //         parallel_count,
+        //         &broadcast_info,
+        //     );
+        //     println!("Verification result: {}", is_verified);
+        // }
         RequestType::Exit => {
             // Handle exit logic here
             println!("Exiting");
             state
                 .global_mpi_config
                 .root_broadcast_bytes(&mut vec![255u8; 1]);
+            state
+                .kernels
+                .into_iter()
+                .for_each(|(_, (circuit, mut window))| {
+                    circuit.discard_control_of_shared_mem();
+                    state.global_mpi_config.free_shared_mem(&mut window);
+                });
+
+            unsafe { mpi::ffi::MPI_Finalize() };
+
             state
                 .shutdown_tx
                 .lock()
@@ -147,49 +165,58 @@ where
     axum::Json(true)
 }
 
-fn worker_main<'a, C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
-    global_mpi_config: MPIConfig<'a>,
+fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
+    global_mpi_config: MPIConfig<'static>,
+    mut state: ServerState<'static, C::PCSField, C::FieldConfig, C::PCSConfig>,
 ) where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    let mut state = ServerState {
-        lock: Arc::new(Mutex::new(())),
-        global_mpi_config: global_mpi_config.clone(),
-        prover_setup: ExpanderGKRProverSetup {
-            p_keys: HashMap::new(),
-        },
-        verifier_setup: ExpanderGKRVerifierSetup {
-            v_keys: HashMap::new(),
-        },
-        kernels: HashMap::new(),
-        shutdown_tx: Arc::new(Mutex::new(None)),
-    };
-
     loop {
         // waiting for work
         let mut bytes = vec![0u8; 1];
         global_mpi_config.root_broadcast_bytes(&mut bytes);
         match bytes[0] {
             2 => {
-                expander_fn::commit::<C>(&state.global_mpi_config);
+                // Commit input
+                let mut parallel_count = 0;
+                state
+                    .global_mpi_config
+                    .root_broadcast_f(&mut parallel_count);
+                let local_mpi_config =
+                    generate_local_mpi_config(&state.global_mpi_config, parallel_count);
+                if let Some(local_mpi_config) = local_mpi_config {
+                    expander_fn::commit::<C>(&local_mpi_config);
+                }
             }
             3 => {
-                // Handle proving
-                let mut kernel_id = 0;
-                state.global_mpi_config.root_broadcast_f(&mut kernel_id);
-                expander_fn::prove::<C, ECCConfig>(
-                    &state.global_mpi_config,
-                    &state.prover_setup,
-                    &mut state
-                        .kernels
-                        .get_mut(&kernel_id)
-                        .expect("Kernel not found")
-                        .0,
-                );
+                // Prove
+                let mut pair = (0usize, 0usize);
+                state.global_mpi_config.root_broadcast_f(&mut pair);
+                let (parallel_count, kernel_id) = pair;
+                let local_mpi_config =
+                    generate_local_mpi_config(&state.global_mpi_config, parallel_count);
+                if let Some(local_mpi_config) = local_mpi_config {
+                    expander_fn::prove::<C, ECCConfig>(
+                        &local_mpi_config,
+                        &state.prover_setup,
+                        &mut state
+                            .kernels
+                            .get_mut(&kernel_id)
+                            .expect("Kernel not found")
+                            .0,
+                    );
+                }
             }
             255 => {
                 // Exit condition, if needed
-                println!("Worker received exit signal");
+                state
+                    .kernels
+                    .into_iter()
+                    .for_each(|(_, (circuit, mut window))| {
+                        circuit.discard_control_of_shared_mem();
+                        state.global_mpi_config.free_shared_mem(&mut window);
+                    });
+                unsafe { mpi::ffi::MPI_Finalize() };
                 break;
             }
             _ => {
@@ -214,6 +241,7 @@ where
         shutdown_tx: Arc::new(Mutex::new(None)),
     };
 
+    // Read the computation graph from file
     let computation_graph = if global_mpi_config.is_root() {
         // Read the computation graph from file
         let computation_graph_bytes = std::fs::read("/tmp/computation_graph.bin")
@@ -228,7 +256,7 @@ where
         None
     };
 
-    // Read the computation graph from file and initialize kernels
+    // Export the computation graph to the format required by Expander
     if global_mpi_config.is_root() {
         let computation_graph = computation_graph
             .as_ref()
@@ -249,7 +277,7 @@ where
                     .kernels
                     .insert(template.kernel_id, (expander_circuit, window));
             });
-        global_mpi_config.root_broadcast_f(&mut usize::MAX.clone()); // Signal that setup is complete
+        global_mpi_config.root_broadcast_f(&mut usize::MAX.clone()); // Signal that circuit read is complete
     } else {
         loop {
             let mut kernel_id = 0;
@@ -283,21 +311,13 @@ where
         MPIConfig::prover_new(UNIVERSE.as_ref(), GLOBAL_COMMUNICATOR.as_ref())
     };
 
-    let (tx, rx) = oneshot::channel::<()>();
-    let state = ServerState::<'static, C::PCSField, C::FieldConfig, C::PCSConfig> {
-        lock: Arc::new(Mutex::new(())),
-        global_mpi_config: global_mpi_config.clone(),
-        prover_setup: ExpanderGKRProverSetup {
-            p_keys: HashMap::new(),
-        },
-        verifier_setup: ExpanderGKRVerifierSetup {
-            v_keys: HashMap::new(),
-        },
-        kernels: HashMap::new(),
-        shutdown_tx: Arc::new(Mutex::new(Some(tx))),
-    };
+    let state = init_server_state::<C, ECCConfig>(global_mpi_config.clone());
+    write_pcs_setup_to_shared_memory(&(state.prover_setup.clone(), state.verifier_setup.clone()));
 
     if global_mpi_config.is_root() {
+        let (tx, rx) = oneshot::channel::<()>();
+        state.shutdown_tx.lock().await.replace(tx);
+
         let app = Router::new()
             .route("/", post(root_main::<C, ECCConfig>))
             .with_state(state);
@@ -313,7 +333,7 @@ where
             .await
             .unwrap();
     } else {
-        worker_main::<C, ECCConfig>(global_mpi_config);
+        worker_main::<C, ECCConfig>(global_mpi_config, state);
     }
 }
 

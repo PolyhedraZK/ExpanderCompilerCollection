@@ -81,6 +81,7 @@ where
                 v_keys.insert((val_actual_len, template.parallel_count), v_key);
             }
         }
+        global_mpi_config.root_broadcast_f(&mut (usize::MAX, usize::MAX)); // Signal the end of the loop
     } else {
         loop {
             let mut pair = (0usize, 0usize);
@@ -101,9 +102,6 @@ where
                 );
                 p_keys.insert((val_actual_len, parallel_count), p_key);
                 v_keys.insert((val_actual_len, parallel_count), v_key);
-            } else {
-                // If we are not in the local communicator, we can skip this
-                continue;
             }
         }
     }

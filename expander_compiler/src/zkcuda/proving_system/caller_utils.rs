@@ -13,7 +13,8 @@ use shared_memory::{Shmem, ShmemConf};
 use crate::circuit::{config::Config, layered::InputType};
 
 use super::{
-    ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof, ExpanderGKRProverSetup,
+    ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof,
+    ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
 };
 
 #[derive(Default)]
@@ -155,7 +156,10 @@ pub fn write_pcs_setup_to_shared_memory<
     F: FieldEngine,
     PCS: ExpanderPCS<F, PCSField>,
 >(
-    pcs_setup: &ExpanderGKRProverSetup<PCSField, F, PCS>,
+    pcs_setup: &(
+        ExpanderGKRProverSetup<PCSField, F, PCS>,
+        ExpanderGKRVerifierSetup<PCSField, F, PCS>,
+    ),
 ) {
     write_object_to_shared_memory(
         pcs_setup,
