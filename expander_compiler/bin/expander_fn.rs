@@ -48,7 +48,8 @@ where
     let mut p_keys = HashMap::new();
     let mut v_keys = HashMap::new();
 
-    if let Some(computation_graph) = computation_graph {
+    if global_mpi_config.is_root() {
+        let computation_graph = computation_graph.unwrap();
         for template in computation_graph.proof_templates.iter() {
             for (x, is_broadcast) in template
                 .commitment_indices
@@ -76,6 +77,10 @@ where
                     val_actual_len,
                     local_mpi_config.as_ref().unwrap(),
                 );
+                println!(
+                    "val actual len {}, parallel_count {}",
+                    val_actual_len, template.parallel_count
+                );
                 p_keys.insert((val_actual_len, template.parallel_count), p_key);
                 v_keys.insert((val_actual_len, template.parallel_count), v_key);
             }
@@ -99,6 +104,10 @@ where
                 >(
                     val_actual_len, &local_mpi_config
                 );
+                println!(
+                    "worker val actual len {} parallel count {}",
+                    val_actual_len, parallel_count
+                );
                 p_keys.insert((val_actual_len, parallel_count), p_key);
                 v_keys.insert((val_actual_len, parallel_count), v_key);
             }
@@ -111,8 +120,10 @@ where
     )
 }
 
-pub fn commit<C: GKREngine>(mpi_config: &MPIConfig)
-where
+pub fn commit<C: GKREngine>(
+    mpi_config: &MPIConfig,
+    prover_setup: &ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+) where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let world_rank = mpi_config.world_rank();
@@ -125,11 +136,14 @@ where
         println!("Expander Commit Exec Called with world size {}", world_size);
     }
 
-    let (local_val_len, p_key) =
-        read_selected_pkey_from_shared_memory::<C::PCSField, C::FieldConfig, C::PCSConfig>();
-
     let local_vals_to_commit =
         read_local_vals_to_commit_from_shared_memory::<C::FieldConfig>(world_rank, world_size);
+    let local_val_len = local_vals_to_commit.len();
+    println!("local val len {}, world size {}", local_val_len, world_size);
+    let p_key = prover_setup
+        .p_keys
+        .get(&(local_val_len, world_size))
+        .unwrap();
 
     let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
         local_val_len.ilog2() as usize,

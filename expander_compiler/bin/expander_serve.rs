@@ -22,7 +22,6 @@ use expander_circuit::Circuit as ExpCircuit;
 use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
 use gkr_engine::{
     ExpanderPCS, FieldEngine, GKREngine, MPIConfig, MPIEngine, PolynomialCommitmentType,
-    SharedMemory,
 };
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::sync::{oneshot, Mutex};
@@ -34,7 +33,7 @@ struct ServerState<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSF
     global_mpi_config: MPIConfig<'a>,
     prover_setup: ExpanderGKRProverSetup<PCSField, F, PCS>,
     verifier_setup: ExpanderGKRVerifierSetup<PCSField, F, PCS>,
-    kernels: HashMap<usize, (ExpCircuit<F>, MPI_Win)>,
+    kernels: HashMap<usize, ExpCircuit<F>>,
     shutdown_tx: Arc<Mutex<Option<oneshot::Sender<()>>>>,
 }
 
@@ -99,7 +98,7 @@ where
                 .root_broadcast_f(&mut parallel_count);
             let local_mpi_config =
                 generate_local_mpi_config(&state.global_mpi_config, parallel_count);
-            expander_fn::commit::<C>(&local_mpi_config.unwrap());
+            expander_fn::commit::<C>(&local_mpi_config.unwrap(), &state.prover_setup);
         }
         RequestType::Prove(parallel_count, kernel_id) => {
             // Handle proving logic here
@@ -116,11 +115,7 @@ where
             expander_fn::prove::<C>(
                 &local_mpi_config.unwrap(),
                 &state.prover_setup,
-                &mut state
-                    .kernels
-                    .get_mut(&kernel_id)
-                    .expect("Kernel not found")
-                    .0,
+                &mut state.kernels.get_mut(&kernel_id).expect("Kernel not found"),
             );
         }
         // RequestType::Verify(parallel_count, kernel_id) => {
@@ -130,7 +125,7 @@ where
         //         .kernels
         //         .get_mut(&kernel_id)
         //         .expect("Kernel not found")
-        //         .0;
+        //         ;
         //     let proof = read_proof_from_shared_memory();
         //     let partition_info = read_partition_info_from_shared_memory();
         //     let commitments = read_commitment_from_shared_memory();
@@ -153,13 +148,6 @@ where
             state
                 .global_mpi_config
                 .root_broadcast_bytes(&mut vec![255u8; 1]);
-            state
-                .kernels
-                .into_iter()
-                .for_each(|(_, (circuit, mut window))| {
-                    circuit.discard_control_of_shared_mem();
-                    state.global_mpi_config.free_shared_mem(&mut window);
-                });
 
             unsafe { mpi::ffi::MPI_Finalize() };
 
@@ -212,7 +200,7 @@ fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
                 let local_mpi_config =
                     generate_local_mpi_config(&state.global_mpi_config, parallel_count);
                 if let Some(local_mpi_config) = local_mpi_config {
-                    expander_fn::commit::<C>(&local_mpi_config);
+                    expander_fn::commit::<C>(&local_mpi_config, &state.prover_setup);
                 }
             }
             3 => {
@@ -226,23 +214,12 @@ fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
                     expander_fn::prove::<C>(
                         &local_mpi_config,
                         &state.prover_setup,
-                        &mut state
-                            .kernels
-                            .get_mut(&kernel_id)
-                            .expect("Kernel not found")
-                            .0,
+                        &mut state.kernels.get_mut(&kernel_id).expect("Kernel not found"),
                     );
                 }
             }
             255 => {
                 // Exit condition, if needed
-                state
-                    .kernels
-                    .into_iter()
-                    .for_each(|(_, (circuit, mut window))| {
-                        circuit.discard_control_of_shared_mem();
-                        state.global_mpi_config.free_shared_mem(&mut window);
-                    });
                 unsafe { mpi::ffi::MPI_Finalize() };
                 break;
             }
@@ -255,63 +232,34 @@ fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
 
 fn read_circuit_and_setup<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     global_mpi_config: MPIConfig<'static>,
-    circuits: &mut HashMap<usize, (ExpCircuit<C::FieldConfig>, MPI_Win)>,
+    circuits: &mut HashMap<usize, ExpCircuit<C::FieldConfig>>,
     prover_setup: &mut ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
     verifier_setup: &mut ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
 ) where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    // Read the computation graph from file
-    let computation_graph = if global_mpi_config.is_root() {
-        // Read the computation graph from file
-        let computation_graph_bytes = std::fs::read("/tmp/computation_graph.bin")
-            .expect("Failed to read computation graph from file");
-        Some(
-            ComputationGraph::<ECCConfig>::deserialize_from(std::io::Cursor::new(
-                computation_graph_bytes,
-            ))
-            .expect("Failed to deserialize computation graph"),
-        )
-    } else {
-        None
-    };
+    let computation_graph_bytes = std::fs::read("/tmp/computation_graph.bin")
+        .expect("Failed to read computation graph from file");
+    let computation_graph = ComputationGraph::<ECCConfig>::deserialize_from(std::io::Cursor::new(
+        computation_graph_bytes,
+    ))
+    .expect("Failed to deserialize computation graph");
 
-    // Export the computation graph to the format required by Expander
-    if global_mpi_config.is_root() {
-        let computation_graph = computation_graph
-            .as_ref()
-            .expect("Computation graph not found on root");
-        computation_graph
-            .proof_templates
-            .iter()
-            .for_each(|template| {
-                global_mpi_config.root_broadcast_f(&mut template.kernel_id.clone());
-                let ecc_circuit = &computation_graph.kernels[template.kernel_id].layered_circuit;
-                let expander_circuit = ecc_circuit
-                    .export_to_expander::<ECCConfig::FieldConfig>()
-                    .flatten::<C>();
-                let (mut expander_circuit, window) =
-                    global_mpi_config.consume_obj_and_create_shared(Some(expander_circuit));
-                expander_circuit.pre_process_gkr::<C>();
-                circuits.insert(template.kernel_id, (expander_circuit, window));
-            });
-        global_mpi_config.root_broadcast_f(&mut usize::MAX.clone()); // Signal that circuit read is complete
-    } else {
-        loop {
-            let mut kernel_id = 0;
-            global_mpi_config.root_broadcast_f(&mut kernel_id);
-            if kernel_id == usize::MAX {
-                break;
-            }
-            let (mut expander_circuit, window) =
-                global_mpi_config.consume_obj_and_create_shared::<ExpCircuit<C::FieldConfig>>(None);
+    computation_graph
+        .proof_templates
+        .iter()
+        .for_each(|template| {
+            global_mpi_config.root_broadcast_f(&mut template.kernel_id.clone());
+            let ecc_circuit = &computation_graph.kernels[template.kernel_id].layered_circuit;
+            let mut expander_circuit = ecc_circuit
+                .export_to_expander::<ECCConfig::FieldConfig>()
+                .flatten::<C>();
             expander_circuit.pre_process_gkr::<C>();
-            circuits.insert(kernel_id, (expander_circuit, window));
-        }
-    }
+            circuits.insert(template.kernel_id, expander_circuit);
+        });
 
     (*prover_setup, *verifier_setup) =
-        expander_fn::setup::<C, ECCConfig>(&global_mpi_config, computation_graph.as_ref());
+        expander_fn::setup::<C, ECCConfig>(&global_mpi_config, Some(&computation_graph));
 }
 
 #[allow(static_mut_refs)]
