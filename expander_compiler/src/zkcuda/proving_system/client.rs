@@ -2,45 +2,8 @@ use super::server::RequestType;
 
 use reqwest::Client;
 
-pub async fn request_pcs_setup(
-    client: &Client,
-    server_url: &str,
-    local_val_len: usize,
-    mpi_world_size: usize,
-) {
-    let request = RequestType::PCSSetup(local_val_len, mpi_world_size);
-    let res = client
-        .post(server_url)
-        .json(&request)
-        .send()
-        .await
-        .expect("Failed to send PCS setup request");
-
-    if res.status().is_success() {
-        println!("PCS setup request successful");
-    } else {
-        eprintln!("PCS setup request failed: {}", res.status());
-    }
-}
-
-pub async fn request_register_kernel(client: &Client, server_url: &str, kernel_id: usize) {
-    let request = RequestType::RegisterKernel(kernel_id);
-    let res = client
-        .post(server_url)
-        .json(&request)
-        .send()
-        .await
-        .expect("Failed to send kernel registration request");
-
-    if res.status().is_success() {
-        println!("Kernel registration request successful");
-    } else {
-        eprintln!("Kernel registration request failed: {}", res.status());
-    }
-}
-
-pub async fn request_commit_input(client: &Client, server_url: &str) {
-    let request = RequestType::CommitInput;
+pub async fn request_commit_input(client: &Client, server_url: &str, parallel_count: usize) {
+    let request = RequestType::CommitInput(parallel_count);
     let res = client
         .post(server_url)
         .json(&request)
@@ -55,8 +18,8 @@ pub async fn request_commit_input(client: &Client, server_url: &str) {
     }
 }
 
-pub async fn request_prove(client: &Client, server_url: &str, kernel_id: usize) {
-    let request = RequestType::Prove(kernel_id);
+pub async fn request_prove(client: &Client, server_url: &str, parallel_count: usize, kernel_id: usize) {
+    let request = RequestType::Prove(parallel_count, kernel_id);
     let res = client
         .post(server_url)
         .json(&request)
@@ -68,6 +31,30 @@ pub async fn request_prove(client: &Client, server_url: &str, kernel_id: usize) 
         println!("Prove request successful");
     } else {
         eprintln!("Prove request failed: {}", res.status());
+    }
+}
+
+pub async fn request_verify(client: &Client, server_url: &str, parallel_count: usize, kernel_id: usize) -> bool {
+    let request = RequestType::Verify(parallel_count, kernel_id);
+    let res = client
+        .post(server_url)
+        .json(&request)
+        .send()
+        .await
+        .expect("Failed to send verify request");
+
+    if res.status().is_success() {
+        // Assuming the response body contains a boolean indicating success
+        match res.json::<bool>().await {
+            Ok(success) => success,
+            Err(e) => {
+                eprintln!("Failed to parse verify response: {}", e);
+                false
+            }
+        }
+    } else {
+        eprintln!("Verify request failed: {}", res.status());
+        false
     }
 }
 

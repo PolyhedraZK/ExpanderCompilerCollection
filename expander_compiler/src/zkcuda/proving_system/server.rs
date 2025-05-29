@@ -1,10 +1,11 @@
 use serde::{Deserialize, Serialize};
 
+pub static SERVER_URL: &str = "http://127.0.0.1:3000/";
+
 #[derive(Serialize, Deserialize)]
 pub enum RequestType {
-    PCSSetup(usize, usize), // (local_val_len, mpi_world_size)
-    RegisterKernel(usize), // kernel_id
-    CommitInput,
-    Prove(usize), // kernel_id
+    CommitInput(usize), // Parallelizaion count
+    Prove(usize, usize), // (Parallelization count, kernel_id)
+    Verify(usize, usize), // (Parallelization count, kernel_id)
     Exit,
 }

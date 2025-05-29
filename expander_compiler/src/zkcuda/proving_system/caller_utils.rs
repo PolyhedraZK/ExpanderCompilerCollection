@@ -266,7 +266,13 @@ pub fn start_server(max_parallel_count: usize) {
         "mpiexec -n {} ../target/release/expander_serve",
         max_parallel_count
     );
-    exec_command(&cmd_str);
+    let mut parts = cmd_str.split_whitespace();
+    let command = parts.next().unwrap();
+    let args: Vec<&str> = parts.collect();
+    let _ = Command::new(command)
+        .args(args)
+        .spawn()
+        .expect("Failed to start child process");
 }
 
 fn parse_config<C: GKREngine>(mpi_size: usize) -> (String, String, String)

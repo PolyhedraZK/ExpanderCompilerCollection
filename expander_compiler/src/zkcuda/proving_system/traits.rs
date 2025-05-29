@@ -28,6 +28,7 @@ pub trait ProvingSystem<C: Config> {
 
     fn prove(
         prover_setup: &Self::ProverSetup,
+        kernel_id: usize,
         kernel: &Kernel<C>,
         commitments: &[Self::Commitment],
         commitments_extra_info: &[Self::CommitmentExtraInfo],
@@ -38,6 +39,7 @@ pub trait ProvingSystem<C: Config> {
 
     fn verify(
         verifier_setup: &Self::VerifierSetup,
+        kernel_id: usize,
         kernel: &Kernel<C>,
         proof: &Self::Proof,
         commitments: &[Self::Commitment],

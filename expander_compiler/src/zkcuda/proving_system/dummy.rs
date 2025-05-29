@@ -70,6 +70,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
 
     fn prove(
         _prover_setup: &Self::ProverSetup,
+        _kernel_id: usize,
         kernel: &Kernel<C>,
         _commitments: &[Self::Commitment],
         _commitments_extra_info: &[Self::CommitmentExtraInfo],
@@ -101,6 +102,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
     }
     fn verify(
         _verifier_setup: &Self::VerifierSetup,
+        _kernel_id: usize,
         kernel: &Kernel<C>,
         proof: &Self::Proof,
         commitments: &[Self::Commitment],

@@ -76,6 +76,17 @@ pub struct ExpanderGKRProverSetup<PCSField: Field, F: FieldEngine, PCS: Expander
     pub p_keys: HashMap<usize, <PCS::SRS as StructuredReferenceString>::PKey>,
 }
 
+// implement default
+impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Default
+    for ExpanderGKRProverSetup<PCSField, F, PCS>
+{
+    fn default() -> Self {
+        Self {
+            p_keys: HashMap::new(),
+        }
+    }
+}
+
 impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
     for ExpanderGKRProverSetup<PCSField, F, PCS>
 {
@@ -91,6 +102,17 @@ impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
 pub struct ExpanderGKRVerifierSetup<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>>
 {
     pub v_keys: HashMap<usize, <PCS::SRS as StructuredReferenceString>::VKey>,
+}
+
+// implement default
+impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Default
+    for ExpanderGKRVerifierSetup<PCSField, F, PCS>
+{
+    fn default() -> Self {
+        Self {
+            v_keys: HashMap::new(),
+        }
+    }
 }
 
 impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
@@ -218,6 +240,7 @@ where
 
     fn prove(
         prover_setup: &Self::ProverSetup,
+        _kernel_id: usize,
         kernel: &Kernel<ECCConfig>,
         _commitments: &[Self::Commitment],
         commitments_extra_info: &[Self::CommitmentExtraInfo],
@@ -295,6 +318,7 @@ where
 
     fn verify(
         verifier_setup: &Self::VerifierSetup,
+        _kernel_id: usize,
         kernel: &Kernel<ECCConfig>,
         proof: &Self::Proof,
         commitments: &[Self::Commitment],

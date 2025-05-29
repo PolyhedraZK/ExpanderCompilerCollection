@@ -613,6 +613,7 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<CircuitField<C>>> Context<C, 
             .map(|(template, commitments_kernel)| {
                 P::prove(
                     prover_setup,
+                    template.kernel_id,
                     self.kernels.get(template.kernel_id),
                     &commitments_kernel.0,
                     &commitments_kernel.1,
@@ -660,6 +661,7 @@ impl<C: Config> ComputationGraph<C> {
             .map(|((proof, template), commitments_kernel)| {
                 P::verify(
                     verifier_setup,
+                    template.kernel_id,
                     &self.kernels[template.kernel_id],
                     proof,
                     commitments_kernel,
