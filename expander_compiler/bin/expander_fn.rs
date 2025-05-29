@@ -13,7 +13,7 @@ use expander_compiler::frontend::{Config, SIMDField};
 use expander_compiler::zkcuda::proving_system::callee_utils::{
     read_broadcast_info_from_shared_memory, read_commitment_extra_info_from_shared_memory,
     read_commitment_from_shared_memory, read_commitment_values_from_shared_memory,
-    read_ecc_circuit_from_shared_memory, read_partition_info_from_shared_memory,
+    read_partition_info_from_shared_memory,
     write_proof_to_shared_memory,
 };
 use expander_compiler::zkcuda::proving_system::callee_utils::{
@@ -38,7 +38,7 @@ use sumcheck::ProverScratchPad;
 
 pub fn setup<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     global_mpi_config: &MPIConfig<'static>,
-    computation_graph: Some(&ComputationGraph<ECCConfig>),
+    computation_graph: Option<&ComputationGraph<ECCConfig>>,
 ) -> (
     ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
     ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
@@ -74,19 +74,34 @@ where
                     C::TranscriptConfig,
                     C::PCSConfig,
                 >(
-                    val_actual_len, &local_mpi_config
+                    val_actual_len, local_mpi_config.as_ref().unwrap(),
                 );
-                p_keys.insert(val_actual_len, p_key);
-                v_keys.insert(val_actual_len, v_key);
+                p_keys.insert((val_actual_len, template.parallel_count), p_key);
+                v_keys.insert((val_actual_len, template.parallel_count), v_key);
             }
         }
     } else {
         loop {
-            let mut val_actual_len = 0;
-            let mut parallel_count = 0;
-            global_mpi_config.root_broadcast_f(&mut (val_actual_len, parallel_count));
+            let mut pair = (0usize, 0usize);
+            global_mpi_config.root_broadcast_f(&mut pair);
+            let (val_actual_len, parallel_count) = pair;
             if val_actual_len == usize::MAX || parallel_count == usize::MAX {
                 break;
+            }
+            let local_mpi_config =
+                generate_local_mpi_config(&global_mpi_config, parallel_count);
+
+            if let Some(local_mpi_config) = local_mpi_config {
+                let (_params, p_key, v_key, _scratch) = pcs_testing_setup_fixed_seed::<
+                    C::FieldConfig,
+                    C::TranscriptConfig,
+                    C::PCSConfig,
+                >(val_actual_len, &local_mpi_config);
+                p_keys.insert((val_actual_len, parallel_count), p_key);
+                v_keys.insert((val_actual_len, parallel_count), v_key);
+            } else {
+                // If we are not in the local communicator, we can skip this
+                continue;
             }
         }
     }
@@ -283,7 +298,7 @@ fn prove_input_claim<C: GKREngine>(
             val_len,
             mpi_config.world_size(),
         );
-        let p_key = p_keys.p_keys.get(&val_len).unwrap();
+        let p_key = p_keys.p_keys.get(&(val_len, mpi_config.world_size())).unwrap();
 
         let poly = RefMultiLinearPoly::from_ref(vals_to_open);
         let v = C::FieldConfig::collectively_eval_circuit_vals_at_expander_challenge(
@@ -348,7 +363,7 @@ pub static mut GLOBAL_COMMUNICATOR: Option<SimpleCommunicator> = None;
 pub static mut LOCAL_COMMUNICATOR: Option<SimpleCommunicator> = None;
 
 #[allow(static_mut_refs)]
-fn generate_local_mpi_config(
+pub fn generate_local_mpi_config(
     global_mpi_config: &MPIConfig<'static>,
     n_parties: usize,
 ) -> Option<MPIConfig<'static>> {

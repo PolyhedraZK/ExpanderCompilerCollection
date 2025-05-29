@@ -4,12 +4,9 @@ use common::ExpanderExecArgs;
 mod expander_fn;
 
 use clap::Parser;
-use expander_compiler::zkcuda::kernel;
 use expander_compiler::zkcuda::proof::ComputationGraph;
 use expander_compiler::zkcuda::proving_system::ExpanderGKRVerifierSetup;
-use mpi::environment::Universe;
 use mpi::ffi::MPI_Win;
-use mpi::topology::SimpleCommunicator;
 use serdes::ExpSerde;
 use std::str::FromStr;
 
@@ -28,7 +25,7 @@ use gkr_engine::{
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::sync::{oneshot, Mutex};
 
-use expander_fn::{GLOBAL_COMMUNICATOR, UNIVERSE};
+use expander_fn::{generate_local_mpi_config, GLOBAL_COMMUNICATOR, UNIVERSE};
 
 struct ServerState<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> {
     lock: Arc<Mutex<()>>, // For now we want to ensure that only one request is processed at a time
@@ -72,12 +69,17 @@ where
 {
     let _lock = state.lock.lock().await; // Ensure only one request is processed at a time
     match request_type {
-        RequestType::CommitInput => {
+        RequestType::CommitInput(mut parallel_count) => {
             // Handle input commitment logic here
             println!("Committing input");
             state
                 .global_mpi_config
                 .root_broadcast_bytes(&mut vec![2u8; 1]);
+            state
+                .global_mpi_config
+                .root_broadcast_f(&mut parallel_count);
+            let local_mpi_config = generate_local_mpi_config(&state.global_mpi_config, parallel_count);
+            expander_fn::commit::<C>(&state.global_mpi_config);
         }
         RequestType::Prove(mut parallel_count, mut kernel_id) => {
             // Handle proving logic here
@@ -96,6 +98,23 @@ where
                     .expect("Kernel not found")
                     .0,
             );
+        }
+        RequestType::Verify(paralle_count, kernel_id) => {
+            // Handle verification logic here
+            println!("Verifying");
+            let mut kernel = state
+                .kernels
+                .get(&kernel_id)
+                .expect("Kernel not found")
+                .0
+                .clone();
+            let is_verified = expander_fn::verify::<C, ECCConfig>(
+                &state.global_mpi_config,
+                &state.verifier_setup,
+                &mut kernel,
+                paralle_count,
+            );
+            println!("Verification result: {}", is_verified);
         }
         RequestType::Exit => {
             // Handle exit logic here
@@ -167,9 +186,9 @@ fn worker_main<'a, C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>
     }
 }
 
-fn init_server_state<'a, C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
-    global_mpi_config: MPIConfig<'a>,
-) -> ServerState<'a, C::PCSField, C::FieldConfig, C::PCSConfig>
+fn init_server_state<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
+    global_mpi_config: MPIConfig<'static>,
+) -> ServerState<'static, C::PCSField, C::FieldConfig, C::PCSConfig>
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
@@ -198,7 +217,7 @@ where
 
     // Read the computation graph from file and initialize kernels
     if global_mpi_config.is_root() {
-        let computation_graph = computation_graph.expect("Computation graph not found on root");
+        let computation_graph = computation_graph.as_ref().expect("Computation graph not found on root");
         computation_graph
             .proof_templates
             .iter()
@@ -230,7 +249,7 @@ where
     }
 
     (server_state.prover_setup, server_state.verifier_setup) =
-        expander_fn::setup::<C>(&global_mpi_config, computation_graph.as_ref());
+        expander_fn::setup::<C, ECCConfig>(&global_mpi_config, computation_graph.as_ref());
 
     server_state
 }
