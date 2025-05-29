@@ -5,6 +5,11 @@ mod expander_fn;
 
 use clap::Parser;
 use expander_compiler::zkcuda::proof::ComputationGraph;
+use expander_compiler::zkcuda::proving_system::callee_utils::{
+    read_broadcast_info_from_shared_memory, read_commitment_from_shared_memory,
+    read_partition_info_from_shared_memory,
+};
+use expander_compiler::zkcuda::proving_system::caller_utils::read_proof_from_shared_memory;
 use expander_compiler::zkcuda::proving_system::ExpanderGKRVerifierSetup;
 use mpi::ffi::MPI_Win;
 use serdes::ExpSerde;
@@ -60,8 +65,8 @@ unsafe impl<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> 
 {
 }
 
-async fn root_main<'a, C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
-    State(mut state): State<ServerState<'a, C::PCSField, C::FieldConfig, C::PCSConfig>>,
+async fn root_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
+    State(mut state): State<ServerState<'static, C::PCSField, C::FieldConfig, C::PCSConfig>>,
     Json(request_type): Json<RequestType>,
 ) -> Json<bool>
 where
@@ -78,10 +83,11 @@ where
             state
                 .global_mpi_config
                 .root_broadcast_f(&mut parallel_count);
-            let local_mpi_config = generate_local_mpi_config(&state.global_mpi_config, parallel_count);
-            expander_fn::commit::<C>(&state.global_mpi_config);
+            let local_mpi_config =
+                generate_local_mpi_config(&state.global_mpi_config, parallel_count);
+            expander_fn::commit::<C>(&local_mpi_config.unwrap());
         }
-        RequestType::Prove(mut parallel_count, mut kernel_id) => {
+        RequestType::Prove(mut _parallel_count, mut kernel_id) => {
             // Handle proving logic here
             println!("Proving");
             state
@@ -99,20 +105,27 @@ where
                     .0,
             );
         }
-        RequestType::Verify(paralle_count, kernel_id) => {
+        RequestType::Verify(parallel_count, kernel_id) => {
             // Handle verification logic here
             println!("Verifying");
-            let mut kernel = state
+            let expander_circuit = &mut state
                 .kernels
-                .get(&kernel_id)
+                .get_mut(&kernel_id)
                 .expect("Kernel not found")
-                .0
-                .clone();
+                .0;
+            let proof = read_proof_from_shared_memory();
+            let partition_info = read_partition_info_from_shared_memory();
+            let commitments = read_commitment_from_shared_memory();
+            let broadcast_info = read_broadcast_info_from_shared_memory();
+
             let is_verified = expander_fn::verify::<C, ECCConfig>(
-                &state.global_mpi_config,
                 &state.verifier_setup,
-                &mut kernel,
-                paralle_count,
+                expander_circuit,
+                &proof,
+                &commitments,
+                &partition_info,
+                parallel_count,
+                &broadcast_info,
             );
             println!("Verification result: {}", is_verified);
         }
@@ -217,7 +230,9 @@ where
 
     // Read the computation graph from file and initialize kernels
     if global_mpi_config.is_root() {
-        let computation_graph = computation_graph.as_ref().expect("Computation graph not found on root");
+        let computation_graph = computation_graph
+            .as_ref()
+            .expect("Computation graph not found on root");
         computation_graph
             .proof_templates
             .iter()
@@ -227,8 +242,9 @@ where
                 let expander_circuit = ecc_circuit
                     .export_to_expander::<ECCConfig::FieldConfig>()
                     .flatten::<C>();
-                let (expander_circuit, window) =
+                let (mut expander_circuit, window) =
                     global_mpi_config.consume_obj_and_create_shared(Some(expander_circuit));
+                expander_circuit.pre_process_gkr::<C>();
                 server_state
                     .kernels
                     .insert(template.kernel_id, (expander_circuit, window));
@@ -241,7 +257,9 @@ where
             if kernel_id == usize::MAX {
                 break;
             }
-            let (expander_circuit, window) = global_mpi_config.consume_obj_and_create_shared(None);
+            let (mut expander_circuit, window) =
+                global_mpi_config.consume_obj_and_create_shared::<ExpCircuit<C::FieldConfig>>(None);
+            expander_circuit.pre_process_gkr::<C>();
             server_state
                 .kernels
                 .insert(kernel_id, (expander_circuit, window));

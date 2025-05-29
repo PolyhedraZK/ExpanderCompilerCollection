@@ -115,7 +115,11 @@ pub fn write_selected_pkey_to_shared_memory<
     pcs_setup: &ExpanderGKRProverSetup<PCSField, F, PCS>,
     actual_local_len: usize,
 ) {
-    let setup = pcs_setup.p_keys.get(&(actual_local_len, 1)).unwrap().clone();
+    let setup = pcs_setup
+        .p_keys
+        .get(&(actual_local_len, 1))
+        .unwrap()
+        .clone();
     let pair = (actual_local_len, setup);
 
     write_object_to_shared_memory(
