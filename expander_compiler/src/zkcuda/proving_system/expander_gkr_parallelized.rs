@@ -13,7 +13,7 @@ use super::caller_utils::{
     write_commitments_extra_info_to_shared_memory, write_commitments_to_shared_memory,
     write_commitments_values_to_shared_memory, write_input_partition_info_to_shared_memory,
 };
-use super::client::{request_commit_input, request_prove, request_setup};
+use super::client::{self, request_commit_input, request_prove, request_setup};
 use super::expander_gkr::{
     ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof,
     ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
@@ -205,6 +205,12 @@ where
 
         timer.stop();
         verified
+    }
+
+    fn post_process() {
+        let client = Client::new();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(client::request_exit(&client, SERVER_URL));
     }
 }
 

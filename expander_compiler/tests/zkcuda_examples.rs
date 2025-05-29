@@ -85,6 +85,7 @@ fn zkcuda_1_expander<C: Config, P: ProvingSystem<C>>() {
     let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
     let proof = ctx.to_proof(&prover_setup);
     assert!(computation_graph.verify(&proof, &verifier_setup));
+    P::post_process();
 }
 
 #[test]

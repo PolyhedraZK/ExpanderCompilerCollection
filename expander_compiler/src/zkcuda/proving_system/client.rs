@@ -55,6 +55,22 @@ pub async fn request_prove(
     }
 }
 
+pub async fn request_exit(client: &Client, server_url: &str) {
+    let request = RequestType::Exit;
+    let res = client
+        .post(server_url)
+        .json(&request)
+        .send()
+        .await
+        .expect("Failed to send exit request");
+
+    if res.status().is_success() {
+        println!("Exit request successful");
+    } else {
+        eprintln!("Exit request failed: {}", res.status());
+    }
+}
+
 // pub async fn request_verify(
 //     client: &Client,
 //     server_url: &str,

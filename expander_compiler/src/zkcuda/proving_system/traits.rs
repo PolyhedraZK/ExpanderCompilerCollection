@@ -47,4 +47,7 @@ pub trait ProvingSystem<C: Config> {
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> bool;
+
+    // In service mode, we sometimes want to end the server gracefully
+    fn post_process() {}
 }
