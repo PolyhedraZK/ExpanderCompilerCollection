@@ -4,10 +4,13 @@ use common::ExpanderExecArgs;
 mod expander_fn;
 
 use clap::Parser;
+use expander_compiler::zkcuda::kernel;
+use expander_compiler::zkcuda::proof::ComputationGraph;
 use expander_compiler::zkcuda::proving_system::ExpanderGKRVerifierSetup;
 use mpi::environment::Universe;
 use mpi::ffi::MPI_Win;
 use mpi::topology::SimpleCommunicator;
+use serdes::ExpSerde;
 use std::str::FromStr;
 
 use arith::Field;
@@ -25,8 +28,7 @@ use gkr_engine::{
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::sync::{oneshot, Mutex};
 
-static mut UNIVERSE: Option<Universe> = None;
-static mut GLOBAL_COMMUNICATOR: Option<SimpleCommunicator> = None;
+use expander_fn::{UNIVERSE, GLOBAL_COMMUNICATOR};
 
 struct ServerState<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> {
     lock: Arc<Mutex<()>>, // For now we want to ensure that only one request is processed at a time
@@ -213,6 +215,62 @@ fn worker_main<'a, C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>
         }
     }
 }
+
+fn init_server_state<'a, C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
+    global_mpi_config: MPIConfig<'a>,
+) -> ServerState<'a, C::PCSField, C::FieldConfig, C::PCSConfig>
+where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
+    let mut server_state = ServerState {
+        lock: Arc::new(Mutex::new(())),
+        global_mpi_config: global_mpi_config.clone(),
+        prover_setup: ExpanderGKRProverSetup::default(),
+        verifier_setup: ExpanderGKRVerifierSetup::default(),
+        kernels: HashMap::new(),
+        shutdown_tx: Arc::new(Mutex::new(None)),
+    };
+
+    let computation_graph = if global_mpi_config.is_root() {
+        // Read the computation graph from file
+        let computation_graph_bytes = std::fs::read("/tmp/computation_graph.bin")
+            .expect("Failed to read computation graph from file");
+        Some(ComputationGraph::<ECCConfig>::deserialize_from(std::io::Cursor::new(computation_graph_bytes))
+            .expect("Failed to deserialize computation graph"))
+    } else {
+        None
+    };
+
+    // Read the computation graph from file and initialize kernels
+    if global_mpi_config.is_root() {
+        let computation_graph = computation_graph.expect("Computation graph not found on root");
+        computation_graph.proof_templates.iter().for_each(|template| {
+            global_mpi_config.root_broadcast_f(&mut template.kernel_id.clone());
+            let ecc_circuit = &computation_graph.kernels[template.kernel_id].layered_circuit;
+            let expander_circuit = ecc_circuit.export_to_expander::<ECCConfig::FieldConfig>().flatten::<C>();
+            let (expander_circuit, window) = global_mpi_config.consume_obj_and_create_shared(Some(expander_circuit));
+            server_state.kernels.insert(template.kernel_id, (expander_circuit, window));
+        });
+        global_mpi_config.root_broadcast_f(&mut usize::MAX.clone()); // Signal that setup is complete
+
+    } else {
+        loop {
+            let mut kernel_id = 0;
+            global_mpi_config.root_broadcast_f(&mut kernel_id);
+            if kernel_id == usize::MAX {
+                break;
+            }
+            let (expander_circuit, window) = global_mpi_config.consume_obj_and_create_shared(None);
+            server_state.kernels.insert(kernel_id, (expander_circuit, window));
+        }
+    }
+
+    (server_state.prover_setup, server_state.verifier_setup) =
+        expander_fn::setup::<C>(&global_mpi_config, computation_graph.as_ref());
+
+    server_state
+}
+
 
 #[allow(static_mut_refs)]
 async fn serve<C: GKREngine + 'static, ECCConfig: Config<FieldConfig = C::FieldConfig> + 'static>()

@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-use std::io::{Cursor, Read};
+use std::io::Read;
 use std::{fs, thread};
 
 use crate::circuit::config::Config;

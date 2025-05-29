@@ -1,5 +1,9 @@
 use expander_compiler::zkcuda::kernel::LayeredCircuitInputVec;
+use expander_compiler::zkcuda::proof::ComputationGraph;
+use mpi::environment::Universe;
 use mpi::ffi::MPI_Win;
+use mpi::topology::SimpleCommunicator;
+use mpi::traits::Communicator;
 use std::cmp::max;
 use std::collections::HashMap;
 
@@ -32,46 +36,66 @@ use polynomials::RefMultiLinearPoly;
 use serdes::ExpSerde;
 use sumcheck::ProverScratchPad;
 
-pub fn setup<C: GKREngine>(
-    mpi_config: &MPIConfig,
-    local_val_len: usize,
-    p_keys: &mut ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-    v_keys: &mut ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-) where
+pub fn setup<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
+    global_mpi_config: &MPIConfig<'static>,
+    computation_graph: Some(&ComputationGraph<ECCConfig>),
+) -> (ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>, ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>)
+where 
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    // There might be a case local_val_len is the same but mpi size is different
-    // TODO: Handle this case
-    if p_keys.p_keys.contains_key(&local_val_len) {
-        // If the key already exists, we can skip the setup
-        return;
+    let mut p_keys = HashMap::new();
+    let mut v_keys = HashMap::new();
+    
+    if let Some(computation_graph) = computation_graph {
+        for template in computation_graph.proof_templates.iter() {
+        for (x, is_broadcast) in template
+            .commitment_indices
+            .iter()
+            .zip(template.is_broadcast.iter())
+        {
+            let val_total_len = computation_graph.commitments_lens[*x];
+            let val_actual_len = if *is_broadcast {
+                val_total_len
+            } else {
+                val_total_len / template.parallel_count
+            };
+            if p_keys.contains_key(&(val_actual_len, template.parallel_count)) {
+                continue;
+            }
+
+            global_mpi_config.root_broadcast_f(&mut (val_actual_len, template.parallel_count));
+            let local_mpi_config =
+                generate_local_mpi_config(&global_mpi_config, template.parallel_count);
+            let (_params, p_key, v_key, _scratch) = pcs_testing_setup_fixed_seed::<
+                C::FieldConfig,
+                C::TranscriptConfig,
+                C::PCSConfig,
+            >(
+                val_actual_len, &local_mpi_config,
+            );
+            p_keys.insert(val_actual_len, p_key);
+            v_keys.insert(val_actual_len, v_key);
+        }
     }
 
-    let (_params, p_key, v_key, _scratch) = pcs_testing_setup_fixed_seed::<
-        C::FieldConfig,
-        C::TranscriptConfig,
-        C::PCSConfig,
-    >(local_val_len, mpi_config);
-
-    p_keys.p_keys.insert(local_val_len, p_key);
-    v_keys.v_keys.insert(local_val_len, v_key);
-}
-
-pub fn register_kernel<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
-    mpi_config: &MPIConfig,
-    kernel_id: usize,
-    kernels: &mut HashMap<usize, (ExpCircuit<C::FieldConfig>, MPI_Win)>,
-) {
-    let (mut expander_circuit, window) = if mpi_config.is_root() {
-        let ecc_circuit = read_ecc_circuit_from_shared_memory::<ECCConfig>();
-        let expander_circuit = ecc_circuit.export_to_expander().flatten::<C>();
-        mpi_config.consume_obj_and_create_shared(Some(expander_circuit))
     } else {
-        mpi_config.consume_obj_and_create_shared(None)
-    };
-    expander_circuit.pre_process_gkr::<C>();
-    kernels.insert(kernel_id, (expander_circuit, window));
+        loop {
+            let mut val_actual_len = 0;
+            let mut parallel_count = 0;
+            global_mpi_config.root_broadcast_f(&mut (val_actual_len, parallel_count));
+            if val_actual_len == usize::MAX || parallel_count == usize::MAX {
+                break;
+            }
+
+        }
 }
+
+    (
+        ExpanderGKRProverSetup { p_keys },
+        ExpanderGKRVerifierSetup { v_keys },
+    )
+}
+
 
 pub fn commit<C: GKREngine>(mpi_config: &MPIConfig)
 where
@@ -316,4 +340,32 @@ fn prepare_inputs<F: Field>(
         input_vals[partition.offset..partition.offset + partition.len].copy_from_slice(val);
     }
     input_vals
+}
+
+// TODO: Find a way to avoid this global state
+pub static mut UNIVERSE: Option<Universe> = None;
+pub static mut GLOBAL_COMMUNICATOR: Option<SimpleCommunicator> = None;
+pub static mut LOCAL_COMMUNICATOR: Option<SimpleCommunicator> = None;
+
+#[allow(static_mut_refs)]
+fn generate_local_mpi_config(
+    global_mpi_config: &MPIConfig<'static>,
+    n_parties: usize,
+) -> Option<MPIConfig<'static>> {
+    assert!(n_parties > 0, "Number of parties must be greater than 0");
+
+    let rank = global_mpi_config.world_rank();
+    let color_v = if rank < n_parties { 0 } else { 1 };
+    let color = mpi::topology::Color::with_value(color_v);
+    unsafe {
+        LOCAL_COMMUNICATOR  = global_mpi_config.world.unwrap().split_by_color_with_key(color, rank as i32);
+    }
+    if color_v == 0 {
+        Some(MPIConfig::prover_new(
+            global_mpi_config.universe,
+            unsafe { LOCAL_COMMUNICATOR.as_ref() },
+        ))
+    } else {
+        None
+    }
 }

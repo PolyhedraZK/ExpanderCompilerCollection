@@ -73,7 +73,7 @@ impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
 #[allow(clippy::type_complexity)]
 #[derive(ExpSerde)]
 pub struct ExpanderGKRProverSetup<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> {
-    pub p_keys: HashMap<usize, <PCS::SRS as StructuredReferenceString>::PKey>,
+    pub p_keys: HashMap<(usize, usize), <PCS::SRS as StructuredReferenceString>::PKey>,
 }
 
 // implement default
@@ -101,7 +101,7 @@ impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
 #[derive(ExpSerde)]
 pub struct ExpanderGKRVerifierSetup<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>>
 {
-    pub v_keys: HashMap<usize, <PCS::SRS as StructuredReferenceString>::VKey>,
+    pub v_keys: HashMap<(usize, usize), <PCS::SRS as StructuredReferenceString>::VKey>,
 }
 
 // implement default
@@ -165,7 +165,7 @@ where
                 } else {
                     val_total_len / template.parallel_count
                 };
-                if p_keys.contains_key(&val_actual_len) {
+                if p_keys.contains_key(&(val_actual_len, 1)) {
                     continue;
                 }
                 let (_params, p_key, v_key, _scratch) = pcs_testing_setup_fixed_seed::<
@@ -176,8 +176,8 @@ where
                     val_actual_len,
                     &MPIConfig::prover_new(None, None),
                 );
-                p_keys.insert(val_actual_len, p_key);
-                v_keys.insert(val_actual_len, v_key);
+                p_keys.insert((val_actual_len, 1), p_key);
+                v_keys.insert((val_actual_len, 1), v_key);
             }
         }
 
@@ -204,7 +204,7 @@ where
         let n_vars = vals_to_commit[0].len().ilog2() as usize;
         let params =
             <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(n_vars, 1);
-        let p_key = prover_setup.p_keys.get(&(1 << n_vars)).unwrap();
+        let p_key = prover_setup.p_keys.get(&(1 << n_vars, 1)).unwrap();
 
         let (commitment, scratch) = vals_to_commit
             .into_iter()
@@ -457,7 +457,7 @@ fn prove_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfi
 
         let params =
             <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(val_len, 1);
-        let p_key = p_keys.p_keys.get(&val_len).unwrap();
+        let p_key = p_keys.p_keys.get(&(val_len, 1)).unwrap();
 
         let poly = RefMultiLinearPoly::from_ref(vals_to_open);
         let v =
@@ -535,7 +535,7 @@ where
             commitment_len.ilog2() as usize,
             1,
         );
-        let v_key = v_keys.v_keys.get(&commitment_len).unwrap();
+        let v_key = v_keys.v_keys.get(&(commitment_len, 1)).unwrap();
 
         let claim =
             <C::FieldConfig as FieldEngine>::ChallengeField::deserialize_from(&mut proof_reader)
