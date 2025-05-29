@@ -15,8 +15,8 @@ use expander_compiler::zkcuda::proving_system::callee_utils::{
     read_partition_info_from_shared_memory, write_proof_to_shared_memory,
 };
 use expander_compiler::zkcuda::proving_system::callee_utils::{
-    read_local_vals_to_commit_from_shared_memory, read_selected_pkey_from_shared_memory,
-    write_commitment_extra_info_to_shared_memory, write_commitment_to_shared_memory,
+    read_local_vals_to_commit_from_shared_memory, write_commitment_extra_info_to_shared_memory,
+    write_commitment_to_shared_memory,
 };
 use expander_compiler::zkcuda::proving_system::{
     max_n_vars, pcs_testing_setup_fixed_seed, ExpanderGKRCommitment,
@@ -77,10 +77,6 @@ where
                     val_actual_len,
                     local_mpi_config.as_ref().unwrap(),
                 );
-                println!(
-                    "val actual len {}, parallel_count {}",
-                    val_actual_len, template.parallel_count
-                );
                 p_keys.insert((val_actual_len, template.parallel_count), p_key);
                 v_keys.insert((val_actual_len, template.parallel_count), v_key);
             }
@@ -103,10 +99,6 @@ where
                     C::PCSConfig,
                 >(
                     val_actual_len, &local_mpi_config
-                );
-                println!(
-                    "worker val actual len {} parallel count {}",
-                    val_actual_len, parallel_count
                 );
                 p_keys.insert((val_actual_len, parallel_count), p_key);
                 v_keys.insert((val_actual_len, parallel_count), v_key);
@@ -139,7 +131,6 @@ pub fn commit<C: GKREngine>(
     let local_vals_to_commit =
         read_local_vals_to_commit_from_shared_memory::<C::FieldConfig>(world_rank, world_size);
     let local_val_len = local_vals_to_commit.len();
-    println!("local val len {}, world size {}", local_val_len, world_size);
     let p_key = prover_setup
         .p_keys
         .get(&(local_val_len, world_size))
@@ -157,7 +148,7 @@ pub fn commit<C: GKREngine>(
     let commitment = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::commit(
         &params,
         mpi_config,
-        &p_key,
+        p_key,
         &RefMultiLinearPoly::from_ref(&local_vals_to_commit),
         &mut scratch,
     );

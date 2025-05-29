@@ -7,7 +7,6 @@ use clap::Parser;
 use expander_compiler::zkcuda::proof::ComputationGraph;
 use expander_compiler::zkcuda::proving_system::caller_utils::write_pcs_setup_to_shared_memory;
 use expander_compiler::zkcuda::proving_system::ExpanderGKRVerifierSetup;
-use mpi::ffi::MPI_Win;
 use serdes::ExpSerde;
 use std::str::FromStr;
 
@@ -31,9 +30,9 @@ use expander_fn::{generate_local_mpi_config, GLOBAL_COMMUNICATOR, UNIVERSE};
 struct ServerState<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> {
     lock: Arc<Mutex<()>>, // For now we want to ensure that only one request is processed at a time
     global_mpi_config: MPIConfig<'a>,
-    prover_setup: ExpanderGKRProverSetup<PCSField, F, PCS>,
-    verifier_setup: ExpanderGKRVerifierSetup<PCSField, F, PCS>,
-    kernels: HashMap<usize, ExpCircuit<F>>,
+    prover_setup: Arc<Mutex<ExpanderGKRProverSetup<PCSField, F, PCS>>>,
+    verifier_setup: Arc<Mutex<ExpanderGKRVerifierSetup<PCSField, F, PCS>>>,
+    kernels: Arc<Mutex<HashMap<usize, ExpCircuit<F>>>>,
     shutdown_tx: Arc<Mutex<Option<oneshot::Sender<()>>>>,
 }
 
@@ -44,9 +43,9 @@ impl<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
         ServerState {
             lock: Arc::clone(&self.lock),
             global_mpi_config: self.global_mpi_config.clone(),
-            prover_setup: self.prover_setup.clone(),
-            verifier_setup: self.verifier_setup.clone(),
-            kernels: self.kernels.clone(),
+            prover_setup: Arc::clone(&self.prover_setup),
+            verifier_setup: Arc::clone(&self.verifier_setup),
+            kernels: Arc::clone(&self.kernels),
             shutdown_tx: Arc::clone(&self.shutdown_tx),
         }
     }
@@ -61,11 +60,13 @@ unsafe impl<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> 
 {
 }
 
-async fn root_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
-    State(mut state): State<ServerState<'static, C::PCSField, C::FieldConfig, C::PCSConfig>>,
+async fn root_main<C, ECCConfig>(
+    State(state): State<ServerState<'static, C::PCSField, C::FieldConfig, C::PCSConfig>>,
     Json(request_type): Json<RequestType>,
 ) -> Json<bool>
 where
+    C: GKREngine,
+    ECCConfig: Config<FieldConfig = C::FieldConfig>,
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let _lock = state.lock.lock().await; // Ensure only one request is processed at a time
@@ -76,15 +77,18 @@ where
             state
                 .global_mpi_config
                 .root_broadcast_bytes(&mut vec![1u8; 1]);
+            let mut kernels_guard = state.kernels.lock().await;
+            let mut prover_setup_guard = state.prover_setup.lock().await;
+            let mut verifier_setup_guard = state.verifier_setup.lock().await;
             read_circuit_and_setup::<C, ECCConfig>(
                 state.global_mpi_config.clone(),
-                &mut state.kernels,
-                &mut state.prover_setup,
-                &mut state.verifier_setup,
+                &mut *kernels_guard,
+                &mut *prover_setup_guard,
+                &mut *verifier_setup_guard,
             );
             write_pcs_setup_to_shared_memory(&(
-                state.prover_setup.clone(),
-                state.verifier_setup.clone(),
+                prover_setup_guard.clone(),
+                verifier_setup_guard.clone(),
             ));
         }
         RequestType::CommitInput(mut parallel_count) => {
@@ -98,7 +102,8 @@ where
                 .root_broadcast_f(&mut parallel_count);
             let local_mpi_config =
                 generate_local_mpi_config(&state.global_mpi_config, parallel_count);
-            expander_fn::commit::<C>(&local_mpi_config.unwrap(), &state.prover_setup);
+            let prover_setup = state.prover_setup.lock().await;
+            expander_fn::commit::<C>(&local_mpi_config.unwrap(), &*prover_setup);
         }
         RequestType::Prove(parallel_count, kernel_id) => {
             // Handle proving logic here
@@ -112,36 +117,11 @@ where
                 .root_broadcast_f(&mut (parallel_count, kernel_id));
             let local_mpi_config =
                 generate_local_mpi_config(&state.global_mpi_config, parallel_count);
-            expander_fn::prove::<C>(
-                &local_mpi_config.unwrap(),
-                &state.prover_setup,
-                &mut state.kernels.get_mut(&kernel_id).expect("Kernel not found"),
-            );
+            let mut kernels_guard = state.kernels.lock().await;
+            let prover_setup_guard = state.prover_setup.lock().await;
+            let kernel = kernels_guard.get_mut(&kernel_id).expect("Kernel not found");
+            expander_fn::prove::<C>(&local_mpi_config.unwrap(), &*prover_setup_guard, kernel);
         }
-        // RequestType::Verify(parallel_count, kernel_id) => {
-        //     // Handle verification logic here
-        //     println!("Verifying");
-        //     let expander_circuit = &mut state
-        //         .kernels
-        //         .get_mut(&kernel_id)
-        //         .expect("Kernel not found")
-        //         ;
-        //     let proof = read_proof_from_shared_memory();
-        //     let partition_info = read_partition_info_from_shared_memory();
-        //     let commitments = read_commitment_from_shared_memory();
-        //     let broadcast_info = read_broadcast_info_from_shared_memory();
-
-        //     let is_verified = expander_fn::verify::<C, ECCConfig>(
-        //         &state.verifier_setup,
-        //         expander_circuit,
-        //         &proof,
-        //         &commitments,
-        //         &partition_info,
-        //         parallel_count,
-        //         &broadcast_info,
-        //     );
-        //     println!("Verification result: {}", is_verified);
-        // }
         RequestType::Exit => {
             // Handle exit logic here
             println!("Exiting");
@@ -163,17 +143,17 @@ where
     axum::Json(true)
 }
 
-fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
+async fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     global_mpi_config: MPIConfig<'static>,
 ) where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    let mut state = ServerState {
+    let state = ServerState {
         lock: Arc::new(Mutex::new(())),
         global_mpi_config: global_mpi_config.clone(),
-        prover_setup: ExpanderGKRProverSetup::default(),
-        verifier_setup: ExpanderGKRVerifierSetup::default(),
-        kernels: HashMap::new(),
+        prover_setup: Arc::new(Mutex::new(ExpanderGKRProverSetup::default())),
+        verifier_setup: Arc::new(Mutex::new(ExpanderGKRVerifierSetup::default())),
+        kernels: Arc::new(Mutex::new(HashMap::new())),
         shutdown_tx: Arc::new(Mutex::new(None)),
     };
 
@@ -184,11 +164,15 @@ fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         match bytes[0] {
             1 => {
                 // Setup
+                let mut kernels_guard = state.kernels.lock().await;
+                let mut prover_setup_guard = state.prover_setup.lock().await;
+                let mut verifier_setup_guard = state.verifier_setup.lock().await;
+
                 read_circuit_and_setup::<C, ECCConfig>(
                     global_mpi_config.clone(),
-                    &mut state.kernels,
-                    &mut state.prover_setup,
-                    &mut state.verifier_setup,
+                    &mut *kernels_guard,
+                    &mut *prover_setup_guard,
+                    &mut *verifier_setup_guard,
                 );
             }
             2 => {
@@ -200,7 +184,8 @@ fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
                 let local_mpi_config =
                     generate_local_mpi_config(&state.global_mpi_config, parallel_count);
                 if let Some(local_mpi_config) = local_mpi_config {
-                    expander_fn::commit::<C>(&local_mpi_config, &state.prover_setup);
+                    let prover_setup_guard = state.prover_setup.lock().await;
+                    expander_fn::commit::<C>(&local_mpi_config, &*prover_setup_guard);
                 }
             }
             3 => {
@@ -211,11 +196,11 @@ fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
                 let local_mpi_config =
                     generate_local_mpi_config(&state.global_mpi_config, parallel_count);
                 if let Some(local_mpi_config) = local_mpi_config {
-                    expander_fn::prove::<C>(
-                        &local_mpi_config,
-                        &state.prover_setup,
-                        &mut state.kernels.get_mut(&kernel_id).expect("Kernel not found"),
-                    );
+                    let prover_setup_guard = state.prover_setup.lock().await;
+                    let mut kernels_guard = state.kernels.lock().await;
+                    let exp_circuit = kernels_guard.get_mut(&kernel_id).expect("Kernel not found");
+
+                    expander_fn::prove::<C>(&local_mpi_config, &*prover_setup_guard, exp_circuit);
                 }
             }
             255 => {
@@ -276,9 +261,9 @@ where
     let state = ServerState {
         lock: Arc::new(Mutex::new(())),
         global_mpi_config: global_mpi_config.clone(),
-        prover_setup: ExpanderGKRProverSetup::default(),
-        verifier_setup: ExpanderGKRVerifierSetup::default(),
-        kernels: HashMap::new(),
+        prover_setup: Arc::new(Mutex::new(ExpanderGKRProverSetup::default())),
+        verifier_setup: Arc::new(Mutex::new(ExpanderGKRVerifierSetup::default())),
+        kernels: Arc::new(Mutex::new(HashMap::new())),
         shutdown_tx: Arc::new(Mutex::new(None)),
     };
 
@@ -301,7 +286,7 @@ where
             .await
             .unwrap();
     } else {
-        worker_main::<C, ECCConfig>(global_mpi_config);
+        worker_main::<C, ECCConfig>(global_mpi_config).await;
     }
 }
 
