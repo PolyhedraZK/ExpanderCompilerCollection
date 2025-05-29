@@ -83,6 +83,21 @@ fn zkcuda_1_expander<C: Config, P: ProvingSystem<C>>() {
     let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
     let proof = ctx.to_proof(&prover_setup);
     assert!(computation_graph.verify(&proof, &verifier_setup));
+
+    // test serde
+    let mut buf_cg: Vec<u8> = Vec::new();
+    computation_graph.serialize_into(&mut buf_cg).unwrap();
+    let mut buf_proof: Vec<u8> = Vec::new();
+    proof.serialize_into(&mut buf_proof).unwrap();
+
+    let computation_graph2 =
+        ComputationGraph::<C>::deserialize_from(&mut buf_cg.as_slice()).unwrap();
+    let proof2 = CombinedProof::<C, P>::deserialize_from(&mut buf_proof.as_slice()).unwrap();
+    let ctx2: Context<C, P> = Context::default();
+    let (_prover_setup2, verifier_setup2) = ctx2.proving_system_setup(&computation_graph2);
+    assert!(computation_graph2.verify(&proof2, &verifier_setup2));
+    assert!(computation_graph.verify(&proof2, &verifier_setup));
+    assert!(computation_graph2.verify(&proof, &verifier_setup2));
 }
 
 #[test]
