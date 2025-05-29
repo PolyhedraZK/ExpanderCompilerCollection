@@ -26,8 +26,10 @@ pub trait ProvingSystem<C: Config> {
         is_broadcast: bool,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo);
 
+    #[allow(clippy::too_many_arguments)]
     fn prove(
         prover_setup: &Self::ProverSetup,
+        kernel_id: usize,
         kernel: &Kernel<C>,
         commitments: &[Self::Commitment],
         commitments_extra_info: &[Self::CommitmentExtraInfo],
@@ -38,10 +40,14 @@ pub trait ProvingSystem<C: Config> {
 
     fn verify(
         verifier_setup: &Self::VerifierSetup,
+        kernel_id: usize,
         kernel: &Kernel<C>,
         proof: &Self::Proof,
         commitments: &[Self::Commitment],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> bool;
+
+    // In service mode, we sometimes want to end the server gracefully
+    fn post_process() {}
 }

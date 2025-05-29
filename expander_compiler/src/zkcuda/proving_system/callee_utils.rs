@@ -13,7 +13,8 @@ use crate::{
 
 pub use super::caller_utils::read_object_from_shared_memory;
 use super::{
-    ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof, ExpanderGKRProverSetup,
+    ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof,
+    ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
 };
 
 pub fn read_object_from_shared_memory_name_string<T: ExpSerde>(
@@ -99,7 +100,10 @@ pub fn read_pcs_setup_from_shared_memory<
     PCSField: Field,
     F: FieldEngine,
     PCS: ExpanderPCS<F, PCSField>,
->() -> ExpanderGKRProverSetup<PCSField, F, PCS> {
+>() -> (
+    ExpanderGKRProverSetup<PCSField, F, PCS>,
+    ExpanderGKRVerifierSetup<PCSField, F, PCS>,
+) {
     read_object_from_shared_memory_name_string("/tmp/pcs_setup", 0)
 }
 

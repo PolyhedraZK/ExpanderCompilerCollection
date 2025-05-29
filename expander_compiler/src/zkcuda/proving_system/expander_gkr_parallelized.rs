@@ -1,28 +1,31 @@
+use std::fs;
 use std::io::{Cursor, Read};
 
 use crate::circuit::config::Config;
 use crate::frontend::SIMDField;
 
 use super::super::kernel::Kernel;
+use super::callee_utils::read_pcs_setup_from_shared_memory;
 use super::caller_utils::{
-    exec_gkr_prove_with_pcs, exec_pcs_commit, init_commitment_and_extra_info_shared_memory,
-    init_proof_shared_memory, read_commitment_and_extra_info_from_shared_memory,
-    read_proof_from_shared_memory, write_broadcast_info_to_shared_memory,
-    write_commit_vals_to_shared_memory, write_commitments_extra_info_to_shared_memory,
-    write_commitments_to_shared_memory, write_commitments_values_to_shared_memory,
-    write_ecc_circuit_to_shared_memory, write_input_partition_info_to_shared_memory,
-    write_pcs_setup_to_shared_memory, write_selected_pkey_to_shared_memory,
+    init_commitment_and_extra_info_shared_memory, init_proof_shared_memory,
+    read_commitment_and_extra_info_from_shared_memory, read_proof_from_shared_memory, start_server,
+    write_broadcast_info_to_shared_memory, write_commit_vals_to_shared_memory,
+    write_commitments_extra_info_to_shared_memory, write_commitments_to_shared_memory,
+    write_commitments_values_to_shared_memory, write_input_partition_info_to_shared_memory,
 };
+use super::client::{self, request_commit_input, request_prove, request_setup};
 use super::expander_gkr::{
     ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof,
     ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
 };
+use super::server::SERVER_URL;
 use super::{Commitment, ExpanderGKRProvingSystem, ProvingSystem};
 use expander_utils::timer::Timer;
 
 use arith::Field;
 use gkr::gkr_verify;
 use gkr_engine::{ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, Transcript};
+use reqwest::Client;
 use serdes::ExpSerde;
 
 use polynomials::EqPolynomial;
@@ -48,10 +51,25 @@ where
     fn setup(
         computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
-        // All of currently supported PCSs(Raw, Orion, Hyrax) do not require the multi-core information in the step of `setup`
-        // So we can simply reuse the setup function from the non-parallelized version
-        // TODO: Do this properly in supporting future mpi-info-awared PCSs
-        ExpanderGKRProvingSystem::<C>::setup(computation_graph)
+        let mut bytes = vec![];
+        computation_graph.serialize_into(&mut bytes).unwrap();
+        fs::write("/tmp/computation_graph.bin", bytes)
+            .expect("Failed to write computation graph to file");
+
+        let max_parallel_count = computation_graph
+            .proof_templates
+            .iter()
+            .map(|t| t.parallel_count)
+            .max()
+            .unwrap_or(1);
+        start_server::<C>(max_parallel_count);
+
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        let client = Client::new();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(request_setup(&client, SERVER_URL));
+
+        read_pcs_setup_from_shared_memory()
     }
 
     fn commit(
@@ -68,22 +86,25 @@ where
                 is_broadcast,
             )
         } else {
-            let timer = Timer::new("commit", true);
-            let actual_local_len = vals.len() / parallel_count;
-
-            // TODO: The size here is for the raw commitment, add an function in the pcs trait to get the size of the commitment
             init_commitment_and_extra_info_shared_memory(SINGLE_KERNEL_MAX_PROOF_SIZE, 8);
-            write_selected_pkey_to_shared_memory(prover_setup, actual_local_len);
             write_commit_vals_to_shared_memory::<ECCConfig>(vals);
-            exec_pcs_commit::<C>(parallel_count);
+
+            let client = Client::new();
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(request_commit_input(
+                &client,
+                SERVER_URL,
+                if is_broadcast { 1 } else { parallel_count },
+            ));
             let (commitment, extra_info) = read_commitment_and_extra_info_from_shared_memory();
-            timer.stop();
+
             (commitment, extra_info)
         }
     }
 
     fn prove(
         prover_setup: &Self::ProverSetup,
+        kernel_id: usize,
         kernel: &Kernel<ECCConfig>,
         commitments: &[Self::Commitment],
         commitments_extra_info: &[Self::CommitmentExtraInfo],
@@ -94,6 +115,7 @@ where
         if parallel_count == 1 {
             ExpanderGKRProvingSystem::<C>::prove(
                 prover_setup,
+                kernel_id,
                 kernel,
                 commitments,
                 commitments_extra_info,
@@ -104,14 +126,21 @@ where
         } else {
             let timer = Timer::new("prove", true);
             init_proof_shared_memory(SINGLE_KERNEL_MAX_PROOF_SIZE);
-            write_pcs_setup_to_shared_memory(prover_setup);
-            write_ecc_circuit_to_shared_memory(&kernel.layered_circuit);
             write_input_partition_info_to_shared_memory(&kernel.layered_circuit_input);
             write_commitments_to_shared_memory(&commitments.to_vec());
             write_commitments_extra_info_to_shared_memory(&commitments_extra_info.to_vec());
             write_commitments_values_to_shared_memory::<C::FieldConfig>(commitments_values);
             write_broadcast_info_to_shared_memory(&is_broadcast.to_vec());
-            exec_gkr_prove_with_pcs::<C>(parallel_count);
+
+            let client = Client::new();
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(request_prove(
+                &client,
+                SERVER_URL,
+                parallel_count,
+                kernel_id,
+            ));
+
             timer.stop();
             read_proof_from_shared_memory()
         }
@@ -120,6 +149,7 @@ where
     // For verification, we don't need the mpi executor and shared memory, it's always run by a single party
     fn verify(
         verifier_setup: &Self::VerifierSetup,
+        _kernel_id: usize,
         kernel: &Kernel<ECCConfig>,
         proof: &Self::Proof,
         commitments: &[Self::Commitment],
@@ -176,6 +206,12 @@ where
         timer.stop();
         verified
     }
+
+    fn post_process() {
+        let client = Client::new();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(client::request_exit(&client, SERVER_URL));
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -212,7 +248,10 @@ where
             nb_challenge_vars,
             parallel_count,
         );
-        let v_key = v_keys.v_keys.get(&local_vals_len).unwrap();
+        let v_key = v_keys
+            .v_keys
+            .get(&(local_vals_len, parallel_count))
+            .unwrap();
 
         let claim =
             <C::FieldConfig as FieldEngine>::ChallengeField::deserialize_from(&mut proof_reader)

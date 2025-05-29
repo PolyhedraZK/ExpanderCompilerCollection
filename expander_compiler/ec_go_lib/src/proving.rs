@@ -13,7 +13,6 @@ use expander_compiler::circuit::config;
 use expander_compiler::circuit::layered;
 use expander_compiler::frontend::{BN254Config, GF2Config, GoldilocksConfig, M31Config};
 use gkr_engine::MPIConfig;
-use gkr_engine::MPIEngine;
 use serdes::ExpSerde;
 
 use super::{match_config_id, ByteArray, Config};
@@ -26,7 +25,8 @@ where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
     C::PCSField: SimdField<Scalar = <C::FieldConfig as FieldEngine>::CircuitField>,
 {
-    let mpi_config = MPIConfig::prover_new();
+    // (None, None) means single core execution
+    let mpi_config = MPIConfig::prover_new(None, None);
 
     let mut circuit =
         expander_circuit::Circuit::<C::FieldConfig>::single_thread_prover_load_circuit::<C>(
@@ -47,7 +47,7 @@ fn verify_circuit_file_inner<C: config::Config>(
     witness: &[u8],
     proof_and_claimed_v: &[u8],
 ) -> Result<u8, String> {
-    let mpi_config = gkr_engine::MPIConfig::prover_new();
+    let mpi_config = gkr_engine::MPIConfig::verifier_new(1);
     let mut circuit =
         expander_circuit::Circuit::<C::FieldConfig>::verifier_load_circuit::<C>(circuit_filename);
     let witness =

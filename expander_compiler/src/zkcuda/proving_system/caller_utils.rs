@@ -13,7 +13,8 @@ use shared_memory::{Shmem, ShmemConf};
 use crate::circuit::{config::Config, layered::InputType};
 
 use super::{
-    ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof, ExpanderGKRProverSetup,
+    ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof,
+    ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
 };
 
 #[derive(Default)]
@@ -115,7 +116,11 @@ pub fn write_selected_pkey_to_shared_memory<
     pcs_setup: &ExpanderGKRProverSetup<PCSField, F, PCS>,
     actual_local_len: usize,
 ) {
-    let setup = pcs_setup.p_keys.get(&actual_local_len).unwrap().clone();
+    let setup = pcs_setup
+        .p_keys
+        .get(&(actual_local_len, 1))
+        .unwrap()
+        .clone();
     let pair = (actual_local_len, setup);
 
     write_object_to_shared_memory(
@@ -151,7 +156,10 @@ pub fn write_pcs_setup_to_shared_memory<
     F: FieldEngine,
     PCS: ExpanderPCS<F, PCSField>,
 >(
-    pcs_setup: &ExpanderGKRProverSetup<PCSField, F, PCS>,
+    pcs_setup: &(
+        ExpanderGKRProverSetup<PCSField, F, PCS>,
+        ExpanderGKRVerifierSetup<PCSField, F, PCS>,
+    ),
 ) {
     write_object_to_shared_memory(
         pcs_setup,
@@ -259,6 +267,26 @@ fn exec_command(cmd: &str) {
         .spawn()
         .expect("Failed to start child process");
     let _ = child.wait();
+}
+
+#[allow(clippy::zombie_processes)]
+pub fn start_server<C: GKREngine>(max_parallel_count: usize)
+where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
+    let (overscribe, field_name, pcs_name) = parse_config::<C>(max_parallel_count);
+
+    let cmd_str = format!(
+        "mpiexec -n {} {} ../target/release/expander_serve --field-type {} --poly-commit {}",
+        max_parallel_count, overscribe, field_name, pcs_name,
+    );
+    let mut parts = cmd_str.split_whitespace();
+    let command = parts.next().unwrap();
+    let args: Vec<&str> = parts.collect();
+    let _ = Command::new(command)
+        .args(args)
+        .spawn()
+        .expect("Failed to start child process");
 }
 
 fn parse_config<C: GKREngine>(mpi_size: usize) -> (String, String, String)
