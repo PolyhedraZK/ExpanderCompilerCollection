@@ -62,7 +62,7 @@ where
             .map(|t| t.parallel_count)
             .max()
             .unwrap_or(1);
-        start_server(max_parallel_count);
+        start_server::<C>(max_parallel_count);
 
         std::thread::sleep(std::time::Duration::from_secs(1));
         let client = Client::new();

@@ -270,17 +270,15 @@ fn exec_command(cmd: &str) {
 }
 
 #[allow(clippy::zombie_processes)]
-pub fn start_server(max_parallel_count: usize) {
-    let overscribe = if max_parallel_count > num_cpus::get_physical() {
-        println!("Warning: Not enough cores available for the requested number of processes. Using oversubscription.");
-        "--oversubscribe"
-    } else {
-        ""
-    };
+pub fn start_server<C: GKREngine>(max_parallel_count: usize)
+where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
+    let (overscribe, field_name, pcs_name) = parse_config::<C>(max_parallel_count);
 
     let cmd_str = format!(
-        "mpiexec -n {} {} ../target/release/expander_serve",
-        overscribe, max_parallel_count
+        "mpiexec -n {} {} ../target/release/expander_server --field-type {} --poly-commit {}",
+        max_parallel_count, overscribe, field_name, pcs_name,
     );
     let mut parts = cmd_str.split_whitespace();
     let command = parts.next().unwrap();
