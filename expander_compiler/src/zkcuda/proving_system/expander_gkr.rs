@@ -165,7 +165,7 @@ where
                 } else {
                     val_total_len / template.parallel_count
                 };
-                if p_keys.contains_key(&(val_actual_len, 1)) {
+                if p_keys.contains_key(&(val_actual_len, template.parallel_count)) {
                     continue;
                 }
                 let (_params, p_key, v_key, _scratch) = pcs_testing_setup_fixed_seed::<
@@ -176,8 +176,8 @@ where
                     val_actual_len,
                     &MPIConfig::prover_new(None, None),
                 );
-                p_keys.insert((val_actual_len, 1), p_key);
-                v_keys.insert((val_actual_len, 1), v_key);
+                p_keys.insert((val_actual_len, template.parallel_count), p_key);
+                v_keys.insert((val_actual_len, template.parallel_count), v_key);
             }
         }
 
@@ -202,9 +202,14 @@ where
         };
 
         let n_vars = vals_to_commit[0].len().ilog2() as usize;
-        let params =
-            <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(n_vars, 1);
-        let p_key = prover_setup.p_keys.get(&(1 << n_vars, 1)).unwrap();
+        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
+            n_vars,
+            parallel_count,
+        );
+        let p_key = prover_setup
+            .p_keys
+            .get(&(1 << n_vars, parallel_count))
+            .unwrap();
 
         let (commitment, scratch) = vals_to_commit
             .into_iter()
@@ -457,7 +462,7 @@ fn prove_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfi
 
         let params =
             <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(val_len, 1);
-        let p_key = p_keys.p_keys.get(&(val_len, 1)).unwrap();
+        let p_key = p_keys.p_keys.get(&(val_len, parallel_count)).unwrap();
 
         let poly = RefMultiLinearPoly::from_ref(vals_to_open);
         let v =
@@ -511,7 +516,7 @@ fn verify_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConf
     commitments: &[ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
     is_broadcast: &[bool],
     parallel_index: usize,
-    _parallel_count: usize,
+    parallel_count: usize,
     transcript: &mut C::TranscriptConfig,
 ) -> bool
 where
@@ -535,7 +540,10 @@ where
             commitment_len.ilog2() as usize,
             1,
         );
-        let v_key = v_keys.v_keys.get(&(commitment_len, 1)).unwrap();
+        let v_key = v_keys
+            .v_keys
+            .get(&(commitment_len, parallel_count))
+            .unwrap();
 
         let claim =
             <C::FieldConfig as FieldEngine>::ChallengeField::deserialize_from(&mut proof_reader)
