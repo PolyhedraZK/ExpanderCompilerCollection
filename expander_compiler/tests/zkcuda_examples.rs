@@ -113,6 +113,7 @@ fn zkcuda_1_multi_core() {
         zkcuda_1_expander::<BN254Config, ParallelizedExpanderGKRProvingSystem<BN254ConfigSha2KZG>>()
     });
     assert!(result.is_err());
+    ParallelizedExpanderGKRProvingSystem::<BN254ConfigSha2KZG>::post_process();
 }
 
 #[kernel]
