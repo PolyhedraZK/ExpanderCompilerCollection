@@ -120,10 +120,6 @@ pub fn commit<C: GKREngine>(
 {
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
-    assert!(
-        world_size > 1,
-        "In case world_size is 1, we should not use the mpi version of the prover"
-    );
     if world_rank == 0 {
         println!("Expander Commit Exec Called with world size {}", world_size);
     }
@@ -182,10 +178,6 @@ pub fn prove<C: GKREngine>(
 {
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
-    assert!(
-        world_size > 1,
-        "In case world_size is 1, we should not use the mpi version of the prover"
-    );
     if world_rank == 0 {
         println!("Expander Prove Exec Called with world size {}", world_size);
     }

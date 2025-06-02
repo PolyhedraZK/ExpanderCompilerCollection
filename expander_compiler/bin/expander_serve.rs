@@ -186,7 +186,7 @@ async fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfi
         global_mpi_config.root_broadcast_bytes(&mut bytes);
         match bytes[0] {
             1 => {
-                let mut setup_file_bytes = vec![0u8; 1024]; // Adjust size as needed
+                let mut setup_file_bytes = vec![0u8; 40]; // Adjust size as needed
                 global_mpi_config.root_broadcast_bytes(&mut setup_file_bytes);
                 let setup_file = String::from_utf8(setup_file_bytes)
                     .expect("Failed to convert setup file bytes to String")
