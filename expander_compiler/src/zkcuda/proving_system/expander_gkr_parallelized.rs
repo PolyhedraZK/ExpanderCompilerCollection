@@ -64,7 +64,15 @@ where
             .unwrap_or(1);
         start_server::<C>(max_parallel_count);
 
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        // Keep trying until the server is ready
+        loop {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            match rt.block_on(Client::new().get(SERVER_URL).send()) {
+                Ok(_) => break,
+                Err(_) => std::thread::sleep(std::time::Duration::from_secs(1)),
+            }
+        }
+
         let client = Client::new();
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(request_setup(&client, SERVER_URL));
@@ -78,7 +86,7 @@ where
         parallel_count: usize,
         is_broadcast: bool,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo) {
-        if is_broadcast || parallel_count == 1 {
+        if parallel_count == 1 {
             <ExpanderGKRProvingSystem<C> as ProvingSystem<ECCConfig>>::commit(
                 prover_setup,
                 vals,

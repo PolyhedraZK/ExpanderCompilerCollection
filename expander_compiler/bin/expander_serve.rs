@@ -1,4 +1,5 @@
 mod common;
+use axum::routing::get;
 use common::ExpanderExecArgs;
 
 mod expander_fn;
@@ -273,6 +274,7 @@ where
 
         let app = Router::new()
             .route("/", post(root_main::<C, ECCConfig>))
+            .route("/", get(|| async { "Expander Server is running" }))
             .with_state(state);
 
         let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
