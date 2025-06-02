@@ -355,7 +355,12 @@ impl<C: Config, P: ProvingSystem<C>, H: HintCaller<CircuitField<C>>> Context<C, 
         )
     }
 
-    pub fn call_kernel(&mut self, kernel: &Kernel<C>, ios: &mut [DeviceMemoryHandle]) {
+    pub fn call_kernel(
+        &mut self,
+        kernel: &Kernel<C>,
+        _num_parallel: usize,
+        ios: &mut [DeviceMemoryHandle],
+    ) {
         if kernel.io_shapes.len() != ios.len() {
             panic!("Invalid number of inputs/outputs");
         }

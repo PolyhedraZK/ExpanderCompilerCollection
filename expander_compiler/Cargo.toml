@@ -53,6 +53,6 @@ path = "bin/expander_commit.rs"
 name = "expander_prove"
 path = "bin/expander_prove.rs"
 
-[[bin]]
-name = "matmul_bench"
-path = "bin/matmul_bench.rs"
+#[[bin]]
+#name = "matmul_bench"
+#path = "bin/matmul_bench.rs"

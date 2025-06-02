@@ -68,7 +68,7 @@ fn zkcuda_matmul<C: Config, P: ProvingSystem<C>>() {
     let a = ctx.copy_to_device(&mat_a, false);
     let b = ctx.copy_to_device(&mat_b, true);
     let mut c = None;
-    call_kernel!(ctx, kernel_mul_line, a, b, mut c);
+    call_kernel!(ctx, kernel_mul_line, N, a, b, mut c);
 
     let c = c.reshape(&[N, K]);
     let result: Vec<Vec<CircuitField<C>>> = ctx.copy_to_host(c);
