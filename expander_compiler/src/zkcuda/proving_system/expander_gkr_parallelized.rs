@@ -51,6 +51,8 @@ where
     fn setup(
         computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
+        let setup_timer = Timer::new("setup", true);
+
         let mut bytes = vec![];
         computation_graph.serialize_into(&mut bytes).unwrap();
         // append current timestamp to the file name to avoid conflicts
@@ -81,6 +83,8 @@ where
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(request_setup(&client, SERVER_URL, &setup_filename));
 
+        setup_timer.stop();
+
         read_pcs_setup_from_shared_memory()
     }
 
@@ -98,6 +102,7 @@ where
                 is_broadcast,
             )
         } else {
+            let commitment_timer = Timer::new("commit", true);
             init_commitment_and_extra_info_shared_memory(SINGLE_KERNEL_MAX_PROOF_SIZE, 8);
             write_commit_vals_to_shared_memory::<ECCConfig>(vals);
 
@@ -110,6 +115,7 @@ where
             ));
             let (commitment, extra_info) = read_commitment_and_extra_info_from_shared_memory();
 
+            commitment_timer.stop();
             (commitment, extra_info)
         }
     }
