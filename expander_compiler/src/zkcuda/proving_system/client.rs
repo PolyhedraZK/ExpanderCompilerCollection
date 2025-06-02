@@ -2,8 +2,8 @@ use super::server::RequestType;
 
 use reqwest::Client;
 
-pub async fn request_setup(client: &Client, server_url: &str) {
-    let request = RequestType::Setup;
+pub async fn request_setup(client: &Client, server_url: &str, setup_file: &str) {
+    let request = RequestType::Setup(setup_file.to_string());
     let res = client
         .post(server_url)
         .json(&request)

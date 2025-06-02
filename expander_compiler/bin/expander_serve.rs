@@ -74,17 +74,23 @@ where
 {
     let _lock = state.lock.lock().await; // Ensure only one request is processed at a time
     match request_type {
-        RequestType::Setup => {
+        RequestType::Setup(setup_file) => {
             // Handle setup logic here
             println!("Setting up");
             state
                 .global_mpi_config
                 .root_broadcast_bytes(&mut vec![1u8; 1]);
+            let mut setup_file_bytes = setup_file.as_bytes().to_vec();
+            state
+                .global_mpi_config
+                .root_broadcast_bytes(&mut setup_file_bytes);
+
             let mut kernels_guard = state.kernels.lock().await;
             let mut prover_setup_guard = state.prover_setup.lock().await;
             let mut verifier_setup_guard = state.verifier_setup.lock().await;
             read_circuit_and_setup::<C, ECCConfig>(
                 state.global_mpi_config.clone(),
+                setup_file,
                 &mut *kernels_guard,
                 &mut *prover_setup_guard,
                 &mut *verifier_setup_guard,
@@ -171,6 +177,13 @@ async fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfi
         global_mpi_config.root_broadcast_bytes(&mut bytes);
         match bytes[0] {
             1 => {
+                let mut setup_file_bytes = vec![0u8; 1024]; // Adjust size as needed
+                global_mpi_config.root_broadcast_bytes(&mut setup_file_bytes);
+                let setup_file = String::from_utf8(setup_file_bytes)
+                    .expect("Failed to convert setup file bytes to String")
+                    .trim_end_matches('\0')
+                    .to_string();
+
                 // Setup
                 let mut kernels_guard = state.kernels.lock().await;
                 let mut prover_setup_guard = state.prover_setup.lock().await;
@@ -178,6 +191,7 @@ async fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfi
 
                 read_circuit_and_setup::<C, ECCConfig>(
                     global_mpi_config.clone(),
+                    setup_file,
                     &mut *kernels_guard,
                     &mut *prover_setup_guard,
                     &mut *verifier_setup_guard,
@@ -225,14 +239,15 @@ async fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfi
 
 fn read_circuit_and_setup<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     global_mpi_config: MPIConfig<'static>,
+    setup_file: String,
     circuits: &mut HashMap<usize, ExpCircuit<C::FieldConfig>>,
     prover_setup: &mut ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
     verifier_setup: &mut ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
 ) where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    let computation_graph_bytes = std::fs::read("/tmp/computation_graph.bin")
-        .expect("Failed to read computation graph from file");
+    let computation_graph_bytes =
+        std::fs::read(setup_file).expect("Failed to read computation graph from file");
     let computation_graph = ComputationGraph::<ECCConfig>::deserialize_from(std::io::Cursor::new(
         computation_graph_bytes,
     ))

@@ -53,8 +53,12 @@ where
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
         let mut bytes = vec![];
         computation_graph.serialize_into(&mut bytes).unwrap();
-        fs::write("/tmp/computation_graph.bin", bytes)
-            .expect("Failed to write computation graph to file");
+        // append current timestamp to the file name to avoid conflicts
+        let setup_filename = format!(
+            "/tmp/computation_graph_{}.bin",
+            chrono::Utc::now().timestamp_millis()
+        );
+        fs::write(&setup_filename, bytes).expect("Failed to write computation graph to file");
 
         let max_parallel_count = computation_graph
             .proof_templates
@@ -75,7 +79,7 @@ where
 
         let client = Client::new();
         let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(request_setup(&client, SERVER_URL));
+        rt.block_on(request_setup(&client, SERVER_URL, &setup_filename));
 
         read_pcs_setup_from_shared_memory()
     }
