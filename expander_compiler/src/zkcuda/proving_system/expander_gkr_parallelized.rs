@@ -94,7 +94,7 @@ where
         parallel_count: usize,
         is_broadcast: bool,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo) {
-        if parallel_count == 1 {
+        if parallel_count == 1 || is_broadcast {
             <ExpanderGKRProvingSystem<C> as ProvingSystem<ECCConfig>>::commit(
                 prover_setup,
                 vals,
@@ -108,11 +108,7 @@ where
 
             let client = Client::new();
             let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(request_commit_input(
-                &client,
-                SERVER_URL,
-                if is_broadcast { 1 } else { parallel_count },
-            ));
+            rt.block_on(request_commit_input(&client, SERVER_URL, parallel_count));
             let (commitment, extra_info) = read_commitment_and_extra_info_from_shared_memory();
 
             commitment_timer.stop();
