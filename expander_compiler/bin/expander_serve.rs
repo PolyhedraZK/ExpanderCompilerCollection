@@ -8,6 +8,7 @@ use clap::Parser;
 use expander_compiler::zkcuda::proof::ComputationGraph;
 use expander_compiler::zkcuda::proving_system::caller_utils::write_pcs_setup_to_shared_memory;
 use expander_compiler::zkcuda::proving_system::ExpanderGKRVerifierSetup;
+use expander_utils::timer::Timer;
 use serdes::ExpSerde;
 use std::str::FromStr;
 
@@ -77,6 +78,8 @@ where
         RequestType::Setup(setup_file) => {
             // Handle setup logic here
             println!("Setting up");
+
+            let setup_timer = Timer::new("server setup", true);
             state
                 .global_mpi_config
                 .root_broadcast_bytes(&mut vec![1u8; 1]);
@@ -99,10 +102,13 @@ where
                 prover_setup_guard.clone(),
                 verifier_setup_guard.clone(),
             ));
+
+            setup_timer.stop();
         }
         RequestType::CommitInput(mut parallel_count) => {
             // Handle input commitment logic here
             println!("Committing input");
+            let commit_timer = Timer::new("server commit", true);
             state
                 .global_mpi_config
                 .root_broadcast_bytes(&mut vec![2u8; 1]);
@@ -113,10 +119,12 @@ where
                 generate_local_mpi_config(&state.global_mpi_config, parallel_count);
             let prover_setup = state.prover_setup.lock().await;
             expander_fn::commit::<C>(state.local_mpi_config.as_ref().unwrap(), &*prover_setup);
+            commit_timer.stop();
         }
         RequestType::Prove(parallel_count, kernel_id) => {
             // Handle proving logic here
             println!("Proving");
+            let prove_timer = Timer::new("server prove", true);
             state
                 .global_mpi_config
                 .root_broadcast_bytes(&mut vec![3u8; 1]);
@@ -134,6 +142,7 @@ where
                 &*prover_setup_guard,
                 kernel,
             );
+            prove_timer.stop();
         }
         RequestType::Exit => {
             // Handle exit logic here
