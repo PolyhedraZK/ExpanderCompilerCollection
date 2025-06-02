@@ -31,6 +31,7 @@ use expander_fn::{generate_local_mpi_config, GLOBAL_COMMUNICATOR, UNIVERSE};
 struct ServerState<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> {
     lock: Arc<Mutex<()>>, // For now we want to ensure that only one request is processed at a time
     global_mpi_config: MPIConfig<'a>,
+    local_mpi_config: Option<MPIConfig<'a>>,
     prover_setup: Arc<Mutex<ExpanderGKRProverSetup<PCSField, F, PCS>>>,
     verifier_setup: Arc<Mutex<ExpanderGKRVerifierSetup<PCSField, F, PCS>>>,
     kernels: Arc<Mutex<HashMap<usize, ExpCircuit<F>>>>,
@@ -44,6 +45,7 @@ impl<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
         ServerState {
             lock: Arc::clone(&self.lock),
             global_mpi_config: self.global_mpi_config.clone(),
+            local_mpi_config: self.local_mpi_config.clone(),
             prover_setup: Arc::clone(&self.prover_setup),
             verifier_setup: Arc::clone(&self.verifier_setup),
             kernels: Arc::clone(&self.kernels),
@@ -62,7 +64,7 @@ unsafe impl<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> 
 }
 
 async fn root_main<C, ECCConfig>(
-    State(state): State<ServerState<'static, C::PCSField, C::FieldConfig, C::PCSConfig>>,
+    State(mut state): State<ServerState<'static, C::PCSField, C::FieldConfig, C::PCSConfig>>,
     Json(request_type): Json<RequestType>,
 ) -> Json<bool>
 where
@@ -101,10 +103,10 @@ where
             state
                 .global_mpi_config
                 .root_broadcast_f(&mut parallel_count);
-            let local_mpi_config =
+            state.local_mpi_config =
                 generate_local_mpi_config(&state.global_mpi_config, parallel_count);
             let prover_setup = state.prover_setup.lock().await;
-            expander_fn::commit::<C>(&local_mpi_config.unwrap(), &*prover_setup);
+            expander_fn::commit::<C>(state.local_mpi_config.as_ref().unwrap(), &*prover_setup);
         }
         RequestType::Prove(parallel_count, kernel_id) => {
             // Handle proving logic here
@@ -116,12 +118,16 @@ where
             state
                 .global_mpi_config
                 .root_broadcast_f(&mut (parallel_count, kernel_id));
-            let local_mpi_config =
+            state.local_mpi_config =
                 generate_local_mpi_config(&state.global_mpi_config, parallel_count);
             let mut kernels_guard = state.kernels.lock().await;
             let prover_setup_guard = state.prover_setup.lock().await;
             let kernel = kernels_guard.get_mut(&kernel_id).expect("Kernel not found");
-            expander_fn::prove::<C>(&local_mpi_config.unwrap(), &*prover_setup_guard, kernel);
+            expander_fn::prove::<C>(
+                state.local_mpi_config.as_ref().unwrap(),
+                &*prover_setup_guard,
+                kernel,
+            );
         }
         RequestType::Exit => {
             // Handle exit logic here
@@ -152,6 +158,7 @@ async fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfi
     let state = ServerState {
         lock: Arc::new(Mutex::new(())),
         global_mpi_config: global_mpi_config.clone(),
+        local_mpi_config: None,
         prover_setup: Arc::new(Mutex::new(ExpanderGKRProverSetup::default())),
         verifier_setup: Arc::new(Mutex::new(ExpanderGKRVerifierSetup::default())),
         kernels: Arc::new(Mutex::new(HashMap::new())),
@@ -262,6 +269,7 @@ where
     let state = ServerState {
         lock: Arc::new(Mutex::new(())),
         global_mpi_config: global_mpi_config.clone(),
+        local_mpi_config: None,
         prover_setup: Arc::new(Mutex::new(ExpanderGKRProverSetup::default())),
         verifier_setup: Arc::new(Mutex::new(ExpanderGKRVerifierSetup::default())),
         kernels: Arc::new(Mutex::new(HashMap::new())),
