@@ -1,17 +1,19 @@
-pub mod server;
-pub mod client;
-pub mod shared_memory_utils;
-pub mod cmd_utils;
-
-
-
 use std::fs;
 use std::io::{Cursor, Read};
 
 use crate::circuit::config::Config;
-use crate::zkcuda::proving_system::{CombinedProof, KernelWiseProvingSystem, ProvingSystem};
+use crate::frontend::SIMDField;
+use crate::zkcuda::proving_system::KernelWiseProvingSystem;
 
 use super::super::kernel::Kernel;
+use super::callee_utils::read_pcs_setup_from_shared_memory;
+use super::caller_utils::{
+    init_commitment_and_extra_info_shared_memory, init_proof_shared_memory,
+    read_commitment_and_extra_info_from_shared_memory, read_proof_from_shared_memory, start_server,
+    write_broadcast_info_to_shared_memory, write_commit_vals_to_shared_memory,
+    write_commitments_extra_info_to_shared_memory, write_commitments_to_shared_memory,
+    write_commitments_values_to_shared_memory, write_input_partition_info_to_shared_memory,
+};
 use super::client::{self, request_commit_input, request_prove, request_setup};
 use super::expander_gkr::{
     ExpanderGKRCommitment, ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof,
@@ -35,14 +37,18 @@ pub struct ParallelizedExpanderGKRProvingSystem<C: GKREngine> {
     _config: std::marker::PhantomData<C>,
 }
 
-impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSystem<ECCConfig> for ParallelizedExpanderGKRProvingSystem<C>
+impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>
+    KernelWiseProvingSystem<ECCConfig> for ParallelizedExpanderGKRProvingSystem<C>
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     type ProverSetup = ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
     type VerifierSetup = ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
-    type Proof = CombinedProof<C, ExpanderGKRProvingSystem<C>>;
-    
+    type Proof = ExpanderGKRProof;
+    type Commitment = ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>;
+    type CommitmentExtraInfo =
+        ExpanderGKRCommitmentExtraInfo<C::PCSField, C::FieldConfig, C::PCSConfig>;
+
     fn setup(
         computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
@@ -63,33 +69,96 @@ where
             .map(|t| t.parallel_count)
             .max()
             .unwrap_or(1);
-
         start_server::<C>(max_parallel_count);
+
         // Keep trying until the server is ready
         loop {
-            match wait_async(Client::new().get(SERVER_URL).send()) {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            match rt.block_on(Client::new().get(SERVER_URL).send()) {
                 Ok(_) => break,
                 Err(_) => std::thread::sleep(std::time::Duration::from_secs(1)),
             }
         }
 
-        wait_async(request_setup(&setup_filename));
+        let client = Client::new();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(request_setup(&client, SERVER_URL, &setup_filename));
 
         setup_timer.stop();
 
         read_pcs_setup_from_shared_memory()
     }
 
-    fn prove(
-            prover_setup: &Self::ProverSetup,
-            computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
-            device_memories: &[crate::zkcuda::context::DeviceMemory<ECCConfig>],
-        ) -> Self::Proof {
-        let timer = Timer::new("prove", true);
-        
+    fn commit(
+        prover_setup: &Self::ProverSetup,
+        vals: &[SIMDField<C>],
+        parallel_count: usize,
+        is_broadcast: bool,
+    ) -> (Self::Commitment, Self::CommitmentExtraInfo) {
+        if parallel_count == 1 || is_broadcast {
+            <ExpanderGKRProvingSystem<C> as KernelWiseProvingSystem<ECCConfig>>::commit(
+                prover_setup,
+                vals,
+                parallel_count,
+                is_broadcast,
+            )
+        } else {
+            let commitment_timer = Timer::new("commit", true);
+            init_commitment_and_extra_info_shared_memory(SINGLE_KERNEL_MAX_PROOF_SIZE, 8);
+            write_commit_vals_to_shared_memory::<ECCConfig>(vals);
 
-        timer.stop();
-        read_proof_from_shared_memory()
+            let client = Client::new();
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(request_commit_input(&client, SERVER_URL, parallel_count));
+            let (commitment, extra_info) = read_commitment_and_extra_info_from_shared_memory();
+
+            commitment_timer.stop();
+            (commitment, extra_info)
+        }
+    }
+
+    fn prove_kernel(
+        prover_setup: &Self::ProverSetup,
+        kernel_id: usize,
+        kernel: &Kernel<ECCConfig>,
+        commitments: &[Self::Commitment],
+        commitments_extra_info: &[Self::CommitmentExtraInfo],
+        commitments_values: &[&[SIMDField<C>]],
+        parallel_count: usize,
+        is_broadcast: &[bool],
+    ) -> Self::Proof {
+        if parallel_count == 1 {
+            ExpanderGKRProvingSystem::<C>::prove_kernel(
+                prover_setup,
+                kernel_id,
+                kernel,
+                commitments,
+                commitments_extra_info,
+                commitments_values,
+                parallel_count,
+                is_broadcast,
+            )
+        } else {
+            let timer = Timer::new("prove", true);
+            init_proof_shared_memory(SINGLE_KERNEL_MAX_PROOF_SIZE);
+            write_input_partition_info_to_shared_memory(&kernel.layered_circuit_input);
+            write_commitments_to_shared_memory(&commitments.to_vec());
+            write_commitments_extra_info_to_shared_memory(&commitments_extra_info.to_vec());
+            write_commitments_values_to_shared_memory::<C::FieldConfig>(commitments_values);
+            write_broadcast_info_to_shared_memory(&is_broadcast.to_vec());
+
+            let client = Client::new();
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(request_prove(
+                &client,
+                SERVER_URL,
+                parallel_count,
+                kernel_id,
+            ));
+
+            timer.stop();
+            read_proof_from_shared_memory()
+        }
     }
 
     // For verification, we don't need the mpi executor and shared memory, it's always run by a single party
@@ -252,14 +321,4 @@ where
 
     // overall claim verification
     *y == target_y
-}
-
-/// Run an async function in a blocking context.
-#[inline(always)]
-fn wait_async<F, T>(f: F) -> T
-where
-    F: std::future::Future<Output = T>,
-{
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(f)
 }
