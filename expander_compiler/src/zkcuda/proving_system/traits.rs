@@ -3,20 +3,22 @@ use serdes::ExpSerde;
 
 use super::super::{kernel::Kernel, proof::ComputationGraph};
 
-use crate::{circuit::config::{Config, SIMDField}, utils::misc::next_power_of_two, zkcuda::context::DeviceMemory};
+use crate::{
+    circuit::config::{Config, SIMDField},
+    utils::misc::next_power_of_two,
+    zkcuda::context::DeviceMemory,
+};
 
 pub trait Commitment<C: Config>: Clone + ExpSerde {
     fn vals_len(&self) -> usize;
 }
 
-pub trait Proof: Clone + ExpSerde {}
-
 pub trait KernelWiseProvingSystem<C: Config> {
-    type ProverSetup: Clone + Send + Sync;
-    type VerifierSetup: Clone + Send + Sync;
-    type Proof: Proof + Send + Sync;
-    type Commitment: Commitment<C> + Send + Sync;
-    type CommitmentExtraInfo: Clone + Send + Sync;
+    type ProverSetup: Clone + Send + Sync + ExpSerde;
+    type VerifierSetup: Clone + Send + Sync + ExpSerde;
+    type Proof: Clone + Send + Sync + ExpSerde;
+    type Commitment: Commitment<C> + Send + Sync + ExpSerde;
+    type CommitmentExtraInfo: Clone + Send + Sync + ExpSerde;
 
     fn setup(computation_graph: &ComputationGraph<C>) -> (Self::ProverSetup, Self::VerifierSetup);
 
@@ -48,24 +50,36 @@ pub trait KernelWiseProvingSystem<C: Config> {
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> bool;
+
+    fn post_process() {}
 }
 
-#[derive(Clone, ExpSerde)]
+#[derive(ExpSerde)]
 pub struct CombinedProof<C: Config, KP: KernelWiseProvingSystem<C>> {
     pub commitments: Vec<Vec<KP::Commitment>>, // a vector of commitments for each kernel
     pub proofs: Vec<KP::Proof>,
 }
 
+impl<C: Config, KP: KernelWiseProvingSystem<C>> Clone for CombinedProof<C, KP> {
+    fn clone(&self) -> Self {
+        CombinedProof {
+            commitments: self.commitments.clone(),
+            proofs: self.proofs.clone(),
+        }
+    }
+}
+
 pub trait ProvingSystem<C: Config> {
-    type ProverSetup: Clone + Send + Sync;
-    type VerifierSetup: Clone + Send + Sync;
-    type Proof: Proof + Send + Sync;
-    
+    type ProverSetup: Clone + Send + Sync + ExpSerde;
+    type VerifierSetup: Clone + Send + Sync + ExpSerde;
+    type Proof: Clone + Send + Sync + ExpSerde;
+
     fn setup(computation_graph: &ComputationGraph<C>) -> (Self::ProverSetup, Self::VerifierSetup);
 
     fn prove(
         prover_setup: &Self::ProverSetup,
-        computation_graph: &ComputationGraph<C>
+        computation_graph: &ComputationGraph<C>,
+        device_memories: &[DeviceMemory<C>],
     ) -> Self::Proof;
 
     fn verify(
@@ -165,5 +179,9 @@ impl<C: Config, KP: KernelWiseProvingSystem<C>> ProvingSystem<C> for KP {
             .collect::<Vec<_>>();
 
         verified.iter().all(|x| *x)
+    }
+
+    fn post_process() {
+        KP::post_process();
     }
 }

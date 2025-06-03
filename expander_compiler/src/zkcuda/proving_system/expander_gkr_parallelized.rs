@@ -3,6 +3,7 @@ use std::io::{Cursor, Read};
 
 use crate::circuit::config::Config;
 use crate::frontend::SIMDField;
+use crate::zkcuda::proving_system::KernelWiseProvingSystem;
 
 use super::super::kernel::Kernel;
 use super::callee_utils::read_pcs_setup_from_shared_memory;
@@ -19,7 +20,7 @@ use super::expander_gkr::{
     ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
 };
 use super::server::SERVER_URL;
-use super::{Commitment, ExpanderGKRProvingSystem, ProvingSystem};
+use super::{Commitment, ExpanderGKRProvingSystem};
 use expander_utils::timer::Timer;
 
 use arith::Field;
@@ -36,8 +37,8 @@ pub struct ParallelizedExpanderGKRProvingSystem<C: GKREngine> {
     _config: std::marker::PhantomData<C>,
 }
 
-impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSystem<ECCConfig>
-    for ParallelizedExpanderGKRProvingSystem<C>
+impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>
+    KernelWiseProvingSystem<ECCConfig> for ParallelizedExpanderGKRProvingSystem<C>
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
@@ -95,7 +96,7 @@ where
         is_broadcast: bool,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo) {
         if parallel_count == 1 || is_broadcast {
-            <ExpanderGKRProvingSystem<C> as ProvingSystem<ECCConfig>>::commit(
+            <ExpanderGKRProvingSystem<C> as KernelWiseProvingSystem<ECCConfig>>::commit(
                 prover_setup,
                 vals,
                 parallel_count,
@@ -116,7 +117,7 @@ where
         }
     }
 
-    fn prove(
+    fn prove_kernel(
         prover_setup: &Self::ProverSetup,
         kernel_id: usize,
         kernel: &Kernel<ECCConfig>,
@@ -127,7 +128,7 @@ where
         is_broadcast: &[bool],
     ) -> Self::Proof {
         if parallel_count == 1 {
-            ExpanderGKRProvingSystem::<C>::prove(
+            ExpanderGKRProvingSystem::<C>::prove_kernel(
                 prover_setup,
                 kernel_id,
                 kernel,
@@ -161,7 +162,7 @@ where
     }
 
     // For verification, we don't need the mpi executor and shared memory, it's always run by a single party
-    fn verify(
+    fn verify_kernel(
         verifier_setup: &Self::VerifierSetup,
         _kernel_id: usize,
         kernel: &Kernel<ECCConfig>,

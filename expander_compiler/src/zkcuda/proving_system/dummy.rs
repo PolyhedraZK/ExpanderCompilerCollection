@@ -1,9 +1,10 @@
 use serdes::ExpSerde;
 
 use crate::circuit::config::{Config, SIMDField};
+use crate::zkcuda::proving_system::KernelWiseProvingSystem;
 
 use super::super::kernel::Kernel;
-use super::{check_inputs, prepare_inputs, Commitment, Proof, ProvingSystem};
+use super::{check_inputs, prepare_inputs, Commitment};
 
 // dummy implementation of these traits
 
@@ -23,8 +24,6 @@ pub struct DummyProof {
     cond: Vec<Vec<bool>>,
 }
 
-impl Proof for DummyProof {}
-
 // TODO
 /*#[deprecated(
     note = "DummyProvingSystem is a dummy implementation for testing purposes. Please use ExpanderGKRProvingSystem."
@@ -34,7 +33,7 @@ pub struct DummyProvingSystem<C: Config> {
 }
 
 #[allow(deprecated)]
-impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
+impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
     type ProverSetup = ();
     type VerifierSetup = ();
     type Proof = DummyProof;
@@ -68,7 +67,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
         )
     }
 
-    fn prove(
+    fn prove_kernel(
         _prover_setup: &Self::ProverSetup,
         _kernel_id: usize,
         kernel: &Kernel<C>,
@@ -100,7 +99,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
         }
         DummyProof { cond: res }
     }
-    fn verify(
+    fn verify_kernel(
         _verifier_setup: &Self::VerifierSetup,
         _kernel_id: usize,
         kernel: &Kernel<C>,

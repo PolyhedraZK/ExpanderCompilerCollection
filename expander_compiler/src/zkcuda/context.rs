@@ -38,10 +38,7 @@ pub enum BroadcastType {
     Both,
 }
 
-pub struct Context<
-    C: Config,
-    H: HintCaller<CircuitField<C>> = EmptyHintCaller,
-> {
+pub struct Context<C: Config, H: HintCaller<CircuitField<C>> = EmptyHintCaller> {
     pub kernels: Pool<Kernel<C>>,
     pub device_memories: Vec<DeviceMemory<C>>,
     pub proof_templates: Vec<ProofTemplate>,

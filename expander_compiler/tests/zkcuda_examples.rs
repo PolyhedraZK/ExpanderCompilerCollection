@@ -59,7 +59,7 @@ fn zkcuda_1_expander<C: Config, P: ProvingSystem<C>>() {
     )
     .unwrap();
 
-    let mut ctx = Context::<C, P>::default();
+    let mut ctx = Context::<C>::default();
     let mut a = vec![];
     for i in 0..32 {
         a.push(<C::FieldConfig as FieldEngine>::CircuitField::from(
@@ -82,9 +82,9 @@ fn zkcuda_1_expander<C: Config, P: ProvingSystem<C>>() {
     );
 
     let computation_graph = ctx.to_computation_graph();
-    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
-    let proof = ctx.to_proof(&prover_setup);
-    assert!(computation_graph.verify(&proof, &verifier_setup));
+    let (prover_setup, verifier_setup) = P::setup(&computation_graph);
+    let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
+    assert!(P::verify(&verifier_setup, &computation_graph, &proof));
     P::post_process();
 }
 
@@ -156,14 +156,25 @@ fn zkcuda_2() {
     assert_eq!(result, M31::from(32 * 33 / 2));
 
     let computation_graph = ctx.to_computation_graph();
-    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
-    let proof = ctx.to_proof(&prover_setup);
-    assert!(computation_graph.verify(&proof, &verifier_setup));
+    let (prover_setup, verifier_setup) =
+        ExpanderGKRProvingSystem::<M31Config>::setup(&computation_graph);
+    let proof = ExpanderGKRProvingSystem::<M31Config>::prove(
+        &prover_setup,
+        &computation_graph,
+        &ctx.device_memories,
+    );
+    assert!(ExpanderGKRProvingSystem::<M31Config>::verify(
+        &verifier_setup,
+        &computation_graph,
+        &proof
+    ));
 }
 
 #[test]
 fn zkcuda_2_simd() {
     use arith::SimdField;
+    type P = ExpanderGKRProvingSystem<M31Config>;
+
     let kernel_add_2_tmp: Kernel<M31Config> = compile_add_2_macro().unwrap();
     let kernel_add_16: Kernel<M31Config> = compile_add_16_macro().unwrap();
 
@@ -197,9 +208,9 @@ fn zkcuda_2_simd() {
     }
 
     let computation_graph = ctx.to_computation_graph();
-    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
-    let proof = ctx.to_proof(&prover_setup);
-    assert!(computation_graph.verify(&proof, &verifier_setup));
+    let (prover_setup, verifier_setup) = P::setup(&computation_graph);
+    let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
+    assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 
     // test serde
     let mut buf_cg: Vec<u8> = Vec::new();
@@ -209,12 +220,13 @@ fn zkcuda_2_simd() {
 
     let computation_graph2 =
         ComputationGraph::<M31Config>::deserialize_from(&mut buf_cg.as_slice()).unwrap();
-    let proof2 = CombinedProof::<M31Config>::deserialize_from(&mut buf_proof.as_slice()).unwrap();
-    let ctx2: Context<M31Config> = Context::default();
-    let (_prover_setup2, verifier_setup2) = ctx2.proving_system_setup(&computation_graph2);
-    assert!(computation_graph2.verify(&proof2, &verifier_setup2));
-    assert!(computation_graph.verify(&proof2, &verifier_setup));
-    assert!(computation_graph2.verify(&proof, &verifier_setup2));
+    let proof2 =
+        <P as ProvingSystem<M31Config>>::Proof::deserialize_from(&mut buf_proof.as_slice())
+            .unwrap();
+    let (_prover_setup2, verifier_setup2) = P::setup(&computation_graph2);
+    assert!(P::verify(&verifier_setup2, &computation_graph2, &proof2));
+    assert!(P::verify(&verifier_setup, &computation_graph, &proof));
+    assert!(P::verify(&verifier_setup2, &computation_graph2, &proof));
 }
 
 #[test]
@@ -249,10 +261,11 @@ fn zkcuda_2_simd_autopack() {
         assert_eq!(result[k], M31::from((32 * 33 / 2 + 32 * k) as u32));
     }
 
+    type P = ExpanderGKRProvingSystem<M31Config>;
     let computation_graph = ctx.to_computation_graph();
-    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
-    let proof = ctx.to_proof(&prover_setup);
-    assert!(computation_graph.verify(&proof, &verifier_setup));
+    let (prover_setup, verifier_setup) = P::setup(&computation_graph);
+    let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
+    assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 }
 
 fn to_binary<C: Config>(api: &mut API<C>, x: Variable, n_bits: usize) -> Vec<Variable> {
@@ -281,8 +294,7 @@ fn zkcuda_to_binary() {
     hint_registry.register("myhint.tobinary", to_binary_hint);
 
     let kernel: Kernel<M31Config> = compile_convert_to_binary().unwrap();
-    let mut ctx: Context<M31Config, ExpanderGKRProvingSystem<M31Config>, _> =
-        Context::new(hint_registry);
+    let mut ctx: Context<M31Config, _> = Context::new(hint_registry);
 
     let a = M31::from(0x55);
     let a = ctx.copy_to_device(&a, false);
@@ -305,10 +317,11 @@ fn zkcuda_to_binary() {
         ]
     );
 
+    type P = ExpanderGKRProvingSystem<M31Config>;
     let computation_graph = ctx.to_computation_graph();
-    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
-    let proof = ctx.to_proof(&prover_setup);
-    assert!(computation_graph.verify(&proof, &verifier_setup));
+    let (prover_setup, verifier_setup) = P::setup(&computation_graph);
+    let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
+    assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 }
 
 #[kernel]
@@ -325,10 +338,11 @@ fn zkcuda_assertion() {
     let b = ctx.copy_to_device(&M31::from(10u32), false).reshape(&[1]);
     call_kernel!(ctx, kernel_tmp, a, b);
 
+    type P = ExpanderGKRProvingSystem<M31Config>;
     let computation_graph = ctx.to_computation_graph();
-    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
-    let proof = ctx.to_proof(&prover_setup);
-    assert!(computation_graph.verify(&proof, &verifier_setup));
+    let (prover_setup, verifier_setup) = P::setup(&computation_graph);
+    let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
+    assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 }
 
 #[test]
@@ -341,8 +355,9 @@ fn zkcuda_assertion_fail() {
     let b = ctx.copy_to_device(&M31::from(9u32), false).reshape(&[1]);
     call_kernel!(ctx, kernel_tmp, a, b);
 
+    type P = ExpanderGKRProvingSystem<M31Config>;
     let computation_graph = ctx.to_computation_graph();
-    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
-    let proof = ctx.to_proof(&prover_setup);
-    assert!(computation_graph.verify(&proof, &verifier_setup));
+    let (prover_setup, verifier_setup) = P::setup(&computation_graph);
+    let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
+    assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 }

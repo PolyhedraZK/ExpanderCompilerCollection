@@ -347,10 +347,10 @@ fn zkcuda_keccak_1() {
     assert_eq!(out[0][0], expected_res[0][0]);
 
     let computation_graph = ctx.to_computation_graph();
-    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
-    let proof = ctx.to_proof(&prover_setup);
+    let (prover_setup, verifier_setup) = P::setup(&computation_graph);
+    let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
     println!("proof generation ok");
-    assert!(computation_graph.verify(&proof, &verifier_setup));
+    assert!(P::verify(&verifier_setup, &computation_graph, &proof));
     println!("verify ok");
 }
 
@@ -405,9 +405,9 @@ fn zkcuda_keccak_2() {
     assert_eq!(out[0][0][0], expected_res[0][0]);
 
     let computation_graph = ctx.to_computation_graph();
-    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
-    let proof = ctx.to_proof(&prover_setup);
+    let (prover_setup, verifier_setup) = P::setup(&computation_graph);
+    let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
     println!("proof generation ok");
-    assert!(computation_graph.verify(&proof, &verifier_setup));
+    assert!(P::verify(&verifier_setup, &computation_graph, &proof));
     println!("verify ok");
 }

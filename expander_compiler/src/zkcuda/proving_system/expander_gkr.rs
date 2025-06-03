@@ -4,9 +4,10 @@ use std::io::{Cursor, Read};
 
 use crate::circuit::config::Config;
 use crate::frontend::SIMDField;
+use crate::zkcuda::proving_system::KernelWiseProvingSystem;
 
 use super::super::kernel::Kernel;
-use super::{check_inputs, prepare_inputs, Commitment, Proof, ProvingSystem};
+use super::{check_inputs, prepare_inputs, Commitment};
 
 use arith::Field;
 use expander_circuit::Circuit;
@@ -130,14 +131,12 @@ pub struct ExpanderGKRProof {
     pub data: Vec<ExpanderProof>,
 }
 
-impl Proof for ExpanderGKRProof {}
-
 pub struct ExpanderGKRProvingSystem<C: GKREngine> {
     _config: std::marker::PhantomData<C>,
 }
 
-impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSystem<ECCConfig>
-    for ExpanderGKRProvingSystem<C>
+impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>
+    KernelWiseProvingSystem<ECCConfig> for ExpanderGKRProvingSystem<C>
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
@@ -243,7 +242,7 @@ where
         )
     }
 
-    fn prove(
+    fn prove_kernel(
         prover_setup: &Self::ProverSetup,
         _kernel_id: usize,
         kernel: &Kernel<ECCConfig>,
@@ -321,7 +320,7 @@ where
         proof
     }
 
-    fn verify(
+    fn verify_kernel(
         verifier_setup: &Self::VerifierSetup,
         _kernel_id: usize,
         kernel: &Kernel<ECCConfig>,
