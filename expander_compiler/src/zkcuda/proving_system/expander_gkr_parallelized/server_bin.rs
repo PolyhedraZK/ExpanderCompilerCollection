@@ -1,12 +1,23 @@
 use std::{collections::HashMap, net::SocketAddr, str::FromStr, sync::Arc};
 
 use arith::Field;
-use axum::{routing::{get, post}, Router};
+use axum::{
+    routing::{get, post},
+    Router,
+};
 use clap::Parser;
 use expander_circuit::Circuit as ExpCircuit;
-use expander_compiler::{frontend::{BN254Config, BabyBearConfig, Config, GF2Config, GoldilocksConfig, M31Config}, zkcuda::proving_system::{ExpanderGKRProverSetup, ExpanderGKRVerifierSetup, expander_gkr_parallelized::server_utils::*}};
+use expander_compiler::{
+    frontend::{BN254Config, BabyBearConfig, Config, GF2Config, GoldilocksConfig, M31Config},
+    zkcuda::proving_system::{
+        expander_gkr_parallelized::server_utils::*, ExpanderGKRProverSetup,
+        ExpanderGKRVerifierSetup,
+    },
+};
 use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
-use gkr_engine::{ExpanderPCS, FieldEngine, GKREngine, MPIConfig, MPIEngine, PolynomialCommitmentType};
+use gkr_engine::{
+    ExpanderPCS, FieldEngine, GKREngine, MPIConfig, MPIEngine, PolynomialCommitmentType,
+};
 use mpi::{environment::Universe, topology::SimpleCommunicator};
 use tokio::sync::{oneshot, Mutex};
 
@@ -25,8 +36,6 @@ pub struct ExpanderExecArgs {
     #[arg(short, long, default_value = "Raw")]
     pub poly_commit: String,
 }
-
-
 
 #[tokio::main]
 async fn main() {
@@ -111,4 +120,3 @@ where
         worker_main::<C, ECCConfig>(global_mpi_config).await;
     }
 }
-
