@@ -1,10 +1,14 @@
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::cmp::max;
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
 
 use crate::circuit::config::Config;
 use crate::frontend::SIMDField;
-use crate::zkcuda::proving_system::KernelWiseProvingSystem;
+use crate::utils::misc::next_power_of_two;
+use crate::zkcuda::context::DeviceMemory;
+use crate::zkcuda::proof::ComputationGraph;
+use crate::zkcuda::proving_system::{CombinedProof, KernelWiseProvingSystem, ProvingSystem};
 
 use super::super::kernel::Kernel;
 use super::{check_inputs, prepare_inputs, Commitment};
@@ -600,4 +604,110 @@ where
     }
 
     *y == target_y
+}
+
+// TODO: Generate this with procedural macros
+// The idea is to implement the ProvingSystem trait for KernelWiseProvingSystem
+// However, we can not simply implement ProvingSystem<C> for all KernelWiseProvingSystem<C> because
+// If later we want a customized implementation of ProvingSystem for some struct A
+// The compiler will not allow use to do so, complaining that KernelWiseProvingSystem may be later implemented for A
+// causing a potential conflict.
+// In this case, generate the implementation with a procedural macro seems to be the best solution.
+impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSystem<ECCConfig>
+    for ExpanderGKRProvingSystem<C>
+where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
+    type ProverSetup = <Self as KernelWiseProvingSystem<ECCConfig>>::ProverSetup;
+    type VerifierSetup = <Self as KernelWiseProvingSystem<ECCConfig>>::VerifierSetup;
+    type Proof = CombinedProof<ECCConfig, Self>;
+
+    fn setup(
+        computation_graph: &ComputationGraph<ECCConfig>,
+    ) -> (Self::ProverSetup, Self::VerifierSetup) {
+        <Self as KernelWiseProvingSystem<ECCConfig>>::setup(computation_graph)
+    }
+
+    fn prove(
+        prover_setup: &Self::ProverSetup,
+        computation_graph: &ComputationGraph<ECCConfig>,
+        device_memories: &[DeviceMemory<ECCConfig>],
+    ) -> Self::Proof {
+        let commitments = computation_graph
+            .proof_templates
+            .iter()
+            .map(|template| {
+                template
+                    .commitment_indices
+                    .iter()
+                    .zip(template.is_broadcast.iter())
+                    .map(|(x, is_broadcast)| {
+                        <Self as KernelWiseProvingSystem<ECCConfig>>::commit(
+                            prover_setup,
+                            &device_memories[*x].values,
+                            next_power_of_two(template.parallel_count),
+                            *is_broadcast,
+                        )
+                    })
+                    .unzip::<_, _, Vec<_>, Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+
+        let proofs: Vec<<Self as KernelWiseProvingSystem<ECCConfig>>::Proof> = computation_graph
+            .proof_templates
+            .iter()
+            .zip(commitments.iter())
+            .map(|(template, commitments_kernel)| {
+                <Self as KernelWiseProvingSystem<ECCConfig>>::prove_kernel(
+                    prover_setup,
+                    template.kernel_id,
+                    &computation_graph.kernels[template.kernel_id],
+                    &commitments_kernel.0,
+                    &commitments_kernel.1,
+                    &template
+                        .commitment_indices
+                        .iter()
+                        .map(|x| &device_memories[*x].values[..])
+                        .collect::<Vec<_>>(),
+                    next_power_of_two(template.parallel_count),
+                    &template.is_broadcast,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        CombinedProof {
+            commitments: commitments.into_iter().map(|x| x.0).collect(),
+            proofs,
+        }
+    }
+
+    fn verify(
+        verifier_setup: &Self::VerifierSetup,
+        computation_graph: &ComputationGraph<ECCConfig>,
+        proof: &Self::Proof,
+    ) -> bool {
+        let verified = proof
+            .proofs
+            .par_iter()
+            .zip(computation_graph.proof_templates.par_iter())
+            .zip(proof.commitments.par_iter())
+            .map(|((proof, template), commitments_kernel)| {
+                <Self as KernelWiseProvingSystem<ECCConfig>>::verify_kernel(
+                    verifier_setup,
+                    template.kernel_id,
+                    &computation_graph.kernels[template.kernel_id],
+                    proof,
+                    commitments_kernel,
+                    next_power_of_two(template.parallel_count),
+                    &template.is_broadcast,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        verified.iter().all(|x| *x)
+    }
+
+    fn post_process() {
+        <Self as KernelWiseProvingSystem<ECCConfig>>::post_process();
+    }
 }

@@ -9,7 +9,9 @@ use crate::zkcuda::proving_system::expander_gkr_parallelized::client::{
 };
 use crate::zkcuda::proving_system::expander_gkr_parallelized::cmd_utils::start_server;
 use crate::zkcuda::proving_system::expander_gkr_parallelized::shared_memory_utils::SharedMemoryEngine;
-use crate::zkcuda::proving_system::{CombinedProof, Commitment, ExpanderGKRCommitment, ExpanderGKRProof, ProvingSystem};
+use crate::zkcuda::proving_system::{
+    CombinedProof, Commitment, ExpanderGKRCommitment, ExpanderGKRProof, ProvingSystem,
+};
 
 use super::super::expander_gkr::{ExpanderGKRProverSetup, ExpanderGKRVerifierSetup};
 use super::super::ExpanderGKRProvingSystem;
@@ -29,7 +31,7 @@ pub struct ParallelizedExpanderGKRProvingSystem<C: GKREngine> {
 }
 
 impl<C: GKREngine> ParallelizedExpanderGKRProvingSystem<C>
-where 
+where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     fn verify_kernel<ECCConfig: Config<FieldConfig = C::FieldConfig>>(
@@ -103,8 +105,7 @@ where
         is_broadcast: &[bool],
         parallel_count: usize,
         transcript: &mut C::TranscriptConfig,
-    ) -> bool
-    {
+    ) -> bool {
         assert_eq!(1 << challenge.r_mpi.len(), parallel_count);
         let mut target_y = <C::FieldConfig as FieldEngine>::ChallengeField::ZERO;
         for ((input, commitment), ib) in kernel
@@ -129,9 +130,10 @@ where
                 .get(&(local_vals_len, parallel_count))
                 .unwrap();
 
-            let claim =
-                <C::FieldConfig as FieldEngine>::ChallengeField::deserialize_from(&mut proof_reader)
-                    .unwrap();
+            let claim = <C::FieldConfig as FieldEngine>::ChallengeField::deserialize_from(
+                &mut proof_reader,
+            )
+            .unwrap();
             transcript.append_field_element(&claim);
 
             let opening =
@@ -183,7 +185,6 @@ where
         // overall claim verification
         *y == target_y
     }
-
 }
 
 impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSystem<ECCConfig>
@@ -239,7 +240,12 @@ where
     ) -> Self::Proof {
         let timer = Timer::new("prove", true);
 
-        SharedMemoryEngine::write_witness_to_shared_memory::<C::FieldConfig>(&device_memories.iter().map(|m| &m.values[..]).collect::<Vec<_>>());
+        SharedMemoryEngine::write_witness_to_shared_memory::<C::FieldConfig>(
+            &device_memories
+                .iter()
+                .map(|m| &m.values[..])
+                .collect::<Vec<_>>(),
+        );
         wait_async(request_prove());
 
         timer.stop();
