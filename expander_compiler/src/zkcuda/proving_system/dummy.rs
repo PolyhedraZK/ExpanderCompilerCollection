@@ -1,9 +1,15 @@
 use serdes::ExpSerde;
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 use crate::circuit::config::{Config, SIMDField};
-use crate::zkcuda::proving_system::KernelWiseProvingSystem;
+use crate::impl_proving_system_for_kernel_wise_proving_system;
+use crate::zkcuda::proving_system::{KernelWiseProvingSystem, ProvingSystem, CombinedProof};
+use crate::zkcuda::proof::ComputationGraph;
+use crate::zkcuda::context::DeviceMemory;
+use crate::utils::misc::next_power_of_two;
 
 use super::super::kernel::Kernel;
+
 use super::{check_inputs, prepare_inputs, Commitment};
 
 // dummy implementation of these traits
@@ -128,3 +134,5 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
         true
     }
 }
+
+impl_proving_system_for_kernel_wise_proving_system!(DummyProvingSystem<C>,<C:Config>);

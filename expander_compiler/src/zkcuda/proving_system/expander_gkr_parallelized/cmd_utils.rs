@@ -1,5 +1,5 @@
-use std::process::Command;
 use gkr_engine::{ExpanderPCS, FieldEngine, FieldType, GKREngine, PolynomialCommitmentType};
+use std::process::Command;
 
 #[allow(clippy::zombie_processes)]
 pub fn start_server<C: GKREngine>(max_parallel_count: usize)
@@ -14,7 +14,6 @@ where
     );
     exec_command(&cmd_str, false);
 }
-
 
 fn parse_config<C: GKREngine>(mpi_size: usize) -> (String, String, String)
 where
