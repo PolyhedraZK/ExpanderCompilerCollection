@@ -1,10 +1,7 @@
 #![allow(static_mut_refs)]
 
-use crate::{
-    frontend::SIMDField,
-    zkcuda::proving_system::{CombinedProof, ExpanderGKRProvingSystem},
-};
-use arith::{Field, SimdField};
+use crate::zkcuda::proving_system::{CombinedProof, ExpanderGKRProvingSystem};
+use arith::Field;
 use gkr_engine::{ExpanderPCS, FieldEngine, GKREngine};
 use serdes::ExpSerde;
 use shared_memory::{Shmem, ShmemConf};

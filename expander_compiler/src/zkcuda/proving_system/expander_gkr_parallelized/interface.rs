@@ -15,7 +15,7 @@ use crate::zkcuda::proving_system::{
 
 use super::super::expander_gkr::{ExpanderGKRProverSetup, ExpanderGKRVerifierSetup};
 use super::super::ExpanderGKRProvingSystem;
-use super::server::SERVER_URL;
+use super::server_utils::SERVER_URL;
 use arith::Field;
 use expander_utils::timer::Timer;
 
@@ -263,7 +263,7 @@ where
             .zip(computation_graph.proof_templates.par_iter())
             .zip(proof.commitments.par_iter())
             .map(|((proof, template), commitments_kernel)| {
-                KP::verify_kernel(
+                Self::verify_kernel(
                     verifier_setup,
                     template.kernel_id,
                     &computation_graph.kernels[template.kernel_id],

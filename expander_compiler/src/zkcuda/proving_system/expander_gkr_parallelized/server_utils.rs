@@ -1,38 +1,269 @@
-use expander_compiler::zkcuda::kernel::LayeredCircuitInputVec;
-use expander_compiler::zkcuda::proof::ComputationGraph;
+use crate::zkcuda::proof::ComputationGraph;
+use crate::zkcuda::proving_system::shared_memory_utils::SharedMemoryEngine;
+use crate::zkcuda::proving_system::ExpanderGKRVerifierSetup;
+use expander_utils::timer::Timer;
 use mpi::environment::Universe;
 use mpi::topology::SimpleCommunicator;
-use mpi::traits::Communicator;
-use std::cmp::max;
-use std::collections::HashMap;
+use serdes::ExpSerde;
 
 use arith::Field;
-use expander_circuit::Circuit as ExpCircuit;
-use expander_compiler::frontend::{Config, SIMDField};
-use expander_compiler::zkcuda::proving_system::callee_utils::{
-    read_broadcast_info_from_shared_memory, read_commitment_extra_info_from_shared_memory,
-    read_commitment_from_shared_memory, read_commitment_values_from_shared_memory,
-    read_partition_info_from_shared_memory, write_proof_to_shared_memory,
+use crate::frontend::{
+    BN254Config, BabyBearConfig, Config, GF2Config, GoldilocksConfig, M31Config,
 };
-use expander_compiler::zkcuda::proving_system::callee_utils::{
-    read_local_vals_to_commit_from_shared_memory, write_commitment_extra_info_to_shared_memory,
-    write_commitment_to_shared_memory,
-};
-use expander_compiler::zkcuda::proving_system::{
-    max_n_vars, pcs_testing_setup_fixed_seed, ExpanderGKRCommitment,
-    ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof, ExpanderGKRProverSetup,
-    ExpanderGKRVerifierSetup,
-};
-use expander_utils::timer::Timer;
+use crate::zkcuda::proving_system::{ExpanderGKRProverSetup};
 
-use gkr::gkr_prove;
+use axum::{extract::State, routing::post, Json, Router};
+use expander_circuit::Circuit as ExpCircuit;
+use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
 use gkr_engine::{
-    ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine,
-    Transcript,
+    ExpanderPCS, FieldEngine, GKREngine, MPIConfig, MPIEngine, PolynomialCommitmentType,
 };
-use polynomials::RefMultiLinearPoly;
-use serdes::ExpSerde;
-use sumcheck::ProverScratchPad;
+use serde::{Serialize, Deserialize};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use tokio::sync::{oneshot, Mutex};
+
+pub static SERVER_URL: &str = "http://127.0.0.1:3000/";
+
+#[derive(Serialize, Deserialize)]
+pub enum RequestType {
+    Setup(String), // The path to the computation graph setup file
+    Prove,
+    Exit,
+}
+
+// TODO: Find a way to avoid this global state
+pub static mut UNIVERSE: Option<Universe> = None;
+pub static mut GLOBAL_COMMUNICATOR: Option<SimpleCommunicator> = None;
+pub static mut LOCAL_COMMUNICATOR: Option<SimpleCommunicator> = None;
+
+struct ServerState<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> {
+    lock: Arc<Mutex<()>>, // For now we want to ensure that only one request is processed at a time
+    global_mpi_config: MPIConfig<'a>,
+    local_mpi_config: Option<MPIConfig<'a>>,
+    prover_setup: Arc<Mutex<ExpanderGKRProverSetup<PCSField, F, PCS>>>,
+    verifier_setup: Arc<Mutex<ExpanderGKRVerifierSetup<PCSField, F, PCS>>>,
+    kernels: Arc<Mutex<HashMap<usize, ExpCircuit<F>>>>,
+    shutdown_tx: Arc<Mutex<Option<oneshot::Sender<()>>>>,
+}
+
+unsafe impl<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Send
+    for ServerState<'a, PCSField, F, PCS>
+{
+}
+unsafe impl<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Sync
+    for ServerState<'a, PCSField, F, PCS>
+{
+}
+
+impl<'a, PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
+    for ServerState<'a, PCSField, F, PCS>
+{
+    fn clone(&self) -> Self {
+        ServerState {
+            lock: Arc::clone(&self.lock),
+            global_mpi_config: self.global_mpi_config.clone(),
+            local_mpi_config: self.local_mpi_config.clone(),
+            prover_setup: Arc::clone(&self.prover_setup),
+            verifier_setup: Arc::clone(&self.verifier_setup),
+            kernels: Arc::clone(&self.kernels),
+            shutdown_tx: Arc::clone(&self.shutdown_tx),
+        }
+    }
+}
+
+async fn root_main<C, ECCConfig>(
+    State(mut state): State<ServerState<'static, C::PCSField, C::FieldConfig, C::PCSConfig>>,
+    Json(request_type): Json<RequestType>,
+) -> Json<bool>
+where
+    C: GKREngine,
+    ECCConfig: Config<FieldConfig = C::FieldConfig>,
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
+    let _lock = state.lock.lock().await; // Ensure only one request is processed at a time
+    match request_type {
+        RequestType::Setup(setup_file) => {
+            let setup_timer = Timer::new("server setup", true);
+            state
+                .global_mpi_config
+                .root_broadcast_bytes(&mut vec![1u8; 1]);
+            let mut setup_file_bytes = setup_file.as_bytes().to_vec();
+            state
+                .global_mpi_config
+                .root_broadcast_bytes(&mut setup_file_bytes);
+
+            let mut kernels_guard = state.kernels.lock().await;
+            let mut prover_setup_guard = state.prover_setup.lock().await;
+            let mut verifier_setup_guard = state.verifier_setup.lock().await;
+            read_circuit_and_setup::<C, ECCConfig>(
+                state.global_mpi_config.clone(),
+                setup_file,
+                &mut *kernels_guard,
+                &mut *prover_setup_guard,
+                &mut *verifier_setup_guard,
+            );
+            SharedMemoryEngine::write_pcs_setup_to_shared_memory(&(
+                prover_setup_guard.clone(),
+                verifier_setup_guard.clone(),
+            ));
+
+            setup_timer.stop();
+        }
+        RequestType::Prove => {
+            // Handle proving logic here
+            println!("Proving");
+            let prove_timer = Timer::new("server prove", true);
+            state
+                .global_mpi_config
+                .root_broadcast_bytes(&mut vec![3u8; 1]);
+
+            state.local_mpi_config =
+                generate_local_mpi_config(&state.global_mpi_config, parallel_count);
+            let mut kernels_guard = state.kernels.lock().await;
+            let prover_setup_guard = state.prover_setup.lock().await;
+            let kernel = kernels_guard.get_mut(&kernel_id).expect("Kernel not found");
+            prove::<C>(
+                state.local_mpi_config.as_ref().unwrap(),
+                &*prover_setup_guard,
+                kernel,
+            );
+            prove_timer.stop();
+        }
+        RequestType::Exit => {
+            // Handle exit logic here
+            println!("Exiting");
+            state
+                .global_mpi_config
+                .root_broadcast_bytes(&mut vec![255u8; 1]);
+
+            unsafe { mpi::ffi::MPI_Finalize() };
+
+            state
+                .shutdown_tx
+                .lock()
+                .await
+                .take()
+                .map(|tx| tx.send(()).ok());
+        }
+    }
+
+    axum::Json(true)
+}
+
+async fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
+    global_mpi_config: MPIConfig<'static>,
+) where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
+    let state = ServerState {
+        lock: Arc::new(Mutex::new(())),
+        global_mpi_config: global_mpi_config.clone(),
+        local_mpi_config: None,
+        prover_setup: Arc::new(Mutex::new(ExpanderGKRProverSetup::default())),
+        verifier_setup: Arc::new(Mutex::new(ExpanderGKRVerifierSetup::default())),
+        kernels: Arc::new(Mutex::new(HashMap::new())),
+        shutdown_tx: Arc::new(Mutex::new(None)),
+    };
+
+    loop {
+        // waiting for work
+        let mut bytes = vec![0u8; 1];
+        global_mpi_config.root_broadcast_bytes(&mut bytes);
+        match bytes[0] {
+            1 => {
+                let mut setup_file_bytes = vec![0u8; 40]; // Adjust size as needed
+                global_mpi_config.root_broadcast_bytes(&mut setup_file_bytes);
+                let setup_file = String::from_utf8(setup_file_bytes)
+                    .expect("Failed to convert setup file bytes to String")
+                    .trim_end_matches('\0')
+                    .to_string();
+
+                // Setup
+                let mut kernels_guard = state.kernels.lock().await;
+                let mut prover_setup_guard = state.prover_setup.lock().await;
+                let mut verifier_setup_guard = state.verifier_setup.lock().await;
+
+                read_circuit_and_setup::<C, ECCConfig>(
+                    global_mpi_config.clone(),
+                    setup_file,
+                    &mut *kernels_guard,
+                    &mut *prover_setup_guard,
+                    &mut *verifier_setup_guard,
+                );
+            }
+            2 => {
+                // Commit input
+                let mut parallel_count = 0;
+                state
+                    .global_mpi_config
+                    .root_broadcast_f(&mut parallel_count);
+                let local_mpi_config =
+                    generate_local_mpi_config(&state.global_mpi_config, parallel_count);
+                if let Some(local_mpi_config) = local_mpi_config {
+                    let prover_setup_guard = state.prover_setup.lock().await;
+                    commit::<C>(&local_mpi_config, &*prover_setup_guard);
+                }
+            }
+            3 => {
+                // Prove
+                let mut pair = (0usize, 0usize);
+                state.global_mpi_config.root_broadcast_f(&mut pair);
+                let (parallel_count, kernel_id) = pair;
+                let local_mpi_config =
+                    generate_local_mpi_config(&state.global_mpi_config, parallel_count);
+                if let Some(local_mpi_config) = local_mpi_config {
+                    let prover_setup_guard = state.prover_setup.lock().await;
+                    let mut kernels_guard = state.kernels.lock().await;
+                    let exp_circuit = kernels_guard.get_mut(&kernel_id).expect("Kernel not found");
+
+                    prove::<C>(&local_mpi_config, &*prover_setup_guard, exp_circuit);
+                }
+            }
+            255 => {
+                // Exit condition, if needed
+                unsafe { mpi::ffi::MPI_Finalize() };
+                break;
+            }
+            _ => {
+                println!("Unknown request type received by worker");
+            }
+        }
+    }
+}
+
+fn read_circuit_and_setup<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
+    global_mpi_config: MPIConfig<'static>,
+    setup_file: String,
+    circuits: &mut HashMap<usize, ExpCircuit<C::FieldConfig>>,
+    prover_setup: &mut ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    verifier_setup: &mut ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+) where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
+    let computation_graph_bytes =
+        std::fs::read(setup_file).expect("Failed to read computation graph from file");
+    let computation_graph = ComputationGraph::<ECCConfig>::deserialize_from(std::io::Cursor::new(
+        computation_graph_bytes,
+    ))
+    .expect("Failed to deserialize computation graph");
+
+    computation_graph
+        .proof_templates
+        .iter()
+        .for_each(|template| {
+            global_mpi_config.root_broadcast_f(&mut template.kernel_id.clone());
+            let ecc_circuit = &computation_graph.kernels[template.kernel_id].layered_circuit;
+            let mut expander_circuit = ecc_circuit
+                .export_to_expander::<ECCConfig::FieldConfig>()
+                .flatten::<C>();
+            expander_circuit.pre_process_gkr::<C>();
+            circuits.insert(template.kernel_id, expander_circuit);
+        });
+
+    (*prover_setup, *verifier_setup) =
+        setup::<C, ECCConfig>(&global_mpi_config, Some(&computation_graph));
+}
+
 
 #[allow(clippy::type_complexity)]
 pub fn setup<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
@@ -356,160 +587,6 @@ fn prepare_inputs<F: Field>(
     input_vals
 }
 
-// pub fn verify<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
-//     verifier_setup: &ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-//     expander_circuit: &mut ExpCircuit<C::FieldConfig>,
-//     proof: &ExpanderGKRProof,
-//     commitments: &[ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
-//     partition_info: &[LayeredCircuitInputVec],
-//     parallel_count: usize,
-//     is_broadcast: &[bool],
-// ) -> bool
-// where
-//     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-// {
-//     let timer = Timer::new("verify", true);
-
-//     let mut transcript = C::TranscriptConfig::new();
-//     transcript.append_u8_slice(&[0u8; 32]);
-//     expander_circuit.fill_rnd_coefs(&mut transcript);
-//     let mut cursor = Cursor::new(&proof.data[0].bytes);
-//     cursor.set_position(32);
-
-//     let (mut verified, challenge, claimed_v0, claimed_v1) = gkr_verify(
-//         parallel_count,
-//         expander_circuit,
-//         &[],
-//         &<C::FieldConfig as FieldEngine>::ChallengeField::ZERO,
-//         &mut transcript,
-//         &mut cursor,
-//     );
-
-//     let pcs_verification_timer = Timer::new("pcs verification", true);
-//     verified &= verify_input_claim::<C, ECCConfig>(
-//         &mut cursor,
-//         partition_info,
-//         verifier_setup,
-//         &challenge.challenge_x(),
-//         &claimed_v0,
-//         commitments,
-//         is_broadcast,
-//         parallel_count,
-//         &mut transcript,
-//     );
-//     if let Some(challenge_y) = challenge.challenge_y() {
-//         verified &= verify_input_claim::<C, ECCConfig>(
-//             &mut cursor,
-//             partition_info,
-//             verifier_setup,
-//             &challenge_y,
-//             &claimed_v1.unwrap(),
-//             commitments,
-//             is_broadcast,
-//             parallel_count,
-//             &mut transcript,
-//         );
-//     }
-//     pcs_verification_timer.stop();
-
-//     timer.stop();
-//     verified
-// }
-
-// #[allow(clippy::too_many_arguments)]
-// fn verify_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
-//     mut proof_reader: impl Read,
-//     partition_info: &[LayeredCircuitInputVec],
-//     v_keys: &ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-//     challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
-//     y: &<C::FieldConfig as FieldEngine>::ChallengeField,
-//     commitments: &[ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
-//     is_broadcast: &[bool],
-//     parallel_count: usize,
-//     transcript: &mut C::TranscriptConfig,
-// ) -> bool
-// where
-//     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-// {
-//     assert_eq!(1 << challenge.r_mpi.len(), parallel_count);
-//     let mut target_y = <C::FieldConfig as FieldEngine>::ChallengeField::ZERO;
-//     for ((input, commitment), ib) in partition_info.iter().zip(commitments).zip(is_broadcast) {
-//         let local_vals_len =
-//             <ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig> as Commitment<
-//                 ECCConfig,
-//             >>::vals_len(commitment);
-//         let nb_challenge_vars = local_vals_len.ilog2() as usize;
-//         let challenge_vars = challenge.rz[..nb_challenge_vars].to_vec();
-
-//         let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
-//             nb_challenge_vars,
-//             parallel_count,
-//         );
-//         let v_key = v_keys
-//             .v_keys
-//             .get(&(local_vals_len, parallel_count))
-//             .unwrap();
-
-//         let claim =
-//             <C::FieldConfig as FieldEngine>::ChallengeField::deserialize_from(&mut proof_reader)
-//                 .unwrap();
-//         transcript.append_field_element(&claim);
-
-//         let opening =
-//             <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Opening::deserialize_from(
-//                 &mut proof_reader,
-//             )
-//             .unwrap();
-
-//         transcript.lock_proof();
-//         // individual pcs verification
-//         let verified = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::verify(
-//             &params,
-//             v_key,
-//             &commitment.commitment[0],
-//             &ExpanderSingleVarChallenge::<C::FieldConfig> {
-//                 rz: challenge_vars.to_vec(),
-//                 r_simd: challenge.r_simd.to_vec(),
-//                 r_mpi: if *ib {
-//                     vec![]
-//                 } else {
-//                     challenge.r_mpi.to_vec()
-//                 }, // In the case of broadcast, whatever x_mpi is, the opening is the same
-//             },
-//             claim,
-//             transcript,
-//             &opening,
-//         );
-//         transcript.unlock_proof();
-
-//         if !verified {
-//             return false;
-//         }
-
-//         let index_vars = &challenge.rz[nb_challenge_vars..];
-//         let index = input.offset / input.len;
-//         let index_as_bits = (0..index_vars.len())
-//             .map(|i| {
-//                 <C::FieldConfig as FieldEngine>::ChallengeField::from(((index >> i) & 1) as u32)
-//             })
-//             .collect::<Vec<_>>();
-//         let v_index = EqPolynomial::<<C::FieldConfig as FieldEngine>::ChallengeField>::eq_vec(
-//             index_vars,
-//             &index_as_bits,
-//         );
-
-//         target_y += v_index * claim;
-//     }
-
-//     // overall claim verification
-//     *y == target_y
-// }
-
-// TODO: Find a way to avoid this global state
-pub static mut UNIVERSE: Option<Universe> = None;
-pub static mut GLOBAL_COMMUNICATOR: Option<SimpleCommunicator> = None;
-pub static mut LOCAL_COMMUNICATOR: Option<SimpleCommunicator> = None;
-
 #[allow(static_mut_refs)]
 pub fn generate_local_mpi_config(
     global_mpi_config: &MPIConfig<'static>,
@@ -534,3 +611,5 @@ pub fn generate_local_mpi_config(
         None
     }
 }
+
+

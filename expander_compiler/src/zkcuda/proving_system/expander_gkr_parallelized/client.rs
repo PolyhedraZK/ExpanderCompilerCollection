@@ -1,4 +1,4 @@
-use super::server::{RequestType, SERVER_URL};
+use super::server_utils::{RequestType, SERVER_URL};
 
 use reqwest::Client;
 
