@@ -565,9 +565,8 @@ where
             is_broadcast,
             &mut transcript,
         );
-
-        proof.data.push(transcript.finalize_and_get_proof());
     }
+    proof.data.push(transcript.finalize_and_get_proof());
 
     if local_world_rank == 0 {
         Some(proof)
