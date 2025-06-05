@@ -184,8 +184,11 @@ impl SharedMemoryEngine {
             .collect()
     }
 
-    pub fn write_proof_to_shared_memory<C: Config>(
-        proof: &CombinedProof<C, ExpanderGKRProvingSystem<C>>,
+    pub fn write_proof_to_shared_memory<
+        C: GKREngine,
+        ECCConfig: Config<FieldConfig = C::FieldConfig>,
+    >(
+        proof: &CombinedProof<ECCConfig, ExpanderGKRProvingSystem<C>>,
     ) where
         C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
     {

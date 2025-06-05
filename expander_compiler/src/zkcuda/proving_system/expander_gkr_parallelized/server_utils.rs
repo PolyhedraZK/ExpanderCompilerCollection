@@ -132,12 +132,14 @@ where
             let prover_setup_guard = state.prover_setup.lock().await;
             let computation_graph = state.computation_graph.lock().await;
 
-            prove_request_handler::<C, ECCConfig>(
+            let proof = prove_request_handler::<C, ECCConfig>(
                 &state.global_mpi_config,
                 &*prover_setup_guard,
                 &*computation_graph,
                 &witness,
             );
+            
+            SharedMemoryEngine::write_proof_to_shared_memory(proof.as_ref().unwrap());
             prove_timer.stop();
         }
         RequestType::Exit => {
