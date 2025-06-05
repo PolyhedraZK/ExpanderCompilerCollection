@@ -353,6 +353,7 @@ fn zkcuda_keccak_1_helper<P: ProvingSystem<M31Config>>() {
     println!("proof generation ok");
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
     println!("verify ok");
+    P::post_process();
 }
 
 #[test]
@@ -416,6 +417,7 @@ fn zkcuda_keccak_2_helper<P: ProvingSystem<M31Config>>() {
     println!("proof generation ok");
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
     println!("verify ok");
+    P::post_process();
 }
 
 #[test]
