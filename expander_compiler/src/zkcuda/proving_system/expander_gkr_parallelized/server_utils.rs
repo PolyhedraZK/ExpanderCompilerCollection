@@ -1,12 +1,20 @@
 use crate::utils::misc::next_power_of_two;
+use crate::zkcuda::kernel::{Kernel, LayeredCircuitInputVec};
 use crate::zkcuda::proof::ComputationGraph;
 use crate::zkcuda::proving_system::shared_memory_utils::SharedMemoryEngine;
-use crate::zkcuda::proving_system::{pcs_testing_setup_fixed_seed, CombinedProof, ExpanderGKRProvingSystem, ExpanderGKRVerifierSetup};
+use crate::zkcuda::proving_system::{
+    max_n_vars, pcs_testing_setup_fixed_seed, CombinedProof, ExpanderGKRCommitment,
+    ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof, ExpanderGKRProvingSystem,
+    ExpanderGKRVerifierSetup,
+};
 use axum::http::request;
 use expander_utils::timer::Timer;
 use mpi::environment::Universe;
 use mpi::topology::SimpleCommunicator;
+use mpi::traits::Communicator;
+use polynomials::RefMultiLinearPoly;
 use serdes::ExpSerde;
+use sumcheck::ProverScratchPad;
 
 use crate::frontend::{
     BN254Config, BabyBearConfig, Config, GF2Config, GoldilocksConfig, M31Config, SIMDField,
@@ -16,11 +24,14 @@ use arith::Field;
 
 use axum::{extract::State, routing::post, Json, Router};
 use expander_circuit::Circuit as ExpCircuit;
-use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
+use gkr::{gkr_prove, prover, BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
+use gkr_engine::Transcript;
 use gkr_engine::{
-    ExpanderPCS, FieldEngine, GKREngine, MPIConfig, MPIEngine, PolynomialCommitmentType,
+    ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine,
+    PolynomialCommitmentType,
 };
 use serde::{Deserialize, Serialize};
+use std::cmp::max;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::sync::{oneshot, Mutex};
 
@@ -38,26 +49,28 @@ pub static mut UNIVERSE: Option<Universe> = None;
 pub static mut GLOBAL_COMMUNICATOR: Option<SimpleCommunicator> = None;
 pub static mut LOCAL_COMMUNICATOR: Option<SimpleCommunicator> = None;
 
-struct ServerState<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> 
-where 
+pub struct ServerState<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>
+where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    lock: Arc<Mutex<()>>, // For now we want to ensure that only one request is processed at a time
-    global_mpi_config: MPIConfig<'static>,
-    local_mpi_config: Option<MPIConfig<'static>>,
-    prover_setup: Arc<Mutex<ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>>>,
-    verifier_setup: Arc<Mutex<ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>>>,
-    computation_graph: Arc<Mutex<ComputationGraph<ECCConfig>>>,
-    shutdown_tx: Arc<Mutex<Option<oneshot::Sender<()>>>>,
+    pub lock: Arc<Mutex<()>>, // For now we want to ensure that only one request is processed at a time
+    pub global_mpi_config: MPIConfig<'static>,
+    pub local_mpi_config: Option<MPIConfig<'static>>,
+    pub prover_setup: Arc<Mutex<ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>>>,
+    pub verifier_setup: Arc<Mutex<ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>>>,
+    pub computation_graph: Arc<Mutex<ComputationGraph<ECCConfig>>>,
+    pub shutdown_tx: Arc<Mutex<Option<oneshot::Sender<()>>>>,
 }
 
-unsafe impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> Send for ServerState<C, ECCConfig>
+unsafe impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> Send
+    for ServerState<C, ECCConfig>
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
 }
 
-unsafe impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> Sync for ServerState<C, ECCConfig>
+unsafe impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> Sync
+    for ServerState<C, ECCConfig>
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
@@ -81,7 +94,7 @@ where
     }
 }
 
-async fn root_main<C, ECCConfig>(
+pub async fn root_main<C, ECCConfig>(
     State(mut state): State<ServerState<C, ECCConfig>>,
     Json(request_type): Json<RequestType>,
 ) -> Json<bool>
@@ -100,7 +113,7 @@ where
             let mut prover_setup_guard = state.prover_setup.lock().await;
             let mut verifier_setup_guard = state.verifier_setup.lock().await;
             setup_request_handler::<C, ECCConfig>(
-                state.global_mpi_config,
+                &state.global_mpi_config,
                 Some(setup_file),
                 &mut computation_graph,
                 &mut *prover_setup_guard,
@@ -119,17 +132,15 @@ where
             let prove_timer = Timer::new("server prove", true);
             let _ = broadcast_request_type(&state.global_mpi_config, 2);
 
-            prove_handler::<C>();
-
-            state.local_mpi_config =
-                generate_local_mpi_config(&state.global_mpi_config, parallel_count);
-            let mut kernels_guard = state.kernels.lock().await;
+            let witness = SharedMemoryEngine::read_witness_from_shared_memory::<C::FieldConfig>();
             let prover_setup_guard = state.prover_setup.lock().await;
-            let kernel = kernels_guard.get_mut(&kernel_id).expect("Kernel not found");
-            prove::<C>(
-                state.local_mpi_config.as_ref().unwrap(),
+            let computation_graph = state.computation_graph.lock().await;
+
+            prove_request_handler::<C, ECCConfig>(
+                &state.global_mpi_config,
                 &*prover_setup_guard,
-                kernel,
+                &*computation_graph,
+                &witness,
             );
             prove_timer.stop();
         }
@@ -150,18 +161,18 @@ where
     axum::Json(true)
 }
 
-async fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
+pub async fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     global_mpi_config: MPIConfig<'static>,
 ) where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    let state = ServerState {
+    let state = ServerState::<C, ECCConfig> {
         lock: Arc::new(Mutex::new(())),
         global_mpi_config: global_mpi_config.clone(),
         local_mpi_config: None,
         prover_setup: Arc::new(Mutex::new(ExpanderGKRProverSetup::default())),
         verifier_setup: Arc::new(Mutex::new(ExpanderGKRVerifierSetup::default())),
-        kernels: Arc::new(Mutex::new(HashMap::new())),
+        computation_graph: Arc::new(Mutex::new(ComputationGraph::default())),
         shutdown_tx: Arc::new(Mutex::new(None)),
     };
 
@@ -171,44 +182,30 @@ async fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfi
         match request_type {
             1 => {
                 // TODO: Do not use this much locks, use a single lock for the whole setup
-                let mut kernels_guard = state.kernels.lock().await;
+                let mut computation_graph = state.computation_graph.lock().await;
                 let mut prover_setup_guard = state.prover_setup.lock().await;
                 let mut verifier_setup_guard = state.verifier_setup.lock().await;
                 setup_request_handler::<C, ECCConfig>(
-                    state.global_mpi_config,
+                    &state.global_mpi_config,
                     None,
-                    &mut *kernels_guard,
-                    &mut *prover_setup_guard,
-                    &mut *verifier_setup_guard,
+                    &mut computation_graph,
+                    &mut prover_setup_guard,
+                    &mut verifier_setup_guard,
                 );
             }
-            // 2 => {
-            //     // Commit input
-            //     let mut parallel_count = 0;
-            //     state
-            //         .global_mpi_config
-            //         .root_broadcast_f(&mut parallel_count);
-            //     let local_mpi_config =
-            //         generate_local_mpi_config(&state.global_mpi_config, parallel_count);
-            //     if let Some(local_mpi_config) = local_mpi_config {
-            //         let prover_setup_guard = state.prover_setup.lock().await;
-            //         commit::<C>(&local_mpi_config, &*prover_setup_guard);
-            //     }
-            // }
             2 => {
                 // Prove
-                let mut pair = (0usize, 0usize);
-                state.global_mpi_config.root_broadcast_f(&mut pair);
-                let (parallel_count, kernel_id) = pair;
-                let local_mpi_config =
-                    generate_local_mpi_config(&state.global_mpi_config, parallel_count);
-                if let Some(local_mpi_config) = local_mpi_config {
-                    let prover_setup_guard = state.prover_setup.lock().await;
-                    let mut kernels_guard = state.kernels.lock().await;
-                    let exp_circuit = kernels_guard.get_mut(&kernel_id).expect("Kernel not found");
-
-                    prove::<C>(&local_mpi_config, &*prover_setup_guard, exp_circuit);
-                }
+                let witness =
+                    SharedMemoryEngine::read_witness_from_shared_memory::<C::FieldConfig>();
+                let prover_setup_guard = state.prover_setup.lock().await;
+                let computation_graph = state.computation_graph.lock().await;
+                let proof = prove_request_handler::<C, ECCConfig>(
+                    &state.global_mpi_config,
+                    &*prover_setup_guard,
+                    &*computation_graph,
+                    &witness,
+                );
+                assert!(proof.is_none());
             }
             255 => {
                 // Exit condition, if needed
@@ -245,7 +242,7 @@ fn broadcast_string(global_mpi_config: &MPIConfig<'static>, string: Option<Strin
 }
 
 fn setup_request_handler<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
-    global_mpi_config: MPIConfig<'static>,
+    global_mpi_config: &MPIConfig<'static>,
     setup_file: Option<String>,
     computation_graph: &mut ComputationGraph<ECCConfig>,
     prover_setup: &mut ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
@@ -305,19 +302,19 @@ fn setup<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             .zip(template.is_broadcast.iter())
         {
             let val_total_len = computation_graph.commitments_lens[*x];
-            let val_actual_len = if *is_broadcast {
-                val_total_len
+            assert!(val_total_len.is_power_of_two());
+            let (val_actual_len, parallel_count) = if *is_broadcast {
+                (val_total_len, 1)
             } else {
-                val_total_len / template.parallel_count
+                let parallel_count = next_power_of_two(template.parallel_count);
+                (val_total_len / parallel_count, parallel_count)
             };
 
-            let parallel_count = next_power_of_two(template.parallel_count);
             if p_keys.contains_key(&(val_actual_len, parallel_count)) {
                 continue;
             }
 
-            let local_mpi_config =
-                generate_local_mpi_config(global_mpi_config, parallel_count);
+            let local_mpi_config = generate_local_mpi_config(global_mpi_config, parallel_count);
 
             if let Some(local_mpi_config) = local_mpi_config {
                 let (_params, p_key, v_key, _scratch) = pcs_testing_setup_fixed_seed::<
@@ -334,12 +331,12 @@ fn setup<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     }
 }
 
-fn prove_handler<C, ECCConfig>(
+fn prove_request_handler<C, ECCConfig>(
     global_mpi_config: &MPIConfig<'static>,
-    prover_setup: &ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>, 
+    prover_setup: &ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
     computation_graph: &ComputationGraph<ECCConfig>,
-    values: &[impl AsRef<SIMDField<C>>]
-) -> CombinedProof<ECCConfig, ExpanderGKRProvingSystem<C>> 
+    values: &[impl AsRef<[SIMDField<C>]>],
+) -> Option<CombinedProof<ECCConfig, ExpanderGKRProvingSystem<C>>>
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
@@ -354,7 +351,8 @@ where
                 .iter()
                 .zip(template.is_broadcast.iter())
                 .map(|(x, is_broadcast)| {
-                    commit(
+                    commit::<C>(
+                        global_mpi_config,
                         prover_setup,
                         values[*x].as_ref(),
                         next_power_of_two(template.parallel_count),
@@ -369,81 +367,113 @@ where
         .proof_templates
         .iter()
         .zip(commitments.iter())
-        .map(|(template, commitments_kernel)| {
-            prove_kernel(
+        .map(|(template, _commitments_kernel)| {
+            prove_kernel::<C, ECCConfig>(
+                &global_mpi_config,
                 prover_setup,
                 template.kernel_id,
                 &computation_graph.kernels[template.kernel_id],
-                &commitments_kernel.0,
-                &commitments_kernel.1,
+                &vec![],
+                &vec![],
                 &template
                     .commitment_indices
                     .iter()
-                    .map(|x| &values[..])
+                    .map(|x| &values[*x].as_ref()[..])
                     .collect::<Vec<_>>(),
-                template.parallel_count,
+                next_power_of_two(template.parallel_count),
                 &template.is_broadcast,
             )
         })
         .collect::<Vec<_>>();
 
-    CombinedProof {
-        commitments: commitments.into_iter().map(|x| x.0).collect(),
-        proofs,
+    if global_mpi_config.is_root() {
+        let commitments = commitments
+            .into_iter()
+            .map(|(commitment, _)| {
+                commitment
+                    .into_iter()
+                    .map(|c| c.unwrap())
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+
+        let proofs = proofs.into_iter().map(|p| p.unwrap()).collect::<Vec<_>>();
+        Some(CombinedProof {
+            commitments,
+            proofs,
+        })
+    } else {
+        None
     }
 }
 
-
-pub fn commit<C: GKREngine>(
-    mpi_config: &MPIConfig,
+fn commit<C: GKREngine>(
+    global_mpi_config: &MPIConfig<'static>,
     prover_setup: &ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-) where
+    vals: &[SIMDField<C>],
+    parallel_count: usize,
+    is_broadcast: bool,
+) -> (
+    Option<ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>>,
+    Option<ExpanderGKRCommitmentExtraInfo<C::PCSField, C::FieldConfig, C::PCSConfig>>,
+)
+where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    let world_rank = mpi_config.world_rank();
-    let world_size = mpi_config.world_size();
-    if world_rank == 0 {
-        println!("Expander Commit Exec Called with world size {}", world_size);
-    }
-
-    let local_vals_to_commit =
-        read_local_vals_to_commit_from_shared_memory::<C::FieldConfig>(world_rank, world_size);
-    let local_val_len = local_vals_to_commit.len();
-    let p_key = prover_setup
-        .p_keys
-        .get(&(local_val_len, world_size))
-        .unwrap();
-
-    let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
-        local_val_len.ilog2() as usize,
-        mpi_config.world_size(),
+    let local_mpi_config = generate_local_mpi_config(
+        global_mpi_config,
+        if is_broadcast { 1 } else { parallel_count },
     );
 
-    let mut scratch = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::init_scratch_pad(
-        &params, mpi_config,
-    );
+    if let Some(local_mpi_config) = local_mpi_config {
+        let local_rank = local_mpi_config.world_rank();
+        let local_world_size = local_mpi_config.world_size();
 
-    let commitment = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::commit(
-        &params,
-        mpi_config,
-        p_key,
-        &RefMultiLinearPoly::from_ref(&local_vals_to_commit),
-        &mut scratch,
-    );
+        let local_val_len = vals.len() / local_world_size;
+        let local_vals_to_commit =
+            &vals[local_val_len * local_rank..local_val_len * (local_rank + 1)];
 
-    if world_rank == 0 {
-        let commitment = ExpanderGKRCommitment {
-            vals_len: local_val_len,
-            commitment: vec![commitment.unwrap()],
-        };
-        let extra_info = ExpanderGKRCommitmentExtraInfo {
-            scratch: vec![scratch],
-        };
+        let p_key = prover_setup
+            .p_keys
+            .get(&(local_val_len, local_world_size))
+            .expect(&format!(
+            "unable to find pkeys for {local_val_len} {local_world_size} {is_broadcast} in commit"
+        ));
 
-        write_commitment_to_shared_memory::<C::PCSField, C::FieldConfig, C::PCSConfig>(&commitment);
-        write_commitment_extra_info_to_shared_memory::<C::PCSField, C::FieldConfig, C::PCSConfig>(
-            &extra_info,
+        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
+            local_val_len.ilog2() as usize,
+            local_world_size,
         );
+
+        let mut scratch =
+            <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::init_scratch_pad(
+                &params,
+                &local_mpi_config,
+            );
+
+        let commitment = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::commit(
+            &params,
+            &local_mpi_config,
+            p_key,
+            &RefMultiLinearPoly::from_ref(&local_vals_to_commit),
+            &mut scratch,
+        );
+
+        if local_rank == 0 {
+            let commitment = ExpanderGKRCommitment {
+                vals_len: local_val_len,
+                commitment: vec![commitment.unwrap()],
+            };
+            let extra_info = ExpanderGKRCommitmentExtraInfo {
+                scratch: vec![scratch],
+            };
+
+            (Some(commitment), Some(extra_info))
+        } else {
+            (None, None)
+        }
+    } else {
+        (None, None)
     }
 }
 
@@ -451,104 +481,111 @@ pub fn commit<C: GKREngine>(
 // But we need to implement `Config` for each GKREngine, which remains to be done
 // For now, the GKREngine actually controls the functionality of the prover
 // The ECCConfig is only used where the `Config` trait is required
-pub fn prove<C: GKREngine>(
-    mpi_config: &MPIConfig,
-    pcs_setup: &ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-    expander_circuit: &mut ExpCircuit<C::FieldConfig>, // mut to allow filling rnd coefs and circuit inputs
-) where
+fn prove_kernel<C, ECCConfig>(
+    mpi_config: &MPIConfig<'static>,
+    prover_setup: &ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    _kernel_id: usize,
+    kernel: &Kernel<ECCConfig>,
+    _commitments: &[ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
+    commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<
+        C::PCSField,
+        C::FieldConfig,
+        C::PCSConfig,
+    >],
+    commitments_values: &[&[SIMDField<C>]],
+    parallel_count: usize,
+    is_broadcast: &[bool],
+) -> Option<ExpanderGKRProof>
+where
+    C: GKREngine,
+    ECCConfig: Config<FieldConfig = C::FieldConfig>,
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    let world_rank = mpi_config.world_rank();
-    let world_size = mpi_config.world_size();
-    if world_rank == 0 {
-        println!("Expander Prove Exec Called with world size {}", world_size);
+    let local_mpi_config = generate_local_mpi_config(mpi_config, parallel_count);
+
+    if local_mpi_config.is_none() {
+        return None;
     }
 
-    let timer = Timer::new(
-        "recurring cost: read witness&commitment",
-        mpi_config.is_root(),
-    );
-    let _commitments = if mpi_config.is_root() {
-        Some(read_commitment_from_shared_memory::<
-            C::PCSField,
-            C::FieldConfig,
-            C::PCSConfig,
-        >())
-    } else {
-        None
-    };
-    let partition_info = read_partition_info_from_shared_memory();
-    let broadcast_info = read_broadcast_info_from_shared_memory();
-    let commitments_extra_info =
-        read_commitment_extra_info_from_shared_memory::<C::PCSField, C::FieldConfig, C::PCSConfig>(
-        );
-    let local_commitment_values = read_commitment_values_from_shared_memory::<C::FieldConfig>(
-        &broadcast_info,
-        world_rank,
-        world_size,
-    );
-    timer.stop();
+    let local_mpi_config = local_mpi_config.unwrap();
+    let local_world_size = local_mpi_config.world_size();
+    let local_world_rank = local_mpi_config.world_rank();
 
-    let timer = Timer::new("gkr prove", mpi_config.is_root());
-    let (max_num_input_var, max_num_output_var) = max_n_vars(expander_circuit);
-    let max_num_var = max(max_num_input_var, max_num_output_var); // temp fix to a bug in Expander, remove this after Expander update.
+    let local_commitment_values = commitments_values
+        .iter()
+        .zip(is_broadcast.iter())
+        .map(|(vals, is_broadcast)| {
+            if *is_broadcast {
+                &vals[..]
+            } else {
+                let local_val_len = vals.len() / local_world_size;
+                &vals[local_val_len * local_world_rank..local_val_len * (local_world_rank + 1)]
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let mut expander_circuit = kernel.layered_circuit.export_to_expander().flatten::<C>();
+    expander_circuit.pre_process_gkr::<C>();
+    let (max_num_input_var, max_num_output_var) = max_n_vars(&expander_circuit);
+    let max_num_var = max(max_num_input_var, max_num_output_var);
     let mut prover_scratch =
-        ProverScratchPad::<C::FieldConfig>::new(max_num_var, max_num_var, world_size);
+        ProverScratchPad::<C::FieldConfig>::new(max_num_var, max_num_var, local_world_size);
+
+    let mut proof = ExpanderGKRProof { data: vec![] };
 
     let mut transcript = C::TranscriptConfig::new();
     transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
     expander_circuit.layers[0].input_vals = prepare_inputs(
         1usize << expander_circuit.log_input_size(),
-        &partition_info,
+        &kernel.layered_circuit_input,
         &local_commitment_values,
     );
     expander_circuit.fill_rnd_coefs(&mut transcript);
     expander_circuit.evaluate();
     let (claimed_v, challenge) = gkr_prove(
-        expander_circuit,
+        &expander_circuit,
         &mut prover_scratch,
         &mut transcript,
-        mpi_config,
+        &local_mpi_config,
     );
     assert_eq!(
         claimed_v,
         <C::FieldConfig as FieldEngine>::ChallengeField::from(0)
     );
-    timer.stop();
-
-    let timer = Timer::new("pcs opening", mpi_config.is_root());
     prove_input_claim::<C>(
-        mpi_config,
+        &local_mpi_config,
         &local_commitment_values,
-        pcs_setup,
+        prover_setup,
         &commitments_extra_info,
         &challenge.challenge_x(),
-        &broadcast_info,
+        is_broadcast,
         &mut transcript,
     );
     if let Some(challenge_y) = challenge.challenge_y() {
         prove_input_claim::<C>(
-            mpi_config,
+            &local_mpi_config,
             &local_commitment_values,
-            pcs_setup,
+            prover_setup,
             &commitments_extra_info,
             &challenge_y,
-            &broadcast_info,
+            is_broadcast,
             &mut transcript,
         );
-    }
-    timer.stop();
 
-    let proof = transcript.finalize_and_get_proof();
-    if world_rank == 0 {
-        write_proof_to_shared_memory(&ExpanderGKRProof { data: vec![proof] });
+        proof.data.push(transcript.finalize_and_get_proof());
+    }
+
+    if local_world_rank == 0 {
+        Some(proof)
+    } else {
+        None
     }
 }
 
 #[allow(clippy::too_many_arguments)]
 fn prove_input_claim<C: GKREngine>(
     mpi_config: &MPIConfig,
-    local_commitments_values: &[Vec<SIMDField<C>>],
+    local_commitments_values: &[impl AsRef<[SIMDField<C>]>],
     p_keys: &ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
     commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<
         C::PCSField,
@@ -566,6 +603,7 @@ fn prove_input_claim<C: GKREngine>(
         .zip(commitments_extra_info)
         .zip(is_broadcast)
     {
+        let local_commitment_val = local_commitment_val.as_ref();
         let val_len = local_commitment_val.len();
         let vals_to_open = local_commitment_val;
 
@@ -628,18 +666,19 @@ fn prove_input_claim<C: GKREngine>(
 fn prepare_inputs<F: Field>(
     input_len: usize,
     partition_info: &[LayeredCircuitInputVec],
-    local_commitment_values: &[Vec<F>],
+    local_commitment_values: &[impl AsRef<[F]>],
 ) -> Vec<F> {
     let mut input_vals = vec![F::ZERO; input_len];
     for (partition, val) in partition_info.iter().zip(local_commitment_values.iter()) {
-        assert!(partition.len == val.len());
-        input_vals[partition.offset..partition.offset + partition.len].copy_from_slice(val);
+        assert!(partition.len == val.as_ref().len());
+        input_vals[partition.offset..partition.offset + partition.len]
+            .copy_from_slice(val.as_ref());
     }
     input_vals
 }
 
 #[allow(static_mut_refs)]
-pub fn generate_local_mpi_config(
+fn generate_local_mpi_config(
     global_mpi_config: &MPIConfig<'static>,
     n_parties: usize,
 ) -> Option<MPIConfig<'static>> {

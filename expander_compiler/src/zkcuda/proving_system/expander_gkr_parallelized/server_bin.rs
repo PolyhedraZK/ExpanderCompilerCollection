@@ -9,10 +9,10 @@ use clap::Parser;
 use expander_circuit::Circuit as ExpCircuit;
 use expander_compiler::{
     frontend::{BN254Config, BabyBearConfig, Config, GF2Config, GoldilocksConfig, M31Config},
-    zkcuda::proving_system::{
+    zkcuda::{proof::ComputationGraph, proving_system::{
         expander_gkr_parallelized::server_utils::*, ExpanderGKRProverSetup,
         ExpanderGKRVerifierSetup,
-    },
+    }},
 };
 use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
 use gkr_engine::{
@@ -93,7 +93,7 @@ where
         local_mpi_config: None,
         prover_setup: Arc::new(Mutex::new(ExpanderGKRProverSetup::default())),
         verifier_setup: Arc::new(Mutex::new(ExpanderGKRVerifierSetup::default())),
-        kernels: Arc::new(Mutex::new(HashMap::new())),
+        computation_graph: Arc::new(Mutex::new(ComputationGraph::default())),
         shutdown_tx: Arc::new(Mutex::new(None)),
     };
 
