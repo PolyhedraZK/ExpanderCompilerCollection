@@ -1,24 +1,21 @@
-use std::{collections::HashMap, net::SocketAddr, str::FromStr, sync::Arc};
+use std::{net::SocketAddr, str::FromStr, sync::Arc};
 
-use arith::Field;
 use axum::{
     routing::{get, post},
     Router,
 };
 use clap::Parser;
-use expander_circuit::Circuit as ExpCircuit;
 use expander_compiler::{
     frontend::{BN254Config, BabyBearConfig, Config, GF2Config, GoldilocksConfig, M31Config},
     zkcuda::{proof::ComputationGraph, proving_system::{
-        expander_gkr_parallelized::server_utils::*, ExpanderGKRProverSetup,
+        expander_gkr_parallelized::server_utils::{GLOBAL_COMMUNICATOR, ServerState, UNIVERSE, root_main, worker_main}, ExpanderGKRProverSetup,
         ExpanderGKRVerifierSetup,
     }},
 };
 use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
 use gkr_engine::{
-    ExpanderPCS, FieldEngine, GKREngine, MPIConfig, MPIEngine, PolynomialCommitmentType,
+    FieldEngine, GKREngine, MPIConfig, MPIEngine, PolynomialCommitmentType,
 };
-use mpi::{environment::Universe, topology::SimpleCommunicator};
 use tokio::sync::{oneshot, Mutex};
 
 #[derive(Parser, Debug)]

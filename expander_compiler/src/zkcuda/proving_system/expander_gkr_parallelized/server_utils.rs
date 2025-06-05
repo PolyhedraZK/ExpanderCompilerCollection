@@ -7,7 +7,6 @@ use crate::zkcuda::proving_system::{
     ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof, ExpanderGKRProvingSystem,
     ExpanderGKRVerifierSetup,
 };
-use axum::http::request;
 use expander_utils::timer::Timer;
 use mpi::environment::Universe;
 use mpi::topology::SimpleCommunicator;
@@ -17,22 +16,20 @@ use serdes::ExpSerde;
 use sumcheck::ProverScratchPad;
 
 use crate::frontend::{
-    BN254Config, BabyBearConfig, Config, GF2Config, GoldilocksConfig, M31Config, SIMDField,
+    Config, SIMDField,
 };
 use crate::zkcuda::proving_system::ExpanderGKRProverSetup;
 use arith::Field;
 
-use axum::{extract::State, routing::post, Json, Router};
-use expander_circuit::Circuit as ExpCircuit;
-use gkr::{gkr_prove, prover, BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
+use axum::{extract::State, Json};
+use gkr::gkr_prove;
 use gkr_engine::Transcript;
 use gkr_engine::{
     ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine,
-    PolynomialCommitmentType,
 };
 use serde::{Deserialize, Serialize};
 use std::cmp::max;
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::{oneshot, Mutex};
 
 pub static SERVER_URL: &str = "http://127.0.0.1:3000/";
@@ -95,7 +92,7 @@ where
 }
 
 pub async fn root_main<C, ECCConfig>(
-    State(mut state): State<ServerState<C, ECCConfig>>,
+    State(state): State<ServerState<C, ECCConfig>>,
     Json(request_type): Json<RequestType>,
 ) -> Json<bool>
 where
@@ -252,15 +249,15 @@ fn setup_request_handler<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldC
 {
     let setup_file = if global_mpi_config.is_root() {
         let setup_file = setup_file.expect("Setup file path must be provided");
-        broadcast_string(&global_mpi_config, Some(setup_file))
+        broadcast_string(global_mpi_config, Some(setup_file))
     } else {
         // Workers will wait for the setup file to be broadcasted
-        broadcast_string(&global_mpi_config, None)
+        broadcast_string(global_mpi_config, None)
     };
 
-    read_circuit::<C, ECCConfig>(&global_mpi_config, setup_file, computation_graph);
+    read_circuit::<C, ECCConfig>(global_mpi_config, setup_file, computation_graph);
     setup::<C, ECCConfig>(
-        &global_mpi_config,
+        global_mpi_config,
         Some(computation_graph),
         prover_setup,
         verifier_setup,
@@ -369,16 +366,16 @@ where
         .zip(commitments.iter())
         .map(|(template, _commitments_kernel)| {
             prove_kernel::<C, ECCConfig>(
-                &global_mpi_config,
+                global_mpi_config,
                 prover_setup,
                 template.kernel_id,
                 &computation_graph.kernels[template.kernel_id],
-                &vec![],
-                &vec![],
+                &[],
+                &[],
                 &template
                     .commitment_indices
                     .iter()
-                    .map(|x| &values[*x].as_ref()[..])
+                    .map(|x| values[*x].as_ref())
                     .collect::<Vec<_>>(),
                 next_power_of_two(template.parallel_count),
                 &template.is_broadcast,
@@ -436,9 +433,7 @@ where
         let p_key = prover_setup
             .p_keys
             .get(&(local_val_len, local_world_size))
-            .expect(&format!(
-            "unable to find pkeys for {local_val_len} {local_world_size} {is_broadcast} in commit"
-        ));
+            .unwrap_or_else(|| panic!("unable to find pkeys for {local_val_len} {local_world_size} {is_broadcast} in commit"));
 
         let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
             local_val_len.ilog2() as usize,
@@ -455,7 +450,7 @@ where
             &params,
             &local_mpi_config,
             p_key,
-            &RefMultiLinearPoly::from_ref(&local_vals_to_commit),
+            &RefMultiLinearPoly::from_ref(local_vals_to_commit),
             &mut scratch,
         );
 
@@ -503,9 +498,7 @@ where
 {
     let local_mpi_config = generate_local_mpi_config(mpi_config, parallel_count);
 
-    if local_mpi_config.is_none() {
-        return None;
-    }
+    local_mpi_config.as_ref()?;
 
     let local_mpi_config = local_mpi_config.unwrap();
     let local_world_size = local_mpi_config.world_size();
@@ -556,7 +549,7 @@ where
         &local_mpi_config,
         &local_commitment_values,
         prover_setup,
-        &commitments_extra_info,
+        commitments_extra_info,
         &challenge.challenge_x(),
         is_broadcast,
         &mut transcript,
@@ -566,7 +559,7 @@ where
             &local_mpi_config,
             &local_commitment_values,
             prover_setup,
-            &commitments_extra_info,
+            commitments_extra_info,
             &challenge_y,
             is_broadcast,
             &mut transcript,
