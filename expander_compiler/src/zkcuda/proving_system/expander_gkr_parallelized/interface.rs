@@ -217,7 +217,7 @@ where
             .max()
             .unwrap_or(1);
 
-        start_server::<C>(max_parallel_count);
+        start_server::<C>(next_power_of_two(max_parallel_count));
         // Keep trying until the server is ready
         loop {
             match wait_async(Client::new().get(SERVER_URL).send()) {
