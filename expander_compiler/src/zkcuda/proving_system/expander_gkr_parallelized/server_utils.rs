@@ -114,8 +114,8 @@ where
                 &state.global_mpi_config,
                 Some(setup_file),
                 &mut computation_graph,
-                &mut *prover_setup_guard,
-                &mut *verifier_setup_guard,
+                &mut prover_setup_guard,
+                &mut verifier_setup_guard,
             );
 
             SharedMemoryEngine::write_pcs_setup_to_shared_memory(&(

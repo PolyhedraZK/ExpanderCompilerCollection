@@ -12,8 +12,7 @@ use expander_compiler::{
         proving_system::{
             expander_gkr_parallelized::server_utils::{
                 root_main, worker_main, ServerState, GLOBAL_COMMUNICATOR, UNIVERSE,
-            },
-            ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
+            }, server_utils::SERVER_URL, ExpanderGKRProverSetup, ExpanderGKRVerifierSetup
         },
     },
 };
@@ -106,7 +105,7 @@ where
             .route("/", get(|| async { "Expander Server is running" }))
             .with_state(state);
 
-        let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+        let addr: SocketAddr = SERVER_URL.parse().expect("Invalid SERVER_URL");
         println!("Server running at http://{}", addr);
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
         axum::serve(listener, app.into_make_service())
