@@ -7,15 +7,18 @@ use axum::{
 use clap::Parser;
 use expander_compiler::{
     frontend::{BN254Config, BabyBearConfig, Config, GF2Config, GoldilocksConfig, M31Config},
-    zkcuda::{proof::ComputationGraph, proving_system::{
-        expander_gkr_parallelized::server_utils::{GLOBAL_COMMUNICATOR, ServerState, UNIVERSE, root_main, worker_main}, ExpanderGKRProverSetup,
-        ExpanderGKRVerifierSetup,
-    }},
+    zkcuda::{
+        proof::ComputationGraph,
+        proving_system::{
+            expander_gkr_parallelized::server_utils::{
+                root_main, worker_main, ServerState, GLOBAL_COMMUNICATOR, UNIVERSE,
+            },
+            ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
+        },
+    },
 };
 use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
-use gkr_engine::{
-    FieldEngine, GKREngine, MPIConfig, MPIEngine, PolynomialCommitmentType,
-};
+use gkr_engine::{FieldEngine, GKREngine, MPIConfig, MPIEngine, PolynomialCommitmentType};
 use tokio::sync::{oneshot, Mutex};
 
 #[derive(Parser, Debug)]

@@ -15,9 +15,7 @@ use polynomials::RefMultiLinearPoly;
 use serdes::ExpSerde;
 use sumcheck::ProverScratchPad;
 
-use crate::frontend::{
-    Config, SIMDField,
-};
+use crate::frontend::{Config, SIMDField};
 use crate::zkcuda::proving_system::ExpanderGKRProverSetup;
 use arith::Field;
 
@@ -54,7 +52,8 @@ where
     pub global_mpi_config: MPIConfig<'static>,
     pub local_mpi_config: Option<MPIConfig<'static>>,
     pub prover_setup: Arc<Mutex<ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>>>,
-    pub verifier_setup: Arc<Mutex<ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>>>,
+    pub verifier_setup:
+        Arc<Mutex<ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>>>,
     pub computation_graph: Arc<Mutex<ComputationGraph<ECCConfig>>>,
     pub shutdown_tx: Arc<Mutex<Option<oneshot::Sender<()>>>>,
 }
@@ -591,7 +590,7 @@ fn prove_input_claim<C: GKREngine>(
 ) where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    for ((local_commitment_val, extra_info), _ib) in local_commitments_values
+    for ((local_commitment_val, _extra_info), _ib) in local_commitments_values
         .iter()
         .zip(commitments_extra_info)
         .zip(is_broadcast)
@@ -641,7 +640,9 @@ fn prove_input_claim<C: GKREngine>(
                 r_mpi: challenge.r_mpi.to_vec(),
             },
             transcript,
-            &extra_info.scratch[0],
+            &<C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::init_scratch_pad(
+                &params, mpi_config,
+            ),
         );
         transcript.unlock_proof();
 
