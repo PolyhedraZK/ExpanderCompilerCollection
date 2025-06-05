@@ -49,6 +49,7 @@ where
     )
 }
 
+#[allow(clippy::zombie_processes)]
 fn exec_command(cmd: &str, wait_for_completion: bool) {
     let mut parts = cmd.split_whitespace();
     let command = parts.next().unwrap();

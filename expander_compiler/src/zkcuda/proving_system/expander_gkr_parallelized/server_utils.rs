@@ -1,3 +1,5 @@
+#![allow(clippy::type_complexity)]
+
 use crate::utils::misc::next_power_of_two;
 use crate::zkcuda::kernel::{Kernel, LayeredCircuitInputVec};
 use crate::zkcuda::proof::ComputationGraph;
@@ -138,7 +140,7 @@ where
                 &*computation_graph,
                 &witness,
             );
-            
+
             SharedMemoryEngine::write_proof_to_shared_memory(proof.as_ref().unwrap());
             prove_timer.stop();
         }
@@ -477,6 +479,7 @@ where
 // But we need to implement `Config` for each GKREngine, which remains to be done
 // For now, the GKREngine actually controls the functionality of the prover
 // The ECCConfig is only used where the `Config` trait is required
+#[allow(clippy::too_many_arguments)]
 fn prove_kernel<C, ECCConfig>(
     mpi_config: &MPIConfig<'static>,
     prover_setup: &ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
