@@ -12,7 +12,9 @@ use expander_compiler::{
         proving_system::{
             expander_gkr_parallelized::server_utils::{
                 root_main, worker_main, ServerState, GLOBAL_COMMUNICATOR, UNIVERSE,
-            }, server_utils::SERVER_URL, ExpanderGKRProverSetup, ExpanderGKRVerifierSetup
+            },
+            server_utils::SERVER_URL,
+            ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
         },
     },
 };

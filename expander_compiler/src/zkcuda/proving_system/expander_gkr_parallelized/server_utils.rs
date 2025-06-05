@@ -32,7 +32,7 @@ use std::cmp::max;
 use std::sync::Arc;
 use tokio::sync::{oneshot, Mutex};
 
-pub static SERVER_URL: &str = "http://127.0.0.1:3000/";
+pub static SERVER_URL: &str = "127.0.0.1:3000";
 
 #[derive(Serialize, Deserialize)]
 pub enum RequestType {
