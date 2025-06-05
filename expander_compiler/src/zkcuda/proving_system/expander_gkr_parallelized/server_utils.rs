@@ -580,7 +580,7 @@ fn prove_input_claim<C: GKREngine>(
     mpi_config: &MPIConfig,
     local_commitments_values: &[impl AsRef<[SIMDField<C>]>],
     p_keys: &ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-    commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<
+    _commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<
         C::PCSField,
         C::FieldConfig,
         C::PCSConfig,
@@ -591,9 +591,9 @@ fn prove_input_claim<C: GKREngine>(
 ) where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    for ((local_commitment_val, _extra_info), _ib) in local_commitments_values
+    for (local_commitment_val, _ib) in local_commitments_values
         .iter()
-        .zip(commitments_extra_info)
+        // .zip(commitments_extra_info)
         .zip(is_broadcast)
     {
         let local_commitment_val = local_commitment_val.as_ref();
