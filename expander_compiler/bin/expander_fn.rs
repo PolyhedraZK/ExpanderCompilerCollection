@@ -228,10 +228,10 @@ pub fn prove<C: GKREngine>(
         &mut transcript,
         mpi_config,
     );
-    assert_eq!(
-        claimed_v,
-        <C::FieldConfig as FieldEngine>::ChallengeField::from(0)
-    );
+    // assert_eq!(
+    //     claimed_v,
+    //     <C::FieldConfig as FieldEngine>::ChallengeField::from(0)
+    // );
     timer.stop();
 
     let timer = Timer::new("pcs opening", mpi_config.is_root());

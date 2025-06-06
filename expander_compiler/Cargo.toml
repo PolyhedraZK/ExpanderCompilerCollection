@@ -5,6 +5,7 @@ edition = "2021"
 
 
 [dependencies]
+stacker = "0.1.15"
 arith.workspace = true
 ark-std.workspace = true
 axum.workspace = true
