@@ -12,7 +12,7 @@ pub struct ProofTemplate {
     pub is_broadcast: Vec<bool>,
 }
 
-#[derive(ExpSerde)]
+#[derive(Default, ExpSerde)]
 pub struct ComputationGraph<C: Config> {
     pub kernels: Vec<Kernel<C>>,
     pub commitments_lens: Vec<usize>,

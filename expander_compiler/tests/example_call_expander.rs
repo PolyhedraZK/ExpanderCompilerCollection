@@ -3,7 +3,7 @@ use arith::SimdField;
 use expander_binary::executor;
 use expander_compiler::frontend::*;
 use gkr_engine::FieldEngine;
-use gkr_engine::{MPIConfig, MPIEngine};
+use gkr_engine::MPIConfig;
 use rand::SeedableRng;
 
 declare_circuit!(Circuit {
@@ -51,7 +51,7 @@ where
 
     let mut expander_circuit = compile_result.layered_circuit.export_to_expander_flatten();
 
-    let mpi_config = MPIConfig::prover_new();
+    let mpi_config = MPIConfig::prover_new(None, None);
 
     let (simd_input, simd_public_input) = witness.to_simd();
     println!("{} {}", simd_input.len(), simd_public_input.len());

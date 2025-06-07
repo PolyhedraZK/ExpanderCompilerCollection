@@ -34,11 +34,13 @@ pub type CircuitField<C> = <<C as GKREngine>::FieldConfig as FieldEngine>::Circu
 pub type ChallengeField<C> = <<C as GKREngine>::FieldConfig as FieldEngine>::ChallengeField;
 pub type SIMDField<C> = <<C as GKREngine>::FieldConfig as FieldEngine>::SimdCircuitField;
 
-pub type BN254Config = BN254ConfigMIMC5Raw;
-pub type M31Config = M31x16ConfigSha2RawVanilla;
-pub type GF2Config = GF2ExtConfigSha2Raw;
-pub type GoldilocksConfig = Goldilocksx8ConfigSha2Raw;
-pub type BabyBearConfig = BabyBearx16ConfigSha2Raw;
+// The Lifetime parameter is used to ensure the mpi config is valid during the proving process.
+// TODO: We should probably not include it in ECC.
+pub type BN254Config = BN254ConfigMIMC5Raw<'static>;
+pub type M31Config = M31x16ConfigSha2RawVanilla<'static>;
+pub type GF2Config = GF2ExtConfigSha2Raw<'static>;
+pub type GoldilocksConfig = Goldilocksx8ConfigSha2Raw<'static>;
+pub type BabyBearConfig = BabyBearx16ConfigSha2Raw<'static>;
 
 impl Config for M31Config {
     const CONFIG_ID: usize = 1;
