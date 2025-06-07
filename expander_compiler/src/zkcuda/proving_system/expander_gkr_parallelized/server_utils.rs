@@ -23,10 +23,10 @@ use arith::Field;
 
 use axum::{extract::State, Json};
 use gkr::gkr_prove;
-use gkr_engine::Transcript;
 use gkr_engine::{
     ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine,
 };
+use gkr_engine::{StructuredReferenceString, Transcript};
 use serde::{Deserialize, Serialize};
 use std::cmp::max;
 use std::sync::Arc;
@@ -316,7 +316,7 @@ fn setup<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
 
             let local_mpi_config = generate_local_mpi_config(global_mpi_config, parallel_count);
 
-            if let Some(local_mpi_config) = local_mpi_config {
+            let (p_key, v_key) = if let Some(local_mpi_config) = local_mpi_config {
                 let (_params, p_key, v_key, _scratch) = pcs_testing_setup_fixed_seed::<
                     C::FieldConfig,
                     C::TranscriptConfig,
@@ -324,9 +324,13 @@ fn setup<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
                 >(
                     val_actual_len, &local_mpi_config
                 );
-                p_keys.insert((val_actual_len, parallel_count), p_key);
-                v_keys.insert((val_actual_len, parallel_count), v_key);
-            }
+                (p_key, v_key)
+            } else {
+                <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::SRS::default()
+                    .into_keys()
+            };
+            p_keys.insert((val_actual_len, parallel_count), p_key);
+            v_keys.insert((val_actual_len, parallel_count), v_key);
         }
     }
 }
