@@ -598,7 +598,7 @@ fn prove_input_claim<C: GKREngine>(
 ) where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    for (local_commitment_val, _ib) in local_commitments_values
+    for (local_commitment_val, ib) in local_commitments_values
         .iter()
         // .zip(commitments_extra_info)
         .zip(is_broadcast)
@@ -610,49 +610,69 @@ fn prove_input_claim<C: GKREngine>(
         let nb_challenge_vars = val_len.ilog2() as usize;
         let challenge_vars = challenge.rz[..nb_challenge_vars].to_vec();
 
-        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
-            val_len,
-            mpi_config.world_size(),
-        );
-        let p_key = p_keys
-            .p_keys
-            .get(&(val_len, mpi_config.world_size()))
-            .unwrap();
+        let local_mpi_config = if *ib {
+            if mpi_config.is_root() {
+                Some(MPIConfig::prover_new(None, None))
+            } else {
+                None
+            }
+        } else {
+            Some(mpi_config.clone())
+        };
 
-        let poly = RefMultiLinearPoly::from_ref(vals_to_open);
-        let v = C::FieldConfig::collectively_eval_circuit_vals_at_expander_challenge(
-            vals_to_open,
-            &ExpanderSingleVarChallenge::<C::FieldConfig> {
+        let opening = if let Some(local_mpi_config) = local_mpi_config {
+            let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
+                val_len,
+                local_mpi_config.world_size(),
+            );
+            let p_key = p_keys
+                .p_keys
+                .get(&(val_len, local_mpi_config.world_size()))
+                .unwrap();
+
+            let local_expander_challenge = ExpanderSingleVarChallenge::<C::FieldConfig> {
                 rz: challenge_vars.to_vec(),
                 r_simd: challenge.r_simd.to_vec(),
-                r_mpi: challenge.r_mpi.to_vec(),
-            },
-            &mut vec![<C::FieldConfig as FieldEngine>::Field::ZERO; val_len],
-            &mut vec![
-                <C::FieldConfig as FieldEngine>::ChallengeField::ZERO;
-                1 << max(challenge.r_simd.len(), challenge.r_mpi.len())
-            ],
-            mpi_config,
-        );
-        transcript.append_field_element(&v);
+                r_mpi: if local_mpi_config.world_size() == 1 {
+                    vec![]
+                } else {
+                    challenge.r_mpi.to_vec()
+                },
+            };
 
-        transcript.lock_proof();
-        let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::open(
-            &params,
-            mpi_config,
-            p_key,
-            &poly,
-            &ExpanderSingleVarChallenge::<C::FieldConfig> {
-                rz: challenge_vars.to_vec(),
-                r_simd: challenge.r_simd.to_vec(),
-                r_mpi: challenge.r_mpi.to_vec(),
-            },
-            transcript,
-            &<C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::init_scratch_pad(
-                &params, mpi_config,
-            ),
-        );
-        transcript.unlock_proof();
+            let poly = RefMultiLinearPoly::from_ref(vals_to_open);
+            let v = C::FieldConfig::collectively_eval_circuit_vals_at_expander_challenge(
+                vals_to_open,
+                &local_expander_challenge,
+                &mut vec![<C::FieldConfig as FieldEngine>::Field::ZERO; val_len],
+                &mut vec![
+                    <C::FieldConfig as FieldEngine>::ChallengeField::ZERO;
+                    1 << max(challenge.r_simd.len(), challenge.r_mpi.len())
+                ],
+                &local_mpi_config,
+            );
+            transcript.append_field_element(&v);
+
+            // WATCH OUT for the transcript syncronization problem here if the underlying opening actually is an IOP
+            transcript.lock_proof();
+            let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::open(
+                &params,
+                &local_mpi_config,
+                p_key,
+                &poly,
+                &local_expander_challenge,
+                transcript,
+                &<C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::init_scratch_pad(
+                    &params,
+                    &local_mpi_config,
+                ),
+            );
+            transcript.unlock_proof();
+
+            opening
+        } else {
+            None
+        };
 
         if mpi_config.is_root() {
             let mut buffer = vec![];
