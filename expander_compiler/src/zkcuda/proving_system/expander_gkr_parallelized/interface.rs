@@ -121,13 +121,15 @@ where
             let nb_challenge_vars = local_vals_len.ilog2() as usize;
             let challenge_vars = challenge.rz[..nb_challenge_vars].to_vec();
 
+            let local_parallel_count = if *ib { 1 } else { parallel_count };
+
             let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
                 nb_challenge_vars,
-                parallel_count,
+                local_parallel_count,
             );
             let v_key = v_keys
                 .v_keys
-                .get(&(local_vals_len, parallel_count))
+                .get(&(local_vals_len, local_parallel_count))
                 .unwrap();
 
             let claim = <C::FieldConfig as FieldEngine>::ChallengeField::deserialize_from(
