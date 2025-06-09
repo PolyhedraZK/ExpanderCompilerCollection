@@ -85,7 +85,7 @@ fn print_info(info: &str) {
 }
 
 fn print_stat(stat_name: &str, stat: usize, is_last: bool) {
-    print!("\x1b[36m{}=\x1b[0m{}", stat_name, stat);
+    print!("\x1b[36m{stat_name}=\x1b[0m{stat}");
     if !is_last {
         print!(" ");
     } else {

@@ -40,7 +40,7 @@ pub fn sub_padding(
     n = modulus - n;
     let mut pad = vec![BigInt::default(); nb_limbs as usize];
     if let Err(err) = decompose(&n, bits_per_limbs, &mut pad) {
-        panic!("decompose: {}", err);
+        panic!("decompose: {err}");
     }
     let mut new_pad = vec![BigInt::default(); nb_limbs as usize];
     for i in 0..pad.len() {

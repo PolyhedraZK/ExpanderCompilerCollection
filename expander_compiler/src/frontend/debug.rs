@@ -34,7 +34,7 @@ pub struct DebugBuilder<C: Config, H: HintCaller<CircuitField<C>>> {
 impl<C: Config, H: HintCaller<CircuitField<C>>> BasicAPI<C> for DebugBuilder<C, H> {
     fn display(&self, str: &str, x: impl ToVariableOrValue<CircuitField<C>>) {
         let x = self.convert_to_value(x);
-        println!("{}: {:?}", str, x);
+        println!("{str}: {x:?}");
     }
 
     fn add(
@@ -166,7 +166,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> BasicAPI<C> for DebugBuilder<C, 
                 .into_iter()
                 .map(|v| self.return_as_variable(v))
                 .collect(),
-            Err(e) => panic!("Hint error: {:?}", e),
+            Err(e) => panic!("Hint error: {e:?}"),
         }
     }
     fn constant(&mut self, x: impl ToVariableOrValue<CircuitField<C>>) -> Variable {
@@ -548,7 +548,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> DebugBuilder<C, H> {
 
     fn eval_ir_insn(&mut self, insn: IrInstruction<C>) -> Variable {
         match insn.eval_unsafe(&self.values) {
-            EvalResult::Error(e) => panic!("error: {:?}", e),
+            EvalResult::Error(e) => panic!("error: {e:?}"),
             EvalResult::SubCircuitCall(_, _) => unreachable!(),
             EvalResult::Value(v) => self.return_as_variable(v),
             EvalResult::Values(_) => unreachable!(),

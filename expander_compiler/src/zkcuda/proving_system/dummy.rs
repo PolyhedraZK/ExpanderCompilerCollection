@@ -1,9 +1,15 @@
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serdes::ExpSerde;
 
 use crate::circuit::config::{Config, SIMDField};
+use crate::utils::misc::next_power_of_two;
+use crate::zkcuda::context::DeviceMemory;
+use crate::zkcuda::proof::ComputationGraph;
+use crate::zkcuda::proving_system::{CombinedProof, KernelWiseProvingSystem, ProvingSystem};
 
 use super::super::kernel::Kernel;
-use super::{check_inputs, prepare_inputs, Commitment, Proof, ProvingSystem};
+
+use super::{check_inputs, prepare_inputs, Commitment};
 
 // dummy implementation of these traits
 
@@ -23,8 +29,6 @@ pub struct DummyProof {
     cond: Vec<Vec<bool>>,
 }
 
-impl Proof for DummyProof {}
-
 // TODO
 /*#[deprecated(
     note = "DummyProvingSystem is a dummy implementation for testing purposes. Please use ExpanderGKRProvingSystem."
@@ -34,7 +38,7 @@ pub struct DummyProvingSystem<C: Config> {
 }
 
 #[allow(deprecated)]
-impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
+impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
     type ProverSetup = ();
     type VerifierSetup = ();
     type Proof = DummyProof;
@@ -48,7 +52,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
         computation_graph
             .commitments_lens
             .iter()
-            .for_each(|&x| println!("Setup length {}", x));
+            .for_each(|&x| println!("Setup length {x}"));
 
         ((), ())
     }
@@ -68,8 +72,9 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
         )
     }
 
-    fn prove(
+    fn prove_kernel(
         _prover_setup: &Self::ProverSetup,
+        _kernel_id: usize,
         kernel: &Kernel<C>,
         _commitments: &[Self::Commitment],
         _commitments_extra_info: &[Self::CommitmentExtraInfo],
@@ -99,8 +104,9 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
         }
         DummyProof { cond: res }
     }
-    fn verify(
+    fn verify_kernel(
         _verifier_setup: &Self::VerifierSetup,
+        _kernel_id: usize,
         kernel: &Kernel<C>,
         proof: &Self::Proof,
         commitments: &[Self::Commitment],
@@ -125,5 +131,105 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
             }
         }
         true
+    }
+}
+
+// TODO: Generate this with procedural macros
+// The idea is to implement the ProvingSystem trait for KernelWiseProvingSystem
+// However, we can not simply implement ProvingSystem<C> for all KernelWiseProvingSystem<C> because
+// If later we want a customized implementation of ProvingSystem for some struct A
+// The compiler will not allow use to do so, complaining that KernelWiseProvingSystem may be later implemented for A
+// causing a potential conflict.
+// In this case, generate the implementation with a procedural macro seems to be the best solution.
+impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
+    type ProverSetup = <Self as KernelWiseProvingSystem<C>>::ProverSetup;
+    type VerifierSetup = <Self as KernelWiseProvingSystem<C>>::VerifierSetup;
+    type Proof = CombinedProof<C, Self>;
+
+    fn setup(computation_graph: &ComputationGraph<C>) -> (Self::ProverSetup, Self::VerifierSetup) {
+        <Self as KernelWiseProvingSystem<C>>::setup(computation_graph)
+    }
+
+    fn prove(
+        prover_setup: &Self::ProverSetup,
+        computation_graph: &ComputationGraph<C>,
+        device_memories: &[DeviceMemory<C>],
+    ) -> Self::Proof {
+        let commitments = computation_graph
+            .proof_templates
+            .iter()
+            .map(|template| {
+                template
+                    .commitment_indices
+                    .iter()
+                    .zip(template.is_broadcast.iter())
+                    .map(|(x, is_broadcast)| {
+                        <Self as KernelWiseProvingSystem<C>>::commit(
+                            prover_setup,
+                            &device_memories[*x].values,
+                            next_power_of_two(template.parallel_count),
+                            *is_broadcast,
+                        )
+                    })
+                    .unzip::<_, _, Vec<_>, Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+
+        let proofs: Vec<<Self as KernelWiseProvingSystem<C>>::Proof> = computation_graph
+            .proof_templates
+            .iter()
+            .zip(commitments.iter())
+            .map(|(template, commitments_kernel)| {
+                <Self as KernelWiseProvingSystem<C>>::prove_kernel(
+                    prover_setup,
+                    template.kernel_id,
+                    &computation_graph.kernels[template.kernel_id],
+                    &commitments_kernel.0,
+                    &commitments_kernel.1,
+                    &template
+                        .commitment_indices
+                        .iter()
+                        .map(|x| &device_memories[*x].values[..])
+                        .collect::<Vec<_>>(),
+                    next_power_of_two(template.parallel_count),
+                    &template.is_broadcast,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        CombinedProof {
+            commitments: commitments.into_iter().map(|x| x.0).collect(),
+            proofs,
+        }
+    }
+
+    fn verify(
+        verifier_setup: &Self::VerifierSetup,
+        computation_graph: &ComputationGraph<C>,
+        proof: &Self::Proof,
+    ) -> bool {
+        let verified = proof
+            .proofs
+            .par_iter()
+            .zip(computation_graph.proof_templates.par_iter())
+            .zip(proof.commitments.par_iter())
+            .map(|((proof, template), commitments_kernel)| {
+                <Self as KernelWiseProvingSystem<C>>::verify_kernel(
+                    verifier_setup,
+                    template.kernel_id,
+                    &computation_graph.kernels[template.kernel_id],
+                    proof,
+                    commitments_kernel,
+                    next_power_of_two(template.parallel_count),
+                    &template.is_broadcast,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        verified.iter().all(|x| *x)
+    }
+
+    fn post_process() {
+        <Self as KernelWiseProvingSystem<C>>::post_process();
     }
 }

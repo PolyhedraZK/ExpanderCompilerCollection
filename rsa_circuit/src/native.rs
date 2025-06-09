@@ -178,9 +178,7 @@ impl RSAFieldElement {
         // Assert equality
         assert!(
             left_result == right_result,
-            "Addition assertion failed\n{:?}\n{:?}",
-            left_result,
-            right_result
+            "Addition assertion failed\n{left_result:?}\n{right_result:?}"
         );
     }
 

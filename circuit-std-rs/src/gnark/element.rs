@@ -87,7 +87,7 @@ pub fn new_const_element<C: Config, B: RootAPI<C>, T: FieldParams>(
     let mut blimbs = vec![BigInt::default(); T::nb_limbs() as usize];
     let mut limbs = vec![Variable::default(); blimbs.len()];
     if let Err(err) = decompose(&b_value, T::bits_per_limb(), &mut blimbs) {
-        panic!("decompose value: {}", err);
+        panic!("decompose value: {err}");
     }
     // assign limb values
     for i in 0..limbs.len() {
@@ -132,7 +132,7 @@ pub fn from_interface(input: Box<dyn Any>) -> BigInt {
         r = BigInt::from(*v as i64);
     } else if let Some(v) = input.downcast_ref::<String>() {
         r = BigInt::parse_bytes(v.as_bytes(), 10).unwrap_or_else(|| {
-            panic!("unable to set BigInt from string: {}", v);
+            panic!("unable to set BigInt from string: {v}");
         });
     } else if let Some(v) = input.downcast_ref::<Vec<u8>>() {
         r = BigInt::from_bytes_be(num_bigint::Sign::Plus, v);

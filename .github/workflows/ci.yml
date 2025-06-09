@@ -76,7 +76,7 @@ jobs:
         run: brew install openmpi
       - if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install libopenmpi-dev -y
-      - run: cargo build --release --bin expander_commit --bin expander_prove
+      - run: cargo build --release --bin expander_serve
       - run: cargo test
 
   test-rust-avx512:
@@ -150,9 +150,9 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-      - run: brew install openmpi
+      - run: |
+          curl --proto '=https' --tlsv1.2 -sSf -y https://sh.rustup.rs | sh
+          rustup component add --toolchain nightly-2025-05-17-aarch64-apple-darwin rustfmt clippy
       - run: cargo fmt --all -- --check
+      - run: brew install openmpi
       - run: cargo clippy
