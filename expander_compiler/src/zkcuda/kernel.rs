@@ -41,6 +41,14 @@ pub fn shape_prepend(shape: &Shape, x: usize) -> Shape {
     }
 }
 
+/*
+Bit order definition:
+Suppose bit_order = [a_0, a_1, a_2, ...]
+Then when we read the i-th position, where i = sum(b_j * 2^j), b_j = 0 or 1,
+we will read the j-th position, where j = sum(b_j * 2^(a_j)).
+*/
+pub type BitOrder = Option<Vec<usize>>;
+
 #[derive(Default, Debug, Clone, Hash, PartialEq, Eq, ExpSerde)]
 pub struct WitnessSolverIOVec {
     pub len: usize,
