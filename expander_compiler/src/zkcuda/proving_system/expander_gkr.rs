@@ -581,9 +581,7 @@ where
         transcript.unlock_proof();
 
         if !verified {
-            println!(
-                "Failed to verify single pcs opening for parallel index {parallel_index}"
-            );
+            println!("Failed to verify single pcs opening for parallel index {parallel_index}");
             return false;
         }
 

@@ -70,9 +70,9 @@ async fn main() {
         ("BN254", PolynomialCommitmentType::KZG) => {
             serve::<BN254ConfigSha2KZG, BN254Config>().await;
         }
-        (field_type, pcs_type) => panic!(
-            "Combination of {field_type:?} and {pcs_type:?} not supported"
-        ),
+        (field_type, pcs_type) => {
+            panic!("Combination of {field_type:?} and {pcs_type:?} not supported")
+        }
     }
 }
 

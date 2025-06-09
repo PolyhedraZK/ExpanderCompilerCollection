@@ -370,9 +370,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             if let Some(pc) = pc {
                 if let Some(parallel_count) = parallel_count {
                     if parallel_count != *pc {
-                        panic!(
-                            "Incompatible parallel counts: {parallel_count:?} {pc:?}"
-                        );
+                        panic!("Incompatible parallel counts: {parallel_count:?} {pc:?}");
                     }
                 } else {
                     parallel_count = Some(*pc);

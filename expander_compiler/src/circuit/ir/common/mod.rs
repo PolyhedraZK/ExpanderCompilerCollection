@@ -159,9 +159,7 @@ impl<Irc: IrConfig> Circuit<Irc> {
             let mut set = HashSet::new();
             for &output in self.outputs.iter() {
                 if !set.insert(output) {
-                    return Err(Error::InternalError(format!(
-                        "duplicate output: {output}"
-                    )));
+                    return Err(Error::InternalError(format!("duplicate output: {output}")));
                 }
             }
         }
