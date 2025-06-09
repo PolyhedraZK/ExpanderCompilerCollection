@@ -47,22 +47,22 @@ stacker = "0.1.17"
 tiny-keccak = { version = "2.0", features = ["keccak"] }
 tokio = { version = "1", features = ["full"] }
 
-arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor" }
-mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor" }
-gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor" }
-babybear = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor" }
-crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor" }
-expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor", package = "circuit" }
-expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor", package = "transcript" }
-expander_binary = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor", package = "bin" }
-gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor" }
-gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor" }
-mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor" }
-goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor" }
-poly_commit = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor", package = "poly_commit" }
-polynomials = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor" }
-sumcheck = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor" }
-serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor", package = "serdes" }
-gkr_engine = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor" }
-gkr_hashers = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor" }
-expander_utils = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/mpi_config_slight_refactor", package = "utils" }
+arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+babybear = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "circuit" }
+expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "transcript" }
+expander_binary = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "bin" }
+gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+poly_commit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "poly_commit" }
+polynomials = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+sumcheck = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "serdes" }
+gkr_engine = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+gkr_hashers = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+expander_utils = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "utils" }
