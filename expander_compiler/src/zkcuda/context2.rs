@@ -6,7 +6,7 @@ use crate::{
     field::FieldArith,
     hints::registry::{EmptyHintCaller, HintCaller},
     utils::{error::Error, misc::next_power_of_two, pool::Pool},
-    zkcuda::shape::{Reshape, Shape},
+    zkcuda::shape::{merge_shape_products, shape_vec_len, Reshape, Shape, ShapeHistory, Transpose},
 };
 
 use super::vec_shaped::{flatten_shaped_pack_simd, unflatten_shaped_unpack_simd};
@@ -20,12 +20,13 @@ pub use macros::call_kernel;
 
 pub struct DeviceMemory<C: Config> {
     pub values: Vec<SIMDField<C>>,
+    pub required_shape_products: Vec<usize>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, ExpSerde)]
 pub struct DeviceMemoryHandleRaw {
     pub id: usize,
-    pub shape: Shape,
+    pub shape_history: ShapeHistory,
 }
 
 pub type DeviceMemoryHandle = Option<DeviceMemoryHandleRaw>;
@@ -34,7 +35,8 @@ pub type DeviceMemoryHandle = Option<DeviceMemoryHandleRaw>;
 pub struct KernelCall {
     pub kernel_id: usize,
     pub num_parallel: usize,
-    pub device_memory_indices: Vec<usize>,
+    pub input_handles: Vec<DeviceMemoryHandle>,
+    pub output_handles: Vec<DeviceMemoryHandle>,
 }
 
 pub struct Context<C: Config, H: HintCaller<CircuitField<C>> = EmptyHintCaller> {
@@ -105,7 +107,17 @@ impl Reshape for DeviceMemoryHandle {
         let handle = ensure_handle(self.clone());
         Some(DeviceMemoryHandleRaw {
             id: handle.id,
-            shape: new_shape.to_vec(),
+            shape_history: handle.shape_history.reshape(new_shape),
+        })
+    }
+}
+
+impl Transpose for DeviceMemoryHandle {
+    fn transpose(&self, axes: &[usize]) -> Self {
+        let handle = ensure_handle(self.clone());
+        Some(DeviceMemoryHandleRaw {
+            id: handle.id,
+            shape_history: handle.shape_history.transpose(axes),
         })
     }
 }
@@ -121,10 +133,15 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
     }
 
     fn make_device_mem(&mut self, values: Vec<SIMDField<C>>, shape: Shape) -> DeviceMemoryHandle {
-        self.device_memories.push(DeviceMemory { values: values });
+        let t = shape_vec_len(&shape);
+        let required_shape_products = if t == 1 { vec![1] } else { vec![1, t] };
+        self.device_memories.push(DeviceMemory {
+            values: values,
+            required_shape_products,
+        });
         Some(DeviceMemoryHandleRaw {
             id: self.device_memories.len() - 1,
-            shape,
+            shape_history: ShapeHistory::new(shape),
         })
     }
 
@@ -158,9 +175,12 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         device_memory_handle: DeviceMemoryHandle,
     ) -> T {
         let device_memory_handle = ensure_handle(device_memory_handle);
+        let permuted_values = device_memory_handle
+            .shape_history
+            .permute_vec(&self.device_memories[device_memory_handle.id].values);
         unflatten_shaped(
-            &unpack_vec::<C>(&self.device_memories[device_memory_handle.id].values),
-            &device_memory_handle.shape,
+            &unpack_vec::<C>(&permuted_values),
+            &device_memory_handle.shape_history.shape(),
         )
     }
 
@@ -169,9 +189,12 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         device_memory_handle: DeviceMemoryHandle,
     ) -> T {
         let device_memory_handle = ensure_handle(device_memory_handle);
+        let permuted_values = device_memory_handle
+            .shape_history
+            .permute_vec(&self.device_memories[device_memory_handle.id].values);
         unflatten_shaped_unpack_simd(
-            &self.device_memories[device_memory_handle.id].values,
-            &device_memory_handle.shape,
+            &permuted_values,
+            &device_memory_handle.shape_history.shape(),
         )
     }
 
@@ -180,27 +203,30 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         device_memory_handle: DeviceMemoryHandle,
     ) -> T {
         let device_memory_handle = ensure_handle(device_memory_handle);
+        let permuted_values = device_memory_handle
+            .shape_history
+            .permute_vec(&self.device_memories[device_memory_handle.id].values);
         unflatten_shaped(
-            &self.device_memories[device_memory_handle.id].values,
-            &device_memory_handle.shape,
+            &permuted_values,
+            &device_memory_handle.shape_history.shape(),
         )
     }
 
     fn ir_copy_from_device_memory(
         &self,
-        handle: DeviceMemoryHandle,
+        values: &[SIMDField<C>],
         s: &mut [SIMDField<C>],
         is_broadcast: bool,
         parallel_index: usize,
+        chunk_size: Option<usize>,
     ) {
-        let handle = ensure_handle(handle);
         if is_broadcast {
-            s.copy_from_slice(&self.device_memories[handle.id].values);
+            s.copy_from_slice(&values);
         } else {
-            let r = &self.device_memories[handle.id].values;
-            let len = r.len();
-            let chunk_size = len / handle.shape[0];
-            s.copy_from_slice(&r[chunk_size * parallel_index..chunk_size * (parallel_index + 1)]);
+            let chunk_size = chunk_size.unwrap();
+            s.copy_from_slice(
+                &values[chunk_size * parallel_index..chunk_size * (parallel_index + 1)],
+            );
         }
     }
 
@@ -230,12 +256,24 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 i, kernel_shape, io, num_parallel
             );
             let io_shape = if let Some(handle) = io {
-                handle.shape.clone()
+                handle.shape_history.shape()
             } else {
                 panic!("Missing input at index {}", i)
             };
             match check_shape_compat(kernel_shape, &io_shape, num_parallel) {
-                Some(ib) => is_broadcast.push(ib),
+                Some(ib) => {
+                    let isl = io
+                        .as_ref()
+                        .unwrap()
+                        .shape_history
+                        .get_initial_split_list(!ib);
+                    let t = io.as_ref().unwrap().id;
+                    self.device_memories[t].required_shape_products = merge_shape_products(
+                        &isl,
+                        &self.device_memories[t].required_shape_products,
+                    );
+                    is_broadcast.push(ib)
+                }
                 None => {
                     panic!(
                         "Incompatible shapes: want {:?}, got {:?}, num_parallel={} (Hint: if you want to broadcast, use {:?}, otherwise use {:?})",
@@ -257,6 +295,23 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         let kernel_id = self.kernel_primitives.add(kernel);
 
         let mut outputs_tmp = vec![Vec::new(); kernel.io_specs.len()];
+        let mut ir_inputs_all = Vec::new();
+        let mut chunk_sizes = Vec::new();
+        for (input, &ib) in ios.iter().zip(is_broadcast.iter()) {
+            if input.is_none() {
+                continue;
+            }
+            let handle = ensure_handle(input.clone());
+            let values = handle
+                .shape_history
+                .permute_vec(&self.device_memories[handle.id].values);
+            chunk_sizes.push(if ib {
+                None
+            } else {
+                Some(values.len() / num_parallel)
+            });
+            ir_inputs_all.push(values);
+        }
         for parallel_i in 0..num_parallel {
             let mut ir_inputs = vec![SIMDField::<C>::zero(); kernel.ir.input_size()];
             for (i, ((input, input_start), input_end)) in ios
@@ -269,10 +324,11 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                     continue;
                 }
                 self.ir_copy_from_device_memory(
-                    input.clone(),
+                    &ir_inputs_all[i],
                     &mut ir_inputs[*input_start..*input_end],
                     is_broadcast[i],
                     parallel_i,
+                    chunk_sizes[i],
                 );
             }
             let ir_outputs = kernel
@@ -291,9 +347,12 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 out.extend_from_slice(&ir_outputs[*output_start..*output_end]);
             }
         }
+        let input_handles = ios.to_vec();
+        let mut output_handles = vec![None; kernel.io_specs.len()];
 
-        for (((output, spec), ov), shape) in ios
+        for ((((output, out2), spec), ov), shape) in ios
             .iter_mut()
+            .zip(output_handles.iter_mut())
             .zip(kernel.io_specs.iter())
             .zip(outputs_tmp.into_iter())
             .zip(kernel.io_shapes.iter())
@@ -304,16 +363,21 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             }
             let handle = self.make_device_mem(ov, shape_prepend(shape, num_parallel));
             *output = handle.clone();
+            *out2 = handle;
         }
         self.kernel_calls.push(KernelCall {
             kernel_id,
             num_parallel,
-            device_memory_indices: ios.iter().map(|x| x.as_ref().map_or(0, |h| h.id)).collect(),
+            input_handles,
+            output_handles,
         });
         Ok(())
     }
 
     pub fn compile_computation_graph(&self) {
+        for dm in &self.device_memories {
+            println!("{:?}", dm.required_shape_products);
+        }
         panic!("TODO");
     }
 }
