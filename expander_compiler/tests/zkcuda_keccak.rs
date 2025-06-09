@@ -356,12 +356,6 @@ fn zkcuda_keccak_1_helper<P: ProvingSystem<M31Config>>() {
     P::post_process();
 }
 
-#[test]
-fn zkcuda_keccak_1() {
-    zkcuda_keccak_1_helper::<ExpanderGKRProvingSystem<M31Config>>();
-    zkcuda_keccak_1_helper::<ParallelizedExpanderGKRProvingSystem<M31Config>>();
-}
-
 fn zkcuda_keccak_2_helper<P: ProvingSystem<M31Config>>() {
     let kernel: Kernel<M31Config> = compile_compute_multiple_keccak().unwrap();
     println!("compile ok");
@@ -421,7 +415,9 @@ fn zkcuda_keccak_2_helper<P: ProvingSystem<M31Config>>() {
 }
 
 #[test]
-fn zkcuda_keccak_2() {
+fn zkcuda_keccak_1_2() {
+    zkcuda_keccak_1_helper::<ExpanderGKRProvingSystem<M31Config>>();
+    zkcuda_keccak_1_helper::<ParallelizedExpanderGKRProvingSystem<M31Config>>();
     zkcuda_keccak_2_helper::<ExpanderGKRProvingSystem<M31Config>>();
     zkcuda_keccak_2_helper::<ParallelizedExpanderGKRProvingSystem<M31Config>>();
 }
