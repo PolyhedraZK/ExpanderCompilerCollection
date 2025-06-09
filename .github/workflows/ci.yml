@@ -152,7 +152,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: |
           curl --proto '=https' --tlsv1.2 -sSf -y https://sh.rustup.rs | sh
-          rustup component add --toolchain nightly-2025-05-17-x86_64-unknown-linux-gnu rustfmt clippy
+          rustup component add --toolchain nightly-2025-05-17-aarch64-apple-darwin rustfmt clippy
           cargo fmt --all -- --check
       - run: brew install openmpi
       - run: cargo clippy
