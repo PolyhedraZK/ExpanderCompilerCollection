@@ -52,7 +52,7 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
         computation_graph
             .commitments_lens
             .iter()
-            .for_each(|&x| println!("Setup length {}", x));
+            .for_each(|&x| println!("Setup length {x}"));
 
         ((), ())
     }

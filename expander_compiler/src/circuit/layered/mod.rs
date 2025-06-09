@@ -45,7 +45,7 @@ impl<C: Config> Coef<C> {
             Coef::Random => CircuitField::<C>::random_unsafe(&mut rand::thread_rng()),
             Coef::PublicInput(id) => {
                 if *id >= public_inputs.len() {
-                    panic!("public input id {} out of range", id);
+                    panic!("public input id {id} out of range");
                 }
                 public_inputs[*id]
             }
@@ -61,7 +61,7 @@ impl<C: Config> Coef<C> {
             Coef::Random => SF::random_unsafe(&mut rand::thread_rng()),
             Coef::PublicInput(id) => {
                 if *id >= public_inputs.len() {
-                    panic!("public input id {} out of range", id);
+                    panic!("public input id {id} out of range");
                 }
                 public_inputs[*id]
             }
@@ -75,8 +75,7 @@ impl<C: Config> Coef<C> {
             Coef::PublicInput(id) => {
                 if *id >= num_public_inputs {
                     Err(Error::UserError(format!(
-                        "public input id {} out of range",
-                        id
+                        "public input id {id} out of range"
                     )))
                 } else {
                     Ok(())
@@ -378,13 +377,12 @@ impl<C: Config, I: InputType> Circuit<C, I> {
             for (j, x) in seg.num_inputs.iter().enumerate() {
                 if x == 0 || (x & (x - 1)) != 0 {
                     return Err(Error::InternalError(format!(
-                        "segment {} input {} len {} not power of 2",
-                        i, j, x
+                        "segment {i} input {j} len {x} not power of 2"
                     )));
                 }
             }
             if seg.num_inputs.len() == 0 {
-                return Err(Error::InternalError(format!("segment {} inputlen 0", i)));
+                return Err(Error::InternalError(format!("segment {i} inputlen 0")));
             }
             if seg.num_outputs == 0 || (seg.num_outputs & (seg.num_outputs - 1)) != 0 {
                 return Err(Error::InternalError(format!(
@@ -477,8 +475,7 @@ impl<C: Config, I: InputType> Circuit<C, I> {
             for (sub_id, allocs) in seg.child_segs.iter() {
                 if *sub_id >= i {
                     return Err(Error::InternalError(format!(
-                        "segment {} subcircuit {} out of range",
-                        i, sub_id
+                        "segment {i} subcircuit {sub_id} out of range"
                     )));
                 }
                 let subc = &self.segments[*sub_id];
@@ -509,14 +506,12 @@ impl<C: Config, I: InputType> Circuit<C, I> {
                     {
                         if x % y != 0 {
                             return Err(Error::InternalError(format!(
-                                "segment {} subcircuit {} input offset {} not aligned to {}",
-                                i, sub_id, x, y
+                                "segment {i} subcircuit {sub_id} input offset {x} not aligned to {y}"
                             )));
                         }
                         if x + y > z {
                             return Err(Error::InternalError(format!(
-                                "segment {} subcircuit {} input offset {} out of range",
-                                i, sub_id, x
+                                "segment {i} subcircuit {sub_id} input offset {x} out of range"
                             )));
                         }
                     }
@@ -537,7 +532,7 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         }
         for x in self.layer_ids.iter() {
             if *x >= self.segments.len() {
-                return Err(Error::InternalError(format!("layer id {} out of range", x)));
+                return Err(Error::InternalError(format!("layer id {x} out of range")));
             }
         }
         if self.layer_ids.is_empty() {
@@ -932,7 +927,7 @@ impl<C: Config> fmt::Display for Coef<C> {
         match self {
             Coef::Constant(c) => write!(f, "{}", c.to_u256()),
             Coef::Random => write!(f, "Random"),
-            Coef::PublicInput(id) => write!(f, "PublicInput({})", id),
+            Coef::PublicInput(id) => write!(f, "PublicInput({id})"),
         }
     }
 }
@@ -953,7 +948,7 @@ impl<C: Config, I: InputType> fmt::Display for Segment<C, I> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "input={:?} output={}", self.num_inputs, self.num_outputs)?;
         for (sub_id, allocs) in self.child_segs.iter() {
-            writeln!(f, "apply circuit {} at:", sub_id)?;
+            writeln!(f, "apply circuit {sub_id} at:")?;
             for a in allocs.iter() {
                 writeln!(
                     f,
@@ -978,7 +973,7 @@ impl<C: Config, I: InputType> fmt::Display for Segment<C, I> {
         for cu in self.gate_customs.iter() {
             write!(f, "out{} += custom{}(", cu.output, cu.gate_type)?;
             for (i, input) in cu.inputs.iter().enumerate() {
-                write!(f, "in{}", input)?;
+                write!(f, "in{input}")?;
                 if i < cu.inputs.len() - 1 {
                     write!(f, ",")?;
                 }
@@ -992,7 +987,7 @@ impl<C: Config, I: InputType> fmt::Display for Segment<C, I> {
 impl<C: Config, I: InputType> fmt::Display for Circuit<C, I> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, seg) in self.segments.iter().enumerate() {
-            write!(f, "Circuit {}: {}", i, seg)?;
+            write!(f, "Circuit {i}: {seg}")?;
             writeln!(f, "================================")?;
         }
         writeln!(f, "Layers: {:?}", self.layer_ids)?;

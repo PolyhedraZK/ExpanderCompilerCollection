@@ -110,8 +110,7 @@ impl<Irc: IrConfig> Circuit<Irc> {
             for term in insn.inputs() {
                 if term > cur_var_max || term == 0 {
                     return Err(Error::InternalError(format!(
-                        "invalid variable reference: {}",
-                        term
+                        "invalid variable reference: {term}"
                     )));
                 }
             }
@@ -123,8 +122,7 @@ impl<Irc: IrConfig> Circuit<Irc> {
                     for &input in inputs.iter() {
                         if !set.insert(input) {
                             return Err(Error::InternalError(format!(
-                                "duplicate sub circuit input: {}",
-                                input
+                                "duplicate sub circuit input: {input}"
                             )));
                         }
                     }
@@ -153,8 +151,7 @@ impl<Irc: IrConfig> Circuit<Irc> {
         for &output in self.outputs.iter() {
             if output > cur_var_max || output == 0 {
                 return Err(Error::InternalError(format!(
-                    "invalid output variable reference: {}",
-                    output
+                    "invalid output variable reference: {output}"
                 )));
             }
         }
@@ -163,8 +160,7 @@ impl<Irc: IrConfig> Circuit<Irc> {
             for &output in self.outputs.iter() {
                 if !set.insert(output) {
                     return Err(Error::InternalError(format!(
-                        "duplicate output: {}",
-                        output
+                        "duplicate output: {output}"
                     )));
                 }
             }
@@ -216,8 +212,7 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
                 if let Some((sub_circuit_id, inputs, num_outputs)) = insn.as_sub_circuit_call() {
                     if !self.circuits.contains_key(&sub_circuit_id) {
                         return Err(Error::InternalError(format!(
-                            "sub circuit {} not found",
-                            sub_circuit_id
+                            "sub circuit {sub_circuit_id} not found"
                         )));
                     }
                     if inputs.len() != self.circuits[&sub_circuit_id].num_inputs {

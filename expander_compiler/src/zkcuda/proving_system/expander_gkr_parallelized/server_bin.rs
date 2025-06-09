@@ -71,8 +71,7 @@ async fn main() {
             serve::<BN254ConfigSha2KZG, BN254Config>().await;
         }
         (field_type, pcs_type) => panic!(
-            "Combination of {:?} and {:?} not supported",
-            field_type, pcs_type
+            "Combination of {field_type:?} and {pcs_type:?} not supported"
         ),
     }
 }
@@ -108,7 +107,7 @@ where
             .with_state(state);
 
         let addr: SocketAddr = SERVER_URL.parse().expect("Invalid SERVER_URL");
-        println!("Server running at http://{}", addr);
+        println!("Server running at http://{addr}");
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
         axum::serve(listener, app.into_make_service())
             .with_graceful_shutdown(async {

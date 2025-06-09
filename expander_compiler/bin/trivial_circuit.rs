@@ -58,11 +58,11 @@ fn build<C: Config>() {
 
     assert_eq!(res, vec![true]);
 
-    let file = std::fs::File::create(format!("trivial_circuit_{}.txt", LOG_NUM_VARS)).unwrap();
+    let file = std::fs::File::create(format!("trivial_circuit_{LOG_NUM_VARS}.txt")).unwrap();
     let writer = std::io::BufWriter::new(file);
     layered_circuit.serialize_into(writer).unwrap();
 
-    let file = std::fs::File::create(format!("trivial_witness_{}.txt", LOG_NUM_VARS)).unwrap();
+    let file = std::fs::File::create(format!("trivial_witness_{LOG_NUM_VARS}.txt")).unwrap();
     let writer = std::io::BufWriter::new(file);
     witness.serialize_into(writer).unwrap();
 }
@@ -70,8 +70,8 @@ fn build<C: Config>() {
 fn print_info(args: &Args) {
     println!("===============================");
     println!("Gen circuit for {} field", args.field);
-    println!("Log Num of variables: {}", LOG_NUM_VARS);
-    println!("Number of layers:     {}", NUM_LAYERS);
+    println!("Log Num of variables: {LOG_NUM_VARS}");
+    println!("Number of layers:     {NUM_LAYERS}");
     println!("===============================")
 }
 

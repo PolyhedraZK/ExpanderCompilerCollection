@@ -222,7 +222,7 @@ where
         start_server::<C>(next_power_of_two(max_parallel_count));
         // Keep trying until the server is ready
         loop {
-            match wait_async(Client::new().get(format!("http://{}/", SERVER_URL)).send()) {
+            match wait_async(Client::new().get(format!("http://{SERVER_URL}/")).send()) {
                 Ok(_) => break,
                 Err(_) => std::thread::sleep(std::time::Duration::from_secs(1)),
             }

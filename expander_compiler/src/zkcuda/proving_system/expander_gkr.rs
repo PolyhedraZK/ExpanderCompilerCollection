@@ -354,7 +354,7 @@ where
             );
 
             if !verified {
-                println!("Failed to verify GKR proof for parallel index {}", i);
+                println!("Failed to verify GKR proof for parallel index {i}");
                 return false;
             }
 
@@ -386,7 +386,7 @@ where
             }
 
             if !verified {
-                println!("Failed to verify overall pcs for parallel index {}", i);
+                println!("Failed to verify overall pcs for parallel index {i}");
                 return false;
             }
         }
@@ -582,8 +582,7 @@ where
 
         if !verified {
             println!(
-                "Failed to verify single pcs opening for parallel index {}",
-                parallel_index
+                "Failed to verify single pcs opening for parallel index {parallel_index}"
             );
             return false;
         }

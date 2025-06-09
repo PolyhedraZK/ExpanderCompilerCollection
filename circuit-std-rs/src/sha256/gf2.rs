@@ -119,7 +119,7 @@ impl SHA256GF2 {
     #[allow(dead_code)]
     fn display_state(&self, api: &mut impl RootAPI<GF2Config>, state: &[Sha256Word; 8]) {
         for (i, s) in state.iter().enumerate() {
-            api.display(&format!("{}", i), s[30]);
+            api.display(&format!("{i}"), s[30]);
         }
     }
 }

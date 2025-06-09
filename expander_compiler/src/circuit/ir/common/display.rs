@@ -13,16 +13,16 @@ where
             let num_outputs = insn.num_outputs();
             for i in 0..num_outputs {
                 var_max += 1;
-                write!(f, "v{}", var_max)?;
+                write!(f, "v{var_max}")?;
                 if i < num_outputs - 1 {
                     write!(f, ",")?;
                 }
             }
-            writeln!(f, " = {}", insn)?;
+            writeln!(f, " = {insn}")?;
         }
         write!(f, "Outputs: ")?;
         for (i, out) in self.outputs.iter().enumerate() {
-            write!(f, "v{}", out)?;
+            write!(f, "v{out}")?;
             if i < self.outputs.len() - 1 {
                 write!(f, ",")?;
             }
@@ -30,7 +30,7 @@ where
         writeln!(f)?;
         write!(f, "Constraints: ")?;
         for (i, con) in self.constraints.iter().enumerate() {
-            write!(f, "v{}", con)?;
+            write!(f, "v{con}")?;
             if i < self.constraints.len() - 1 {
                 write!(f, ",")?;
             }
@@ -55,7 +55,7 @@ where
                 circuit.outputs.len(),
                 circuit.constraints.len()
             )?;
-            write!(f, "{}", circuit)?;
+            write!(f, "{circuit}")?;
         }
         Ok(())
     }

@@ -16,7 +16,7 @@ pub async fn request_exit() {
 
 pub async fn post_request(request: RequestType) {
     let client = Client::new();
-    let server_url = format!("http://{}/", SERVER_URL);
+    let server_url = format!("http://{SERVER_URL}/");
 
     let res = client
         .post(server_url)
