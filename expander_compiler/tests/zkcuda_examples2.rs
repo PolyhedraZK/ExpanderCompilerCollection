@@ -1,4 +1,5 @@
 use expander_compiler::frontend::*;
+use expander_compiler::zkcuda::shape::Reshape;
 use expander_compiler::zkcuda::{context2::*, kernel2::*};
 
 #[kernel]

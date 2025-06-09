@@ -1,6 +1,7 @@
 use crate::circuit::{config::Config, ir};
 use crate::compile::compile_step_1;
 use crate::frontend::{BasicAPI, Error, Variable, API};
+use crate::zkcuda::shape::Shape;
 pub use macros::kernel;
 
 use serdes::ExpSerde;
@@ -15,8 +16,6 @@ pub struct KernelPrimitive<C: Config> {
     pub io_specs: Vec<IOVecSpec>,
     pub io_shapes: Vec<Shape>,
 }
-
-pub type Shape = Vec<usize>;
 
 pub fn shape_prepend(shape: &Shape, x: usize) -> Shape {
     let mut shape = shape.clone();

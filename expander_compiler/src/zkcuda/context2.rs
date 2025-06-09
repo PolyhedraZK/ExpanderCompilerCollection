@@ -6,11 +6,12 @@ use crate::{
     field::FieldArith,
     hints::registry::{EmptyHintCaller, HintCaller},
     utils::{error::Error, misc::next_power_of_two, pool::Pool},
+    zkcuda::shape::{Reshape, Shape},
 };
 
 use super::vec_shaped::{flatten_shaped_pack_simd, unflatten_shaped_unpack_simd};
 use super::{
-    kernel2::{shape_prepend, KernelPrimitive, Shape},
+    kernel2::{shape_prepend, KernelPrimitive},
     proving_system::{ExpanderGKRProvingSystem, ProvingSystem},
     vec_shaped::{flatten_shaped, unflatten_shaped, VecShaped},
 };
@@ -99,19 +100,9 @@ fn check_shape_compat(
     }
 }
 
-fn check_reshape_compat(shape: &[usize], new_shape: &[usize]) {
-    // TODO!!!
-    //panic!("TODO")
-}
-
-pub trait Reshape {
-    fn reshape(&self, new_shape: &[usize]) -> Self;
-}
-
 impl Reshape for DeviceMemoryHandle {
     fn reshape(&self, new_shape: &[usize]) -> Self {
         let handle = ensure_handle(self.clone());
-        check_reshape_compat(&handle.shape, new_shape);
         Some(DeviceMemoryHandleRaw {
             id: handle.id,
             shape: new_shape.to_vec(),
