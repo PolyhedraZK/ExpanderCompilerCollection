@@ -9,7 +9,7 @@ use crate::zkcuda::proving_system::{CombinedProof, KernelWiseProvingSystem, Prov
 
 use super::super::kernel::Kernel;
 
-use super::{check_inputs, prepare_inputs, Commitment};
+use super::{check_inputs, prepare_inputs_bit_order, Commitment};
 
 // dummy implementation of these traits
 
@@ -79,16 +79,18 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
         _commitments: &[Self::Commitment],
         _commitments_extra_info: &[Self::CommitmentExtraInfo],
         commitments_values: &[&[SIMDField<C>]],
+        commitments_bit_order: &[Option<Vec<usize>>],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> DummyProof {
         check_inputs(kernel, commitments_values, parallel_count, is_broadcast);
         let mut res = vec![];
         for i in 0..parallel_count {
-            let lc_input = prepare_inputs(
+            let lc_input = prepare_inputs_bit_order(
                 &kernel.layered_circuit,
                 &kernel.layered_circuit_input,
                 commitments_values,
+                commitments_bit_order,
                 is_broadcast,
                 i,
             );
@@ -110,16 +112,18 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
         kernel: &Kernel<C>,
         proof: &Self::Proof,
         commitments: &[Self::Commitment],
+        commitments_bit_order: &[Option<Vec<usize>>],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> bool {
         let values = commitments.iter().map(|c| &c.vals[..]).collect::<Vec<_>>();
         check_inputs(kernel, &values, parallel_count, is_broadcast);
         for i in 0..parallel_count {
-            let lc_input = prepare_inputs(
+            let lc_input = prepare_inputs_bit_order(
                 &kernel.layered_circuit,
                 &kernel.layered_circuit_input,
                 &values,
+                commitments_bit_order,
                 is_broadcast,
                 i,
             );
@@ -191,6 +195,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
                         .iter()
                         .map(|x| &device_memories[*x].values[..])
                         .collect::<Vec<_>>(),
+                    &template.commitment_bit_orders,
                     next_power_of_two(template.parallel_count),
                     &template.is_broadcast,
                 )
@@ -220,6 +225,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
                     &computation_graph.kernels[template.kernel_id],
                     proof,
                     commitments_kernel,
+                    &template.commitment_bit_orders,
                     next_power_of_two(template.parallel_count),
                     &template.is_broadcast,
                 )

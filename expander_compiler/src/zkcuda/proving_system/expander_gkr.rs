@@ -253,6 +253,7 @@ where
         _commitments: &[Self::Commitment],
         commitments_extra_info: &[Self::CommitmentExtraInfo],
         commitments_values: &[&[SIMDField<C>]],
+        _commitments_bit_order: &[Option<Vec<usize>>],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> Self::Proof {
@@ -330,6 +331,7 @@ where
         kernel: &Kernel<ECCConfig>,
         proof: &Self::Proof,
         commitments: &[Self::Commitment],
+        _commitments_bit_order: &[Option<Vec<usize>>],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> bool {
@@ -666,6 +668,7 @@ where
                         .iter()
                         .map(|x| &device_memories[*x].values[..])
                         .collect::<Vec<_>>(),
+                    &template.commitment_bit_orders,
                     next_power_of_two(template.parallel_count),
                     &template.is_broadcast,
                 )
@@ -695,6 +698,7 @@ where
                     &computation_graph.kernels[template.kernel_id],
                     proof,
                     commitments_kernel,
+                    &template.commitment_bit_orders,
                     next_power_of_two(template.parallel_count),
                     &template.is_broadcast,
                 )
