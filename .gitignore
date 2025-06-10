@@ -17,12 +17,7 @@ libec_go_lib.*
 *.json
 *.witness
 
-# mpi generated
-broadcast_info
-circuit
-commitment
-extra_info
-input_partition
-input_vals
+# shared memory handles
 pcs_setup
+witness
 proof

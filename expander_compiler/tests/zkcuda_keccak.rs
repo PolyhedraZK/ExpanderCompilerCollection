@@ -2,6 +2,8 @@
 use expander_compiler::field::FieldArith;
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::proving_system::ExpanderGKRProvingSystem;
+use expander_compiler::zkcuda::proving_system::ParallelizedExpanderGKRProvingSystem;
+use expander_compiler::zkcuda::proving_system::ProvingSystem;
 use expander_compiler::zkcuda::{context::*, kernel::*};
 use rand::{Rng, SeedableRng};
 use tiny_keccak::Hasher;
@@ -297,12 +299,11 @@ fn compute_multiple_keccak<C: Config>(
     }
 }
 
-#[test]
-fn zkcuda_keccak_1() {
+fn zkcuda_keccak_1_helper<P: ProvingSystem<M31Config>>() {
     let kernel: Kernel<M31Config> = compile_compute_keccak().unwrap();
     println!("compile ok");
 
-    let mut ctx: Context<M31Config, ExpanderGKRProvingSystem<M31Config>> = Context::default();
+    let mut ctx: Context<M31Config> = Context::default();
     let mut p: Vec<Vec<M31>> = vec![];
     let mut data: Vec<Vec<u8>> = vec![];
     let mut expected_res: Vec<Vec<M31>> = vec![];
@@ -348,15 +349,15 @@ fn zkcuda_keccak_1() {
     assert_eq!(out[0][0], expected_res[0][0]);
 
     let computation_graph = ctx.to_computation_graph();
-    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
-    let proof = ctx.to_proof(&prover_setup);
+    let (prover_setup, verifier_setup) = P::setup(&computation_graph);
+    let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
     println!("proof generation ok");
-    assert!(computation_graph.verify(&proof, &verifier_setup));
+    assert!(P::verify(&verifier_setup, &computation_graph, &proof));
     println!("verify ok");
+    P::post_process();
 }
 
-#[test]
-fn zkcuda_keccak_2() {
+fn zkcuda_keccak_2_helper<P: ProvingSystem<M31Config>>() {
     let kernel: Kernel<M31Config> = compile_compute_multiple_keccak().unwrap();
     println!("compile ok");
 
@@ -406,10 +407,19 @@ fn zkcuda_keccak_2() {
     assert_eq!(out[0][0][0], expected_res[0][0]);
 
     let computation_graph = ctx.to_computation_graph();
-    let (prover_setup, verifier_setup) = ctx.proving_system_setup(&computation_graph);
-    let proof = ctx.to_proof(&prover_setup);
+    let (prover_setup, verifier_setup) = P::setup(&computation_graph);
+    let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
     println!("proof generation ok");
-    assert!(computation_graph.verify(&proof, &verifier_setup));
+    assert!(P::verify(&verifier_setup, &computation_graph, &proof));
     println!("verify ok");
+    P::post_process();
+}
+
+#[test]
+fn zkcuda_keccak_1_2() {
+    zkcuda_keccak_1_helper::<ExpanderGKRProvingSystem<M31Config>>();
+    zkcuda_keccak_1_helper::<ParallelizedExpanderGKRProvingSystem<M31Config>>();
+    zkcuda_keccak_2_helper::<ExpanderGKRProvingSystem<M31Config>>();
+    zkcuda_keccak_2_helper::<ParallelizedExpanderGKRProvingSystem<M31Config>>();
 }
 */

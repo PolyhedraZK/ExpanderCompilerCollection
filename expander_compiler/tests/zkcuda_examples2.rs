@@ -41,5 +41,6 @@ fn zkcuda_example_tmp() {
     let result: M31 = ctx.copy_to_host(c);
     assert_eq!(result, M31::from(32 * 33 / 2));
 
-    ctx.compile_computation_graph();
+    let computation_graph = ctx.compile_computation_graph().unwrap();
+    let _ = computation_graph;
 }

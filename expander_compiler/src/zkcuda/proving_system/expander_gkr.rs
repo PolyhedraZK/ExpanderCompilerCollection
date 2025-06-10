@@ -1,12 +1,17 @@
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::cmp::max;
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
 
 use crate::circuit::config::Config;
 use crate::frontend::SIMDField;
+use crate::utils::misc::next_power_of_two;
+use crate::zkcuda::context::DeviceMemory;
+use crate::zkcuda::proof::ComputationGraph;
+use crate::zkcuda::proving_system::{CombinedProof, KernelWiseProvingSystem, ProvingSystem};
 
 use super::super::kernel::Kernel;
-use super::{check_inputs, prepare_inputs, Commitment, Proof, ProvingSystem};
+use super::{check_inputs, prepare_inputs, Commitment};
 
 use arith::Field;
 use expander_circuit::Circuit;
@@ -17,18 +22,20 @@ use gkr_engine::{
     Proof as ExpanderProof, StructuredReferenceString, Transcript,
 };
 use poly_commit::expander_pcs_init_testing_only;
-use polynomials::{EqPolynomial, MultiLinearPoly};
+use polynomials::{EqPolynomial, MultiLinearPoly, RefMultiLinearPoly};
 use serdes::ExpSerde;
 use sumcheck::ProverScratchPad;
 
 #[allow(clippy::type_complexity)]
 #[derive(ExpSerde)]
-pub struct ExpanderGKRCommitment<F: FieldEngine, PCS: ExpanderPCS<F>> {
+pub struct ExpanderGKRCommitment<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> {
     pub vals_len: usize,
     pub commitment: Vec<PCS::Commitment>,
 }
 
-impl<F: FieldEngine, PCS: ExpanderPCS<F>> Clone for ExpanderGKRCommitment<F, PCS> {
+impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
+    for ExpanderGKRCommitment<PCSField, F, PCS>
+{
     fn clone(&self) -> Self {
         Self {
             vals_len: self.vals_len,
@@ -37,8 +44,11 @@ impl<F: FieldEngine, PCS: ExpanderPCS<F>> Clone for ExpanderGKRCommitment<F, PCS
     }
 }
 
-impl<F: FieldEngine, PCS: ExpanderPCS<F>, ECCConfig: Config<FieldConfig = F>> Commitment<ECCConfig>
-    for ExpanderGKRCommitment<F, PCS>
+impl<
+        F: FieldEngine,
+        PCS: ExpanderPCS<F, F::SimdCircuitField>,
+        ECCConfig: Config<FieldConfig = F>,
+    > Commitment<ECCConfig> for ExpanderGKRCommitment<F::SimdCircuitField, F, PCS>
 {
     fn vals_len(&self) -> usize {
         self.vals_len
@@ -47,11 +57,17 @@ impl<F: FieldEngine, PCS: ExpanderPCS<F>, ECCConfig: Config<FieldConfig = F>> Co
 
 #[allow(clippy::type_complexity)]
 #[derive(ExpSerde)]
-pub struct ExpanderGKRCommitmentExtraInfo<F: FieldEngine, PCS: ExpanderPCS<F>> {
+pub struct ExpanderGKRCommitmentExtraInfo<
+    PCSField: Field,
+    F: FieldEngine,
+    PCS: ExpanderPCS<F, PCSField>,
+> {
     pub scratch: Vec<PCS::ScratchPad>,
 }
 
-impl<F: FieldEngine, PCS: ExpanderPCS<F>> Clone for ExpanderGKRCommitmentExtraInfo<F, PCS> {
+impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
+    for ExpanderGKRCommitmentExtraInfo<PCSField, F, PCS>
+{
     fn clone(&self) -> Self {
         Self {
             scratch: self.scratch.clone(),
@@ -61,11 +77,24 @@ impl<F: FieldEngine, PCS: ExpanderPCS<F>> Clone for ExpanderGKRCommitmentExtraIn
 
 #[allow(clippy::type_complexity)]
 #[derive(ExpSerde)]
-pub struct ExpanderGKRProverSetup<F: FieldEngine, PCS: ExpanderPCS<F>> {
-    pub p_keys: HashMap<usize, <PCS::SRS as StructuredReferenceString>::PKey>,
+pub struct ExpanderGKRProverSetup<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> {
+    pub p_keys: HashMap<(usize, usize), <PCS::SRS as StructuredReferenceString>::PKey>,
 }
 
-impl<F: FieldEngine, PCS: ExpanderPCS<F>> Clone for ExpanderGKRProverSetup<F, PCS> {
+// implement default
+impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Default
+    for ExpanderGKRProverSetup<PCSField, F, PCS>
+{
+    fn default() -> Self {
+        Self {
+            p_keys: HashMap::new(),
+        }
+    }
+}
+
+impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
+    for ExpanderGKRProverSetup<PCSField, F, PCS>
+{
     fn clone(&self) -> Self {
         Self {
             p_keys: self.p_keys.clone(),
@@ -75,11 +104,25 @@ impl<F: FieldEngine, PCS: ExpanderPCS<F>> Clone for ExpanderGKRProverSetup<F, PC
 
 #[allow(clippy::type_complexity)]
 #[derive(ExpSerde)]
-pub struct ExpanderGKRVerifierSetup<F: FieldEngine, PCS: ExpanderPCS<F>> {
-    pub v_keys: HashMap<usize, <PCS::SRS as StructuredReferenceString>::VKey>,
+pub struct ExpanderGKRVerifierSetup<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>>
+{
+    pub v_keys: HashMap<(usize, usize), <PCS::SRS as StructuredReferenceString>::VKey>,
 }
 
-impl<F: FieldEngine, PCS: ExpanderPCS<F>> Clone for ExpanderGKRVerifierSetup<F, PCS> {
+// implement default
+impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Default
+    for ExpanderGKRVerifierSetup<PCSField, F, PCS>
+{
+    fn default() -> Self {
+        Self {
+            v_keys: HashMap::new(),
+        }
+    }
+}
+
+impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
+    for ExpanderGKRVerifierSetup<PCSField, F, PCS>
+{
     fn clone(&self) -> Self {
         Self {
             v_keys: self.v_keys.clone(),
@@ -92,20 +135,21 @@ pub struct ExpanderGKRProof {
     pub data: Vec<ExpanderProof>,
 }
 
-impl Proof for ExpanderGKRProof {}
-
 pub struct ExpanderGKRProvingSystem<C: GKREngine> {
     _config: std::marker::PhantomData<C>,
 }
 
-impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSystem<ECCConfig>
-    for ExpanderGKRProvingSystem<C>
+impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>
+    KernelWiseProvingSystem<ECCConfig> for ExpanderGKRProvingSystem<C>
+where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    type ProverSetup = ExpanderGKRProverSetup<C::FieldConfig, C::PCSConfig>;
-    type VerifierSetup = ExpanderGKRVerifierSetup<C::FieldConfig, C::PCSConfig>;
+    type ProverSetup = ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
+    type VerifierSetup = ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
     type Proof = ExpanderGKRProof;
-    type Commitment = ExpanderGKRCommitment<C::FieldConfig, C::PCSConfig>;
-    type CommitmentExtraInfo = ExpanderGKRCommitmentExtraInfo<C::FieldConfig, C::PCSConfig>;
+    type Commitment = ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>;
+    type CommitmentExtraInfo =
+        ExpanderGKRCommitmentExtraInfo<C::PCSField, C::FieldConfig, C::PCSConfig>;
 
     fn setup(
         computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
@@ -124,16 +168,19 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
                 } else {
                     val_total_len / template.parallel_count
                 };
-                if p_keys.contains_key(&val_actual_len) {
+                if p_keys.contains_key(&(val_actual_len, template.parallel_count)) {
                     continue;
                 }
                 let (_params, p_key, v_key, _scratch) = pcs_testing_setup_fixed_seed::<
                     C::FieldConfig,
                     C::TranscriptConfig,
                     C::PCSConfig,
-                >(val_actual_len);
-                p_keys.insert(val_actual_len, p_key);
-                v_keys.insert(val_actual_len, v_key);
+                >(
+                    val_actual_len,
+                    &MPIConfig::prover_new(None, None),
+                );
+                p_keys.insert((val_actual_len, template.parallel_count), p_key);
+                v_keys.insert((val_actual_len, template.parallel_count), v_key);
             }
         }
 
@@ -158,25 +205,33 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
         };
 
         let n_vars = vals_to_commit[0].len().ilog2() as usize;
-        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(n_vars);
-        let p_key = prover_setup.p_keys.get(&(1 << n_vars)).unwrap();
+        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
+            n_vars,
+            parallel_count,
+        );
+        let p_key = prover_setup
+            .p_keys
+            .get(&(1 << n_vars, parallel_count))
+            .unwrap();
 
         let (commitment, scratch) = vals_to_commit
             .into_iter()
             .map(|vals| {
-                let mut scratch = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::init_scratch_pad(
-                    &params,
-                    &MPIConfig::default(),
-                );
+                let mut scratch =
+                    <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::init_scratch_pad(
+                        &params,
+                        &MPIConfig::default(),
+                    );
 
-                let commitment = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::commit(
-                    &params,
-                    &MPIConfig::default(),
-                    p_key,
-                    &MultiLinearPoly::new(vals.to_vec()),
-                    &mut scratch,
-                )
-                .unwrap();
+                let commitment =
+                    <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::commit(
+                        &params,
+                        &MPIConfig::default(),
+                        p_key,
+                        &MultiLinearPoly::new(vals.to_vec()),
+                        &mut scratch,
+                    )
+                    .unwrap();
                 (commitment, scratch)
             })
             .unzip::<_, _, Vec<_>, Vec<_>>();
@@ -191,8 +246,9 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
         )
     }
 
-    fn prove(
+    fn prove_kernel(
         prover_setup: &Self::ProverSetup,
+        _kernel_id: usize,
         kernel: &Kernel<ECCConfig>,
         _commitments: &[Self::Commitment],
         commitments_extra_info: &[Self::CommitmentExtraInfo],
@@ -268,8 +324,9 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
         proof
     }
 
-    fn verify(
+    fn verify_kernel(
         verifier_setup: &Self::VerifierSetup,
+        _kernel_id: usize,
         kernel: &Kernel<ECCConfig>,
         proof: &Self::Proof,
         commitments: &[Self::Commitment],
@@ -297,7 +354,7 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
             );
 
             if !verified {
-                println!("Failed to verify GKR proof for parallel index {}", i);
+                println!("Failed to verify GKR proof for parallel index {i}");
                 return false;
             }
 
@@ -329,7 +386,7 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
             }
 
             if !verified {
-                println!("Failed to verify overall pcs for parallel index {}", i);
+                println!("Failed to verify overall pcs for parallel index {i}");
                 return false;
             }
         }
@@ -340,18 +397,23 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
 
 #[allow(clippy::type_complexity)]
 pub fn pcs_testing_setup_fixed_seed<
+    'a,
     FConfig: FieldEngine,
     T: Transcript,
-    PCS: ExpanderPCS<FConfig>,
+    PCS: ExpanderPCS<FConfig, FConfig::SimdCircuitField>,
 >(
     vals_len: usize,
+    mpi_config: &MPIConfig<'a>,
 ) -> (
     PCS::Params,
     <PCS::SRS as StructuredReferenceString>::PKey,
     <PCS::SRS as StructuredReferenceString>::VKey,
     PCS::ScratchPad,
 ) {
-    expander_pcs_init_testing_only::<FConfig, PCS>(vals_len.ilog2() as usize, &MPIConfig::default())
+    expander_pcs_init_testing_only::<FConfig, FConfig::SimdCircuitField, PCS>(
+        vals_len.ilog2() as usize,
+        mpi_config,
+    )
 }
 
 pub fn max_n_vars<C: FieldEngine>(circuit: &Circuit<C>) -> (usize, usize) {
@@ -368,14 +430,20 @@ pub fn max_n_vars<C: FieldEngine>(circuit: &Circuit<C>) -> (usize, usize) {
 fn prove_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     _kernel: &Kernel<ECCConfig>,
     commitments_values: &[&[SIMDField<C>]],
-    p_keys: &ExpanderGKRProverSetup<C::FieldConfig, C::PCSConfig>,
-    commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<C::FieldConfig, C::PCSConfig>],
+    p_keys: &ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<
+        C::PCSField,
+        C::FieldConfig,
+        C::PCSConfig,
+    >],
     challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
     is_broadcast: &[bool],
     parallel_index: usize,
     parallel_count: usize,
     transcript: &mut C::TranscriptConfig,
-) {
+) where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
     for ((commitment_val, extra_info), ib) in commitments_values
         .iter()
         .zip(commitments_extra_info)
@@ -395,11 +463,11 @@ fn prove_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfi
         let nb_challenge_vars = val_len.ilog2() as usize;
         let challenge_vars = challenge.rz[..nb_challenge_vars].to_vec();
 
-        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(val_len);
-        let p_key = p_keys.p_keys.get(&val_len).unwrap();
+        let params =
+            <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(val_len, 1);
+        let p_key = p_keys.p_keys.get(&(val_len, parallel_count)).unwrap();
 
-        // TODO: Remove unnecessary `to_vec` clone
-        let poly = MultiLinearPoly::new(vals_to_open.to_vec());
+        let poly = RefMultiLinearPoly::from_ref(vals_to_open);
         let v =
             <C::FieldConfig as FieldEngine>::single_core_eval_circuit_vals_at_expander_challenge(
                 vals_to_open,
@@ -417,7 +485,7 @@ fn prove_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfi
         } else {
             &extra_info.scratch[parallel_index]
         };
-        let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::open(
+        let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::open(
             &params,
             &MPIConfig::default(),
             p_key,
@@ -445,15 +513,18 @@ fn prove_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfi
 fn verify_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     mut proof_reader: impl Read,
     kernel: &Kernel<ECCConfig>,
-    v_keys: &ExpanderGKRVerifierSetup<C::FieldConfig, C::PCSConfig>,
+    v_keys: &ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
     challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
     y: &<C::FieldConfig as FieldEngine>::ChallengeField,
-    commitments: &[ExpanderGKRCommitment<C::FieldConfig, C::PCSConfig>],
+    commitments: &[ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
     is_broadcast: &[bool],
     parallel_index: usize,
-    _parallel_count: usize,
+    parallel_count: usize,
     transcript: &mut C::TranscriptConfig,
-) -> bool {
+) -> bool
+where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
     let mut target_y = <C::FieldConfig as FieldEngine>::ChallengeField::ZERO;
     for ((input, commitment), ib) in kernel
         .layered_circuit_input
@@ -461,26 +532,32 @@ fn verify_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConf
         .zip(commitments.iter())
         .zip(is_broadcast)
     {
-        let commitment_len = <ExpanderGKRCommitment<C::FieldConfig, C::PCSConfig> as Commitment<
-            ECCConfig,
-        >>::vals_len(commitment);
+        let commitment_len =
+            <ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig> as Commitment<
+                ECCConfig,
+            >>::vals_len(commitment);
         let nb_challenge_vars = commitment_len.ilog2() as usize;
         let challenge_vars = challenge.rz[..nb_challenge_vars].to_vec();
 
-        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(
+        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
             commitment_len.ilog2() as usize,
+            1,
         );
-        let v_key = v_keys.v_keys.get(&commitment_len).unwrap();
+        let v_key = v_keys
+            .v_keys
+            .get(&(commitment_len, parallel_count))
+            .unwrap();
 
         let claim =
             <C::FieldConfig as FieldEngine>::ChallengeField::deserialize_from(&mut proof_reader)
                 .unwrap();
         transcript.append_field_element(&claim);
 
-        let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::Opening::deserialize_from(
-            &mut proof_reader,
-        )
-        .unwrap();
+        let opening =
+            <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Opening::deserialize_from(
+                &mut proof_reader,
+            )
+            .unwrap();
 
         transcript.lock_proof();
         let commitment_for_parallel_index = if *ib {
@@ -488,7 +565,7 @@ fn verify_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConf
         } else {
             &commitment.commitment[parallel_index]
         };
-        let verified = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::verify(
+        let verified = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::verify(
             &params,
             v_key,
             commitment_for_parallel_index,
@@ -504,10 +581,7 @@ fn verify_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConf
         transcript.unlock_proof();
 
         if !verified {
-            println!(
-                "Failed to verify single pcs opening for parallel index {}",
-                parallel_index
-            );
+            println!("Failed to verify single pcs opening for parallel index {parallel_index}");
             return false;
         }
 
@@ -527,4 +601,110 @@ fn verify_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConf
     }
 
     *y == target_y
+}
+
+// TODO: Generate this with procedural macros
+// The idea is to implement the ProvingSystem trait for KernelWiseProvingSystem
+// However, we can not simply implement ProvingSystem<C> for all KernelWiseProvingSystem<C> because
+// If later we want a customized implementation of ProvingSystem for some struct A
+// The compiler will not allow use to do so, complaining that KernelWiseProvingSystem may be later implemented for A
+// causing a potential conflict.
+// In this case, generate the implementation with a procedural macro seems to be the best solution.
+impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSystem<ECCConfig>
+    for ExpanderGKRProvingSystem<C>
+where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
+    type ProverSetup = <Self as KernelWiseProvingSystem<ECCConfig>>::ProverSetup;
+    type VerifierSetup = <Self as KernelWiseProvingSystem<ECCConfig>>::VerifierSetup;
+    type Proof = CombinedProof<ECCConfig, Self>;
+
+    fn setup(
+        computation_graph: &ComputationGraph<ECCConfig>,
+    ) -> (Self::ProverSetup, Self::VerifierSetup) {
+        <Self as KernelWiseProvingSystem<ECCConfig>>::setup(computation_graph)
+    }
+
+    fn prove(
+        prover_setup: &Self::ProverSetup,
+        computation_graph: &ComputationGraph<ECCConfig>,
+        device_memories: &[DeviceMemory<ECCConfig>],
+    ) -> Self::Proof {
+        let commitments = computation_graph
+            .proof_templates
+            .iter()
+            .map(|template| {
+                template
+                    .commitment_indices
+                    .iter()
+                    .zip(template.is_broadcast.iter())
+                    .map(|(x, is_broadcast)| {
+                        <Self as KernelWiseProvingSystem<ECCConfig>>::commit(
+                            prover_setup,
+                            &device_memories[*x].values,
+                            next_power_of_two(template.parallel_count),
+                            *is_broadcast,
+                        )
+                    })
+                    .unzip::<_, _, Vec<_>, Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+
+        let proofs: Vec<<Self as KernelWiseProvingSystem<ECCConfig>>::Proof> = computation_graph
+            .proof_templates
+            .iter()
+            .zip(commitments.iter())
+            .map(|(template, commitments_kernel)| {
+                <Self as KernelWiseProvingSystem<ECCConfig>>::prove_kernel(
+                    prover_setup,
+                    template.kernel_id,
+                    &computation_graph.kernels[template.kernel_id],
+                    &commitments_kernel.0,
+                    &commitments_kernel.1,
+                    &template
+                        .commitment_indices
+                        .iter()
+                        .map(|x| &device_memories[*x].values[..])
+                        .collect::<Vec<_>>(),
+                    next_power_of_two(template.parallel_count),
+                    &template.is_broadcast,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        CombinedProof {
+            commitments: commitments.into_iter().map(|x| x.0).collect(),
+            proofs,
+        }
+    }
+
+    fn verify(
+        verifier_setup: &Self::VerifierSetup,
+        computation_graph: &ComputationGraph<ECCConfig>,
+        proof: &Self::Proof,
+    ) -> bool {
+        let verified = proof
+            .proofs
+            .par_iter()
+            .zip(computation_graph.proof_templates.par_iter())
+            .zip(proof.commitments.par_iter())
+            .map(|((proof, template), commitments_kernel)| {
+                <Self as KernelWiseProvingSystem<ECCConfig>>::verify_kernel(
+                    verifier_setup,
+                    template.kernel_id,
+                    &computation_graph.kernels[template.kernel_id],
+                    proof,
+                    commitments_kernel,
+                    next_power_of_two(template.parallel_count),
+                    &template.is_broadcast,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        verified.iter().all(|x| *x)
+    }
+
+    fn post_process() {
+        <Self as KernelWiseProvingSystem<ECCConfig>>::post_process();
+    }
 }

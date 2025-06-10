@@ -488,7 +488,7 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         let y_bits = self.to_binary(y, num_bits);
 
         for (i, x_bit) in x_bits.iter().enumerate() {
-            self.display(format!("x[{}]", i).as_ref(), x_bit);
+            self.display(format!("x[{i}]").as_ref(), x_bit);
         }
 
         // Compare bit by bit from MSB to LSB

@@ -118,7 +118,7 @@ where
     let mut r_source = root_builder.build();
     assert_eq!(r_source.circuits[&0].outputs.len(), 0);
     r_source.circuits.get_mut(&0).unwrap().outputs = output_vars.clone();
-    let (r, src_im) = compile_step_1(&r_source)?;
+    let (r, src_im) = compile_step_1(&r_source, CompileOptions::default())?;
     for (i, x) in src_im.mapping().iter().enumerate() {
         assert_eq!(*x, i);
     }
@@ -151,7 +151,8 @@ pub fn compile_primitive<C: Config>(
         .validate()
         .map_err(|e| e.prepend("hint exported circuit invalid"))?;
     let mut tmp_im = InputMapping::new_identity(r_hint_exported.input_size());
-    let mut r_hint_exported_opt = compile_step_4(r_hint_exported, &mut tmp_im)?;
+    let mut r_hint_exported_opt =
+        compile_step_4(r_hint_exported, &mut tmp_im, CompileOptions::default())?;
     // No inputs should be removed in this step.
     for (i, x) in tmp_im.mapping().iter().enumerate() {
         assert_eq!(i, *x);
@@ -208,7 +209,7 @@ pub fn compile_primitive<C: Config>(
             assert_eq!(*x, EMPTY);
         }
     }
-    let lc = compile_step_3(lc)?;
+    let lc = compile_step_3(lc, CompileOptions::default())?;
     print_layered_circuit_stats(&lc);
 
     Ok(Kernel {

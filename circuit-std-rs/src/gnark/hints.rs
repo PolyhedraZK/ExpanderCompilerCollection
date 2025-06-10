@@ -60,11 +60,11 @@ pub fn mul_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     let rem = ab.clone() % p.clone();
     let mut quo_limbs = vec![BigInt::default(); nb_quo_len];
     if let Err(err) = decompose(&quo, nb_bits as u32, &mut quo_limbs) {
-        panic!("decompose value: {}", err);
+        panic!("decompose value: {err}");
     }
     let mut rem_limbs = vec![BigInt::default(); nb_limbs];
     if let Err(err) = decompose(&rem, nb_bits as u32, &mut rem_limbs) {
-        panic!("decompose value: {}", err);
+        panic!("decompose value: {err}");
     }
     let mut xp = vec![BigInt::default(); nb_multiplication_res_limbs(nb_a_len, nb_b_len)];
     let mut yp = vec![BigInt::default(); nb_multiplication_res_limbs(nb_quo_len, nb_limbs)];
@@ -156,7 +156,7 @@ pub fn div_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     res %= &p;
     let mut res_limbs = vec![BigInt::default(); nb_limbs];
     if let Err(err) = decompose(&res, nb_bits as u32, &mut res_limbs) {
-        panic!("decompose value: {}", err);
+        panic!("decompose value: {err}");
     }
     for i in 0..nb_limbs {
         outputs[i] = M31::from(res_limbs[i].to_u64().unwrap() as u32);
@@ -185,7 +185,7 @@ pub fn inv_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
     let res = x.clone().modinv(&p).unwrap();
     let mut res_limbs = vec![BigInt::default(); nb_limbs];
     if let Err(err) = decompose(&res, nb_bits as u32, &mut res_limbs) {
-        panic!("decompose value: {}", err);
+        panic!("decompose value: {err}");
     }
     for i in 0..nb_limbs {
         outputs[i] = M31::from(res_limbs[i].to_u64().unwrap() as u32);
@@ -224,7 +224,7 @@ pub fn div_e2_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
             vec![c0_bigint, c1_bigint]
         },
     ) {
-        panic!("divE2Hint: {}", err);
+        panic!("divE2Hint: {err}");
     }
     Ok(())
 }
@@ -257,7 +257,7 @@ pub fn inverse_e2_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error>
             vec![c0_bigint, c1_bigint]
         },
     ) {
-        panic!("inverseE2Hint: {}", err);
+        panic!("inverseE2Hint: {err}");
     }
     Ok(())
 }
@@ -342,7 +342,7 @@ pub fn div_e6_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
             ]
         },
     ) {
-        panic!("divE6Hint: {}", err);
+        panic!("divE6Hint: {err}");
     }
     Ok(())
 }
@@ -413,7 +413,7 @@ pub fn inverse_e6_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error>
             ]
         },
     ) {
-        panic!("inverseE6Hint: {}", err);
+        panic!("inverseE6Hint: {err}");
     }
     Ok(())
 }
@@ -487,7 +487,7 @@ pub fn div_e6_by_6_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error
             ]
         },
     ) {
-        panic!("divE6By6Hint: {}", err);
+        panic!("divE6By6Hint: {err}");
     }
     Ok(())
 }
@@ -651,7 +651,7 @@ pub fn div_e12_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
             ]
         },
     ) {
-        panic!("divE12Hint: {}", err);
+        panic!("divE12Hint: {err}");
     }
     Ok(())
 }
@@ -787,7 +787,7 @@ pub fn inverse_e12_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error
             ]
         },
     ) {
-        panic!("inverseE12Hint: {}", err);
+        panic!("inverseE12Hint: {err}");
     }
     Ok(())
 }
@@ -804,7 +804,7 @@ pub fn copy_element_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Erro
         //copyE2Hint
         |inputs| inputs,
     ) {
-        panic!("copyElementHint: {}", err);
+        panic!("copyElementHint: {err}");
     }
     Ok(())
 }
@@ -817,7 +817,7 @@ pub fn copy_e2_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
         //copyE2Hint
         |inputs| inputs,
     ) {
-        panic!("copyE2Hint: {}", err);
+        panic!("copyE2Hint: {err}");
     }
     Ok(())
 }
@@ -842,7 +842,7 @@ pub fn get_element_sqrt_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), 
             vec![BigInt::from(is_square), sqrt_bigint]
         },
     ) {
-        panic!("getElementSqrtHint: {}", err);
+        panic!("getElementSqrtHint: {err}");
     }
     Ok(())
 }
@@ -875,7 +875,7 @@ pub fn get_e2_sqrt_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error
             vec![BigInt::from(is_square), sqrt0_bigint, sqrt1_bigint]
         },
     ) {
-        panic!("getElementSqrtHint: {}", err);
+        panic!("getElementSqrtHint: {err}");
     }
     Ok(())
 }
@@ -917,7 +917,7 @@ pub fn get_sqrt_x0x1_fq_new_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<
             vec![BigInt::from(is_square0), y_bigint]
         },
     ) {
-        panic!("divE2Hint: {}", err);
+        panic!("divE2Hint: {err}");
     }
     Ok(())
 }
@@ -971,7 +971,7 @@ pub fn get_sqrt_x0x1_fq2_new_hint(inputs: &[M31], outputs: &mut [M31]) -> Result
             vec![BigInt::from(is_square0), y0_c0_bigint, y0_c1_bigint]
         },
     ) {
-        panic!("divE2Hint: {}", err);
+        panic!("divE2Hint: {err}");
     }
     Ok(())
 }
@@ -984,7 +984,7 @@ pub fn copy_e12_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> {
         //copyE12Hint
         |inputs| inputs,
     ) {
-        panic!("copyE12Hint: {}", err);
+        panic!("copyE12Hint: {err}");
     }
     Ok(())
 }
@@ -1235,7 +1235,7 @@ pub fn final_exp_hint(inputs: &[M31], outputs: &mut [M31]) -> Result<(), Error> 
             ]
         },
     ) {
-        panic!("inverseE12Hint: {}", err);
+        panic!("inverseE12Hint: {err}");
     }
     Ok(())
 }
@@ -1287,14 +1287,14 @@ pub fn unwrap_hint(
         nonnative_inputs = vec![BigInt::default(); nb_inputs];
         for (i, nonnative_input) in nonnative_inputs.iter_mut().enumerate().take(nb_inputs) {
             if native_inputs.len() < read_ptr + 1 {
-                return Err(format!("can not read {}-th native input", i));
+                return Err(format!("can not read {i}-th native input"));
             }
             if native_inputs[read_ptr].to_u256() >= i64_max {
-                return Err(format!("corrupted {}-th native input", i));
+                return Err(format!("corrupted {i}-th native input"));
             }
             let current_input_len = native_inputs[read_ptr].to_u256().as_usize();
             if native_inputs.len() < read_ptr + 1 + current_input_len {
-                return Err(format!("cannot read {}-th nonnative element", i));
+                return Err(format!("cannot read {i}-th nonnative element"));
             }
             let tmp_inputs = m31_to_bigint_array(
                 native_inputs[read_ptr + 1..read_ptr + 1 + current_input_len]
@@ -1325,7 +1325,7 @@ pub fn unwrap_hint(
                 nb_bits,
                 &mut tmp_outputs[i * nb_limbs..(i + 1) * nb_limbs],
             ) {
-                return Err(format!("decompose {}-th element: {}", i, e));
+                return Err(format!("decompose {i}-th element: {e}"));
             }
         }
     } else {

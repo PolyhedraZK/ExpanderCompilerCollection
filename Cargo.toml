@@ -21,6 +21,7 @@ ark-ec = "0.4.0"
 ark-ff = "0.4.0"
 ark-serialize = "0.4.0"
 ark-std = "0.4.0"
+axum = "0.7"
 base64 = "0.22.1"
 big-int = "7.0.0"
 chrono = "0.4.39"
@@ -31,17 +32,20 @@ halo2curves = { git = "https://github.com/PolyhedraZK/halo2curves", default-feat
     "bits",
 ] }
 hex = "0.4"
+mpi = "0.8.0"
 num-bigint = "0.4.6"
 num_cpus = "1.16.0"
 num-traits = "0.2.19"
 rand = "0.8.5"
 rayon = "1.10.0"
+reqwest = { version = "0.11", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 shared_memory = "0.12.4"
 sha2 = "0.10.8"
 stacker = "0.1.17"
 tiny-keccak = { version = "2.0", features = ["keccak"] }
+tokio = { version = "1", features = ["full"] }
 
 arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
@@ -58,7 +62,7 @@ goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" 
 poly_commit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "poly_commit" }
 polynomials = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 sumcheck = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "serdes" }
 gkr_engine = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 gkr_hashers = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 expander_utils = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "utils" }

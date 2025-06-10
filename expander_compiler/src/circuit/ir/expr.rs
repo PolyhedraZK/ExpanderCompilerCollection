@@ -166,19 +166,19 @@ impl<C: Config> fmt::Display for Term<C> {
         if self.coef == CircuitField::<C>::one() {
             match &self.vars {
                 VarSpec::Const => write!(f, "1"),
-                VarSpec::Linear(index) => write!(f, "v{}", index),
-                VarSpec::Quad(index1, index2) => write!(f, "v{}*v{}", index1, index2),
+                VarSpec::Linear(index) => write!(f, "v{index}"),
+                VarSpec::Quad(index1, index2) => write!(f, "v{index1}*v{index2}"),
                 VarSpec::Custom { gate_type, inputs } => {
-                    write!(f, "custom{}(", gate_type)?;
+                    write!(f, "custom{gate_type}(")?;
                     for (i, input) in inputs.iter().enumerate() {
                         if i > 0 {
                             write!(f, ",")?;
                         }
-                        write!(f, "v{}", input)?;
+                        write!(f, "v{input}")?;
                     }
                     write!(f, ")")
                 }
-                VarSpec::RandomLinear(index) => write!(f, "random*v{}", index),
+                VarSpec::RandomLinear(index) => write!(f, "random*v{index}"),
             }
         } else {
             match &self.vars {
@@ -188,12 +188,12 @@ impl<C: Config> fmt::Display for Term<C> {
                     write!(f, "v{}*v{}*{}", index1, index2, self.coef.to_u256())
                 }
                 VarSpec::Custom { gate_type, inputs } => {
-                    write!(f, "custom{}(", gate_type)?;
+                    write!(f, "custom{gate_type}(")?;
                     for (i, input) in inputs.iter().enumerate() {
                         if i > 0 {
                             write!(f, ",")?;
                         }
-                        write!(f, "v{}", input)?;
+                        write!(f, "v{input}")?;
                     }
                     write!(f, ")*{}", self.coef.to_u256())
                 }
@@ -235,7 +235,7 @@ impl<C: Config> fmt::Display for Expression<C> {
             if i > 0 {
                 write!(f, " + ")?;
             }
-            write!(f, "{}", term)?;
+            write!(f, "{term}")?;
         }
         Ok(())
     }
