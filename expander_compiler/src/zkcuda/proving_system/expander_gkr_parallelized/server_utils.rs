@@ -33,13 +33,12 @@ use std::sync::Arc;
 use tokio::sync::{oneshot, Mutex};
 use once_cell::sync::Lazy;
 use std::sync::Mutex as SyncMutex;
-pub static SERVER_URL: &str = "127.0.0.1:3000";
 pub static SERVER_IP: &str = "127.0.0.1";
 pub static SERVER_PORT: Lazy<SyncMutex<u16>> = Lazy::new(|| {
     SyncMutex::new(3000)
 });
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize)]
 pub enum RequestType {
     Setup(String), // The path to the computation graph setup file
     Prove,

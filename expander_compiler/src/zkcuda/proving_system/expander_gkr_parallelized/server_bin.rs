@@ -123,7 +123,6 @@ where
             })
             .await
             .unwrap();
-        println!("Server loaded");
     } else {
         worker_main::<C, ECCConfig>(global_mpi_config).await;
     }

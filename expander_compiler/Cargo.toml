@@ -8,7 +8,6 @@ edition = "2021"
 arith.workspace = true
 ark-std.workspace = true
 axum.workspace = true
-axum.workspace = true
 babybear.workspace = true
 chrono.workspace = true
 clap.workspace = true
@@ -27,16 +26,11 @@ goldilocks.workspace = true
 halo2curves.workspace = true
 mersenne31.workspace = true
 mpi.workspace = true
-mpi.workspace = true
 num_cpus.workspace = true
 poly_commit.workspace = true
 polynomials.workspace = true
 rand.workspace = true
 rayon.workspace = true
-reqwest.workspace = true
-serde.workspace = true
-serdes.workspace = true
-serde_json.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serdes.workspace = true
@@ -60,8 +54,6 @@ name = "trivial_circuit"
 path = "bin/trivial_circuit.rs"
 
 [[bin]]
-name = "expander_serve"
-path = "src/zkcuda/proving_system/expander_gkr_parallelized/server_bin.rs"
 name = "expander_serve"
 path = "src/zkcuda/proving_system/expander_gkr_parallelized/server_bin.rs"
 
