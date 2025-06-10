@@ -21,7 +21,7 @@ pub fn hint_key_to_id(key: &str) -> usize {
 
     let res = usize::from_le_bytes(hash[0..8].try_into().unwrap());
     if BuiltinHintIds::from_usize(res).is_some() {
-        panic!("Hint id {} collides with a builtin hint id", res);
+        panic!("Hint id {res} collides with a builtin hint id");
     }
     res
 }
@@ -37,7 +37,7 @@ impl<F: Field> HintRegistry<F> {
     ) {
         let id = hint_key_to_id(key);
         if self.hints.contains_key(&id) {
-            panic!("Hint with id {} already exists", id);
+            panic!("Hint with id {id} already exists");
         }
         self.hints.insert(id, Box::new(hint));
     }
@@ -46,7 +46,7 @@ impl<F: Field> HintRegistry<F> {
             let mut outputs = vec![F::zero(); num_outputs];
             hint(args, &mut outputs).map(|_| outputs)
         } else {
-            panic!("Hint with id {} not found", id);
+            panic!("Hint with id {id} not found");
         }
     }
 }
@@ -73,7 +73,7 @@ impl<F: Field + 'static> HintCaller<F> for HintRegistry<F> {
 
 impl<F: Field> HintCaller<F> for EmptyHintCaller {
     fn call(&mut self, id: usize, _: &[F], _: usize) -> Result<Vec<F>, Error> {
-        Err(Error::UserError(format!("hint with id {} not found", id)))
+        Err(Error::UserError(format!("hint with id {id} not found")))
     }
 }
 

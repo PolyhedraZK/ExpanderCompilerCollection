@@ -182,7 +182,7 @@ where
     let en0 = r_source.expected_num_output_zeroes;
     let c0 = r_source.circuits.get_mut(&0).unwrap();
     let tmp = remove_duplicate(en0, &mut c0.outputs);
-    let (mut r_hint_normalized_opt, src_im) = compile_step_1(&r_source)?;
+    let (mut r_hint_normalized_opt, src_im) = compile_step_1(&r_source, CompileOptions::default())?;
     let en0 = r_hint_normalized_opt.expected_num_output_zeroes;
     let c0 = r_hint_normalized_opt.circuits.get_mut(&0).unwrap();
     add_duplicate(en0, &mut c0.outputs, &tmp);
@@ -268,11 +268,12 @@ where
             assert_eq!(*x, EMPTY);
         }
     }
-    let lc = compile_step_3(lc)?;
+    let lc = compile_step_3(lc, CompileOptions::default())?;
     print_layered_circuit_stats(&lc);
     // compile step 4
     let mut tmp_im = InputMapping::new_identity(r_hint_exported.input_size());
-    let mut r_hint_exported_opt = compile_step_4(r_hint_exported, &mut tmp_im)?;
+    let mut r_hint_exported_opt =
+        compile_step_4(r_hint_exported, &mut tmp_im, CompileOptions::default())?;
     for (i, x) in tmp_im.mapping().iter().enumerate() {
         assert_eq!(i, *x);
     }

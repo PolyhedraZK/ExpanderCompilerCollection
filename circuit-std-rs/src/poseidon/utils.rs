@@ -7,7 +7,7 @@ use tiny_keccak::{Hasher, Keccak};
 const FIELD_NAME: &str = "Mersenne 31";
 
 pub fn get_constants(width: usize, round_num: usize) -> Vec<Vec<u32>> {
-    let seed = format!("{POSEIDON_SEED_PREFIX}_{}_{}", FIELD_NAME, width);
+    let seed = format!("{POSEIDON_SEED_PREFIX}_{FIELD_NAME}_{width}");
 
     let mut keccak = Keccak::v256();
     let mut buffer = [0u8; 32];

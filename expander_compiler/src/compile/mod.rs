@@ -19,6 +19,7 @@ mod tests;
 pub struct CompileOptions {
     pub mul_fanout_limit: Option<usize>,
     pub allow_input_reorder: bool,
+    pub opt_level: usize,
 }
 
 impl Default for CompileOptions {
@@ -26,6 +27,7 @@ impl Default for CompileOptions {
         Self {
             mul_fanout_limit: None,
             allow_input_reorder: true,
+            opt_level: 3,
         }
     }
 }
@@ -38,6 +40,19 @@ impl CompileOptions {
     pub fn without_input_reorder(mut self) -> Self {
         self.allow_input_reorder = false;
         self
+    }
+    pub fn with_opt_level(mut self, opt_level: usize) -> Self {
+        self.opt_level = opt_level;
+        self
+    }
+    pub fn validate(&self) -> Result<(), Error> {
+        if self.mul_fanout_limit.is_some() && self.mul_fanout_limit.unwrap() <= 1 {
+            return Err(Error::UserError("mul_fanout_limit must be > 1".to_string()));
+        }
+        if self.opt_level < 1 || self.opt_level > 3 {
+            return Err(Error::UserError("opt_level must be 1, 2 or 3".to_string()));
+        }
+        Ok(())
     }
 }
 
@@ -70,7 +85,7 @@ fn print_info(info: &str) {
 }
 
 fn print_stat(stat_name: &str, stat: usize, is_last: bool) {
-    print!("\x1b[36m{}=\x1b[0m{}", stat_name, stat);
+    print!("\x1b[36m{stat_name}=\x1b[0m{stat}");
     if !is_last {
         print!(" ");
     } else {
@@ -80,20 +95,30 @@ fn print_stat(stat_name: &str, stat: usize, is_last: bool) {
 
 pub fn compile_step_1<C: Config>(
     r_source: &ir::source::RootCircuit<C>,
+    options: CompileOptions,
 ) -> Result<(ir::hint_normalized::RootCircuit<C>, InputMapping), Error> {
     r_source.validate()?;
 
     let mut src_im = InputMapping::new_identity(r_source.input_size());
 
     let mut r_source = r_source.clone();
-    r_source.detect_chains();
 
-    let r_source_opt = optimize_until_fixed_point(&r_source, &mut src_im, |r| {
-        let (mut r, im) = r.remove_unreachable();
-        r.reassign_duplicate_sub_circuit_outputs();
-        r.detect_chains();
-        (r, im)
-    });
+    let r_source_opt = if options.opt_level >= 3 {
+        r_source.detect_chains();
+        optimize_until_fixed_point(&r_source, &mut src_im, |r| {
+            let (mut r, im) = r.remove_unreachable();
+            r.reassign_duplicate_sub_circuit_outputs(false);
+            r.detect_chains();
+            (r, im)
+        })
+    } else if options.opt_level >= 1 {
+        r_source.detect_chains();
+        let (r, im) = r_source.remove_unreachable();
+        src_im.compose_in_place(&im);
+        r
+    } else {
+        r_source
+    };
     r_source_opt
         .validate()
         .map_err(|e| e.prepend("source ir circuit invalid"))?;
@@ -101,11 +126,19 @@ pub fn compile_step_1<C: Config>(
     let r_hint_normalized = builder::hint_normalize::process(&r_source_opt)
         .map_err(|e| e.prepend("hint normalization failed"))?;
 
-    let r_hint_normalized_opt = optimize_until_fixed_point(&r_hint_normalized, &mut src_im, |r| {
-        let (mut r, im) = r.remove_unreachable();
-        r.reassign_duplicate_sub_circuit_outputs();
-        (r, im)
-    });
+    let r_hint_normalized_opt = if options.opt_level >= 2 {
+        optimize_until_fixed_point(&r_hint_normalized, &mut src_im, |r| {
+            let (mut r, im) = r.remove_unreachable();
+            r.reassign_duplicate_sub_circuit_outputs(false);
+            (r, im)
+        })
+    } else if options.opt_level >= 1 {
+        let (r, im) = r_hint_normalized.remove_unreachable();
+        src_im.compose_in_place(&im);
+        r
+    } else {
+        r_hint_normalized
+    };
     r_hint_normalized_opt
         .validate()
         .map_err(|e| e.prepend("hint normalized ir circuit invalid"))?;
@@ -118,11 +151,15 @@ pub fn compile_step_2<C: Config, I: InputType>(
 ) -> Result<(ir::dest::RootCircuit<C>, InputMapping), Error> {
     let mut hl_im = InputMapping::new_identity(r_hint_less.input_size());
 
-    let r_hint_less_opt = optimize_until_fixed_point(&r_hint_less, &mut hl_im, |r| {
-        let (mut r, im) = r.remove_unreachable();
-        r.reassign_duplicate_sub_circuit_outputs();
-        (r, im)
-    });
+    let r_hint_less_opt = if options.opt_level >= 2 {
+        optimize_until_fixed_point(&r_hint_less, &mut hl_im, |r| {
+            let (mut r, im) = r.remove_unreachable();
+            r.reassign_duplicate_sub_circuit_outputs(false);
+            (r, im)
+        })
+    } else {
+        r_hint_less
+    };
     r_hint_less_opt
         .validate()
         .map_err(|e| e.prepend("hint less ir circuit invalid"))?;
@@ -130,58 +167,85 @@ pub fn compile_step_2<C: Config, I: InputType>(
     let r_dest_relaxed = builder::final_build_opt::process(&r_hint_less_opt)
         .map_err(|e| e.prepend("final build failed"))?;
 
-    let r_dest_relaxed_opt = optimize_until_fixed_point(&r_dest_relaxed, &mut hl_im, |r| {
-        let (mut r, im) = r.remove_unreachable();
-        r.reassign_duplicate_sub_circuit_outputs();
-        (r, im)
-    });
+    let r_dest_relaxed_opt = if options.opt_level >= 2 {
+        optimize_until_fixed_point(&r_dest_relaxed, &mut hl_im, |r| {
+            let (mut r, im) = r.remove_unreachable();
+            r.reassign_duplicate_sub_circuit_outputs(false);
+            (r, im)
+        })
+    } else if options.opt_level >= 1 {
+        let (r, im) = r_dest_relaxed.remove_unreachable();
+        hl_im.compose_in_place(&im);
+        r
+    } else {
+        r_dest_relaxed
+    };
     r_dest_relaxed_opt
         .validate()
         .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
 
     let r_dest_relaxed_opt = if let Some(limit) = options.mul_fanout_limit {
-        r_dest_relaxed_opt.solve_mul_fanout_limit(limit)
+        let r = r_dest_relaxed_opt.solve_mul_fanout_limit(limit);
+        r.validate()
+            .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
+        r
     } else {
         r_dest_relaxed_opt
     };
-    r_dest_relaxed_opt
-        .validate()
-        .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
 
     let r_dest_relaxed_p2 = if C::ENABLE_RANDOM_COMBINATION {
         r_dest_relaxed_opt
     } else {
         let mut r1 = r_dest_relaxed_opt.export_constraints();
-        r1.reassign_duplicate_sub_circuit_outputs();
+        r1.reassign_duplicate_sub_circuit_outputs(false);
         let (r2, im) = r1.remove_unreachable();
         hl_im.compose_in_place(&im);
+        r2.validate()
+            .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
         r2
     };
-    r_dest_relaxed_p2
-        .validate()
-        .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
 
-    let r_dest_relaxed_p3 = if I::CROSS_LAYER_RELAY {
+    let mut r_dest_relaxed_p3 = if I::CROSS_LAYER_RELAY {
         r_dest_relaxed_p2
     } else {
         let r = layering::ir_split::split_to_single_layer(&r_dest_relaxed_p2);
         r.validate()
             .map_err(|e| e.prepend("dest relaxed ir circuit invalid"))?;
 
-        optimize_until_fixed_point(&r, &mut hl_im, |r| {
-            let (mut r, im) = r.remove_unreachable();
-            r.reassign_duplicate_sub_circuit_outputs();
-            (r, im)
-        })
+        if options.opt_level >= 2 {
+            optimize_until_fixed_point(&r, &mut hl_im, |r| {
+                let (mut r, im) = r.remove_unreachable();
+                r.reassign_duplicate_sub_circuit_outputs(false);
+                (r, im)
+            })
+        } else if options.opt_level >= 1 {
+            let (r, im) = r.remove_unreachable();
+            hl_im.compose_in_place(&im);
+            r
+        } else {
+            r
+        }
     };
+
+    if options.opt_level == 1 {
+        r_dest_relaxed_p3.reassign_duplicate_sub_circuit_outputs(true);
+    }
 
     let r_dest = r_dest_relaxed_p3.solve_duplicates();
 
-    let r_dest_opt = optimize_until_fixed_point(&r_dest, &mut hl_im, |r| {
-        let (mut r, im) = r.remove_unreachable();
-        r.reassign_duplicate_sub_circuit_outputs();
-        (r, im)
-    });
+    let r_dest_opt = if options.opt_level >= 2 {
+        optimize_until_fixed_point(&r_dest, &mut hl_im, |r| {
+            let (mut r, im) = r.remove_unreachable();
+            r.reassign_duplicate_sub_circuit_outputs(false);
+            (r, im)
+        })
+    } else if options.opt_level >= 1 {
+        let (r, im) = r_dest.remove_unreachable();
+        hl_im.compose_in_place(&im);
+        r
+    } else {
+        r_dest
+    };
     r_dest_opt
         .validate()
         .map_err(|e| e.prepend("dest ir circuit invalid"))?;
@@ -193,22 +257,27 @@ pub fn compile_step_2<C: Config, I: InputType>(
 
 pub fn compile_step_3<C: Config, I: InputType>(
     mut lc: layered::Circuit<C, I>,
+    options: CompileOptions,
 ) -> Result<layered::Circuit<C, I>, Error> {
     lc.validate()
         .map_err(|e| e.prepend("layered circuit invalid"))?;
 
-    lc.dedup_gates();
-    loop {
-        let lc1 = lc.expand_small_segments();
-        let lc2 = if lc1.segments.len() <= 100 {
-            lc1.find_common_parts()
-        } else {
-            lc1
-        };
-        if lc2 == lc {
-            break;
+    if options.opt_level >= 1 {
+        lc.dedup_gates();
+    }
+    if options.opt_level >= 3 {
+        loop {
+            let lc1 = lc.expand_small_segments();
+            let lc2 = if lc1.segments.len() <= 100 {
+                lc1.find_common_parts()
+            } else {
+                lc1
+            };
+            if lc2 == lc {
+                break;
+            }
+            lc = lc2;
         }
-        lc = lc2;
     }
     lc.validate()
         .map_err(|e| e.prepend("layered circuit invalid1"))?;
@@ -219,14 +288,19 @@ pub fn compile_step_3<C: Config, I: InputType>(
 pub fn compile_step_4<C: Config>(
     r_hint_exported: ir::hint_normalized::RootCircuit<C>,
     src_im: &mut InputMapping,
+    options: CompileOptions,
 ) -> Result<ir::hint_normalized::RootCircuit<C>, Error> {
     r_hint_exported
         .validate()
         .map_err(|e| e.prepend("final hint exported circuit invalid"))?;
-    let r_hint_exported_opt = optimize_until_fixed_point(&r_hint_exported, src_im, |r| {
-        let (r, im) = r.remove_unreachable();
-        (r, im)
-    });
+    let r_hint_exported_opt = if options.opt_level >= 2 {
+        optimize_until_fixed_point(&r_hint_exported, src_im, |r| {
+            let (r, im) = r.remove_unreachable();
+            (r, im)
+        })
+    } else {
+        r_hint_exported
+    };
     Ok(r_hint_exported_opt)
 }
 
@@ -264,7 +338,9 @@ pub fn compile_with_options<C: Config, I: InputType>(
     r_source: &ir::source::RootCircuit<C>,
     options: CompileOptions,
 ) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C, I>), Error> {
-    let (r_hint_normalized_opt, mut src_im) = compile_step_1(r_source)?;
+    options.validate()?;
+
+    let (r_hint_normalized_opt, mut src_im) = compile_step_1(r_source, options.clone())?;
 
     print_ir_stats(&r_hint_normalized_opt);
 
@@ -282,7 +358,7 @@ pub fn compile_with_options<C: Config, I: InputType>(
         },
     );
 
-    let lc = compile_step_3(lc)?;
+    let lc = compile_step_3(lc, options.clone())?;
 
     print_layered_circuit_stats(&lc);
 
@@ -295,7 +371,7 @@ pub fn compile_with_options<C: Config, I: InputType>(
         .map(|&x| x.max(1))
         .collect();
 
-    let mut r_hint_exported_opt = compile_step_4(r_hint_exported, &mut src_im)?;
+    let mut r_hint_exported_opt = compile_step_4(r_hint_exported, &mut src_im, options.clone())?;
     r_hint_exported_opt.add_back_removed_inputs(&src_im);
     r_hint_exported_opt
         .validate()

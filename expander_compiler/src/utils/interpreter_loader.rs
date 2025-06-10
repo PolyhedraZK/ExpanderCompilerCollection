@@ -64,7 +64,7 @@ impl M31Loader {
         if raw.chars().nth(0) == Some('v') {
             let value = raw[1..].parse::<i32>().unwrap();
             if value < 0 {
-                panic!("negative value: {}", value);
+                panic!("negative value: {value}");
             }
             self.get_rval_scalar(value as usize)
         } else {
@@ -92,7 +92,7 @@ impl M31Loader {
             "or" => api.or(lhs, rhs),
             "mul" => api.mul(lhs, rhs),
             _ => {
-                panic!("unknown opcode: {}", opcode);
+                panic!("unknown opcode: {opcode}");
             }
         };
         self.register_lval(lval, [gate].to_vec());
@@ -105,7 +105,7 @@ impl M31Loader {
         output: &mut Vec<Vec<Vec<Variable>>>,
         api: &mut B,
     ) {
-        eprintln!("loading {}", fname);
+        eprintln!("loading {fname}");
         let raw = std::fs::read_to_string(fname).unwrap();
         for line in raw.lines() {
             let v = line.split_whitespace().collect::<Vec<_>>();

@@ -17,8 +17,8 @@ impl Error {
 
     pub fn prepend(&self, prefix: &str) -> Error {
         match self {
-            Error::UserError(s) => Error::UserError(format!("{}: {}", prefix, s)),
-            Error::InternalError(s) => Error::InternalError(format!("{}: {}", prefix, s)),
+            Error::UserError(s) => Error::UserError(format!("{prefix}: {s}")),
+            Error::InternalError(s) => Error::InternalError(format!("{prefix}: {s}")),
         }
     }
 }
@@ -26,8 +26,8 @@ impl Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::UserError(s) => write!(f, "{}", s),
-            Error::InternalError(s) => write!(f, "{}", s),
+            Error::UserError(s) => write!(f, "{s}"),
+            Error::InternalError(s) => write!(f, "{s}"),
         }
     }
 }

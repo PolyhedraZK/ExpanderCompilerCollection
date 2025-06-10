@@ -21,18 +21,18 @@ where
     C: config::Config,
 {
     let ir_source = ir::source::RootCircuit::<C>::deserialize_from(&ir_source[..])
-        .map_err(|e| format!("failed to deserialize the source circuit: {}", e))?;
+        .map_err(|e| format!("failed to deserialize the source circuit: {e}"))?;
     let (ir_witness_gen, layered) =
         expander_compiler::compile::compile::<_, NormalInputType>(&ir_source)
             .map_err(|e| e.to_string())?;
     let mut ir_wg_s: Vec<u8> = Vec::new();
     ir_witness_gen
         .serialize_into(&mut ir_wg_s)
-        .map_err(|e| format!("failed to serialize the witness generator: {}", e))?;
+        .map_err(|e| format!("failed to serialize the witness generator: {e}"))?;
     let mut layered_s: Vec<u8> = Vec::new();
     layered
         .serialize_into(&mut layered_s)
-        .map_err(|e| format!("failed to serialize the layered circuit: {}", e))?;
+        .map_err(|e| format!("failed to serialize the layered circuit: {e}"))?;
     Ok((ir_wg_s, layered_s))
 }
 

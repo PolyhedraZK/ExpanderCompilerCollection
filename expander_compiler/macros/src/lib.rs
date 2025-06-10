@@ -311,7 +311,7 @@ fn replace_array_with_vec(ty: &Type) -> proc_macro2::TokenStream {
                 "InputVariable" | "OutputVariable" | "InputOutputVariable" => {
                     quote! { Variable }
                 }
-                _ => panic!("Unsupported type: {}. Expected InputVariable, OutputVariable, or InputOutputVariable", ident),
+                _ => panic!("Unsupported type: {ident}. Expected InputVariable, OutputVariable, or InputOutputVariable"),
             }
         }
         _ => panic!("Unsupported type structure. Expected array of Variable types."),

@@ -361,7 +361,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             };
             let chk = check_shape_compat(kernel_shape, &io_shape, broadcast_type);
             if !chk.0 {
-                panic!("Incompatible shapes: {:?} {:?}", kernel_shape, io_shape);
+                panic!("Incompatible shapes: {kernel_shape:?} {io_shape:?}");
             }
             check_results.push(chk);
         }
@@ -370,10 +370,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             if let Some(pc) = pc {
                 if let Some(parallel_count) = parallel_count {
                     if parallel_count != *pc {
-                        panic!(
-                            "Incompatible parallel counts: {:?} {:?}",
-                            parallel_count, pc
-                        );
+                        panic!("Incompatible parallel counts: {parallel_count:?} {pc:?}");
                     }
                 } else {
                     parallel_count = Some(*pc);
