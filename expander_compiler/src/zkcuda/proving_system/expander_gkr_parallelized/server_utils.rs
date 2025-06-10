@@ -31,10 +31,15 @@ use serde::{Deserialize, Serialize};
 use std::cmp::max;
 use std::sync::Arc;
 use tokio::sync::{oneshot, Mutex};
-
+use once_cell::sync::Lazy;
+use std::sync::Mutex as SyncMutex;
 pub static SERVER_URL: &str = "127.0.0.1:3000";
+pub static SERVER_IP: &str = "127.0.0.1";
+pub static SERVER_PORT: Lazy<SyncMutex<u16>> = Lazy::new(|| {
+    SyncMutex::new(3000)
+});
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum RequestType {
     Setup(String), // The path to the computation graph setup file
     Prove,
@@ -104,6 +109,7 @@ where
     let _lock = state.lock.lock().await; // Ensure only one request is processed at a time
     match request_type {
         RequestType::Setup(setup_file) => {
+            println!("receive setup request");
             let setup_timer = Timer::new("server setup", true);
             let _ = broadcast_request_type(&state.global_mpi_config, 1);
 

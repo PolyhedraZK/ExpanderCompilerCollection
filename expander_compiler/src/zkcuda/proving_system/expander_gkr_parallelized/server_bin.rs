@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, str::FromStr, sync::Arc};
+use std::{net::{IpAddr, SocketAddr}, str::FromStr, sync::Arc};
 
 use axum::{
     routing::{get, post},
@@ -13,7 +13,7 @@ use expander_compiler::{
             expander_gkr_parallelized::server_utils::{
                 root_main, worker_main, ServerState, GLOBAL_COMMUNICATOR, UNIVERSE,
             },
-            server_utils::SERVER_URL,
+            server_utils::SERVER_IP,
             ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
         },
     },
@@ -36,6 +36,11 @@ pub struct ExpanderExecArgs {
     /// Polynomial Commitment Scheme: Raw, or Orion
     #[arg(short, long, default_value = "Raw")]
     pub poly_commit: String,
+
+
+    /// Polynomial Commitment Scheme: Raw, or Orion
+    #[arg(short, long, default_value = "Port")]
+    pub port_number: String,
 }
 
 #[tokio::main]
@@ -50,25 +55,25 @@ async fn main() {
 
     match (expander_exec_args.field_type.as_str(), pcs_type) {
         ("M31", PolynomialCommitmentType::Raw) => {
-            serve::<M31Config, M31Config>().await;
+            serve::<M31Config, M31Config>(expander_exec_args.port_number).await;
         }
         ("GF2", PolynomialCommitmentType::Raw) => {
-            serve::<GF2Config, GF2Config>().await;
+            serve::<GF2Config, GF2Config>(expander_exec_args.port_number).await;
         }
         ("Goldilocks", PolynomialCommitmentType::Raw) => {
-            serve::<GoldilocksConfig, GoldilocksConfig>().await;
+            serve::<GoldilocksConfig, GoldilocksConfig>(expander_exec_args.port_number).await;
         }
         ("BabyBear", PolynomialCommitmentType::Raw) => {
-            serve::<BabyBearConfig, BabyBearConfig>().await;
+            serve::<BabyBearConfig, BabyBearConfig>(expander_exec_args.port_number).await;
         }
         ("BN254", PolynomialCommitmentType::Raw) => {
-            serve::<BN254Config, BN254Config>().await;
+            serve::<BN254Config, BN254Config>(expander_exec_args.port_number).await;
         }
         ("BN254", PolynomialCommitmentType::Hyrax) => {
-            serve::<BN254ConfigSha2Hyrax, BN254Config>().await;
+            serve::<BN254ConfigSha2Hyrax, BN254Config>(expander_exec_args.port_number).await;
         }
         ("BN254", PolynomialCommitmentType::KZG) => {
-            serve::<BN254ConfigSha2KZG, BN254Config>().await;
+            serve::<BN254ConfigSha2KZG, BN254Config>(expander_exec_args.port_number).await;
         }
         (field_type, pcs_type) => panic!(
             "Combination of {:?} and {:?} not supported",
@@ -78,7 +83,7 @@ async fn main() {
 }
 
 #[allow(static_mut_refs)]
-async fn serve<C: GKREngine + 'static, ECCConfig: Config<FieldConfig = C::FieldConfig> + 'static>()
+async fn serve<C: GKREngine + 'static, ECCConfig: Config<FieldConfig = C::FieldConfig> + 'static>(port_number: String)
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
@@ -107,9 +112,10 @@ where
             .route("/", get(|| async { "Expander Server is running" }))
             .with_state(state);
 
-        let addr: SocketAddr = SERVER_URL.parse().expect("Invalid SERVER_URL");
-        println!("Server running at http://{}", addr);
+        let ip: IpAddr = SERVER_IP.parse().expect("Invalid SERVER_IP");
+        let addr = SocketAddr::new(ip, port_number.parse::<u16>().expect("Invalid port number"));
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        println!("Server running at http://{}", addr);
         axum::serve(listener, app.into_make_service())
             .with_graceful_shutdown(async {
                 rx.await.ok();
@@ -117,6 +123,7 @@ where
             })
             .await
             .unwrap();
+        println!("Server loaded");
     } else {
         worker_main::<C, ECCConfig>(global_mpi_config).await;
     }
