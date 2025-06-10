@@ -229,10 +229,10 @@ where
 
         // Keep trying until the server is ready
         let port = parse_port_number();
-        let server_url = format!("{}:{}", SERVER_IP, port);
+        let server_url = format!("{SERVER_IP}:{port}");
         start_server::<C>(next_power_of_two(max_parallel_count), port);
         loop {
-            match wait_async(Client::new().get(format!("http://{}/", server_url)).send()) {
+            match wait_async(Client::new().get(format!("http://{server_url}/")).send()) {
                 Ok(_) => break,
                 Err(_) => std::thread::sleep(std::time::Duration::from_secs(1)),
             }

@@ -16,10 +16,12 @@ pub async fn request_exit() {
 
 pub async fn post_request(request: RequestType) {
     let client = Client::new();
-    let port = SERVER_PORT.lock().unwrap();
-    let server_url = format!("{}:{}", SERVER_IP, *port);
-    drop(port);
-    let server_url = format!("http://{}/", server_url);
+    let port = {
+        let port = SERVER_PORT.lock().unwrap();
+        *port
+    };
+    let server_url = format!("{SERVER_IP}:{port}");
+    let server_url = format!("http://{server_url}/");
 
     let res = client
         .post(server_url)

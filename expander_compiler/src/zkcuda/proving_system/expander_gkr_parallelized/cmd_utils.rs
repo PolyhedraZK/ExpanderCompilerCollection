@@ -9,8 +9,7 @@ where
     let (overscribe, field_name, pcs_name) = parse_config::<C>(max_parallel_count);
 
     let cmd_str = format!(
-        "mpiexec -n {} {} ../target/release/expander_serve --field-type {} --poly-commit {} --port-number {}",
-        max_parallel_count, overscribe, field_name, pcs_name, port_number,
+        "mpiexec -n {max_parallel_count} {overscribe} ../target/release/expander_serve --field-type {field_name} --poly-commit {pcs_name} --port-number {port_number}"
     );
     exec_command(&cmd_str, false);
 }

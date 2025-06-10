@@ -79,8 +79,7 @@ async fn main() {
             serve::<BN254ConfigSha2KZG, BN254Config>(expander_exec_args.port_number).await;
         }
         (field_type, pcs_type) => panic!(
-            "Combination of {:?} and {:?} not supported",
-            field_type, pcs_type
+            "Combination of {field_type:?} and {pcs_type:?} not supported"
         ),
     }
 }
@@ -118,12 +117,12 @@ async fn serve<C: GKREngine + 'static, ECCConfig: Config<FieldConfig = C::FieldC
 
         let ip: IpAddr = SERVER_IP.parse().expect("Invalid SERVER_IP");
         let port_val = port_number.parse::<u16>().unwrap_or_else(|e| {
-            eprintln!("Error: Invalid port number '{}'. {}.", port_number, e);
+            eprintln!("Error: Invalid port number '{port_number}'. {e}.");
             std::process::exit(1);
         });
         let addr = SocketAddr::new(ip, port_val);
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-        println!("Server running at http://{}", addr);
+        println!("Server running at http://{addr}");
         axum::serve(listener, app.into_make_service())
             .with_graceful_shutdown(async {
                 rx.await.ok();
