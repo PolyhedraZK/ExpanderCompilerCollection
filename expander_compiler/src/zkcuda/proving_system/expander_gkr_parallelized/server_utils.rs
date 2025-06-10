@@ -109,7 +109,6 @@ where
     let _lock = state.lock.lock().await; // Ensure only one request is processed at a time
     match request_type {
         RequestType::Setup(setup_file) => {
-            println!("receive setup request");
             let setup_timer = Timer::new("server setup", true);
             let _ = broadcast_request_type(&state.global_mpi_config, 1);
 

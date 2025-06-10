@@ -1,6 +1,5 @@
 use std::fs;
-use std::io::{Cursor, ErrorKind, Read};
-use std::net::{IpAddr, SocketAddr};
+use std::io::{Cursor, Read};
 
 use crate::circuit::config::Config;
 use crate::utils::misc::next_power_of_two;
@@ -200,7 +199,7 @@ where
     type Proof = CombinedProof<ECCConfig, ExpanderGKRProvingSystem<C>>;
 
     fn setup(
-        computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
+        computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
         let setup_timer = Timer::new("setup", true);
 
@@ -221,41 +220,17 @@ where
             .unwrap_or(1);
 
         // Keep trying until the server is ready
-        let ip: IpAddr = SERVER_IP.parse().expect("Invalid SERVER_IP");
-        let mut port = SERVER_PORT.lock().unwrap();
-        let mut try_port = *port;
-        loop {
-            let try_addr = SocketAddr::new(ip, try_port);
-            match std::net::TcpListener::bind(try_addr) {
-                Ok(l) => {
-                    drop(l);
-                    break;
-                }
-                Err(e) if e.kind() == ErrorKind::AddrInUse => {
-                    eprintln!("⚠️ Port {} in use, trying {}", try_port, try_port + 1);
-                    try_port += 1;
-                    if try_port > 10000 {
-                        panic!("No free port in {}–{}", port, try_port);
-                    }
-                }
-                Err(e) => {
-                    panic!("Failed to bind to {}: {}", try_addr, e);
-                }
-            }
-        };
-        println!("update port to {}", try_port);
-        *port = try_port;
-        let server_url = format!("{}:{}", SERVER_IP, *port);
+        let port = SERVER_PORT.lock().unwrap();
+        let port_number = *port;
         drop(port);
-        println!("Waiting for server at http://{}/", server_url);
-        start_server::<C>(next_power_of_two(max_parallel_count), try_port);
+        let server_url = format!("{}:{}", SERVER_IP, port_number);
+        start_server::<C>(next_power_of_two(max_parallel_count), port_number);
         loop {
             match wait_async(Client::new().get(format!("http://{}/", server_url)).send()) {
                 Ok(_) => break,
                 Err(_) => std::thread::sleep(std::time::Duration::from_secs(1)),
             }
         }
-        println!("Find server at http://{}/", server_url);
 
         wait_async(request_setup(&setup_filename));
 
@@ -277,7 +252,6 @@ where
                 .map(|m| &m.values[..])
                 .collect::<Vec<_>>(),
         );
-        println!("request_prove");
         wait_async(request_prove());
 
         timer.stop();
@@ -311,7 +285,6 @@ where
     }
 
     fn post_process() {
-        println!("post_process");
         wait_async(request_exit())
     }
 }
