@@ -1,7 +1,22 @@
 use serdes::ExpSerde;
 
+use crate::{circuit::input_mapping::InputMapping, utils::misc::next_power_of_two};
+
 pub type Shape = Vec<usize>;
 pub type Axes = Vec<usize>;
+/*
+Bit order definition:
+Suppose bit_order = [a_0, a_1, a_2, ...]
+Then when we read the i-th position, where i = sum(b_j * 2^j), b_j = 0 or 1,
+we will read the j-th position, where j = sum(b_j * 2^(a_j)).
+*/
+pub type BitOrder = Vec<usize>;
+
+pub fn shape_prepend(shape: &Shape, x: usize) -> Shape {
+    let mut shape = shape.clone();
+    shape.insert(0, x);
+    shape
+}
 
 #[derive(Debug, Clone, ExpSerde)]
 pub struct ShapeHistory {
@@ -64,6 +79,32 @@ impl Entry {
             Some(axes) => axes.iter().map(|&a| self.shape[a]).collect(),
         }
     }
+    fn transpose_shape(&self, shape: &[(usize, usize)]) -> Vec<(usize, usize)> {
+        if self.axes.is_none() {
+            return shape.to_vec();
+        }
+        let mut segments = vec![];
+        let mut cur_prod = 1;
+        let mut target = 1;
+        let mut self_shape_iter = self.shape.iter();
+        for &x in shape.iter().skip(1) {
+            if cur_prod == target {
+                cur_prod = x.0;
+                target = *self_shape_iter.next().unwrap();
+                segments.push(vec![x]);
+            } else {
+                cur_prod *= x.0;
+                segments.last_mut().unwrap().push(x);
+            }
+        }
+        assert_eq!(cur_prod, target);
+        assert_eq!(self_shape_iter.next(), None);
+        let mut res = Vec::with_capacity(shape.len());
+        for i in self.axes.as_ref().unwrap() {
+            res.extend(segments[*i].iter());
+        }
+        res
+    }
     fn undo_transpose_shape_products(&self, products: &[usize]) -> Vec<usize> {
         if self.axes.is_none() {
             return products.to_vec();
@@ -104,7 +145,11 @@ pub fn shape_vec_len(shape: &[usize]) -> usize {
     shape.iter().product()
 }
 
-fn prefix_products(shape: &[usize]) -> Vec<usize> {
+pub fn shape_vec_padded_len(shape: &[usize]) -> usize {
+    shape.iter().map(|&x| next_power_of_two(x)).product()
+}
+
+pub fn prefix_products(shape: &[usize]) -> Vec<usize> {
     let mut products = Vec::with_capacity(shape.len() + 1);
     let mut product = 1;
     products.push(1);
@@ -113,6 +158,14 @@ fn prefix_products(shape: &[usize]) -> Vec<usize> {
         products.push(product);
     }
     products
+}
+
+pub fn prefix_products_to_shape(products: &[usize]) -> Vec<usize> {
+    let mut shape = Vec::with_capacity(products.len() - 1);
+    for i in 1..products.len() {
+        shape.push(products[i] / products[i - 1]);
+    }
+    shape
 }
 
 pub fn merge_shape_products(a: &[usize], b: &[usize]) -> Vec<usize> {
@@ -126,6 +179,39 @@ pub fn merge_shape_products(a: &[usize], b: &[usize]) -> Vec<usize> {
         assert_eq!(y % x, 0, "Detected illegal shape operation");
     }
     all
+}
+
+pub fn keep_shape_products_until(shape: &[usize], x: usize) -> Vec<usize> {
+    let p = shape.iter().position(|&y| y == x).unwrap();
+    shape[..=p].iter().cloned().collect()
+}
+
+pub fn keep_shape_since(shape: &[usize], x: usize) -> Vec<usize> {
+    let mut p = 1;
+    if x == 1 {
+        return shape.to_vec();
+    }
+    for (i, &y) in shape.iter().enumerate() {
+        p *= y;
+        if p == x {
+            return shape[i + 1..].to_vec();
+        }
+    }
+    unreachable!()
+}
+
+pub fn shape_padded_mapping(shape: &[usize]) -> InputMapping {
+    let mut cur = vec![0];
+    let mut step = 1;
+    for &len in shape.iter().rev() {
+        let mut new = cur.clone();
+        for i in 1..len {
+            new.extend(cur.iter().map(|&y| y + i * step));
+        }
+        step *= next_power_of_two(len);
+        cur = new;
+    }
+    InputMapping::new(step, cur)
 }
 
 impl ShapeHistory {
@@ -153,6 +239,52 @@ impl ShapeHistory {
             split_list = e.undo_transpose_shape_products(&merged_split_list);
         }
         split_list
+    }
+
+    pub fn get_transposed_shape_and_bit_order(&self, shape: &[usize]) -> (Shape, BitOrder) {
+        let mut cur = None;
+        let initial_shape = || {
+            shape
+                .iter()
+                .enumerate()
+                .map(|(i, &x)| (x, i))
+                .collect::<Vec<_>>()
+        };
+        for e in self.entries.iter() {
+            cur = if e.axes.as_ref().is_none() {
+                cur
+            } else {
+                if cur.is_none() {
+                    Some(e.transpose_shape(&initial_shape()))
+                } else {
+                    Some(e.transpose_shape(&cur.unwrap()))
+                }
+            };
+        }
+        let new_shape_and_id = match cur {
+            None => initial_shape(),
+            Some(transposed_shape) => transposed_shape,
+        };
+        let bit_len = shape
+            .iter()
+            .map(|&x| next_power_of_two(x).trailing_zeros() as usize)
+            .collect::<Vec<_>>();
+        let mut bit_start = vec![0];
+        for &x in bit_len.iter().rev() {
+            bit_start.push(bit_start.last().unwrap() + x);
+        }
+        let mut bit_order = Vec::new();
+        for &x in new_shape_and_id.iter().rev() {
+            let n = bit_len[x.1];
+            let k = bit_start[bit_len.len() - x.1];
+            for i in 0..n {
+                bit_order.push(k + i);
+            }
+        }
+        (
+            new_shape_and_id.iter().map(|&(x, _)| x).collect(),
+            bit_order,
+        )
     }
 
     pub fn shape(&self) -> Shape {
