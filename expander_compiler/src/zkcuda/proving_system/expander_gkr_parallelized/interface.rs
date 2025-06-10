@@ -220,11 +220,14 @@ where
             .unwrap_or(1);
 
         // Keep trying until the server is ready
-        let port = SERVER_PORT.lock().unwrap();
-        let port_number = *port;
+        let mut port = SERVER_PORT.lock().unwrap();
+        *port = std::env::var("PORT_NUMBER")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(*port);
+        let server_url = format!("{}:{}", SERVER_IP, port);
+        start_server::<C>(next_power_of_two(max_parallel_count), *port);
         drop(port);
-        let server_url = format!("{}:{}", SERVER_IP, port_number);
-        start_server::<C>(next_power_of_two(max_parallel_count), port_number);
         loop {
             match wait_async(Client::new().get(format!("http://{}/", server_url)).send()) {
                 Ok(_) => break,
