@@ -27,12 +27,14 @@ use gkr_engine::{
     ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine,
 };
 use gkr_engine::{StructuredReferenceString, Transcript};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::cmp::max;
 use std::sync::Arc;
+use std::sync::Mutex as SyncMutex;
 use tokio::sync::{oneshot, Mutex};
-
-pub static SERVER_URL: &str = "127.0.0.1:3000";
+pub static SERVER_IP: &str = "127.0.0.1";
+pub static SERVER_PORT: Lazy<SyncMutex<u16>> = Lazy::new(|| SyncMutex::new(3000));
 
 #[derive(Serialize, Deserialize)]
 pub enum RequestType {
