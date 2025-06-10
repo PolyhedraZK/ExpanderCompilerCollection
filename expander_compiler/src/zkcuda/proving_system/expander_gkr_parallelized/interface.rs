@@ -29,6 +29,14 @@ use serdes::ExpSerde;
 pub struct ParallelizedExpanderGKRProvingSystem<C: GKREngine> {
     _config: std::marker::PhantomData<C>,
 }
+fn parse_port_number() -> u16 {
+    let mut port = SERVER_PORT.lock().unwrap();
+    *port = std::env::var("PORT_NUMBER")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(*port);
+    *port
+}
 
 impl<C: GKREngine> ParallelizedExpanderGKRProvingSystem<C>
 where
@@ -199,7 +207,7 @@ where
     type Proof = CombinedProof<ECCConfig, ExpanderGKRProvingSystem<C>>;
 
     fn setup(
-        computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>
+        computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
         let setup_timer = Timer::new("setup", true);
 
@@ -220,14 +228,9 @@ where
             .unwrap_or(1);
 
         // Keep trying until the server is ready
-        let mut port = SERVER_PORT.lock().unwrap();
-        *port = std::env::var("PORT_NUMBER")
-            .ok()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(*port);
+        let port = parse_port_number();
         let server_url = format!("{}:{}", SERVER_IP, port);
-        start_server::<C>(next_power_of_two(max_parallel_count), *port);
-        drop(port);
+        start_server::<C>(next_power_of_two(max_parallel_count), port);
         loop {
             match wait_async(Client::new().get(format!("http://{}/", server_url)).send()) {
                 Ok(_) => break,

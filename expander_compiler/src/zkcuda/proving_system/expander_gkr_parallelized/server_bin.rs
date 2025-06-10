@@ -1,4 +1,8 @@
-use std::{net::{IpAddr, SocketAddr}, str::FromStr, sync::Arc};
+use std::{
+    net::{IpAddr, SocketAddr},
+    str::FromStr,
+    sync::Arc,
+};
 
 use axum::{
     routing::{get, post},
@@ -37,8 +41,7 @@ pub struct ExpanderExecArgs {
     #[arg(short, long, default_value = "Raw")]
     pub poly_commit: String,
 
-
-    /// Polynomial Commitment Scheme: Raw, or Orion
+    /// The port number for the server to listen on.
     #[arg(short, long, default_value = "Port")]
     pub port_number: String,
 }
@@ -83,8 +86,9 @@ async fn main() {
 }
 
 #[allow(static_mut_refs)]
-async fn serve<C: GKREngine + 'static, ECCConfig: Config<FieldConfig = C::FieldConfig> + 'static>(port_number: String)
-where
+async fn serve<C: GKREngine + 'static, ECCConfig: Config<FieldConfig = C::FieldConfig> + 'static>(
+    port_number: String,
+) where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let global_mpi_config = unsafe {
@@ -113,7 +117,11 @@ where
             .with_state(state);
 
         let ip: IpAddr = SERVER_IP.parse().expect("Invalid SERVER_IP");
-        let addr = SocketAddr::new(ip, port_number.parse::<u16>().expect("Invalid port number"));
+        let port_val = port_number.parse::<u16>().unwrap_or_else(|e| {
+            eprintln!("Error: Invalid port number '{}'. {}.", port_number, e);
+            std::process::exit(1);
+        });
+        let addr = SocketAddr::new(ip, port_val);
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
         println!("Server running at http://{}", addr);
         axum::serve(listener, app.into_make_service())
