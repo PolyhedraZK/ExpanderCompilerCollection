@@ -83,8 +83,8 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
         let mut res = vec![];
         for i in 0..parallel_count {
             let lc_input = prepare_inputs(
-                &kernel.layered_circuit(),
-                &kernel.layered_circuit_input(),
+                kernel.layered_circuit(),
+                kernel.layered_circuit_input(),
                 commitments_values,
                 is_broadcast,
                 i,
@@ -114,8 +114,8 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
         check_inputs(kernel, &values, parallel_count, is_broadcast);
         for i in 0..parallel_count {
             let lc_input = prepare_inputs(
-                &kernel.layered_circuit(),
-                &kernel.layered_circuit_input(),
+                kernel.layered_circuit(),
+                kernel.layered_circuit_input(),
                 &values,
                 is_broadcast,
                 i,
@@ -189,7 +189,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
                         .map(|x| &device_memories[*x][..])
                         .collect::<Vec<_>>(),
                     next_power_of_two(template.parallel_count()),
-                    &template.is_broadcast(),
+                    template.is_broadcast(),
                 )
             })
             .collect::<Vec<_>>();
@@ -218,7 +218,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
                     proof,
                     commitments_kernel,
                     next_power_of_two(template.parallel_count()),
-                    &template.is_broadcast(),
+                    template.is_broadcast(),
                 )
             })
             .collect::<Vec<_>>();

@@ -8,7 +8,7 @@ use expander_compiler::zkcuda::proving_system::{
     ExpanderGKRProvingSystem, ParallelizedExpanderGKRProvingSystem, ProvingSystem,
 };
 use expander_compiler::zkcuda::shape::Reshape;
-use expander_compiler::zkcuda::{context::*, kernel::*};
+use expander_compiler::zkcuda::{context::{call_kernel, Context}, kernel::{kernel, KernelPrimitive, compile_with_spec_and_shapes, IOVecSpec}};
 use gkr::BN254ConfigSha2Hyrax;
 
 /// N * M matrix times M *K matrix

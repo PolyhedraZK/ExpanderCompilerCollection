@@ -280,7 +280,7 @@ where
                     proof,
                     commitments_kernel,
                     next_power_of_two(template.parallel_count()),
-                    &template.is_broadcast(),
+                    template.is_broadcast(),
                 )
             })
             .collect::<Vec<_>>();

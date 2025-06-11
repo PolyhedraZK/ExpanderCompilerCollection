@@ -194,7 +194,7 @@ fn make_device_mem<C: Config>(
     let t = shape_vec_len(&shape);
     let required_shape_products = if t == 1 { vec![1] } else { vec![1, t] };
     device_memories.push(DeviceMemory {
-        values: values,
+        values,
         required_shape_products,
     });
     Some(DeviceMemoryHandleRaw {
@@ -292,7 +292,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         chunk_size: Option<usize>,
     ) {
         if is_broadcast {
-            s.copy_from_slice(&values);
+            s.copy_from_slice(values);
         } else {
             let chunk_size = chunk_size.unwrap();
             s.copy_from_slice(
@@ -330,7 +330,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             let io_shape = if let Some(handle) = io {
                 handle.shape_history.shape()
             } else {
-                panic!("Missing input at index {}", i)
+                panic!("Missing input at index {i}")
             };
             match check_shape_compat(kernel_shape, &io_shape, num_parallel) {
                 Some(ib) => {
@@ -473,15 +473,10 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
     fn propagate_and_get_shapes(&mut self) -> Vec<Shape> {
         let mut dm_shapes = self.get_current_device_memory_shapes();
         loop {
-            let get_pad_shape = |x: &DeviceMemoryHandle| match x.as_ref() {
-                Some(handle) => Some(
-                    handle
+            let get_pad_shape = |x: &DeviceMemoryHandle| x.as_ref().map(|handle| handle
                         .shape_history
                         .get_transposed_shape_and_bit_order(&dm_shapes[handle.id])
-                        .0,
-                ),
-                None => None,
-            };
+                        .0);
             for kernel_call in self.kernel_calls.iter() {
                 let kernel_primitive = self.kernel_primitives.get(kernel_call.kernel_id);
                 let mut all_shapes = Vec::new();
@@ -515,7 +510,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 let mut required_shape_products = prefix_products(&[kernel_call.num_parallel]);
                 for shape in all_shapes.iter() {
                     let products = keep_shape_products_until(
-                        &prefix_products(&shape),
+                        &prefix_products(shape),
                         kernel_call.num_parallel,
                     );
                     required_shape_products =
@@ -558,7 +553,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
 
         let (mut cg_kernels, cg_proof_templates, cg_commitments_lens) = if let Some(cg) = cg {
             for (i, kernel) in cg.kernels.iter().enumerate() {
-                assert_eq!(self.kernels.add(&kernel), i);
+                assert_eq!(self.kernels.add(kernel), i);
             }
             assert!(cg.commitments_lens.len() >= self.device_memories.len());
             for (dm_shape, cm_len) in dm_shapes.iter().zip(cg.commitments_lens.iter()) {
@@ -573,16 +568,11 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             (None, None, None)
         };
         let mut commitments_lens: Vec<usize> =
-            dm_shapes.iter().map(|x| shape_vec_padded_len(&x)).collect();
+            dm_shapes.iter().map(|x| shape_vec_padded_len(x)).collect();
 
-        let get_pad_shape = |x: &DeviceMemoryHandle| match x.as_ref() {
-            Some(handle) => Some(
-                handle
+        let get_pad_shape = |x: &DeviceMemoryHandle| x.as_ref().map(|handle| handle
                     .shape_history
-                    .get_transposed_shape_and_bit_order(&dm_shapes[handle.id]),
-            ),
-            None => None,
-        };
+                    .get_transposed_shape_and_bit_order(&dm_shapes[handle.id]));
         let mut dm_max = self.device_memories.len();
         for kernel_call in self.kernel_calls.iter() {
             let pad_shapes_input = kernel_call
@@ -601,30 +591,22 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             } else {
                 let mut psi = Vec::new();
                 for (s, &ib) in pad_shapes_input.iter().zip(kernel_call.is_broadcast.iter()) {
-                    psi.push(if let Some(t) = s {
-                        Some(if ib {
+                    psi.push(s.as_ref().map(|t| if ib {
                             t.0.clone()
                         } else {
                             keep_shape_since(&t.0, kernel_call.num_parallel)
-                        })
-                    } else {
-                        None
-                    });
+                        }));
                 }
                 let mut pso = Vec::new();
                 for (s, &ib) in pad_shapes_output
                     .iter()
                     .zip(kernel_call.is_broadcast.iter())
                 {
-                    pso.push(if let Some(t) = s {
-                        Some(if ib {
+                    pso.push(s.as_ref().map(|t| if ib {
                             t.0.clone()
                         } else {
                             keep_shape_since(&t.0, kernel_call.num_parallel)
-                        })
-                    } else {
-                        None
-                    });
+                        }));
                 }
                 compile_primitive(kernel_primitive, &psi, &pso)?
             };
@@ -781,7 +763,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 let values = handle
                     .shape_history
                     .permute_vec(&self.device_memories[handle.id].values);
-                assert_eq!(ib, false);
+                assert!(!ib);
                 *chunk_size = Some(values.len() / kernel_call.num_parallel);
                 *ir_inputs = values;
             }

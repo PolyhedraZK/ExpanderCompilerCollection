@@ -272,8 +272,8 @@ where
             let mut transcript = C::TranscriptConfig::new();
             transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
             expander_circuit.layers[0].input_vals = prepare_inputs(
-                &kernel.layered_circuit(),
-                &kernel.layered_circuit_input(),
+                kernel.layered_circuit(),
+                kernel.layered_circuit_input(),
                 commitments_values,
                 is_broadcast,
                 i,
@@ -666,7 +666,7 @@ where
                         .map(|x| &device_memories[*x][..])
                         .collect::<Vec<_>>(),
                     next_power_of_two(template.parallel_count()),
-                    &template.is_broadcast(),
+                    template.is_broadcast(),
                 )
             })
             .collect::<Vec<_>>();
@@ -695,7 +695,7 @@ where
                     proof,
                     commitments_kernel,
                     next_power_of_two(template.parallel_count()),
-                    &template.is_broadcast(),
+                    template.is_broadcast(),
                 )
             })
             .collect::<Vec<_>>();

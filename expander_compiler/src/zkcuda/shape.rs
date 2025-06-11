@@ -183,7 +183,7 @@ pub fn merge_shape_products(a: &[usize], b: &[usize]) -> Vec<usize> {
 
 pub fn keep_shape_products_until(shape: &[usize], x: usize) -> Vec<usize> {
     let p = shape.iter().position(|&y| y == x).unwrap();
-    shape[..=p].iter().cloned().collect()
+    shape[..=p].to_vec()
 }
 
 pub fn keep_shape_until(shape: &[usize], x: usize) -> Vec<usize> {
@@ -267,12 +267,10 @@ impl ShapeHistory {
         for e in self.entries.iter() {
             cur = if e.axes.as_ref().is_none() {
                 cur
+            } else if cur.is_none() {
+                Some(e.transpose_shape(&initial_shape()))
             } else {
-                if cur.is_none() {
-                    Some(e.transpose_shape(&initial_shape()))
-                } else {
-                    Some(e.transpose_shape(&cur.unwrap()))
-                }
+                Some(e.transpose_shape(&cur.unwrap()))
             };
         }
         let new_shape_and_id = match cur {

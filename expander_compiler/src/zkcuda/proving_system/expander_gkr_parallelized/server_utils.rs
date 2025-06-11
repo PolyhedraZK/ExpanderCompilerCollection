@@ -387,7 +387,7 @@ where
                     .map(|x| values[*x].as_ref())
                     .collect::<Vec<_>>(),
                 next_power_of_two(template.parallel_count()),
-                &template.is_broadcast(),
+                template.is_broadcast(),
             )
         })
         .collect::<Vec<_>>();
@@ -540,7 +540,7 @@ where
     transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
     expander_circuit.layers[0].input_vals = prepare_inputs(
         1usize << expander_circuit.log_input_size(),
-        &kernel.layered_circuit_input(),
+        kernel.layered_circuit_input(),
         &local_commitment_values,
     );
     expander_circuit.fill_rnd_coefs(&mut transcript);
