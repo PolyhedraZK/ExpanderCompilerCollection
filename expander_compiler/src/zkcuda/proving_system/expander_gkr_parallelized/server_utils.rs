@@ -543,7 +543,7 @@ fn root_prove_input_claim<C: GKREngine>(
             get_challenge_for_pcs_with_mpi(gkr_challenge, val_len, parallel_count, *ib);
 
         let params =
-            <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(val_len, 1);
+            <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(val_len.ilog2() as usize, 1);
         let p_key = p_keys.p_keys.get(&val_len).unwrap();
 
         let poly = RefMultiLinearPoly::from_ref(commitment_val.as_ref());
