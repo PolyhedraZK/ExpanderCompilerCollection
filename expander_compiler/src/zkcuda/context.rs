@@ -473,10 +473,14 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
     fn propagate_and_get_shapes(&mut self) -> Vec<Shape> {
         let mut dm_shapes = self.get_current_device_memory_shapes();
         loop {
-            let get_pad_shape = |x: &DeviceMemoryHandle| x.as_ref().map(|handle| handle
+            let get_pad_shape = |x: &DeviceMemoryHandle| {
+                x.as_ref().map(|handle| {
+                    handle
                         .shape_history
                         .get_transposed_shape_and_bit_order(&dm_shapes[handle.id])
-                        .0);
+                        .0
+                })
+            };
             for kernel_call in self.kernel_calls.iter() {
                 let kernel_primitive = self.kernel_primitives.get(kernel_call.kernel_id);
                 let mut all_shapes = Vec::new();
@@ -570,9 +574,13 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         let mut commitments_lens: Vec<usize> =
             dm_shapes.iter().map(|x| shape_vec_padded_len(x)).collect();
 
-        let get_pad_shape = |x: &DeviceMemoryHandle| x.as_ref().map(|handle| handle
+        let get_pad_shape = |x: &DeviceMemoryHandle| {
+            x.as_ref().map(|handle| {
+                handle
                     .shape_history
-                    .get_transposed_shape_and_bit_order(&dm_shapes[handle.id]));
+                    .get_transposed_shape_and_bit_order(&dm_shapes[handle.id])
+            })
+        };
         let mut dm_max = self.device_memories.len();
         for kernel_call in self.kernel_calls.iter() {
             let pad_shapes_input = kernel_call
@@ -591,22 +599,26 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             } else {
                 let mut psi = Vec::new();
                 for (s, &ib) in pad_shapes_input.iter().zip(kernel_call.is_broadcast.iter()) {
-                    psi.push(s.as_ref().map(|t| if ib {
+                    psi.push(s.as_ref().map(|t| {
+                        if ib {
                             t.0.clone()
                         } else {
                             keep_shape_since(&t.0, kernel_call.num_parallel)
-                        }));
+                        }
+                    }));
                 }
                 let mut pso = Vec::new();
                 for (s, &ib) in pad_shapes_output
                     .iter()
                     .zip(kernel_call.is_broadcast.iter())
                 {
-                    pso.push(s.as_ref().map(|t| if ib {
+                    pso.push(s.as_ref().map(|t| {
+                        if ib {
                             t.0.clone()
                         } else {
                             keep_shape_since(&t.0, kernel_call.num_parallel)
-                        }));
+                        }
+                    }));
                 }
                 compile_primitive(kernel_primitive, &psi, &pso)?
             };
