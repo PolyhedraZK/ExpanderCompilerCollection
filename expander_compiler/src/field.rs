@@ -5,7 +5,17 @@ pub use goldilocks::{Goldilocks, Goldilocksx8};
 pub use mersenne31::{M31x16, M31};
 use serdes::ExpSerde;
 
-pub trait Field: FieldArith + ExpSerde {}
+pub trait Field: FieldArith + ExpSerde {
+    fn optimistic_inv(&self) -> Option<Self> {
+        if self.is_zero() {
+            None
+        } else if *self == Self::ONE {
+            Some(Self::ONE)
+        } else {
+            self.inv()
+        }
+    }
+}
 
 impl Field for BN254Fr {}
 impl Field for GF2 {}
