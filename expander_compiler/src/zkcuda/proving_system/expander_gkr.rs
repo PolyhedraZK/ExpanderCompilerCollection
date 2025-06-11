@@ -1,5 +1,4 @@
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
-use std::cmp::max;
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
 
@@ -226,13 +225,12 @@ where
         let mut expander_circuit = kernel.layered_circuit.export_to_expander().flatten::<C>();
         expander_circuit.pre_process_gkr::<C>();
         let (max_num_input_var, max_num_output_var) = max_n_vars(&expander_circuit);
-        let max_num_var = max(max_num_input_var, max_num_output_var);
         let mut prover_scratch =
-            ProverScratchPad::<C::FieldConfig>::new(max_num_var, max_num_var, 1);
+            ProverScratchPad::<C::FieldConfig>::new(max_num_input_var, max_num_output_var, 1);
 
         let mut proof = ExpanderGKRProof { data: vec![] };
 
-        // For each parallel index, prove the GKR proof
+        // For each parallel index, generate the GKR proof
         for i in 0..parallel_count {
             let mut transcript = C::TranscriptConfig::new();
             transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
@@ -469,14 +467,14 @@ fn prove_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfi
         let val_len = commitment_val.len();
         let (challenge_for_pcs, _) = get_challenge_for_pcs(
             challenge,
-            commitment_val.len(),
+            val_len,
             parallel_index,
             parallel_count,
             *ib,
         );
 
         let params =
-            <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(val_len, 1);
+            <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(val_len.ilog2() as usize, 1);
         let p_key = p_keys.p_keys.get(&val_len).unwrap();
 
         let poly = RefMultiLinearPoly::from_ref(commitment_val);
@@ -490,7 +488,7 @@ fn prove_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfi
         transcript.lock_proof();
         let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::open(
             &params,
-            &MPIConfig::default(),
+            &MPIConfig::prover_new(None, None),
             p_key,
             &poly,
             &challenge_for_pcs,
