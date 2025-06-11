@@ -4,11 +4,13 @@ use std::io::{Cursor, Read};
 use crate::circuit::config::Config;
 use crate::utils::misc::next_power_of_two;
 use crate::zkcuda::kernel::Kernel;
+use crate::zkcuda::proof::ComputationGraph;
 use crate::zkcuda::proving_system::expander_gkr_parallelized::client::{
     request_exit, request_prove, request_setup,
 };
 use crate::zkcuda::proving_system::expander_gkr_parallelized::cmd_utils::start_server;
 use crate::zkcuda::proving_system::expander_gkr_parallelized::shared_memory_utils::SharedMemoryEngine;
+use crate::zkcuda::proving_system::server_utils::get_challenge_for_pcs_with_mpi;
 use crate::zkcuda::proving_system::{
     CombinedProof, Commitment, ExpanderGKRCommitment, ExpanderGKRProof, ProvingSystem,
 };
@@ -35,27 +37,25 @@ where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     fn verify_kernel<ECCConfig: Config<FieldConfig = C::FieldConfig>>(
-        verifier_setup: &<ParallelizedExpanderGKRProvingSystem<C> as ProvingSystem<ECCConfig>>::VerifierSetup,
-        _kernel_id: usize,
+        verifier_setup: &ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
         kernel: &Kernel<ECCConfig>,
         proof: &ExpanderGKRProof,
-        commitments: &[ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
+        commitments: &[&ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> bool {
         let timer = Timer::new("verify", true);
-
         let mut expander_circuit = kernel.layered_circuit.export_to_expander().flatten::<C>();
         expander_circuit.pre_process_gkr::<C>();
 
         let mut transcript = C::TranscriptConfig::new();
         transcript.append_u8_slice(&[0u8; 32]);
         expander_circuit.fill_rnd_coefs(&mut transcript);
+
         let mut cursor = Cursor::new(&proof.data[0].bytes);
         cursor.set_position(32);
-
         let (mut verified, challenge, claimed_v0, claimed_v1) = gkr_verify(
-            parallel_count,
+            1,
             &expander_circuit,
             &[],
             &<C::FieldConfig as FieldEngine>::ChallengeField::ZERO,
@@ -63,7 +63,11 @@ where
             &mut cursor,
         );
 
-        let pcs_verification_timer = Timer::new("pcs verification", true);
+        if !verified {
+            println!("Failed to verify GKR proof");
+            return false;
+        }
+
         verified &= Self::verify_input_claim::<ECCConfig>(
             &mut cursor,
             kernel,
@@ -88,10 +92,12 @@ where
                 &mut transcript,
             );
         }
-        pcs_verification_timer.stop();
-
+        if !verified {
+            println!("Failed to verify overall pcs");
+            return false;
+        }
         timer.stop();
-        verified
+        true
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -101,36 +107,30 @@ where
         v_keys: &ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
         challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
         y: &<C::FieldConfig as FieldEngine>::ChallengeField,
-        commitments: &[ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
+        commitments: &[&ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
         is_broadcast: &[bool],
         parallel_count: usize,
         transcript: &mut C::TranscriptConfig,
     ) -> bool {
-        assert_eq!(1 << challenge.r_mpi.len(), parallel_count);
         let mut target_y = <C::FieldConfig as FieldEngine>::ChallengeField::ZERO;
         for ((input, commitment), ib) in kernel
             .layered_circuit_input
             .iter()
-            .zip(commitments)
+            .zip(commitments.iter())
             .zip(is_broadcast)
         {
-            let local_vals_len =
+            let val_len =
                 <ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig> as Commitment<
                     ECCConfig,
                 >>::vals_len(commitment);
-            let nb_challenge_vars = local_vals_len.ilog2() as usize;
-            let challenge_vars = challenge.rz[..nb_challenge_vars].to_vec();
-
-            let local_parallel_count = if *ib { 1 } else { parallel_count };
+            let (challenge_for_pcs, component_idx_vars) =
+                get_challenge_for_pcs_with_mpi(challenge, val_len, parallel_count, *ib);
 
             let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
-                nb_challenge_vars,
-                local_parallel_count,
+                val_len.ilog2() as usize,
+                1,
             );
-            let v_key = v_keys
-                .v_keys
-                .get(&(local_vals_len, local_parallel_count))
-                .unwrap();
+            let v_key = v_keys.v_keys.get(&val_len).unwrap();
 
             let claim = <C::FieldConfig as FieldEngine>::ChallengeField::deserialize_from(
                 &mut proof_reader,
@@ -145,20 +145,11 @@ where
                 .unwrap();
 
             transcript.lock_proof();
-            // individual pcs verification
             let verified = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::verify(
                 &params,
                 v_key,
-                &commitment.commitment[0],
-                &ExpanderSingleVarChallenge::<C::FieldConfig> {
-                    rz: challenge_vars.to_vec(),
-                    r_simd: challenge.r_simd.to_vec(),
-                    r_mpi: if *ib {
-                        vec![]
-                    } else {
-                        challenge.r_mpi.to_vec()
-                    }, // In the case of broadcast, whatever x_mpi is, the opening is the same
-                },
+                &commitment.commitment,
+                &challenge_for_pcs,
                 claim,
                 transcript,
                 &opening,
@@ -166,20 +157,12 @@ where
             transcript.unlock_proof();
 
             if !verified {
+                println!("Failed to verify single pcs opening");
                 return false;
             }
 
-            let index_vars = &challenge.rz[nb_challenge_vars..];
-            let index = input.offset / input.len;
-            let index_as_bits = (0..index_vars.len())
-                .map(|i| {
-                    <C::FieldConfig as FieldEngine>::ChallengeField::from(((index >> i) & 1) as u32)
-                })
-                .collect::<Vec<_>>();
-            let v_index = EqPolynomial::<<C::FieldConfig as FieldEngine>::ChallengeField>::eq_vec(
-                index_vars,
-                &index_as_bits,
-            );
+            let component_index = input.offset / input.len;
+            let v_index = EqPolynomial::ith_eq_vec_elem(&component_idx_vars, component_index);
 
             target_y += v_index * claim;
         }
@@ -256,21 +239,25 @@ where
 
     fn verify(
         verifier_setup: &Self::VerifierSetup,
-        computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
+        computation_graph: &ComputationGraph<ECCConfig>,
         proof: &Self::Proof,
     ) -> bool {
         let verified = proof
             .proofs
             .par_iter()
             .zip(computation_graph.proof_templates.par_iter())
-            .zip(proof.commitments.par_iter())
-            .map(|((proof, template), commitments_kernel)| {
+            .map(|(local_proof, template)| {
+                let local_commitments = template
+                    .commitment_indices
+                    .iter()
+                    .map(|idx| &proof.commitments[*idx])
+                    .collect::<Vec<_>>();
+
                 Self::verify_kernel(
                     verifier_setup,
-                    template.kernel_id,
                     &computation_graph.kernels[template.kernel_id],
-                    proof,
-                    commitments_kernel,
+                    local_proof,
+                    &local_commitments,
                     next_power_of_two(template.parallel_count),
                     &template.is_broadcast,
                 )

@@ -23,10 +23,11 @@ use arith::Field;
 
 use axum::{extract::State, Json};
 use gkr::gkr_prove;
-use gkr_engine::{
-    ExpanderDualVarChallenge, ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine
-};
 use gkr_engine::Transcript;
+use gkr_engine::{
+    ExpanderDualVarChallenge, ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine,
+    MPIConfig, MPIEngine,
+};
 use serde::{Deserialize, Serialize};
 use std::cmp::max;
 use std::sync::Arc;
@@ -314,17 +315,16 @@ where
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    let (commitments, extra_infos) = 
-        if global_mpi_config.is_root() {
-            let (commitments, extra_infos) = values
-                .iter()
-                .map(|value| root_commit::<C>(prover_setup, value.as_ref()))
-                .unzip::<_, _, Vec<_>, Vec<_>>();
-            (Some(commitments), Some(extra_infos))            
-        } else {
-            (None, None)
-        };
-    
+    let (commitments, extra_infos) = if global_mpi_config.is_root() {
+        let (commitments, extra_infos) = values
+            .iter()
+            .map(|value| root_commit::<C>(prover_setup, value.as_ref()))
+            .unzip::<_, _, Vec<_>, Vec<_>>();
+        (Some(commitments), Some(extra_infos))
+    } else {
+        (None, None)
+    };
+
     let proofs = computation_graph
         .proof_templates
         .iter()
@@ -332,7 +332,8 @@ where
             let gkr_end_state = prove_kernel_gkr::<C, ECCConfig>(
                 global_mpi_config,
                 &computation_graph.kernels[template.kernel_id],
-                &template.commitment_indices
+                &template
+                    .commitment_indices
                     .iter()
                     .map(|&idx| values[idx].as_ref())
                     .collect::<Vec<_>>(),
@@ -351,7 +352,8 @@ where
                 challenges.iter().for_each(|c| {
                     root_prove_input_claim::<C>(
                         &prover_setup,
-                        &template.commitment_indices
+                        &template
+                            .commitment_indices
                             .iter()
                             .map(|&idx| values[idx].as_ref())
                             .collect::<Vec<_>>(),
@@ -430,7 +432,10 @@ fn prove_kernel_gkr<C, ECCConfig>(
     commitments_values: &[&[SIMDField<C>]],
     parallel_count: usize,
     is_broadcast: &[bool],
-) -> Option<(C::TranscriptConfig, ExpanderDualVarChallenge<C::FieldConfig>)>
+) -> Option<(
+    C::TranscriptConfig,
+    ExpanderDualVarChallenge<C::FieldConfig>,
+)>
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
@@ -483,11 +488,11 @@ where
         claimed_v,
         <C::FieldConfig as FieldEngine>::ChallengeField::from(0)
     );
-    
+
     Some((transcript, challenge))
 }
 
-fn get_challenge_for_pcs_with_mpi<F: FieldEngine>(
+pub fn get_challenge_for_pcs_with_mpi<F: FieldEngine>(
     gkr_challenge: &ExpanderSingleVarChallenge<F>,
     total_vals_len: usize,
     parallel_count: usize,
@@ -534,12 +539,8 @@ fn root_prove_input_claim<C: GKREngine>(
         .zip(is_broadcast)
     {
         let val_len = commitment_val.as_ref().len();
-        let (challenge_for_pcs, _) = get_challenge_for_pcs_with_mpi(
-            gkr_challenge,
-            val_len,
-            parallel_count,
-            *ib,
-        );
+        let (challenge_for_pcs, _) =
+            get_challenge_for_pcs_with_mpi(gkr_challenge, val_len, parallel_count, *ib);
 
         let params =
             <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(val_len, 1);
