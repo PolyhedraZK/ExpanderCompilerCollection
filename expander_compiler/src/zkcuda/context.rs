@@ -353,7 +353,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                         io_shape,
                         num_parallel,
                         kernel_shape,
-                        shape_prepend(&io_shape, num_parallel)
+                        shape_prepend(kernel_shape, num_parallel)
                     );
                 }
             }
@@ -388,7 +388,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             *ir_inputs = values;
         }
         for parallel_i in 0..num_parallel {
-            let mut ir_inputs = vec![SIMDField::<C>::zero(); kernel.ir().input_size()];
+            let mut ir_inputs = vec![SIMDField::<C>::zero(); kernel.ir_for_calling().input_size()];
             for (i, ((input, input_start), input_end)) in ios
                 .iter()
                 .zip(kernel.ir_input_offsets().iter())
@@ -406,9 +406,10 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                     chunk_sizes[i],
                 );
             }
-            let ir_outputs = kernel
-                .ir()
-                .eval_safe_simd(ir_inputs, &[], &mut self.hint_caller)?;
+            let ir_outputs =
+                kernel
+                    .ir_for_calling()
+                    .eval_safe_simd(ir_inputs, &[], &mut self.hint_caller)?;
             for (((spec, output_start), output_end), out) in kernel
                 .io_specs()
                 .iter()

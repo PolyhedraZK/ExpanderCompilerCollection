@@ -22,7 +22,8 @@ use serdes::ExpSerde;
 #[derive(Debug, Clone, Hash, PartialEq, Eq, ExpSerde)]
 pub struct KernelPrimitive<C: Config> {
     // The circuit IR for output computation and later compilation
-    ir: ir::hint_normalized::RootCircuit<C>,
+    ir_for_later_compilation: ir::hint_normalized::RootCircuit<C>,
+    ir_for_calling: ir::hint_normalized::RootCircuit<C>,
     ir_input_offsets: Vec<usize>,
     ir_output_offsets: Vec<usize>,
 
@@ -31,8 +32,11 @@ pub struct KernelPrimitive<C: Config> {
 }
 
 impl<C: Config> KernelPrimitive<C> {
-    pub fn ir(&self) -> &ir::hint_normalized::RootCircuit<C> {
-        &self.ir
+    pub fn ir_for_later_compilation(&self) -> &ir::hint_normalized::RootCircuit<C> {
+        &self.ir_for_later_compilation
+    }
+    pub fn ir_for_calling(&self) -> &ir::hint_normalized::RootCircuit<C> {
+        &self.ir_for_calling
     }
     pub fn ir_input_offsets(&self) -> &[usize] {
         &self.ir_input_offsets
@@ -153,9 +157,18 @@ where
         assert_eq!(*x, i);
     }
     print_ir_stats(&r);
+    let mut r2 = r.clone();
+    r2.circuits.get_mut(&0).unwrap().constraints = Vec::new();
+    let mut tmp_im = InputMapping::new_identity(r2.input_size());
+    let r2 = compile_step_4(r2, &mut tmp_im, CompileOptions::default())?;
+    // No inputs should be removed in this step.
+    for (i, x) in tmp_im.mapping().iter().take(n_in).enumerate() {
+        assert_eq!(i, *x);
+    }
 
     Ok(KernelPrimitive {
-        ir: r,
+        ir_for_later_compilation: r,
+        ir_for_calling: r2,
         ir_input_offsets: inputs_offsets,
         ir_output_offsets: outputs_offsets,
         io_specs: io_specs.to_vec(),
@@ -168,13 +181,14 @@ pub fn compile_primitive<C: Config>(
     pad_shapes_input: &[Option<Shape>],
     pad_shapes_output: &[Option<Shape>],
 ) -> Result<Kernel<C>, Error> {
-    let prev_total_inputs = kernel.ir.input_size();
+    let prev_total_inputs = kernel.ir_for_later_compilation.input_size();
 
     // Split the ir into hint_solver and hint less circuit.
     // In compile_with_spec_and_shapes, the circuit has all inputs exported to output.
     // Thus r_hint_less also has all inputs exported to output.
     // Additionally, r_hint_exported has hints in output.
-    let (mut r_hint_less, r_hint_exported) = kernel.ir.remove_and_export_hints();
+    let (mut r_hint_less, r_hint_exported) =
+        kernel.ir_for_later_compilation.remove_and_export_hints();
 
     // Process the hint solver
     r_hint_exported
