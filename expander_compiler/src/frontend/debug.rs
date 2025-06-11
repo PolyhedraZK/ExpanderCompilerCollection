@@ -169,6 +169,21 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> BasicAPI<C> for DebugBuilder<C, 
             Err(e) => panic!("Hint error: {e:?}"),
         }
     }
+    fn custom_gate(&mut self, gate_type: usize, inputs: &[Variable]) -> Variable {
+        ensure_variables_valid(inputs);
+        let inputs: Vec<CircuitField<C>> =
+            inputs.iter().map(|v| self.convert_to_value(v)).collect();
+        match self.hint_caller.custom_gate_type_to_hint_id(gate_type) {
+            Ok(hint_id) => {
+                let outputs = self
+                    .hint_caller
+                    .call(hint_id, &inputs, 1)
+                    .expect("Custom gate call failed");
+                self.return_as_variable(outputs[0])
+            }
+            Err(e) => panic!("Custom gate error: {e:?}"),
+        }
+    }
     fn constant(&mut self, x: impl ToVariableOrValue<CircuitField<C>>) -> Variable {
         let x = self.convert_to_value(x);
         self.return_as_variable(x)

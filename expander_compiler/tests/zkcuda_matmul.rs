@@ -1,7 +1,18 @@
 use expander_compiler::frontend::*;
-use expander_compiler::zkcuda::proving_system::ExpanderGKRProvingSystem;
+use expander_compiler::zkcuda::proving_system::DummyProvingSystem;
 use expander_compiler::zkcuda::proving_system::ProvingSystem;
 use expander_compiler::zkcuda::{context::*, kernel::*};
+
+fn mul_sum(a: &[M31], b: &mut [M31]) -> Result<(), Error> {
+    let mut sum = M31::ZERO;
+    let n = a.len() / 2;
+    for i in 0..n {
+        let t = a[i] * a[i + n];
+        sum += t;
+    }
+    b[0] = sum;
+    Ok(())
+}
 
 #[kernel]
 fn mul_line<C: Config>(
@@ -11,13 +22,14 @@ fn mul_line<C: Config>(
     c: &mut [OutputVariable; 64],
 ) {
     for j in 0..64 {
-        c[j] = api.constant(0);
-    }
-    for i in 0..32 {
-        for j in 0..64 {
-            let t = api.mul(a[i], b[i][j]);
-            c[j] = api.add(c[j], t);
+        let mut xs = Vec::new();
+        let mut ys = Vec::new();
+        for i in 0..32 {
+            xs.push(a[i]);
+            ys.push(b[i][j]);
         }
+        xs.extend(ys);
+        c[j] = api.custom_gate(12348, &xs);
     }
 }
 
@@ -32,10 +44,14 @@ fn sum_8_elements<C: Config>(api: &mut API<C>, a: &[InputVariable; 8], b: &mut O
 
 #[test]
 fn zkcuda_matmul_sum() {
+    let mut registry = HintRegistry::<M31>::new();
+    registry.register("mul_sum", mul_sum);
+    registry.register_custom_gate(12348, "mul_sum");
+
     let kernel_mul_line: Kernel<M31Config> = compile_mul_line().unwrap();
     let kernel_sum_8_elements: Kernel<M31Config> = compile_sum_8_elements().unwrap();
 
-    let mut ctx: Context<M31Config> = Context::default();
+    let mut ctx: Context<M31Config, _> = Context::new(registry);
 
     let mut mat_a: Vec<Vec<M31>> = vec![];
     for i in 0..64 {
@@ -85,7 +101,7 @@ fn zkcuda_matmul_sum() {
     let result: M31 = ctx.copy_to_host(g);
     assert_eq!(result, expected_result);
 
-    type P = ExpanderGKRProvingSystem<M31Config>;
+    type P = DummyProvingSystem<M31Config>;
     let computation_graph = ctx.to_computation_graph();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
