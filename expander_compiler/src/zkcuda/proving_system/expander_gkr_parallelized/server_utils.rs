@@ -1,8 +1,8 @@
 #![allow(clippy::type_complexity)]
 
 use crate::utils::misc::next_power_of_two;
+use crate::zkcuda::context::ComputationGraph;
 use crate::zkcuda::kernel::{Kernel, LayeredCircuitInputVec};
-use crate::zkcuda::proof::ComputationGraph;
 use crate::zkcuda::proving_system::shared_memory_utils::SharedMemoryEngine;
 use crate::zkcuda::proving_system::{
     max_n_vars, pcs_testing_setup_fixed_seed, CombinedProof, ExpanderGKRCommitment,
@@ -297,18 +297,18 @@ fn setup<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     let v_keys = &mut verifier_setup.v_keys;
 
     let computation_graph = computation_graph.unwrap();
-    for template in computation_graph.proof_templates.iter() {
+    for template in computation_graph.proof_templates().iter() {
         for (x, is_broadcast) in template
-            .commitment_indices
+            .commitment_indices()
             .iter()
-            .zip(template.is_broadcast.iter())
+            .zip(template.is_broadcast().iter())
         {
-            let val_total_len = computation_graph.commitments_lens[*x];
+            let val_total_len = computation_graph.commitments_lens()[*x];
             assert!(val_total_len.is_power_of_two());
             let (val_actual_len, parallel_count) = if *is_broadcast {
                 (val_total_len, 1)
             } else {
-                let parallel_count = next_power_of_two(template.parallel_count);
+                let parallel_count = next_power_of_two(template.parallel_count());
                 (val_total_len / parallel_count, parallel_count)
             };
 
@@ -349,19 +349,19 @@ where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let commitments = computation_graph
-        .proof_templates
+        .proof_templates()
         .iter()
         .map(|template| {
             template
-                .commitment_indices
+                .commitment_indices()
                 .iter()
-                .zip(template.is_broadcast.iter())
+                .zip(template.is_broadcast().iter())
                 .map(|(x, is_broadcast)| {
                     commit::<C>(
                         global_mpi_config,
                         prover_setup,
                         values[*x].as_ref(),
-                        next_power_of_two(template.parallel_count),
+                        next_power_of_two(template.parallel_count()),
                         *is_broadcast,
                     )
                 })
@@ -370,24 +370,24 @@ where
         .collect::<Vec<_>>();
 
     let proofs = computation_graph
-        .proof_templates
+        .proof_templates()
         .iter()
         .zip(commitments.iter())
         .map(|(template, _commitments_kernel)| {
             prove_kernel::<C, ECCConfig>(
                 global_mpi_config,
                 prover_setup,
-                template.kernel_id,
-                &computation_graph.kernels[template.kernel_id],
+                template.kernel_id(),
+                &computation_graph.kernels()[template.kernel_id()],
                 &[],
                 &[],
                 &template
-                    .commitment_indices
+                    .commitment_indices()
                     .iter()
                     .map(|x| values[*x].as_ref())
                     .collect::<Vec<_>>(),
-                next_power_of_two(template.parallel_count),
-                &template.is_broadcast,
+                next_power_of_two(template.parallel_count()),
+                &template.is_broadcast(),
             )
         })
         .collect::<Vec<_>>();
@@ -527,7 +527,7 @@ where
         })
         .collect::<Vec<_>>();
 
-    let mut expander_circuit = kernel.layered_circuit.export_to_expander().flatten::<C>();
+    let mut expander_circuit = kernel.layered_circuit().export_to_expander().flatten::<C>();
     expander_circuit.pre_process_gkr::<C>();
     let (max_num_input_var, max_num_output_var) = max_n_vars(&expander_circuit);
     let max_num_var = max(max_num_input_var, max_num_output_var);
@@ -540,7 +540,7 @@ where
     transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
     expander_circuit.layers[0].input_vals = prepare_inputs(
         1usize << expander_circuit.log_input_size(),
-        &kernel.layered_circuit_input,
+        &kernel.layered_circuit_input(),
         &local_commitment_values,
     );
     expander_circuit.fill_rnd_coefs(&mut transcript);

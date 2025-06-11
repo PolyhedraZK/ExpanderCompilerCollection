@@ -5,10 +5,9 @@ use circuit_std_rs::{
     LogUpCircuit, LogUpParams,
 };
 use expander_compiler::{
-    field::BN254Fr,
-    field::Goldilocks,
+    field::{BN254Fr, Goldilocks},
     frontend::*,
-    zkcuda::{context::*, kernel::*, proving_system::*},
+    zkcuda::{context::*, kernel::*, proving_system::*, shape::Reshape},
 };
 
 #[test]
@@ -136,7 +135,7 @@ fn rangeproof_bn254_test() {
     let output = compile_result.layered_circuit.run(&witness);
     assert_eq!(output, vec![true]);
 }
-/*
+
 #[kernel]
 fn rangeproof_test_kernel<C: Config>(builder: &mut API<C>, test: &InputVariable) {
     let mut table = LogUpRangeProofTable::new(8);
@@ -151,18 +150,22 @@ fn rangeproof_zkcuda_test() {
     hint_registry.register("myhint.querycounthint", query_count_hint);
     hint_registry.register("myhint.rangeproofhint", rangeproof_hint);
     //compile and test
-    let kernel: Kernel<M31Config> = compile_rangeproof_test_kernel().unwrap();
+    let kernel: KernelPrimitive<M31Config> = compile_rangeproof_test_kernel().unwrap();
     let mut ctx: Context<M31Config, _> = Context::new(hint_registry);
 
     let a = M31::from(1 << 9);
-    let a = ctx.copy_to_device(&a, false);
+    let a = ctx.copy_to_device(&a);
     let a = a.reshape(&[1]);
-    call_kernel!(ctx, kernel, 0, a);
+    call_kernel!(ctx, kernel, 0, a).unwrap();
 
     type P = ExpanderGKRProvingSystem<M31Config>;
-    let computation_graph = ctx.to_computation_graph();
+    let computation_graph = ctx.compile_computation_graph().unwrap();
     let (prover_setup, verifier_setup) = <P as ProvingSystem<M31Config>>::setup(&computation_graph);
-    let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
+    let proof = P::prove(
+        &prover_setup,
+        &computation_graph,
+        &ctx.export_device_memories(),
+    );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 }
 
@@ -173,18 +176,21 @@ fn rangeproof_zkcuda_test_fail() {
     hint_registry.register("myhint.querycounthint", query_count_hint);
     hint_registry.register("myhint.rangeproofhint", rangeproof_hint);
     //compile and test
-    let kernel: Kernel<M31Config> = compile_rangeproof_test_kernel().unwrap();
+    let kernel: KernelPrimitive<M31Config> = compile_rangeproof_test_kernel().unwrap();
     let mut ctx: Context<M31Config, _> = Context::new(hint_registry);
 
     let a = M31::from(1 << 11);
-    let a = ctx.copy_to_device(&a, false);
+    let a = ctx.copy_to_device(&a);
     let a = a.reshape(&[1]);
-    call_kernel!(ctx, kernel, 0, a);
+    call_kernel!(ctx, kernel, 0, a).unwrap();
 
     type P = ExpanderGKRProvingSystem<M31Config>;
-    let computation_graph = ctx.to_computation_graph();
+    let computation_graph = ctx.compile_computation_graph().unwrap();
     let (prover_setup, verifier_setup) = <P as ProvingSystem<M31Config>>::setup(&computation_graph);
-    let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
+    let proof = P::prove(
+        &prover_setup,
+        &computation_graph,
+        &ctx.export_device_memories(),
+    );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 }
-*/

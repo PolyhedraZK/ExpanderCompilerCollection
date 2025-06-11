@@ -1,4 +1,3 @@
-/*
 use expander_compiler::field::FieldArith;
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::proving_system::ExpanderGKRProvingSystem;
@@ -300,7 +299,7 @@ fn compute_multiple_keccak<C: Config>(
 }
 
 fn zkcuda_keccak_1_helper<P: ProvingSystem<M31Config>>() {
-    let kernel: Kernel<M31Config> = compile_compute_keccak().unwrap();
+    let kernel: KernelPrimitive<M31Config> = compile_compute_keccak().unwrap();
     println!("compile ok");
 
     let mut ctx: Context<M31Config> = Context::default();
@@ -338,19 +337,23 @@ fn zkcuda_keccak_1_helper<P: ProvingSystem<M31Config>>() {
     }
 
     println!("prepare data ok");
-    let p = ctx.copy_to_device(&p, false);
+    let p = ctx.copy_to_device(&p);
     println!("copy to device ok");
     let mut out = None;
-    call_kernel!(ctx, kernel, p, mut out);
+    call_kernel!(ctx, kernel, N_PARALLEL, p, mut out).unwrap();
     println!("call kernel ok");
     let out: Vec<Vec<M31>> = ctx.copy_to_host(out);
     println!("copy to host ok");
     assert_eq!(out, expected_res);
     assert_eq!(out[0][0], expected_res[0][0]);
 
-    let computation_graph = ctx.to_computation_graph();
+    let computation_graph = ctx.compile_computation_graph().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
-    let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
+    let proof = P::prove(
+        &prover_setup,
+        &computation_graph,
+        &ctx.export_device_memories(),
+    );
     println!("proof generation ok");
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
     println!("verify ok");
@@ -358,7 +361,7 @@ fn zkcuda_keccak_1_helper<P: ProvingSystem<M31Config>>() {
 }
 
 fn zkcuda_keccak_2_helper<P: ProvingSystem<M31Config>>() {
-    let kernel: Kernel<M31Config> = compile_compute_multiple_keccak().unwrap();
+    let kernel: KernelPrimitive<M31Config> = compile_compute_multiple_keccak().unwrap();
     println!("compile ok");
 
     let mut ctx: Context<M31Config> = Context::default();
@@ -396,19 +399,23 @@ fn zkcuda_keccak_2_helper<P: ProvingSystem<M31Config>>() {
     }
 
     println!("prepare data ok");
-    let p = ctx.copy_to_device(&vec![p], false);
+    let p = ctx.copy_to_device(&vec![p]);
     println!("copy to device ok");
     let mut out = None;
-    call_kernel!(ctx, kernel, p, mut out);
+    call_kernel!(ctx, kernel, 1, p, mut out).unwrap();
     println!("call kernel ok");
     let out: Vec<Vec<Vec<M31>>> = ctx.copy_to_host(out);
     println!("copy to host ok");
     assert_eq!(out[0], expected_res);
     assert_eq!(out[0][0][0], expected_res[0][0]);
 
-    let computation_graph = ctx.to_computation_graph();
+    let computation_graph = ctx.compile_computation_graph().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
-    let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
+    let proof = P::prove(
+        &prover_setup,
+        &computation_graph,
+        &ctx.export_device_memories(),
+    );
     println!("proof generation ok");
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
     println!("verify ok");
@@ -422,4 +429,3 @@ fn zkcuda_keccak_1_2() {
     zkcuda_keccak_2_helper::<ExpanderGKRProvingSystem<M31Config>>();
     zkcuda_keccak_2_helper::<ParallelizedExpanderGKRProvingSystem<M31Config>>();
 }
-*/

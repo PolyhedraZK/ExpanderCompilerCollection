@@ -7,10 +7,8 @@ use expander_compiler::frontend::{
 use expander_compiler::zkcuda::proving_system::{
     ExpanderGKRProvingSystem, ParallelizedExpanderGKRProvingSystem, ProvingSystem,
 };
-use expander_compiler::zkcuda::{
-    context::{call_kernel, Context, Reshape},
-    kernel::{compile_with_spec_and_shapes, kernel, IOVecSpec, Kernel},
-};
+use expander_compiler::zkcuda::shape::Reshape;
+use expander_compiler::zkcuda::{context::*, kernel::*};
 use gkr::BN254ConfigSha2Hyrax;
 
 /// N * M matrix times M *K matrix
@@ -38,7 +36,7 @@ fn mul_line<C: Config>(
 }
 
 fn zkcuda_matmul<C: Config, P: ProvingSystem<C>>() {
-    let kernel_mul_line: Kernel<C> = compile_mul_line().unwrap();
+    let kernel_mul_line: KernelPrimitive<C> = compile_mul_line().unwrap();
 
     let mut ctx: Context<C> = Context::default();
 
@@ -65,18 +63,22 @@ fn zkcuda_matmul<C: Config, P: ProvingSystem<C>>() {
         }
     }
 
-    let a = ctx.copy_to_device(&mat_a, false);
-    let b = ctx.copy_to_device(&mat_b, true);
+    let a = ctx.copy_to_device(&mat_a);
+    let b = ctx.copy_to_device(&mat_b);
     let mut c = None;
-    call_kernel!(ctx, kernel_mul_line, N, a, b, mut c);
+    call_kernel!(ctx, kernel_mul_line, N, a, b, mut c).unwrap();
 
     let c = c.reshape(&[N, K]);
     let result: Vec<Vec<CircuitField<C>>> = ctx.copy_to_host(c);
     assert_eq!(result, expected_result);
 
-    let computation_graph = ctx.to_computation_graph();
+    let computation_graph = ctx.compile_computation_graph().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
-    let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
+    let proof = P::prove(
+        &prover_setup,
+        &computation_graph,
+        &ctx.export_device_memories(),
+    );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 }
 

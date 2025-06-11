@@ -1,6 +1,6 @@
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::shape::Reshape;
-use expander_compiler::zkcuda::{context2::*, kernel2::*};
+use expander_compiler::zkcuda::{context::*, kernel::*};
 
 #[kernel]
 fn add_2_macro<C: Config>(api: &mut API<C>, a: &[InputVariable; 2], b: &mut OutputVariable) {
@@ -20,8 +20,8 @@ fn add_16_macro<C: Config>(api: &mut API<C>, a: &[InputVariable; 16], b: &mut Ou
 fn zkcuda_example_tmp() {
     let kernel_add_2: KernelPrimitive<M31Config> = compile_add_2_macro().unwrap();
     let kernel_add_16: KernelPrimitive<M31Config> = compile_add_16_macro().unwrap();
-    println!("{:?}", kernel_add_2.io_shapes);
-    println!("{:?}", kernel_add_16.io_shapes);
+    println!("{:?}", kernel_add_2.io_shapes());
+    println!("{:?}", kernel_add_16.io_shapes());
 
     let mut ctx: Context<M31Config> = Context::default();
     let mut a: Vec<Vec<M31>> = vec![];

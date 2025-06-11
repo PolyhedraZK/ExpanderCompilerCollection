@@ -1,7 +1,7 @@
-/*
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::proving_system::ExpanderGKRProvingSystem;
 use expander_compiler::zkcuda::proving_system::ProvingSystem;
+use expander_compiler::zkcuda::shape::Reshape;
 use expander_compiler::zkcuda::{context::*, kernel::*};
 
 #[kernel]
@@ -33,8 +33,8 @@ fn sum_8_elements<C: Config>(api: &mut API<C>, a: &[InputVariable; 8], b: &mut O
 
 #[test]
 fn zkcuda_matmul_sum() {
-    let kernel_mul_line: Kernel<M31Config> = compile_mul_line().unwrap();
-    let kernel_sum_8_elements: Kernel<M31Config> = compile_sum_8_elements().unwrap();
+    let kernel_mul_line: KernelPrimitive<M31Config> = compile_mul_line().unwrap();
+    let kernel_sum_8_elements: KernelPrimitive<M31Config> = compile_sum_8_elements().unwrap();
 
     let mut ctx: Context<M31Config> = Context::default();
 
@@ -61,35 +61,38 @@ fn zkcuda_matmul_sum() {
         }
     }
 
-    let a = ctx.copy_to_device(&mat_a, false);
-    let b = ctx.copy_to_device(&mat_b, true);
+    let a = ctx.copy_to_device(&mat_a);
+    let b = ctx.copy_to_device(&mat_b);
     let mut c = None;
-    call_kernel!(ctx, kernel_mul_line, a, b, mut c);
+    call_kernel!(ctx, kernel_mul_line, 64, a, b, mut c).unwrap();
 
     let c = c.reshape(&[512, 8]);
     let mut d = None;
-    call_kernel!(ctx, kernel_sum_8_elements, c, mut d);
+    call_kernel!(ctx, kernel_sum_8_elements, 512, c, mut d).unwrap();
 
     let d = d.reshape(&[64, 8]);
     let mut e = None;
-    call_kernel!(ctx, kernel_sum_8_elements, d, mut e);
+    call_kernel!(ctx, kernel_sum_8_elements, 64, d, mut e).unwrap();
 
     let e = e.reshape(&[8, 8]);
     let mut f = None;
-    call_kernel!(ctx, kernel_sum_8_elements, e, mut f);
+    call_kernel!(ctx, kernel_sum_8_elements, 8, e, mut f).unwrap();
 
     let f = f.reshape(&[1, 8]);
     let mut g = None;
-    call_kernel!(ctx, kernel_sum_8_elements, f, mut g);
+    call_kernel!(ctx, kernel_sum_8_elements, 1, f, mut g).unwrap();
 
     let g = g.reshape(&[]);
     let result: M31 = ctx.copy_to_host(g);
     assert_eq!(result, expected_result);
 
     type P = ExpanderGKRProvingSystem<M31Config>;
-    let computation_graph = ctx.to_computation_graph();
+    let computation_graph = ctx.compile_computation_graph().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
-    let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
+    let proof = P::prove(
+        &prover_setup,
+        &computation_graph,
+        &ctx.export_device_memories(),
+    );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 }
-*/

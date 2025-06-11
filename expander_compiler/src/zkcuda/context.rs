@@ -1,48 +1,112 @@
 use arith::SimdField;
+use serdes::ExpSerde;
 
-use crate::field::FieldArith;
-use crate::hints::registry::{EmptyHintCaller, HintCaller};
-use crate::utils::misc::next_power_of_two;
 use crate::{
     circuit::config::{CircuitField, Config, SIMDField},
-    utils::pool::Pool,
+    field::FieldArith,
+    hints::registry::{EmptyHintCaller, HintCaller},
+    utils::{error::Error, pool::Pool},
 };
 
-use super::vec_shaped::{flatten_shaped_pack_simd, unflatten_shaped_unpack_simd};
 use super::{
-    kernel::{shape_prepend, Kernel, Shape},
-    proof::{ComputationGraph, ProofTemplate},
-    vec_shaped::{flatten_shaped, unflatten_shaped, VecShaped},
+    kernel::{compile_primitive, Kernel, KernelPrimitive},
+    shape::{
+        keep_shape_products_until, keep_shape_since, merge_shape_products, prefix_products,
+        prefix_products_to_shape, shape_padded_mapping, shape_prepend, shape_vec_len,
+        shape_vec_padded_len, BitOrder, Reshape, Shape, ShapeHistory, Transpose,
+    },
+    vec_shaped::{
+        flatten_shaped, flatten_shaped_pack_simd, unflatten_shaped, unflatten_shaped_unpack_simd,
+        VecShaped,
+    },
 };
 
 pub use macros::call_kernel;
 
-pub struct DeviceMemory<C: Config> {
-    pub raw_values: Vec<SIMDField<C>>,
-    pub values: Vec<SIMDField<C>>,
+struct DeviceMemory<C: Config> {
+    values: Vec<SIMDField<C>>,
+    required_shape_products: Vec<usize>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, ExpSerde)]
 pub struct DeviceMemoryHandleRaw {
-    pub id: usize,
-    pub broadcast_type: BroadcastType,
-    pub shape: Shape,
+    id: usize,
+    shape_history: ShapeHistory,
 }
 
 pub type DeviceMemoryHandle = Option<DeviceMemoryHandleRaw>;
 
-#[derive(Copy, Clone)]
-pub enum BroadcastType {
-    BroadcastOnly,
-    NonBroadcastOnly,
-    Both,
+#[derive(Clone, ExpSerde)]
+pub struct KernelCall {
+    kernel_id: usize,
+    num_parallel: usize,
+    input_handles: Vec<DeviceMemoryHandle>,
+    output_handles: Vec<DeviceMemoryHandle>,
+    is_broadcast: Vec<bool>,
+}
+
+#[derive(PartialEq, Eq, Clone, Debug, ExpSerde)]
+pub struct ProofTemplate {
+    kernel_id: usize,
+    commitment_indices: Vec<usize>,
+    commitment_bit_orders: Vec<BitOrder>,
+    parallel_count: usize,
+    is_broadcast: Vec<bool>,
+}
+
+impl ProofTemplate {
+    pub fn kernel_id(&self) -> usize {
+        self.kernel_id
+    }
+    pub fn commitment_indices(&self) -> &[usize] {
+        &self.commitment_indices
+    }
+    pub fn commitment_bit_orders(&self) -> &[BitOrder] {
+        &self.commitment_bit_orders
+    }
+    pub fn parallel_count(&self) -> usize {
+        self.parallel_count
+    }
+    pub fn is_broadcast(&self) -> &[bool] {
+        &self.is_broadcast
+    }
+}
+
+#[derive(Default, Clone, ExpSerde)]
+pub struct ComputationGraph<C: Config> {
+    kernels: Vec<Kernel<C>>,
+    commitments_lens: Vec<usize>,
+    proof_templates: Vec<ProofTemplate>,
+}
+
+impl<C: Config> ComputationGraph<C> {
+    pub fn kernels(&self) -> &[Kernel<C>] {
+        &self.kernels
+    }
+    pub fn commitments_lens(&self) -> &[usize] {
+        &self.commitments_lens
+    }
+    pub fn proof_templates(&self) -> &[ProofTemplate] {
+        &self.proof_templates
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum ContextState {
+    ComputationGraphNotDone,
+    ComputationGraphDone,
+    WitnessDone,
 }
 
 pub struct Context<C: Config, H: HintCaller<CircuitField<C>> = EmptyHintCaller> {
-    pub kernels: Pool<Kernel<C>>,
-    pub device_memories: Vec<DeviceMemory<C>>,
-    pub proof_templates: Vec<ProofTemplate>,
-    pub hint_caller: H,
+    kernel_primitives: Pool<KernelPrimitive<C>>,
+    kernels: Pool<Kernel<C>>,
+    device_memories: Vec<DeviceMemory<C>>,
+    kernel_calls: Vec<KernelCall>,
+    proof_templates: Vec<ProofTemplate>,
+    hint_caller: H,
+    // current state of the context
+    state: ContextState,
 }
 
 impl<C: Config> Default for Context<C> {
@@ -74,236 +138,106 @@ fn unpack_vec<C: Config>(v: &[SIMDField<C>]) -> Vec<CircuitField<C>> {
     v.iter().map(|x| x.unpack()[0]).collect()
 }
 
-fn pad_vec<F: arith::Field>(v: &[F], dim0_size: usize) -> Vec<F> {
-    assert_eq!(v.len() % dim0_size, 0);
-    let dim1_size = v.len() / dim0_size;
-    let padded_dim0_size = next_power_of_two(dim0_size);
-    let padded_dim1_size = next_power_of_two(dim1_size);
-    let mut padded = vec![F::zero(); padded_dim0_size * padded_dim1_size];
-    for i in 0..dim0_size {
-        for j in 0..dim1_size {
-            padded[i * padded_dim1_size + j] = v[i * dim1_size + j];
-        }
-    }
-    padded
-}
-
-fn dim0_size(shape: &Shape, is_broadcast: bool) -> usize {
-    if let Some(shape) = shape {
-        if is_broadcast || shape.is_empty() {
-            1
-        } else {
-            shape[0]
-        }
-    } else {
-        1
-    }
-}
-
-fn broadcast_type(shape: &Shape, is_broadcast: bool) -> BroadcastType {
-    if let Some(shape) = shape {
-        if shape.iter().all(|x| *x > 0 && (x & (x - 1) == 0)) {
-            BroadcastType::Both
-        } else if is_broadcast {
-            BroadcastType::BroadcastOnly
-        } else {
-            BroadcastType::NonBroadcastOnly
-        }
-    } else {
-        BroadcastType::Both
-    }
-}
-
-// returns (compatible, is_broadcast, parallel_count)
+// returns Option<is_broadcast>
 fn check_shape_compat(
     kernel_shape: &Shape,
     io_shape: &Shape,
-    broadcast_type: BroadcastType,
-) -> (bool, bool, Option<usize>) {
-    if let Some(kernel_shape) = kernel_shape {
-        if let Some(io_shape) = io_shape {
-            if kernel_shape.len() == io_shape.len() {
-                if *kernel_shape == *io_shape {
-                    match broadcast_type {
-                        BroadcastType::BroadcastOnly | BroadcastType::Both => (true, true, None),
-                        BroadcastType::NonBroadcastOnly => (false, false, None),
-                    }
-                } else {
-                    (false, false, None)
-                }
-            } else if kernel_shape.len() + 1 == io_shape.len() {
-                if io_shape.iter().skip(1).eq(kernel_shape.iter()) {
-                    match broadcast_type {
-                        BroadcastType::BroadcastOnly => (false, false, None),
-                        BroadcastType::NonBroadcastOnly | BroadcastType::Both => {
-                            (true, false, Some(io_shape[0]))
-                        }
-                    }
-                } else {
-                    (false, false, None)
-                }
+    parallel_count: usize,
+) -> Option<bool> {
+    if kernel_shape.len() == io_shape.len() {
+        if *kernel_shape == *io_shape {
+            Some(true)
+        } else {
+            None
+        }
+    } else if kernel_shape.len() + 1 == io_shape.len() {
+        if io_shape.iter().skip(1).eq(kernel_shape.iter()) {
+            if io_shape[0] == parallel_count {
+                Some(false)
             } else {
-                (false, false, None)
+                None
             }
         } else {
-            panic!("IO shape is not defined, you should use copy_to_device or copy_simd_to_device instead of copy_raw_* functions");
+            None
         }
     } else {
-        panic!("Kernel shape is not defined, you should define kernel using macro, or use call_kernel_raw");
+        None
     }
-}
-
-/*
-A reshape is acceptable if:
-support the shape is [a,b,c]
-let sequence of a*b*c,b*c,c be a1,a2,a3,... and other one be b1,b2,b3,...
-there must exist n such that a1=b1, a2=b2, a3=b3, ..., an=bn
-and for i>n, ai=2^k and bi=2^k for some k
-*/
-fn check_reshape_compat(shape: &[usize], new_shape: &[usize]) {
-    let total = shape.iter().product::<usize>();
-    let new_total = new_shape.iter().product::<usize>();
-    if total != new_total {
-        panic!("Total number of elements must be the same");
-    }
-    let mut i = 0;
-    while i < shape.len() && i < new_shape.len() && shape[i] == new_shape[i] {
-        i += 1;
-    }
-    for x in shape.iter().skip(i) {
-        if *x & (*x - 1) != 0 {
-            panic!("Incompatible shapes");
-        }
-    }
-    for x in new_shape.iter().skip(i) {
-        if *x & (*x - 1) != 0 {
-            panic!("Incompatible shapes");
-        }
-    }
-}
-
-pub trait Reshape {
-    fn reshape(&self, new_shape: &[usize]) -> Self;
 }
 
 impl Reshape for DeviceMemoryHandle {
     fn reshape(&self, new_shape: &[usize]) -> Self {
         let handle = ensure_handle(self.clone());
-        if handle.shape.is_none() {
-            panic!("Cannot reshape non-shaped memory");
-        }
-        check_reshape_compat(&handle.shape.unwrap(), new_shape);
         Some(DeviceMemoryHandleRaw {
             id: handle.id,
-            broadcast_type: handle.broadcast_type,
-            shape: Some(new_shape.to_vec()),
+            shape_history: handle.shape_history.reshape(new_shape),
         })
     }
+}
+
+impl Transpose for DeviceMemoryHandle {
+    fn transpose(&self, axes: &[usize]) -> Self {
+        let handle = ensure_handle(self.clone());
+        Some(DeviceMemoryHandleRaw {
+            id: handle.id,
+            shape_history: handle.shape_history.transpose(axes),
+        })
+    }
+}
+
+fn make_device_mem<C: Config>(
+    device_memories: &mut Vec<DeviceMemory<C>>,
+    values: Vec<SIMDField<C>>,
+    shape: Shape,
+) -> DeviceMemoryHandle {
+    let t = shape_vec_len(&shape);
+    let required_shape_products = if t == 1 { vec![1] } else { vec![1, t] };
+    device_memories.push(DeviceMemory {
+        values: values,
+        required_shape_products,
+    });
+    Some(DeviceMemoryHandleRaw {
+        id: device_memories.len() - 1,
+        shape_history: ShapeHistory::new(shape),
+    })
 }
 
 impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
     pub fn new(hint_caller: H) -> Self {
         Context {
+            kernel_primitives: Pool::new(),
             kernels: Pool::new(),
             device_memories: vec![],
+            kernel_calls: vec![],
             proof_templates: vec![],
             hint_caller,
+            state: ContextState::ComputationGraphNotDone,
         }
-    }
-
-    fn make_device_mem(
-        &mut self,
-        values: Vec<SIMDField<C>>,
-        padded_values: Vec<SIMDField<C>>,
-        broadcast_type: BroadcastType,
-        shape: Shape,
-    ) -> DeviceMemoryHandle {
-        self.device_memories.push(DeviceMemory {
-            raw_values: values,
-            values: padded_values,
-        });
-        Some(DeviceMemoryHandleRaw {
-            id: self.device_memories.len() - 1,
-            broadcast_type,
-            shape,
-        })
-    }
-
-    pub fn copy_raw_to_device(&mut self, host_memory: &[CircuitField<C>]) -> DeviceMemoryHandle {
-        let simd_host_memory = pack_vec::<C>(host_memory);
-        self.make_device_mem(
-            simd_host_memory.clone(),
-            simd_host_memory,
-            BroadcastType::Both,
-            None,
-        )
-    }
-
-    pub fn copy_raw_simd_to_device(
-        &mut self,
-        simd_host_memory: &[SIMDField<C>],
-    ) -> DeviceMemoryHandle {
-        self.make_device_mem(
-            simd_host_memory.to_vec(),
-            simd_host_memory.to_vec(),
-            BroadcastType::Both,
-            None,
-        )
     }
 
     pub fn copy_to_device<T: VecShaped<CircuitField<C>>>(
         &mut self,
         host_memory: &T,
-        is_broadcast: bool,
     ) -> DeviceMemoryHandle {
         let (flat, shape) = flatten_shaped(host_memory);
-        let shape = Some(shape);
         let simd_flat = pack_vec::<C>(&flat);
-        let simd_pad = pad_vec(&simd_flat, dim0_size(&shape, is_broadcast));
-        self.make_device_mem(
-            simd_flat,
-            simd_pad,
-            broadcast_type(&shape, is_broadcast),
-            shape,
-        )
+        make_device_mem(&mut self.device_memories, simd_flat, shape)
     }
 
     pub fn copy_to_device_and_pack_simd<T: VecShaped<CircuitField<C>>>(
         &mut self,
         host_memory: &T,
-        is_broadcast: bool,
     ) -> DeviceMemoryHandle {
         let (flat, shape) = flatten_shaped_pack_simd(host_memory);
-        let shape = Some(shape);
-        let pad = pad_vec(&flat, dim0_size(&shape, is_broadcast));
-        self.make_device_mem(flat, pad, broadcast_type(&shape, is_broadcast), shape)
+        make_device_mem(&mut self.device_memories, flat, shape)
     }
 
     pub fn copy_simd_to_device<T: VecShaped<SIMDField<C>>>(
         &mut self,
         host_memory: &T,
-        is_broadcast: bool,
     ) -> DeviceMemoryHandle {
         let (flat, shape) = flatten_shaped(host_memory);
-        let shape = Some(shape);
-        let pad = pad_vec(&flat, dim0_size(&shape, is_broadcast));
-        self.make_device_mem(flat, pad, broadcast_type(&shape, is_broadcast), shape)
-    }
-
-    pub fn copy_raw_to_host(
-        &self,
-        device_memory_handle: DeviceMemoryHandle,
-    ) -> Vec<CircuitField<C>> {
-        let device_memory_handle = ensure_handle(device_memory_handle);
-        unpack_vec::<C>(&self.device_memories[device_memory_handle.id].values)
-    }
-
-    pub fn copy_raw_simd_to_host(
-        &self,
-        device_memory_handle: DeviceMemoryHandle,
-    ) -> Vec<SIMDField<C>> {
-        let device_memory_handle = ensure_handle(device_memory_handle);
-        self.device_memories[device_memory_handle.id].values.clone()
+        make_device_mem(&mut self.device_memories, flat, shape)
     }
 
     pub fn copy_to_host<T: VecShaped<CircuitField<C>> + Default>(
@@ -311,9 +245,12 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         device_memory_handle: DeviceMemoryHandle,
     ) -> T {
         let device_memory_handle = ensure_handle(device_memory_handle);
+        let permuted_values = device_memory_handle
+            .shape_history
+            .permute_vec(&self.device_memories[device_memory_handle.id].values);
         unflatten_shaped(
-            &unpack_vec::<C>(&self.device_memories[device_memory_handle.id].raw_values),
-            &device_memory_handle.shape.unwrap(),
+            &unpack_vec::<C>(&permuted_values),
+            &device_memory_handle.shape_history.shape(),
         )
     }
 
@@ -322,9 +259,12 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         device_memory_handle: DeviceMemoryHandle,
     ) -> T {
         let device_memory_handle = ensure_handle(device_memory_handle);
+        let permuted_values = device_memory_handle
+            .shape_history
+            .permute_vec(&self.device_memories[device_memory_handle.id].values);
         unflatten_shaped_unpack_simd(
-            &self.device_memories[device_memory_handle.id].raw_values,
-            &device_memory_handle.shape.unwrap(),
+            &permuted_values,
+            &device_memory_handle.shape_history.shape(),
         )
     }
 
@@ -333,232 +273,541 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         device_memory_handle: DeviceMemoryHandle,
     ) -> T {
         let device_memory_handle = ensure_handle(device_memory_handle);
+        let permuted_values = device_memory_handle
+            .shape_history
+            .permute_vec(&self.device_memories[device_memory_handle.id].values);
         unflatten_shaped(
-            &self.device_memories[device_memory_handle.id].raw_values,
-            &device_memory_handle.shape.unwrap(),
+            &permuted_values,
+            &device_memory_handle.shape_history.shape(),
         )
+    }
+
+    fn ir_copy_from_device_memory(
+        &self,
+        values: &[SIMDField<C>],
+        s: &mut [SIMDField<C>],
+        is_broadcast: bool,
+        parallel_index: usize,
+        chunk_size: Option<usize>,
+    ) {
+        if is_broadcast {
+            s.copy_from_slice(&values);
+        } else {
+            let chunk_size = chunk_size.unwrap();
+            s.copy_from_slice(
+                &values[chunk_size * parallel_index..chunk_size * (parallel_index + 1)],
+            );
+        }
     }
 
     pub fn call_kernel(
         &mut self,
-        kernel: &Kernel<C>,
-        _num_parallel: usize,
+        kernel: &KernelPrimitive<C>,
+        num_parallel: usize,
         ios: &mut [DeviceMemoryHandle],
-    ) {
-        if kernel.io_shapes.len() != ios.len() {
+    ) -> Result<(), Error> {
+        assert_eq!(self.state, ContextState::ComputationGraphNotDone);
+        if kernel.io_shapes().len() != ios.len() {
             panic!("Invalid number of inputs/outputs");
         }
-        let mut check_results = Vec::with_capacity(ios.len());
-        for ((kernel_shape, io), ws_input) in kernel
-            .io_shapes
+        let mut is_broadcast = Vec::with_capacity(ios.len());
+        for (i, ((kernel_shape, io), spec)) in kernel
+            .io_shapes()
             .iter()
             .zip(ios.iter())
-            .zip(kernel.witness_solver_io.iter())
+            .zip(kernel.io_specs().iter())
+            .enumerate()
         {
-            if ws_input.input_offset.is_none() {
-                check_results.push((true, false, None));
+            if !spec.is_input {
+                is_broadcast.push(false);
                 continue;
             }
-            let (io_shape, broadcast_type) = if let Some(handle) = io {
-                (handle.shape.clone(), handle.broadcast_type)
+            println!(
+                "Checking shape compatibility for input/output {}: kernel_shape={:?}, io_shape={:?}, num_parallel={}",
+                i, kernel_shape, io, num_parallel
+            );
+            let io_shape = if let Some(handle) = io {
+                handle.shape_history.shape()
             } else {
-                panic!("Missing input")
+                panic!("Missing input at index {}", i)
             };
-            let chk = check_shape_compat(kernel_shape, &io_shape, broadcast_type);
-            if !chk.0 {
-                panic!("Incompatible shapes: {kernel_shape:?} {io_shape:?}");
-            }
-            check_results.push(chk);
-        }
-        let mut parallel_count = None;
-        for (_, _, pc) in check_results.iter() {
-            if let Some(pc) = pc {
-                if let Some(parallel_count) = parallel_count {
-                    if parallel_count != *pc {
-                        panic!("Incompatible parallel counts: {parallel_count:?} {pc:?}");
-                    }
-                } else {
-                    parallel_count = Some(*pc);
+            match check_shape_compat(kernel_shape, &io_shape, num_parallel) {
+                Some(ib) => {
+                    let isl = io
+                        .as_ref()
+                        .unwrap()
+                        .shape_history
+                        .get_initial_split_list(!ib);
+                    let t = io.as_ref().unwrap().id;
+                    self.device_memories[t].required_shape_products = merge_shape_products(
+                        &isl,
+                        &self.device_memories[t].required_shape_products,
+                    );
+                    is_broadcast.push(ib)
+                }
+                None => {
+                    panic!(
+                        "Incompatible shapes: want {:?}, got {:?}, num_parallel={} (Hint: if you want to broadcast, use {:?}, otherwise use {:?})",
+                        kernel_shape,
+                        io_shape,
+                        num_parallel,
+                        kernel_shape,
+                        shape_prepend(&io_shape, num_parallel)
+                    );
                 }
             }
         }
-        if parallel_count.is_none() {
-            panic!("Parallel count is not defined");
-        }
-        self.call_kernel_raw(
-            kernel,
-            ios,
-            parallel_count.unwrap(),
-            &check_results.iter().map(|x| x.1).collect::<Vec<_>>(),
-        );
-    }
-
-    pub fn call_kernel_raw(
-        &mut self,
-        kernel: &Kernel<C>,
-        ios: &mut [DeviceMemoryHandle],
-        parallel_count: usize,
-        is_broadcast: &[bool],
-    ) {
-        if kernel.witness_solver_io.len() != ios.len() {
-            panic!("Invalid number of inputs/outputs");
-        }
-        if kernel.witness_solver_io.len() != is_broadcast.len() {
-            panic!("Invalid number of is_broadcast");
-        }
-        if parallel_count == 0 {
-            panic!("parallel_count must be at least 1");
-        }
-        // TODO: Is this necessary?
-        // If it's not needed to pad the parallel count to a power of 2, we need to change other parts of the code
-        /*if parallel_count & parallel_count - 1 != 0 {
-            panic!("parallel_count must be a power of 2");
-        }*/
-        for i in 0..ios.len() {
-            if is_broadcast[i] {
-                assert!(kernel.witness_solver_io[i].output_offset.is_none());
-                assert_eq!(
-                    self.device_memories[ios[i].as_ref().unwrap().id]
-                        .values
-                        .len(),
-                    next_power_of_two(kernel.witness_solver_io[i].len)
-                );
-            } else if kernel.witness_solver_io[i].input_offset.is_some() {
-                assert_eq!(
-                    self.device_memories[ios[i].as_ref().unwrap().id]
-                        .values
-                        .len(),
-                    next_power_of_two(kernel.witness_solver_io[i].len)
-                        * next_power_of_two(parallel_count)
-                );
+        for (io_spec, ib) in kernel.io_specs().iter().zip(is_broadcast.iter()) {
+            if io_spec.is_output && *ib {
+                panic!("Output is broadcasted, but it shouldn't be");
             }
         }
 
-        let kernel_id = self.kernels.add(kernel);
+        let kernel_id = self.kernel_primitives.add(kernel);
 
-        let mut handles = vec![];
-        let mut lc_is_broadcast = vec![];
-        for ((input, ws_input), ib) in ios
+        let mut outputs_tmp = vec![Vec::new(); kernel.io_specs().len()];
+        let mut ir_inputs_all = vec![Vec::new(); kernel.io_specs().len()];
+        let mut chunk_sizes: Vec<Option<usize>> = vec![None; kernel.io_specs().len()];
+        for (((input, &ib), ir_inputs), chunk_size) in ios
             .iter()
-            .zip(kernel.witness_solver_io.iter())
-            .zip(is_broadcast)
+            .zip(is_broadcast.iter())
+            .zip(ir_inputs_all.iter_mut())
+            .zip(chunk_sizes.iter_mut())
         {
-            assert_eq!(input.is_some(), ws_input.input_offset.is_some());
-            if input.is_some() {
-                handles.push(input.clone().unwrap());
-                lc_is_broadcast.push(*ib);
+            if input.is_none() {
+                continue;
             }
+            let handle = ensure_handle(input.clone());
+            let values = handle
+                .shape_history
+                .permute_vec(&self.device_memories[handle.id].values);
+            if !ib {
+                *chunk_size = Some(values.len() / num_parallel);
+            }
+            *ir_inputs = values;
         }
-
-        let mut output_vecs = vec![vec![]; ios.len()];
-        let mut output_vecs_raw = vec![vec![]; ios.len()];
-        let mut hint_output_vec = vec![];
-
-        for parallel_i in 0..parallel_count {
-            let mut ws_inputs = vec![SIMDField::<C>::zero(); kernel.witness_solver.input_size()];
-            for (i, (input, ws_input)) in
-                ios.iter().zip(kernel.witness_solver_io.iter()).enumerate()
+        for parallel_i in 0..num_parallel {
+            let mut ir_inputs = vec![SIMDField::<C>::zero(); kernel.ir().input_size()];
+            for (i, ((input, input_start), input_end)) in ios
+                .iter()
+                .zip(kernel.ir_input_offsets().iter())
+                .zip(kernel.ir_input_offsets().iter().skip(1))
+                .enumerate()
             {
                 if input.is_none() {
                     continue;
                 }
-                let device_memory = &self.device_memories[input.as_ref().unwrap().id];
-                let offset = ws_input.input_offset.unwrap();
-                if is_broadcast[i] {
-                    for (i, x) in device_memory.values.iter().enumerate() {
-                        ws_inputs[offset + i] = *x;
-                    }
-                } else {
-                    for (i, x) in device_memory
-                        .values
-                        .iter()
-                        .skip(parallel_i * next_power_of_two(ws_input.len))
-                        .take(ws_input.len)
-                        .enumerate()
-                    {
-                        ws_inputs[offset + i] = *x;
-                    }
-                }
+                self.ir_copy_from_device_memory(
+                    &ir_inputs_all[i],
+                    &mut ir_inputs[*input_start..*input_end],
+                    is_broadcast[i],
+                    parallel_i,
+                    chunk_sizes[i],
+                );
             }
-            let ws_outputs = kernel
-                .witness_solver
-                .eval_safe_simd(ws_inputs, &[], &mut self.hint_caller)
-                .unwrap(); // TODO: handle error
-            for (i, ws_input) in kernel.witness_solver_io.iter().enumerate() {
-                if ws_input.output_offset.is_none() {
+            let ir_outputs = kernel
+                .ir()
+                .eval_safe_simd(ir_inputs, &[], &mut self.hint_caller)?;
+            for (((spec, output_start), output_end), out) in kernel
+                .io_specs()
+                .iter()
+                .zip(kernel.ir_output_offsets().iter())
+                .zip(kernel.ir_output_offsets().iter().skip(1))
+                .zip(outputs_tmp.iter_mut())
+            {
+                if !spec.is_output {
                     continue;
                 }
-                let offset = ws_input.output_offset.unwrap();
-                let values = &ws_outputs[offset..offset + ws_input.len];
-                output_vecs[i].extend_from_slice(values);
-                output_vecs_raw[i].extend_from_slice(values);
-                for _ in ws_input.len..next_power_of_two(ws_input.len) {
-                    output_vecs[i].push(SIMDField::<C>::zero());
-                }
-            }
-            if let Some(hint_io) = &kernel.witness_solver_hint_input {
-                let values = &ws_outputs
-                    [hint_io.output_offset.unwrap()..hint_io.output_offset.unwrap() + hint_io.len];
-                hint_output_vec.extend_from_slice(values);
-                for _ in hint_io.len..next_power_of_two(hint_io.len) {
-                    hint_output_vec.push(SIMDField::<C>::zero());
-                }
+                out.extend_from_slice(&ir_outputs[*output_start..*output_end]);
             }
         }
+        let input_handles = ios.to_vec();
+        let mut output_handles = vec![None; kernel.io_specs().len()];
 
-        for ((((output, ws_input), mut ov), ov_raw), shape) in ios
+        for ((((output, out2), spec), ov), shape) in ios
             .iter_mut()
-            .zip(kernel.witness_solver_io.iter())
-            .zip(output_vecs.into_iter())
-            .zip(output_vecs_raw.into_iter())
-            .zip(kernel.io_shapes.iter())
+            .zip(output_handles.iter_mut())
+            .zip(kernel.io_specs().iter())
+            .zip(outputs_tmp.into_iter())
+            .zip(kernel.io_shapes().iter())
         {
-            if ws_input.output_offset.is_none() {
+            if !spec.is_output {
                 *output = None;
                 continue;
             }
-            ov.resize(next_power_of_two(ov.len()), SIMDField::<C>::zero());
-            let handle = self.make_device_mem(
-                ov_raw,
+            let handle = make_device_mem(
+                &mut self.device_memories,
                 ov,
-                broadcast_type(shape, false),
-                shape_prepend(shape, parallel_count),
+                shape_prepend(shape, num_parallel),
             );
             *output = handle.clone();
-            handles.push(handle.unwrap());
-            lc_is_broadcast.push(false);
+            *out2 = handle;
         }
-        if kernel.witness_solver_hint_input.is_some() {
-            hint_output_vec.resize(
-                next_power_of_two(hint_output_vec.len()),
-                SIMDField::<C>::zero(),
-            );
-            let handle = self.make_device_mem(
-                hint_output_vec.clone(),
-                hint_output_vec,
-                BroadcastType::Both,
-                None,
-            );
-            handles.push(handle.unwrap());
-            lc_is_broadcast.push(false);
-        }
-        self.proof_templates.push(ProofTemplate {
+        self.kernel_calls.push(KernelCall {
             kernel_id,
-            commitment_indices: handles.iter().map(|x| x.id).collect(),
-            parallel_count,
-            is_broadcast: lc_is_broadcast,
+            num_parallel,
+            input_handles,
+            output_handles,
+            is_broadcast,
         });
+        Ok(())
     }
 
-    pub fn to_computation_graph(&self) -> ComputationGraph<C> {
-        ComputationGraph {
-            kernels: self.kernels.vec().clone(),
-            commitments_lens: self
-                .device_memories
-                .iter()
-                .map(|x| x.values.len())
-                .collect(),
-            proof_templates: self.proof_templates.clone(),
+    fn get_current_device_memory_shapes(&self) -> Vec<Shape> {
+        self.device_memories
+            .iter()
+            .map(|dm| prefix_products_to_shape(&dm.required_shape_products))
+            .collect()
+    }
+
+    fn propagate_and_get_shapes(&mut self) -> Vec<Shape> {
+        let mut dm_shapes = self.get_current_device_memory_shapes();
+        loop {
+            let get_pad_shape = |x: &DeviceMemoryHandle| match x.as_ref() {
+                Some(handle) => Some(
+                    handle
+                        .shape_history
+                        .get_transposed_shape_and_bit_order(&dm_shapes[handle.id])
+                        .0,
+                ),
+                None => None,
+            };
+            for kernel_call in self.kernel_calls.iter() {
+                let kernel_primitive = self.kernel_primitives.get(kernel_call.kernel_id);
+                let mut all_shapes = Vec::new();
+                let mut all_handles = Vec::new();
+                for ((spec, input_handle), &ib) in kernel_primitive
+                    .io_specs()
+                    .iter()
+                    .zip(kernel_call.input_handles.iter())
+                    .zip(kernel_call.is_broadcast.iter())
+                {
+                    if !spec.is_input || ib {
+                        continue;
+                    }
+                    let pad_shape = get_pad_shape(input_handle).unwrap();
+                    all_shapes.push(pad_shape);
+                    all_handles.push(ensure_handle(input_handle.clone()));
+                }
+                for ((spec, output_handle), &ib) in kernel_primitive
+                    .io_specs()
+                    .iter()
+                    .zip(kernel_call.output_handles.iter())
+                    .zip(kernel_call.is_broadcast.iter())
+                {
+                    if !spec.is_output || ib {
+                        continue;
+                    }
+                    let pad_shape = get_pad_shape(output_handle).unwrap();
+                    all_shapes.push(pad_shape);
+                    all_handles.push(ensure_handle(output_handle.clone()));
+                }
+                let mut required_shape_products = prefix_products(&[kernel_call.num_parallel]);
+                for shape in all_shapes.iter() {
+                    let products = keep_shape_products_until(
+                        &prefix_products(&shape),
+                        kernel_call.num_parallel,
+                    );
+                    required_shape_products =
+                        merge_shape_products(&required_shape_products, &products);
+                }
+                for handle in all_handles.iter() {
+                    let dm = &mut self.device_memories[handle.id];
+                    let total = shape_vec_len(&handle.shape_history.shape());
+                    for &x in required_shape_products.iter() {
+                        if x != 1 && x != kernel_call.num_parallel {
+                            let sh_tmp = handle.shape_history.reshape(&[x, total / x]);
+                            dm.required_shape_products = merge_shape_products(
+                                &sh_tmp.get_initial_split_list(true),
+                                &dm.required_shape_products,
+                            );
+                        }
+                    }
+                }
+            }
+            let new_dm_shapes = self.get_current_device_memory_shapes();
+            if new_dm_shapes == dm_shapes {
+                return dm_shapes;
+            }
+            dm_shapes = new_dm_shapes;
         }
+    }
+
+    fn compile_or_load_computation_graph(
+        &mut self,
+        cg: Option<ComputationGraph<C>>,
+    ) -> Result<Option<ComputationGraph<C>>, Error> {
+        assert_eq!(self.state, ContextState::ComputationGraphNotDone);
+        self.state = ContextState::ComputationGraphDone;
+
+        let dm_shapes = self.propagate_and_get_shapes();
+
+        let (mut cg_kernels, cg_proof_templates) = if let Some(cg) = cg {
+            for (i, kernel) in cg.kernels.iter().enumerate() {
+                assert_eq!(self.kernels.add(&kernel), i);
+            }
+            assert!(cg.commitments_lens.len() >= self.device_memories.len());
+            for (dm_shape, cm_len) in dm_shapes.iter().zip(cg.commitments_lens.iter()) {
+                assert_eq!(shape_vec_padded_len(dm_shape), *cm_len);
+            }
+            (Some(cg.kernels), Some(cg.proof_templates))
+        } else {
+            (None, None)
+        };
+
+        let get_pad_shape = |x: &DeviceMemoryHandle| match x.as_ref() {
+            Some(handle) => Some(
+                handle
+                    .shape_history
+                    .get_transposed_shape_and_bit_order(&dm_shapes[handle.id]),
+            ),
+            None => None,
+        };
+        let mut dm_max = self.device_memories.len();
+        for kernel_call in self.kernel_calls.iter() {
+            let pad_shapes_input = kernel_call
+                .input_handles
+                .iter()
+                .map(get_pad_shape)
+                .collect::<Vec<_>>();
+            let pad_shapes_output = kernel_call
+                .output_handles
+                .iter()
+                .map(get_pad_shape)
+                .collect::<Vec<_>>();
+            let kernel_primitive = self.kernel_primitives.get(kernel_call.kernel_id);
+            let kernel = if let Some(cg_kernels) = cg_kernels.as_mut() {
+                cg_kernels.drain(..1).next().unwrap()
+            } else {
+                let mut psi = Vec::new();
+                for (s, &ib) in pad_shapes_input.iter().zip(kernel_call.is_broadcast.iter()) {
+                    psi.push(if let Some(t) = s {
+                        Some(if ib {
+                            t.0.clone()
+                        } else {
+                            keep_shape_since(&t.0, kernel_call.num_parallel)
+                        })
+                    } else {
+                        None
+                    });
+                }
+                let mut pso = Vec::new();
+                for (s, &ib) in pad_shapes_output
+                    .iter()
+                    .zip(kernel_call.is_broadcast.iter())
+                {
+                    pso.push(if let Some(t) = s {
+                        Some(if ib {
+                            t.0.clone()
+                        } else {
+                            keep_shape_since(&t.0, kernel_call.num_parallel)
+                        })
+                    } else {
+                        None
+                    });
+                }
+                compile_primitive(kernel_primitive, &psi, &pso)?
+            };
+
+            let mut commitment_indices: Vec<usize> = Vec::new();
+            let mut commitment_bit_orders: Vec<BitOrder> = Vec::new();
+            for (spec, pad_shape) in kernel_primitive.io_specs().iter().zip(&pad_shapes_input) {
+                if spec.is_input {
+                    if let Some(shape) = pad_shape {
+                        commitment_indices.push(dm_max);
+                        commitment_bit_orders.push(shape.1.clone());
+                    }
+                }
+            }
+            for (spec, pad_shape) in kernel_primitive.io_specs().iter().zip(&pad_shapes_output) {
+                if spec.is_output {
+                    if let Some(shape) = pad_shape {
+                        commitment_indices.push(dm_max);
+                        commitment_bit_orders.push(shape.1.clone());
+                    }
+                }
+            }
+
+            if kernel.hint_solver().is_some() {
+                // if the kernel has a hint solver, we need to add another input
+                let n = kernel.layered_circuit_input().last().unwrap().len;
+                commitment_indices.push(dm_max);
+                dm_max += 1;
+                commitment_bit_orders.push((0..n.trailing_zeros() as usize).collect());
+            }
+
+            let kernel_id = self.kernels.add(&kernel);
+            self.proof_templates.push(ProofTemplate {
+                kernel_id,
+                commitment_indices,
+                commitment_bit_orders,
+                parallel_count: kernel_call.num_parallel,
+                is_broadcast: kernel_call.is_broadcast.clone(),
+            });
+        }
+
+        if let Some(cg_kernels) = cg_kernels {
+            assert!(cg_kernels.is_empty());
+            assert_eq!(cg_proof_templates.unwrap(), self.proof_templates);
+            Ok(None)
+        } else {
+            Ok(Some(ComputationGraph {
+                kernels: self.kernels.vec().clone(),
+                commitments_lens: dm_shapes.iter().map(|x| shape_vec_padded_len(&x)).collect(),
+                proof_templates: self.proof_templates.clone(),
+            }))
+        }
+    }
+
+    pub fn compile_computation_graph(&mut self) -> Result<ComputationGraph<C>, Error> {
+        Ok(self.compile_or_load_computation_graph(None)?.unwrap())
+    }
+
+    pub fn load_computation_graph(&mut self, cg: ComputationGraph<C>) -> Result<(), Error> {
+        let _ = self.compile_or_load_computation_graph(Some(cg))?;
+        Ok(())
+    }
+
+    // actually, this function computes hints
+    pub fn solve_witness(&mut self) -> Result<(), Error> {
+        assert_eq!(self.state, ContextState::ComputationGraphDone);
+        self.state = ContextState::WitnessDone;
+
+        for (kernel_call, proof_template) in
+            self.kernel_calls.iter().zip(self.proof_templates.iter())
+        {
+            let kernel = self.kernels.get(proof_template.kernel_id);
+            if kernel.hint_solver().is_none() {
+                continue; // no need to solve hints
+            }
+            let hint_solver = kernel.hint_solver().unwrap();
+            let kernel_primitive = self.kernel_primitives.get(kernel_call.kernel_id);
+
+            let mut ir_inputs_all = vec![Vec::new(); kernel_primitive.io_specs().len()];
+            let mut ir_outputs_all = vec![Vec::new(); kernel_primitive.io_specs().len()];
+            let mut input_chunk_sizes: Vec<Option<usize>> =
+                vec![None; kernel_primitive.io_specs().len()];
+            let mut output_chunk_sizes: Vec<Option<usize>> =
+                vec![None; kernel_primitive.io_specs().len()];
+            let mut any_shape = None;
+            for (((input, &ib), ir_inputs), chunk_size) in kernel_call
+                .input_handles
+                .iter()
+                .zip(kernel_call.is_broadcast.iter())
+                .zip(ir_inputs_all.iter_mut())
+                .zip(input_chunk_sizes.iter_mut())
+            {
+                if input.is_none() {
+                    continue;
+                }
+                let handle = ensure_handle(input.clone());
+                if any_shape.is_none() {
+                    any_shape = Some(handle.shape_history.shape());
+                }
+                let values = handle
+                    .shape_history
+                    .permute_vec(&self.device_memories[handle.id].values);
+                if !ib {
+                    *chunk_size = Some(values.len() / kernel_call.num_parallel);
+                }
+                *ir_inputs = values;
+            }
+            for (((output, &ib), ir_inputs), chunk_size) in kernel_call
+                .output_handles
+                .iter()
+                .zip(kernel_call.is_broadcast.iter())
+                .zip(ir_outputs_all.iter_mut())
+                .zip(output_chunk_sizes.iter_mut())
+            {
+                if output.is_none() {
+                    continue;
+                }
+                let handle = ensure_handle(output.clone());
+                if any_shape.is_none() {
+                    any_shape = Some(handle.shape_history.shape());
+                }
+                let values = handle
+                    .shape_history
+                    .permute_vec(&self.device_memories[handle.id].values);
+                assert_eq!(ib, false);
+                *chunk_size = Some(values.len() / kernel_call.num_parallel);
+                *ir_inputs = values;
+            }
+
+            let mut hints_all = Vec::new();
+            for parallel_i in 0..kernel_call.num_parallel {
+                let mut inputs = vec![SIMDField::<C>::zero(); hint_solver.input_size()];
+
+                for ((((spec, ir_inputs), input_start), input_end), chunk_size) in kernel_primitive
+                    .io_specs()
+                    .iter()
+                    .zip(ir_inputs_all.iter())
+                    .zip(kernel_primitive.ir_input_offsets().iter())
+                    .zip(kernel_primitive.ir_input_offsets().iter().skip(1))
+                    .zip(input_chunk_sizes.iter())
+                {
+                    if !spec.is_input {
+                        continue;
+                    }
+                    self.ir_copy_from_device_memory(
+                        ir_inputs,
+                        &mut inputs[*input_start..*input_end],
+                        chunk_size.is_none(),
+                        parallel_i,
+                        *chunk_size,
+                    );
+                }
+                for ((((spec, ir_outputs), output_start), output_end), chunk_size) in
+                    kernel_primitive
+                        .io_specs()
+                        .iter()
+                        .zip(ir_outputs_all.iter())
+                        .zip(kernel_primitive.ir_output_offsets().iter())
+                        .zip(kernel_primitive.ir_output_offsets().iter().skip(1))
+                        .zip(output_chunk_sizes.iter())
+                {
+                    if !spec.is_output {
+                        continue;
+                    }
+                    self.ir_copy_from_device_memory(
+                        ir_outputs,
+                        &mut inputs[*output_start..*output_end],
+                        chunk_size.is_none(),
+                        parallel_i,
+                        *chunk_size,
+                    );
+                }
+                let hints = hint_solver.eval_safe_simd(inputs, &[], &mut self.hint_caller)?;
+                hints_all.extend(hints);
+            }
+            let hints_len = hints_all.len();
+            let hints_id = make_device_mem(&mut self.device_memories, hints_all, vec![hints_len])
+                .unwrap()
+                .id;
+            // we need to assign correct shape to it
+            let any_shape = any_shape.unwrap();
+            let mut any_shape_products =
+                keep_shape_products_until(&prefix_products(&any_shape), kernel_call.num_parallel);
+            if kernel_call.num_parallel != hints_len {
+                any_shape_products.push(hints_len);
+            }
+            self.device_memories[hints_id].required_shape_products = merge_shape_products(
+                &any_shape_products,
+                &self.device_memories[hints_id].required_shape_products,
+            );
+        }
+
+        Ok(())
+    }
+
+    pub fn export_device_memories(&self) -> Vec<Vec<SIMDField<C>>> {
+        self.device_memories
+            .iter()
+            .map(|dm| {
+                let shape = prefix_products_to_shape(&dm.required_shape_products);
+                let im = shape_padded_mapping(&shape);
+                im.map_inputs(&dm.values)
+            })
+            .collect()
     }
 }
