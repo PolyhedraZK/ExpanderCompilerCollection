@@ -48,6 +48,7 @@ fn zkcuda_test<C: Config, P: ProvingSystem<C>>() {
     assert_eq!(result, CircuitField::<C>::from(32 * 33 / 2));
 
     let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.solve_witness().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(
         &prover_setup,
@@ -56,6 +57,16 @@ fn zkcuda_test<C: Config, P: ProvingSystem<C>>() {
     );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
     P::post_process();
+}
+
+#[test]
+#[allow(deprecated)]
+fn zkcuda_test_single_core_dummy() {
+    // DO NOT USE DUMMY PROVING SYSTEM IN PRODUCTION!!!
+    zkcuda_test::<
+        M31Config,
+        expander_compiler::zkcuda::proving_system::DummyProvingSystem<M31Config>,
+    >();
 }
 
 #[test]
@@ -125,6 +136,7 @@ fn zkcuda_test_simd() {
     }
 
     let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.solve_witness().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(
         &prover_setup,
@@ -185,6 +197,7 @@ fn zkcuda_test_simd_autopack() {
 
     type P = ExpanderGKRProvingSystem<M31Config>;
     let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.solve_witness().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(
         &prover_setup,
@@ -245,6 +258,9 @@ fn zkcuda_to_binary() {
 
     type P = ExpanderGKRProvingSystem<M31Config>;
     let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.solve_witness().unwrap();
+    println!("{:?}", computation_graph);
+    println!("{:?}", ctx.export_device_memories());
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(
         &prover_setup,
@@ -270,6 +286,7 @@ fn zkcuda_assertion() {
 
     type P = ExpanderGKRProvingSystem<M31Config>;
     let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.solve_witness().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(
         &prover_setup,
@@ -291,6 +308,7 @@ fn zkcuda_assertion_fail() {
 
     type P = ExpanderGKRProvingSystem<M31Config>;
     let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.solve_witness().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(
         &prover_setup,

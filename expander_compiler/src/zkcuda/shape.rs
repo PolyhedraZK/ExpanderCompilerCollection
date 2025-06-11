@@ -87,7 +87,7 @@ impl Entry {
         let mut cur_prod = 1;
         let mut target = 1;
         let mut self_shape_iter = self.shape.iter();
-        for &x in shape.iter().skip(1) {
+        for &x in shape.iter() {
             if cur_prod == target {
                 cur_prod = x.0;
                 target = *self_shape_iter.next().unwrap();
@@ -186,6 +186,20 @@ pub fn keep_shape_products_until(shape: &[usize], x: usize) -> Vec<usize> {
     shape[..=p].iter().cloned().collect()
 }
 
+pub fn keep_shape_until(shape: &[usize], x: usize) -> Vec<usize> {
+    let mut p = 1;
+    if x == 1 {
+        return shape.to_vec();
+    }
+    for (i, &y) in shape.iter().enumerate() {
+        p *= y;
+        if p == x {
+            return shape[..=i].to_vec();
+        }
+    }
+    unreachable!()
+}
+
 pub fn keep_shape_since(shape: &[usize], x: usize) -> Vec<usize> {
     let mut p = 1;
     if x == 1 {
@@ -276,7 +290,7 @@ impl ShapeHistory {
         let mut bit_order = Vec::new();
         for &x in new_shape_and_id.iter().rev() {
             let n = bit_len[x.1];
-            let k = bit_start[bit_len.len() - x.1];
+            let k = bit_start[bit_len.len() - x.1 - 1];
             for i in 0..n {
                 bit_order.push(k + i);
             }
@@ -497,6 +511,26 @@ mod tests {
             sh.get_initial_split_list(true);
         })
         .is_err());
+    }
+
+    #[test]
+    fn test_get_transposed_shape_and_bit_order() {
+        let sh = ShapeHistory::new(vec![125, 125]);
+        let sh = sh.transpose(&[1, 0]);
+        assert_eq!(
+            sh.get_transposed_shape_and_bit_order(&[5, 5, 5, 5, 5, 5]),
+            (
+                vec![5, 5, 5, 5, 5, 5],
+                vec![9, 10, 11, 12, 13, 14, 15, 16, 17, 0, 1, 2, 3, 4, 5, 6, 7, 8]
+            )
+        );
+        assert_eq!(
+            sh.get_transposed_shape_and_bit_order(&[5, 5, 5, 25, 5]),
+            (
+                vec![25, 5, 5, 5, 5],
+                vec![8, 9, 10, 11, 12, 13, 14, 15, 16, 0, 1, 2, 3, 4, 5, 6, 7]
+            )
+        );
     }
 
     #[test]

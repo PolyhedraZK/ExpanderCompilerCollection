@@ -348,6 +348,7 @@ fn zkcuda_keccak_1_helper<P: ProvingSystem<M31Config>>() {
     assert_eq!(out[0][0], expected_res[0][0]);
 
     let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.solve_witness().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(
         &prover_setup,
@@ -410,6 +411,7 @@ fn zkcuda_keccak_2_helper<P: ProvingSystem<M31Config>>() {
     assert_eq!(out[0][0][0], expected_res[0][0]);
 
     let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.solve_witness().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(
         &prover_setup,

@@ -6,6 +6,7 @@ use crate::{
     field::FieldArith,
     hints::registry::{EmptyHintCaller, HintCaller},
     utils::{error::Error, pool::Pool},
+    zkcuda::shape::keep_shape_until,
 };
 
 use super::{
@@ -72,7 +73,7 @@ impl ProofTemplate {
     }
 }
 
-#[derive(Default, Clone, ExpSerde)]
+#[derive(Default, Clone, Debug, ExpSerde)]
 pub struct ComputationGraph<C: Config> {
     kernels: Vec<Kernel<C>>,
     commitments_lens: Vec<usize>,
@@ -322,10 +323,10 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 is_broadcast.push(false);
                 continue;
             }
-            println!(
+            /*println!(
                 "Checking shape compatibility for input/output {}: kernel_shape={:?}, io_shape={:?}, num_parallel={}",
                 i, kernel_shape, io, num_parallel
-            );
+            );*/
             let io_shape = if let Some(handle) = io {
                 handle.shape_history.shape()
             } else {
@@ -440,6 +441,15 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 ov,
                 shape_prepend(shape, num_parallel),
             );
+            let id = handle.as_ref().unwrap().id;
+            self.device_memories[id].required_shape_products = merge_shape_products(
+                &handle
+                    .as_ref()
+                    .unwrap()
+                    .shape_history
+                    .get_initial_split_list(true),
+                &self.device_memories[id].required_shape_products,
+            );
             *output = handle.clone();
             *out2 = handle;
         }
@@ -537,12 +547,16 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         &mut self,
         cg: Option<ComputationGraph<C>>,
     ) -> Result<Option<ComputationGraph<C>>, Error> {
-        assert_eq!(self.state, ContextState::ComputationGraphNotDone);
+        assert_eq!(
+            self.state,
+            ContextState::ComputationGraphNotDone,
+            "Computation graph is already done, please compile or load it only once."
+        );
         self.state = ContextState::ComputationGraphDone;
 
         let dm_shapes = self.propagate_and_get_shapes();
 
-        let (mut cg_kernels, cg_proof_templates) = if let Some(cg) = cg {
+        let (mut cg_kernels, cg_proof_templates, cg_commitments_lens) = if let Some(cg) = cg {
             for (i, kernel) in cg.kernels.iter().enumerate() {
                 assert_eq!(self.kernels.add(&kernel), i);
             }
@@ -550,10 +564,16 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             for (dm_shape, cm_len) in dm_shapes.iter().zip(cg.commitments_lens.iter()) {
                 assert_eq!(shape_vec_padded_len(dm_shape), *cm_len);
             }
-            (Some(cg.kernels), Some(cg.proof_templates))
+            (
+                Some(cg.kernels),
+                Some(cg.proof_templates),
+                Some(cg.commitments_lens),
+            )
         } else {
-            (None, None)
+            (None, None, None)
         };
+        let mut commitments_lens: Vec<usize> =
+            dm_shapes.iter().map(|x| shape_vec_padded_len(&x)).collect();
 
         let get_pad_shape = |x: &DeviceMemoryHandle| match x.as_ref() {
             Some(handle) => Some(
@@ -611,29 +631,52 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
 
             let mut commitment_indices: Vec<usize> = Vec::new();
             let mut commitment_bit_orders: Vec<BitOrder> = Vec::new();
-            for (spec, pad_shape) in kernel_primitive.io_specs().iter().zip(&pad_shapes_input) {
+            let mut any_shape = None;
+            for (((spec, pad_shape), handle), &ib) in kernel_primitive
+                .io_specs()
+                .iter()
+                .zip(&pad_shapes_input)
+                .zip(kernel_call.input_handles.iter())
+                .zip(kernel_call.is_broadcast.iter())
+            {
                 if spec.is_input {
-                    if let Some(shape) = pad_shape {
-                        commitment_indices.push(dm_max);
-                        commitment_bit_orders.push(shape.1.clone());
+                    let shape = pad_shape.as_ref().unwrap();
+                    commitment_indices.push(handle.as_ref().unwrap().id);
+                    commitment_bit_orders.push(shape.1.clone());
+                    if !ib {
+                        any_shape = Some(shape.0.clone());
                     }
                 }
             }
-            for (spec, pad_shape) in kernel_primitive.io_specs().iter().zip(&pad_shapes_output) {
+            for (((spec, pad_shape), handle), &ib) in kernel_primitive
+                .io_specs()
+                .iter()
+                .zip(&pad_shapes_output)
+                .zip(kernel_call.output_handles.iter())
+                .zip(kernel_call.is_broadcast.iter())
+            {
                 if spec.is_output {
-                    if let Some(shape) = pad_shape {
-                        commitment_indices.push(dm_max);
-                        commitment_bit_orders.push(shape.1.clone());
+                    let shape = pad_shape.as_ref().unwrap();
+                    commitment_indices.push(handle.as_ref().unwrap().id);
+                    commitment_bit_orders.push(shape.1.clone());
+                    if !ib {
+                        any_shape = Some(shape.0.clone());
                     }
                 }
             }
 
+            let mut is_broadcast = kernel_call.is_broadcast.clone();
             if kernel.hint_solver().is_some() {
                 // if the kernel has a hint solver, we need to add another input
-                let n = kernel.layered_circuit_input().last().unwrap().len;
+                let any_shape = any_shape.unwrap();
+                let any_shape = keep_shape_until(&any_shape, kernel_call.num_parallel);
+                let dim0_len = shape_vec_padded_len(&any_shape);
+                let n = kernel.layered_circuit_input().last().unwrap().len * dim0_len;
                 commitment_indices.push(dm_max);
                 dm_max += 1;
                 commitment_bit_orders.push((0..n.trailing_zeros() as usize).collect());
+                commitments_lens.push(n);
+                is_broadcast.push(false);
             }
 
             let kernel_id = self.kernels.add(&kernel);
@@ -642,18 +685,19 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 commitment_indices,
                 commitment_bit_orders,
                 parallel_count: kernel_call.num_parallel,
-                is_broadcast: kernel_call.is_broadcast.clone(),
+                is_broadcast,
             });
         }
 
         if let Some(cg_kernels) = cg_kernels {
             assert!(cg_kernels.is_empty());
             assert_eq!(cg_proof_templates.unwrap(), self.proof_templates);
+            assert_eq!(cg_commitments_lens.unwrap(), commitments_lens);
             Ok(None)
         } else {
             Ok(Some(ComputationGraph {
                 kernels: self.kernels.vec().clone(),
-                commitments_lens: dm_shapes.iter().map(|x| shape_vec_padded_len(&x)).collect(),
+                commitments_lens,
                 proof_templates: self.proof_templates.clone(),
             }))
         }
@@ -670,7 +714,15 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
 
     // actually, this function computes hints
     pub fn solve_witness(&mut self) -> Result<(), Error> {
-        assert_eq!(self.state, ContextState::ComputationGraphDone);
+        match self.state {
+            ContextState::ComputationGraphNotDone => {
+                panic!("Please compile computation graph first.");
+            }
+            ContextState::ComputationGraphDone => {}
+            ContextState::WitnessDone => {
+                panic!("Witness already solved.");
+            }
+        }
         self.state = ContextState::WitnessDone;
 
         for (kernel_call, proof_template) in
@@ -801,6 +853,11 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
     }
 
     pub fn export_device_memories(&self) -> Vec<Vec<SIMDField<C>>> {
+        assert_eq!(
+            self.state,
+            ContextState::WitnessDone,
+            "Please finish computation graph and witness solving before exporting device memories."
+        );
         self.device_memories
             .iter()
             .map(|dm| {

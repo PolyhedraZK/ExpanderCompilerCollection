@@ -88,6 +88,7 @@ fn zkcuda_matmul_sum() {
 
     type P = ExpanderGKRProvingSystem<M31Config>;
     let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.solve_witness().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(
         &prover_setup,
