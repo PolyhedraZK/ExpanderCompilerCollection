@@ -414,7 +414,7 @@ where
 
     (
         ExpanderGKRCommitment {
-            vals_len: 1 << vals.len(),
+            vals_len: vals.len(),
             commitment,
         },
         ExpanderGKRCommitmentExtraInfo { scratch },

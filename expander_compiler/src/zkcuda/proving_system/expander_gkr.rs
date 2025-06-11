@@ -204,7 +204,7 @@ where
         timer.stop();
         (
             Self::Commitment {
-                vals_len: 1 << vals.len(),
+                vals_len: vals.len(),
                 commitment,
             },
             Self::CommitmentExtraInfo { scratch },
