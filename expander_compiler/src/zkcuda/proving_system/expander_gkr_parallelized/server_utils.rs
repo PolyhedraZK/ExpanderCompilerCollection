@@ -29,7 +29,6 @@ use gkr_engine::{
     MPIConfig, MPIEngine,
 };
 use serde::{Deserialize, Serialize};
-use std::cmp::max;
 use std::sync::Arc;
 use tokio::sync::{oneshot, Mutex};
 
@@ -329,14 +328,16 @@ where
         .proof_templates
         .iter()
         .map(|template| {
+            let commitment_values = template
+                .commitment_indices
+                .iter()
+                .map(|&idx| values[idx].as_ref())
+                .collect::<Vec<_>>();
+
             let gkr_end_state = prove_kernel_gkr::<C, ECCConfig>(
                 global_mpi_config,
                 &computation_graph.kernels[template.kernel_id],
-                &template
-                    .commitment_indices
-                    .iter()
-                    .map(|&idx| values[idx].as_ref())
-                    .collect::<Vec<_>>(),
+                &commitment_values,
                 next_power_of_two(template.parallel_count),
                 &template.is_broadcast,
             );
@@ -352,12 +353,12 @@ where
                 challenges.iter().for_each(|c| {
                     root_prove_input_claim::<C>(
                         prover_setup,
+                        &commitment_values,
                         &template
                             .commitment_indices
                             .iter()
-                            .map(|&idx| values[idx].as_ref())
+                            .map(|&idx| &extra_infos.as_ref().unwrap()[idx])
                             .collect::<Vec<_>>(),
-                        extra_infos.as_ref().unwrap(),
                         c,
                         &template.is_broadcast,
                         &mut transcript,
@@ -465,9 +466,11 @@ where
     let mut expander_circuit = kernel.layered_circuit.export_to_expander().flatten::<C>();
     expander_circuit.pre_process_gkr::<C>();
     let (max_num_input_var, max_num_output_var) = max_n_vars(&expander_circuit);
-    let max_num_var = max(max_num_input_var, max_num_output_var);
-    let mut prover_scratch =
-        ProverScratchPad::<C::FieldConfig>::new(max_num_var, max_num_var, local_world_size);
+    let mut prover_scratch = ProverScratchPad::<C::FieldConfig>::new(
+        max_num_input_var,
+        max_num_output_var,
+        local_world_size,
+    );
 
     let mut transcript = C::TranscriptConfig::new();
     transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
@@ -521,7 +524,7 @@ pub fn get_challenge_for_pcs_with_mpi<F: FieldEngine>(
 fn root_prove_input_claim<C: GKREngine>(
     p_keys: &ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
     commitments_values: &[impl AsRef<[SIMDField<C>]>],
-    commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<
+    commitments_extra_info: &[&ExpanderGKRCommitmentExtraInfo<
         C::PCSField,
         C::FieldConfig,
         C::PCSConfig,
@@ -542,8 +545,10 @@ fn root_prove_input_claim<C: GKREngine>(
         let (challenge_for_pcs, _) =
             get_challenge_for_pcs_with_mpi(gkr_challenge, val_len, parallel_count, *ib);
 
-        let params =
-            <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(val_len.ilog2() as usize, 1);
+        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
+            val_len.ilog2() as usize,
+            1,
+        );
         let p_key = p_keys.p_keys.get(&val_len).unwrap();
 
         let poly = RefMultiLinearPoly::from_ref(commitment_val.as_ref());

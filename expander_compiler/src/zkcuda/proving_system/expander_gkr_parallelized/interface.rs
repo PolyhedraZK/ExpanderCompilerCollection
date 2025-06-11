@@ -55,7 +55,7 @@ where
         let mut cursor = Cursor::new(&proof.data[0].bytes);
         cursor.set_position(32);
         let (mut verified, challenge, claimed_v0, claimed_v1) = gkr_verify(
-            1,
+            parallel_count,
             &expander_circuit,
             &[],
             &<C::FieldConfig as FieldEngine>::ChallengeField::ZERO,
@@ -160,6 +160,12 @@ where
                 println!("Failed to verify single pcs opening");
                 return false;
             }
+
+            let mut buffer = vec![];
+            opening
+                .serialize_into(&mut buffer)
+                .expect("Failed to serialize opening");
+            transcript.append_u8_slice(&buffer);
 
             let component_index = input.offset / input.len;
             let v_index = EqPolynomial::ith_eq_vec_elem(&component_idx_vars, component_index);
