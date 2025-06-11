@@ -89,10 +89,8 @@ fn zkcuda_test_multi_core() {
     zkcuda_test::<BN254Config, ParallelizedExpanderGKRProvingSystem<BN254ConfigSha2KZG>>();
 }
 
-#[test]
-fn zkcuda_test_simd() {
+fn zkcuda_test_simd_prepare_ctx() -> Context<M31Config> {
     use arith::SimdField;
-    type P = ExpanderGKRProvingSystem<M31Config>;
 
     let kernel_add_2_tmp: KernelPrimitive<M31Config> = compile_add_2_macro().unwrap();
     let kernel_add_16: KernelPrimitive<M31Config> = compile_add_16_macro().unwrap();
@@ -126,6 +124,14 @@ fn zkcuda_test_simd() {
     for k in 0..16 {
         assert_eq!(result[k], M31::from((32 * 33 / 2 + 32 * k) as u32));
     }
+    ctx
+}
+
+#[test]
+fn zkcuda_test_simd() {
+    type P = ExpanderGKRProvingSystem<M31Config>;
+
+    let mut ctx = zkcuda_test_simd_prepare_ctx();
 
     let computation_graph = ctx.compile_computation_graph().unwrap();
     ctx.solve_witness().unwrap();
@@ -137,7 +143,7 @@ fn zkcuda_test_simd() {
     );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 
-    // test serde
+    // test proof serde and verification
     let mut buf_cg: Vec<u8> = Vec::new();
     computation_graph.serialize_into(&mut buf_cg).unwrap();
     let mut buf_proof: Vec<u8> = Vec::new();
@@ -152,6 +158,18 @@ fn zkcuda_test_simd() {
     assert!(P::verify(&verifier_setup2, &computation_graph2, &proof2));
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
     assert!(P::verify(&verifier_setup2, &computation_graph2, &proof));
+
+    // test load computation graph
+    let mut ctx3: Context<M31Config> = zkcuda_test_simd_prepare_ctx();
+    let (prover_setup3, _verifier_setup3) = P::setup(&computation_graph2);
+    ctx3.load_computation_graph(computation_graph2).unwrap();
+    ctx3.solve_witness().unwrap();
+    let proof3 = P::prove(
+        &prover_setup3,
+        &computation_graph,
+        &ctx3.export_device_memories(),
+    );
+    assert!(P::verify(&verifier_setup2, &computation_graph, &proof3));
 }
 
 #[test]

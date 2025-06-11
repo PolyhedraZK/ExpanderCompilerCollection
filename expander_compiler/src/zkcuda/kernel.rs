@@ -5,7 +5,7 @@ use crate::compile::{
     CompileOptions,
 };
 use crate::frontend::{BasicAPI, Error, Variable, API};
-use crate::zkcuda::shape::{shape_padded_mapping, shape_vec_padded_len, Shape};
+use crate::zkcuda::shape::{shape_padded_mapping, shape_vec_len, shape_vec_padded_len, Shape};
 use crate::{
     circuit::{
         config::Config,
@@ -277,9 +277,14 @@ fn reorder_ir_inputs<C: Config>(
         .enumerate()
         .map(|(i, x)| (shape_vec_padded_len(x), i))
         .collect();
+    let sizes_prev: Vec<(usize, usize)> = pad_shapes
+        .iter()
+        .enumerate()
+        .map(|(i, x)| (shape_vec_len(x), i))
+        .collect();
     let mut prev_offset = Vec::new();
     let mut cur = 0;
-    for (x, _) in sizes.iter() {
+    for (x, _) in sizes_prev.iter() {
         prev_offset.push(cur);
         cur += *x;
     }
@@ -296,6 +301,7 @@ fn reorder_ir_inputs<C: Config>(
         lc_in[i].len = n;
         assert!(var_max % n == 0);
         let im = shape_padded_mapping(&pad_shapes[i]);
+        println!("{:?}", im.mapping());
         for (j, &k) in im.mapping().iter().enumerate() {
             var_new_id[prev + k + 1] = var_max + j + 1;
         }

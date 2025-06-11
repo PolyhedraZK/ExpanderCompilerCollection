@@ -627,6 +627,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             let mut commitment_indices: Vec<usize> = Vec::new();
             let mut commitment_bit_orders: Vec<BitOrder> = Vec::new();
             let mut any_shape = None;
+            let mut is_broadcast = Vec::new();
             for (((spec, pad_shape), handle), &ib) in kernel_primitive
                 .io_specs()
                 .iter()
@@ -638,6 +639,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                     let shape = pad_shape.as_ref().unwrap();
                     commitment_indices.push(handle.as_ref().unwrap().id);
                     commitment_bit_orders.push(shape.1.clone());
+                    is_broadcast.push(ib);
                     if !ib {
                         any_shape = Some(shape.0.clone());
                     }
@@ -654,18 +656,19 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                     let shape = pad_shape.as_ref().unwrap();
                     commitment_indices.push(handle.as_ref().unwrap().id);
                     commitment_bit_orders.push(shape.1.clone());
+                    is_broadcast.push(ib);
                     if !ib {
                         any_shape = Some(shape.0.clone());
                     }
                 }
             }
 
-            let mut is_broadcast = kernel_call.is_broadcast.clone();
+            let any_shape = any_shape.unwrap();
+            let any_shape = keep_shape_until(&any_shape, kernel_call.num_parallel);
+            let dim0_len = shape_vec_padded_len(&any_shape);
+
             if kernel.hint_solver().is_some() {
                 // if the kernel has a hint solver, we need to add another input
-                let any_shape = any_shape.unwrap();
-                let any_shape = keep_shape_until(&any_shape, kernel_call.num_parallel);
-                let dim0_len = shape_vec_padded_len(&any_shape);
                 let n = kernel.layered_circuit_input().last().unwrap().len * dim0_len;
                 commitment_indices.push(dm_max);
                 dm_max += 1;
@@ -679,7 +682,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 kernel_id,
                 commitment_indices,
                 commitment_bit_orders,
-                parallel_count: kernel_call.num_parallel,
+                parallel_count: dim0_len,
                 is_broadcast,
             });
         }
