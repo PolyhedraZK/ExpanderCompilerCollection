@@ -23,17 +23,14 @@ pub trait KernelWiseProvingSystem<C: Config> {
     fn commit(
         prover_setup: &Self::ProverSetup,
         vals: &[SIMDField<C>],
-        parallel_count: usize,
-        is_broadcast: bool,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo);
 
     #[allow(clippy::too_many_arguments)]
     fn prove_kernel(
         prover_setup: &Self::ProverSetup,
-        kernel_id: usize,
         kernel: &Kernel<C>,
-        commitments: &[Self::Commitment],
-        commitments_extra_info: &[Self::CommitmentExtraInfo],
+        commitments: &[&Self::Commitment],
+        commitments_extra_info: &[&Self::CommitmentExtraInfo],
         commitments_values: &[&[SIMDField<C>]],
         parallel_count: usize,
         is_broadcast: &[bool],
@@ -41,10 +38,9 @@ pub trait KernelWiseProvingSystem<C: Config> {
 
     fn verify_kernel(
         verifier_setup: &Self::VerifierSetup,
-        kernel_id: usize,
         kernel: &Kernel<C>,
         proof: &Self::Proof,
-        commitments: &[Self::Commitment],
+        commitments: &[&Self::Commitment],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> bool;
@@ -54,7 +50,7 @@ pub trait KernelWiseProvingSystem<C: Config> {
 
 #[derive(ExpSerde)]
 pub struct CombinedProof<C: Config, KP: KernelWiseProvingSystem<C>> {
-    pub commitments: Vec<Vec<KP::Commitment>>, // a vector of commitments for each kernel
+    pub commitments: Vec<KP::Commitment>,
     pub proofs: Vec<KP::Proof>,
 }
 
