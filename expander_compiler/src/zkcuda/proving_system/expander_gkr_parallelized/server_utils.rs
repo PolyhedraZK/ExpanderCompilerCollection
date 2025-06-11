@@ -24,9 +24,9 @@ use arith::Field;
 use axum::{extract::State, Json};
 use gkr::gkr_prove;
 use gkr_engine::{
-    ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine,
+    ExpanderDualVarChallenge, ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine
 };
-use gkr_engine::{StructuredReferenceString, Transcript};
+use gkr_engine::Transcript;
 use serde::{Deserialize, Serialize};
 use std::cmp::max;
 use std::sync::Arc;
@@ -259,12 +259,9 @@ fn setup_request_handler<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldC
     };
 
     read_circuit::<C, ECCConfig>(global_mpi_config, setup_file, computation_graph);
-    setup::<C, ECCConfig>(
-        global_mpi_config,
-        Some(computation_graph),
-        prover_setup,
-        verifier_setup,
-    );
+    if global_mpi_config.is_root() {
+        root_setup::<C, ECCConfig>(Some(computation_graph), prover_setup, verifier_setup);
+    }
 }
 
 fn read_circuit<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
@@ -283,8 +280,7 @@ fn read_circuit<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
 }
 
 #[allow(clippy::type_complexity)]
-fn setup<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
-    global_mpi_config: &MPIConfig<'static>,
+fn root_setup<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     computation_graph: Option<&ComputationGraph<ECCConfig>>,
     prover_setup: &mut ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
     verifier_setup: &mut ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
@@ -293,45 +289,17 @@ fn setup<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
 {
     let p_keys = &mut prover_setup.p_keys;
     let v_keys = &mut verifier_setup.v_keys;
-
-    let computation_graph = computation_graph.unwrap();
-    for template in computation_graph.proof_templates.iter() {
-        for (x, is_broadcast) in template
-            .commitment_indices
-            .iter()
-            .zip(template.is_broadcast.iter())
-        {
-            let val_total_len = computation_graph.commitments_lens[*x];
-            assert!(val_total_len.is_power_of_two());
-            let (val_actual_len, parallel_count) = if *is_broadcast {
-                (val_total_len, 1)
-            } else {
-                let parallel_count = next_power_of_two(template.parallel_count);
-                (val_total_len / parallel_count, parallel_count)
-            };
-
-            if p_keys.contains_key(&(val_actual_len, parallel_count)) {
-                continue;
-            }
-
-            let local_mpi_config = generate_local_mpi_config(global_mpi_config, parallel_count);
-
-            let (p_key, v_key) = if let Some(local_mpi_config) = local_mpi_config {
-                let (_params, p_key, v_key, _scratch) = pcs_testing_setup_fixed_seed::<
-                    C::FieldConfig,
-                    C::TranscriptConfig,
-                    C::PCSConfig,
-                >(
-                    val_actual_len, &local_mpi_config
-                );
-                (p_key, v_key)
-            } else {
-                <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::SRS::default()
-                    .into_keys()
-            };
-            p_keys.insert((val_actual_len, parallel_count), p_key);
-            v_keys.insert((val_actual_len, parallel_count), v_key);
+    for commitment_len in computation_graph.unwrap().commitments_lens.iter() {
+        if p_keys.contains_key(commitment_len) {
+            continue;
         }
+        let (_params, p_key, v_key, _scratch) =
+            pcs_testing_setup_fixed_seed::<C::FieldConfig, C::TranscriptConfig, C::PCSConfig>(
+                *commitment_len,
+                &MPIConfig::prover_new(None, None),
+            );
+        p_keys.insert(*commitment_len, p_key);
+        v_keys.insert(*commitment_len, v_key);
     }
 }
 
@@ -346,64 +314,67 @@ where
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    let commitments = computation_graph
-        .proof_templates
-        .iter()
-        .map(|template| {
-            template
-                .commitment_indices
+    let (commitments, extra_infos) = 
+        if global_mpi_config.is_root() {
+            let (commitments, extra_infos) = values
                 .iter()
-                .zip(template.is_broadcast.iter())
-                .map(|(x, is_broadcast)| {
-                    commit::<C>(
-                        global_mpi_config,
-                        prover_setup,
-                        values[*x].as_ref(),
-                        next_power_of_two(template.parallel_count),
-                        *is_broadcast,
-                    )
-                })
-                .unzip::<_, _, Vec<_>, Vec<_>>()
-        })
-        .collect::<Vec<_>>();
-
+                .map(|value| root_commit::<C>(prover_setup, value.as_ref()))
+                .unzip::<_, _, Vec<_>, Vec<_>>();
+            (Some(commitments), Some(extra_infos))            
+        } else {
+            (None, None)
+        };
+    
     let proofs = computation_graph
         .proof_templates
         .iter()
-        .zip(commitments.iter())
-        .map(|(template, _commitments_kernel)| {
-            prove_kernel::<C, ECCConfig>(
+        .map(|template| {
+            let gkr_end_state = prove_kernel_gkr::<C, ECCConfig>(
                 global_mpi_config,
-                prover_setup,
-                template.kernel_id,
                 &computation_graph.kernels[template.kernel_id],
-                &[],
-                &[],
-                &template
-                    .commitment_indices
+                &template.commitment_indices
                     .iter()
-                    .map(|x| values[*x].as_ref())
+                    .map(|&idx| values[idx].as_ref())
                     .collect::<Vec<_>>(),
                 next_power_of_two(template.parallel_count),
                 &template.is_broadcast,
-            )
+            );
+
+            if global_mpi_config.is_root() {
+                let (mut transcript, challenge) = gkr_end_state.unwrap();
+                let challenges = if let Some(challenge_y) = challenge.challenge_y() {
+                    vec![challenge.challenge_x(), challenge_y]
+                } else {
+                    vec![challenge.challenge_x()]
+                };
+
+                challenges.iter().for_each(|c| {
+                    root_prove_input_claim::<C>(
+                        &prover_setup,
+                        &template.commitment_indices
+                            .iter()
+                            .map(|&idx| values[idx].as_ref())
+                            .collect::<Vec<_>>(),
+                        &extra_infos.as_ref().unwrap(),
+                        c,
+                        &template.is_broadcast,
+                        &mut transcript,
+                    );
+                });
+
+                Some(ExpanderGKRProof {
+                    data: vec![transcript.finalize_and_get_proof()],
+                })
+            } else {
+                None
+            }
         })
         .collect::<Vec<_>>();
 
     if global_mpi_config.is_root() {
-        let commitments = commitments
-            .into_iter()
-            .map(|(commitment, _)| {
-                commitment
-                    .into_iter()
-                    .map(|c| c.unwrap())
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
-
         let proofs = proofs.into_iter().map(|p| p.unwrap()).collect::<Vec<_>>();
         Some(CombinedProof {
-            commitments,
+            commitments: commitments.unwrap(),
             proofs,
         })
     } else {
@@ -411,72 +382,41 @@ where
     }
 }
 
-fn commit<C: GKREngine>(
-    global_mpi_config: &MPIConfig<'static>,
+fn root_commit<C: GKREngine>(
     prover_setup: &ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
     vals: &[SIMDField<C>],
-    parallel_count: usize,
-    is_broadcast: bool,
 ) -> (
-    Option<ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>>,
-    Option<ExpanderGKRCommitmentExtraInfo<C::PCSField, C::FieldConfig, C::PCSConfig>>,
+    ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    ExpanderGKRCommitmentExtraInfo<C::PCSField, C::FieldConfig, C::PCSConfig>,
 )
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    let local_mpi_config = generate_local_mpi_config(
-        global_mpi_config,
-        if is_broadcast { 1 } else { parallel_count },
+    let n_vars = vals.len().ilog2() as usize;
+    let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(n_vars, 1);
+    let p_key = prover_setup.p_keys.get(&vals.len()).unwrap();
+
+    let mut scratch = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::init_scratch_pad(
+        &params,
+        &MPIConfig::prover_new(None, None),
     );
 
-    if let Some(local_mpi_config) = local_mpi_config {
-        let local_rank = local_mpi_config.world_rank();
-        let local_world_size = local_mpi_config.world_size();
+    let commitment = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::commit(
+        &params,
+        &MPIConfig::prover_new(None, None),
+        p_key,
+        &RefMultiLinearPoly::from_ref(vals),
+        &mut scratch,
+    )
+    .unwrap();
 
-        let local_val_len = vals.len() / local_world_size;
-        let local_vals_to_commit =
-            &vals[local_val_len * local_rank..local_val_len * (local_rank + 1)];
-
-        let p_key = prover_setup
-            .p_keys
-            .get(&(local_val_len, local_world_size))
-            .unwrap_or_else(|| panic!("unable to find pkeys for {local_val_len} {local_world_size} {is_broadcast} in commit"));
-
-        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
-            local_val_len.ilog2() as usize,
-            local_world_size,
-        );
-
-        let mut scratch =
-            <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::init_scratch_pad(
-                &params,
-                &local_mpi_config,
-            );
-
-        let commitment = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::commit(
-            &params,
-            &local_mpi_config,
-            p_key,
-            &RefMultiLinearPoly::from_ref(local_vals_to_commit),
-            &mut scratch,
-        );
-
-        if local_rank == 0 {
-            let commitment = ExpanderGKRCommitment {
-                vals_len: local_val_len,
-                commitment: vec![commitment.unwrap()],
-            };
-            let extra_info = ExpanderGKRCommitmentExtraInfo {
-                scratch: vec![scratch],
-            };
-
-            (Some(commitment), Some(extra_info))
-        } else {
-            (None, None)
-        }
-    } else {
-        (None, None)
-    }
+    (
+        ExpanderGKRCommitment {
+            vals_len: 1 << vals.len(),
+            commitment,
+        },
+        ExpanderGKRCommitmentExtraInfo { scratch },
+    )
 }
 
 // Ideally, there will only one ECCConfig generics
@@ -484,21 +424,13 @@ where
 // For now, the GKREngine actually controls the functionality of the prover
 // The ECCConfig is only used where the `Config` trait is required
 #[allow(clippy::too_many_arguments)]
-fn prove_kernel<C, ECCConfig>(
+fn prove_kernel_gkr<C, ECCConfig>(
     mpi_config: &MPIConfig<'static>,
-    prover_setup: &ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-    _kernel_id: usize,
     kernel: &Kernel<ECCConfig>,
-    _commitments: &[ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
-    commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<
-        C::PCSField,
-        C::FieldConfig,
-        C::PCSConfig,
-    >],
     commitments_values: &[&[SIMDField<C>]],
     parallel_count: usize,
     is_broadcast: &[bool],
-) -> Option<ExpanderGKRProof>
+) -> Option<(C::TranscriptConfig, ExpanderDualVarChallenge<C::FieldConfig>)>
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
@@ -532,8 +464,6 @@ where
     let mut prover_scratch =
         ProverScratchPad::<C::FieldConfig>::new(max_num_var, max_num_var, local_world_size);
 
-    let mut proof = ExpanderGKRProof { data: vec![] };
-
     let mut transcript = C::TranscriptConfig::new();
     transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
     expander_circuit.layers[0].input_vals = prepare_inputs(
@@ -553,135 +483,94 @@ where
         claimed_v,
         <C::FieldConfig as FieldEngine>::ChallengeField::from(0)
     );
-    prove_input_claim::<C>(
-        &local_mpi_config,
-        &local_commitment_values,
-        prover_setup,
-        commitments_extra_info,
-        &challenge.challenge_x(),
-        is_broadcast,
-        &mut transcript,
-    );
-    if let Some(challenge_y) = challenge.challenge_y() {
-        prove_input_claim::<C>(
-            &local_mpi_config,
-            &local_commitment_values,
-            prover_setup,
-            commitments_extra_info,
-            &challenge_y,
-            is_broadcast,
-            &mut transcript,
-        );
-    }
-    proof.data.push(transcript.finalize_and_get_proof());
+    
+    Some((transcript, challenge))
+}
 
-    if local_world_rank == 0 {
-        Some(proof)
+fn get_challenge_for_pcs_with_mpi<F: FieldEngine>(
+    gkr_challenge: &ExpanderSingleVarChallenge<F>,
+    total_vals_len: usize,
+    parallel_count: usize,
+    is_broadcast: bool,
+) -> (ExpanderSingleVarChallenge<F>, Vec<F::ChallengeField>) {
+    let mut challenge = gkr_challenge.clone();
+    let zero = F::ChallengeField::ZERO;
+    if is_broadcast {
+        let n_vals_vars = total_vals_len.ilog2() as usize;
+        let component_idx_vars = challenge.rz[n_vals_vars..].to_vec();
+        challenge.rz.resize(n_vals_vars, zero);
+        challenge.r_mpi.clear();
+        (challenge, component_idx_vars)
     } else {
-        None
+        let n_vals_vars = (total_vals_len / parallel_count).ilog2() as usize;
+        let component_idx_vars = challenge.rz[n_vals_vars..].to_vec();
+        challenge.rz.resize(n_vals_vars, zero);
+
+        challenge.rz.extend_from_slice(&challenge.r_mpi);
+        challenge.r_mpi.clear();
+        (challenge, component_idx_vars)
     }
 }
 
 #[allow(clippy::too_many_arguments)]
-fn prove_input_claim<C: GKREngine>(
-    mpi_config: &MPIConfig,
-    local_commitments_values: &[impl AsRef<[SIMDField<C>]>],
+fn root_prove_input_claim<C: GKREngine>(
     p_keys: &ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-    _commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<
+    commitments_values: &[impl AsRef<[SIMDField<C>]>],
+    commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<
         C::PCSField,
         C::FieldConfig,
         C::PCSConfig,
     >],
-    challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
+    gkr_challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
     is_broadcast: &[bool],
     transcript: &mut C::TranscriptConfig,
 ) where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    for (local_commitment_val, ib) in local_commitments_values
+    let parallel_count = 1 << gkr_challenge.r_mpi.len();
+    for ((commitment_val, extra_info), ib) in commitments_values
         .iter()
-        // .zip(commitments_extra_info)
+        .zip(commitments_extra_info)
         .zip(is_broadcast)
     {
-        let local_commitment_val = local_commitment_val.as_ref();
-        let val_len = local_commitment_val.len();
-        let vals_to_open = local_commitment_val;
+        let val_len = commitment_val.as_ref().len();
+        let (challenge_for_pcs, _) = get_challenge_for_pcs_with_mpi(
+            gkr_challenge,
+            val_len,
+            parallel_count,
+            *ib,
+        );
 
-        let nb_challenge_vars = val_len.ilog2() as usize;
-        let challenge_vars = challenge.rz[..nb_challenge_vars].to_vec();
+        let params =
+            <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(val_len, 1);
+        let p_key = p_keys.p_keys.get(&val_len).unwrap();
 
-        let local_mpi_config = if *ib {
-            if mpi_config.is_root() {
-                Some(MPIConfig::prover_new(None, None))
-            } else {
-                None
-            }
-        } else {
-            Some(mpi_config.clone())
-        };
-
-        let opening = if let Some(local_mpi_config) = local_mpi_config {
-            let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
-                val_len,
-                local_mpi_config.world_size(),
+        let poly = RefMultiLinearPoly::from_ref(commitment_val.as_ref());
+        let v =
+            <C::FieldConfig as FieldEngine>::single_core_eval_circuit_vals_at_expander_challenge(
+                commitment_val.as_ref(),
+                &challenge_for_pcs,
             );
-            let p_key = p_keys
-                .p_keys
-                .get(&(val_len, local_mpi_config.world_size()))
-                .unwrap();
+        transcript.append_field_element(&v);
 
-            let local_expander_challenge = ExpanderSingleVarChallenge::<C::FieldConfig> {
-                rz: challenge_vars.to_vec(),
-                r_simd: challenge.r_simd.to_vec(),
-                r_mpi: if local_mpi_config.world_size() == 1 {
-                    vec![]
-                } else {
-                    challenge.r_mpi.to_vec()
-                },
-            };
+        transcript.lock_proof();
+        let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::open(
+            &params,
+            &MPIConfig::prover_new(None, None),
+            p_key,
+            &poly,
+            &challenge_for_pcs,
+            transcript,
+            &extra_info.scratch,
+        )
+        .unwrap();
+        transcript.unlock_proof();
 
-            let poly = RefMultiLinearPoly::from_ref(vals_to_open);
-            let v = C::FieldConfig::collectively_eval_circuit_vals_at_expander_challenge(
-                vals_to_open,
-                &local_expander_challenge,
-                &mut vec![<C::FieldConfig as FieldEngine>::Field::ZERO; val_len],
-                &mut vec![
-                    <C::FieldConfig as FieldEngine>::ChallengeField::ZERO;
-                    1 << max(challenge.r_simd.len(), challenge.r_mpi.len())
-                ],
-                &local_mpi_config,
-            );
-            transcript.append_field_element(&v);
-
-            // WATCH OUT for the transcript syncronization problem here if the underlying opening actually is an IOP
-            transcript.lock_proof();
-            let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::open(
-                &params,
-                &local_mpi_config,
-                p_key,
-                &poly,
-                &local_expander_challenge,
-                transcript,
-                &<C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::init_scratch_pad(
-                    &params,
-                    &local_mpi_config,
-                ),
-            );
-            transcript.unlock_proof();
-
-            opening
-        } else {
-            None
-        };
-
-        if mpi_config.is_root() {
-            let mut buffer = vec![];
-            opening
-                .unwrap()
-                .serialize_into(&mut buffer)
-                .expect("Failed to serialize opening");
-            transcript.append_u8_slice(&buffer);
-        }
+        let mut buffer = vec![];
+        opening
+            .serialize_into(&mut buffer)
+            .expect("Failed to serialize opening");
+        transcript.append_u8_slice(&buffer);
     }
 }
 
