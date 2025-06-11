@@ -189,7 +189,7 @@ pub fn keep_shape_products_until(shape: &[usize], x: usize) -> Vec<usize> {
 pub fn keep_shape_until(shape: &[usize], x: usize) -> Vec<usize> {
     let mut p = 1;
     if x == 1 {
-        return shape.to_vec();
+        return Vec::new();
     }
     for (i, &y) in shape.iter().enumerate() {
         p *= y;
