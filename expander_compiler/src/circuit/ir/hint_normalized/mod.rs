@@ -623,8 +623,23 @@ impl<C: Config> RootCircuit<C> {
                         &mut values,
                     )?;
                 }
-                Instruction::CustomGate { .. } => {
-                    panic!("CustomGate currently unsupported");
+                Instruction::CustomGate { gate_type, inputs } => {
+                    let hint_id = hint_caller.custom_gate_type_to_hint_id(*gate_type)?;
+                    let mut inputs_scalar = vec![Vec::with_capacity(inputs.len()); SF::PACK_SIZE];
+                    for x in inputs.iter().map(|i| values[*i]) {
+                        let tmp = x.unpack();
+                        for (i, y) in tmp.iter().enumerate() {
+                            inputs_scalar[i].push(*y);
+                        }
+                    }
+                    let mut outputs_tmp = vec![CircuitField::<C>::zero(); SF::PACK_SIZE];
+                    for (i, inputs) in inputs_scalar.iter().enumerate() {
+                        let outputs = hints::safe_impl(hint_caller, hint_id, inputs, 1)?;
+                        for (j, x) in outputs.iter().enumerate() {
+                            outputs_tmp[j * SF::PACK_SIZE + i] = *x;
+                        }
+                    }
+                    values.push(SF::pack(&outputs_tmp));
                 }
             }
         }

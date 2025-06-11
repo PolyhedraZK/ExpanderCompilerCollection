@@ -883,7 +883,12 @@ impl<C: Config, I: InputType> Circuit<C, I> {
             }
             let mut outputs = Vec::with_capacity(SF::PACK_SIZE);
             for x in inputs.iter() {
-                outputs.push(hints::stub_impl(cu.gate_type, x, 1));
+                // TODO: better handle custom gates
+                if cu.gate_type == 12348 {
+                    outputs.push(vec![tmp_mul(&x)]);
+                } else {
+                    outputs.push(hints::stub_impl(cu.gate_type, x, 1));
+                }
             }
             for i in 0..outputs[0].len() {
                 let mut tmp = Vec::with_capacity(SF::PACK_SIZE);
@@ -997,4 +1002,14 @@ impl<C: Config, I: InputType> fmt::Display for Circuit<C, I> {
         writeln!(f, "Layers: {:?}", self.layer_ids)?;
         Ok(())
     }
+}
+
+fn tmp_mul<F: crate::field::Field>(a: &[F]) -> F {
+    let mut sum = F::ZERO;
+    let n = a.len() / 2;
+    for i in 0..n {
+        let t = a[i] * a[i + n];
+        sum += t;
+    }
+    sum
 }
