@@ -1,5 +1,3 @@
-use std::panic;
-
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::proof::ComputationGraph;
 use expander_compiler::zkcuda::proving_system::{
@@ -107,13 +105,7 @@ fn zkcuda_1_multi_core() {
     zkcuda_1_expander::<BabyBearConfig, ParallelizedExpanderGKRProvingSystem<BabyBearConfig>>();
     zkcuda_1_expander::<BN254Config, ParallelizedExpanderGKRProvingSystem<BN254Config>>();
     zkcuda_1_expander::<BN254Config, ParallelizedExpanderGKRProvingSystem<BN254ConfigSha2Hyrax>>();
-
-    // The setup phase is now called in an incorrect way for KZG. This does not affect efficiency
-    let result = panic::catch_unwind(|| {
-        zkcuda_1_expander::<BN254Config, ParallelizedExpanderGKRProvingSystem<BN254ConfigSha2KZG>>()
-    });
-    assert!(result.is_err());
-    <ParallelizedExpanderGKRProvingSystem::<BN254ConfigSha2KZG> as ProvingSystem<BN254Config>>::post_process();
+    zkcuda_1_expander::<BN254Config, ParallelizedExpanderGKRProvingSystem<BN254ConfigSha2KZG>>()
 }
 
 #[kernel]
