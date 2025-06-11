@@ -9,7 +9,7 @@ use crate::{
             expr::{Expression, LinComb, Term, VarSpec},
         },
     },
-    field::FieldArith,
+    field::{Field, FieldArith},
     frontend::CircuitField,
     utils::{error::Error, pool::Pool},
 };
@@ -278,7 +278,7 @@ impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
                         IrcOut::Instruction::from_kx_plus_b(ovr.x, k, b);
                 }
                 None => {
-                    let coef_inv = coef.inv().unwrap();
+                    let coef_inv = coef.optimistic_inv().unwrap();
                     self.mid_to_out[eid] = Some(OutVarRef {
                         x: id,
                         k: coef_inv,
@@ -436,7 +436,7 @@ fn strip_constants<C: Config>(
         return (Expression::default(), CircuitField::<C>::zero(), cst);
     }
     let v = e[0].coef;
-    let vi = v.inv().unwrap();
+    let vi = v.optimistic_inv().unwrap();
     for term in e.iter_mut() {
         term.coef *= vi;
     }
