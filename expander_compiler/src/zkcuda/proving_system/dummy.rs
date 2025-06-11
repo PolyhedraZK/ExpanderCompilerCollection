@@ -174,7 +174,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
                     &local_extra_info,
                     &local_vals,
                     next_power_of_two(template.parallel_count()),
-                    &template.is_broadcast(),
+                    template.is_broadcast(),
                 )
             })
             .collect::<Vec<_>>();
@@ -207,7 +207,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
                     local_proof,
                     &local_commitments,
                     next_power_of_two(template.parallel_count()),
-                    &template.is_broadcast(),
+                    template.is_broadcast(),
                 )
             })
             .collect::<Vec<_>>();

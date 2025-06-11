@@ -341,7 +341,7 @@ where
                 &computation_graph.kernels()[template.kernel_id()],
                 &commitment_values,
                 next_power_of_two(template.parallel_count()),
-                &template.is_broadcast(),
+                template.is_broadcast(),
             );
 
             if global_mpi_config.is_root() {
@@ -362,7 +362,7 @@ where
                             .map(|&idx| &extra_infos.as_ref().unwrap()[idx])
                             .collect::<Vec<_>>(),
                         c,
-                        &template.is_broadcast(),
+                        template.is_broadcast(),
                         &mut transcript,
                     );
                 });
