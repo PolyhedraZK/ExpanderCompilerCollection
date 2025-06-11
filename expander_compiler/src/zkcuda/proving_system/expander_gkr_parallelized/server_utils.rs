@@ -351,13 +351,13 @@ where
 
                 challenges.iter().for_each(|c| {
                     root_prove_input_claim::<C>(
-                        &prover_setup,
+                        prover_setup,
                         &template
                             .commitment_indices
                             .iter()
                             .map(|&idx| values[idx].as_ref())
                             .collect::<Vec<_>>(),
-                        &extra_infos.as_ref().unwrap(),
+                        extra_infos.as_ref().unwrap(),
                         c,
                         &template.is_broadcast,
                         &mut transcript,
