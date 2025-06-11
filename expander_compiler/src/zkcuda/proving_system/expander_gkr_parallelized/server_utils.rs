@@ -27,15 +27,40 @@ use gkr_engine::{
     ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine,
 };
 use gkr_engine::{StructuredReferenceString, Transcript};
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::cmp::max;
 use std::sync::Arc;
-use std::sync::Mutex as SyncMutex;
 use tokio::sync::{oneshot, Mutex};
 pub static SERVER_IP: &str = "127.0.0.1";
-pub static SERVER_PORT: Lazy<SyncMutex<u16>> = Lazy::new(|| SyncMutex::new(3000));
+pub static SERVER_PORT: u16 = 3000;
 
+fn parse_ip_arg() -> Option<String> {
+    let mut args = std::env::args();
+    while let Some(arg) = args.next() {
+        if arg == "--ip-address" {
+            return args.next();
+        }
+    }
+    None
+}
+fn parse_port_arg() -> Option<u16> {
+    let mut args = std::env::args();
+    while let Some(arg) = args.next() {
+        if arg == "--port-number" {
+            if let Some(val) = args.next() {
+                if let Ok(n) = val.parse() {
+                    return Some(n);
+                }
+            }
+        }
+    }
+    None
+}
+pub fn get_service_args() -> (String, u16) {
+    let ip = parse_ip_arg().unwrap_or_else(|| SERVER_IP.to_string());
+    let port = parse_port_arg().unwrap_or(SERVER_PORT);
+    (ip, port)
+}
 #[derive(Serialize, Deserialize)]
 pub enum RequestType {
     Setup(String), // The path to the computation graph setup file

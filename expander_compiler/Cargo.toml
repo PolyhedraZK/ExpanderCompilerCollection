@@ -39,7 +39,6 @@ sumcheck.workspace = true
 shared_memory.workspace = true
 tiny-keccak.workspace = true
 tokio.workspace = true
-once_cell = "1.21.3"
 
 [dev-dependencies]
 rayon = "1.9"
@@ -60,3 +59,7 @@ path = "src/zkcuda/proving_system/expander_gkr_parallelized/server_bin.rs"
 [[bin]]
 name = "matmul_bench"
 path = "bin/matmul_bench.rs"
+
+[[bin]]
+name = "test_keccak"
+path = "bin/test_keccak.rs"

@@ -1,4 +1,4 @@
-use super::server_utils::{RequestType, SERVER_IP, SERVER_PORT};
+use super::server_utils::{RequestType, get_service_args};
 
 use reqwest::Client;
 
@@ -16,12 +16,8 @@ pub async fn request_exit() {
 
 pub async fn post_request(request: RequestType) {
     let client = Client::new();
-    let port = {
-        let port = SERVER_PORT.lock().unwrap();
-        *port
-    };
-    let server_url = format!("{SERVER_IP}:{port}");
-    let server_url = format!("http://{server_url}/");
+    let (ip, port) = get_service_args();
+    let server_url = format!("http://{ip}:{port}/");
 
     let res = client
         .post(server_url)

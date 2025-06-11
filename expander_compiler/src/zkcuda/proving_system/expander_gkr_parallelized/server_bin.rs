@@ -17,7 +17,6 @@ use expander_compiler::{
             expander_gkr_parallelized::server_utils::{
                 root_main, worker_main, ServerState, GLOBAL_COMMUNICATOR, UNIVERSE,
             },
-            server_utils::SERVER_IP,
             ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
         },
     },
@@ -41,6 +40,10 @@ pub struct ExpanderExecArgs {
     #[arg(short, long, default_value = "Raw")]
     pub poly_commit: String,
 
+    /// The ip address for the server to listen on.
+    #[arg(short, long, default_value = "IPAddr")]
+    pub ip_addr: String,
+
     /// The port number for the server to listen on.
     #[arg(short, long, default_value = "Port")]
     pub port_number: String,
@@ -58,25 +61,25 @@ async fn main() {
 
     match (expander_exec_args.field_type.as_str(), pcs_type) {
         ("M31", PolynomialCommitmentType::Raw) => {
-            serve::<M31Config, M31Config>(expander_exec_args.port_number).await;
+            serve::<M31Config, M31Config>(expander_exec_args.ip_addr, expander_exec_args.port_number).await;
         }
         ("GF2", PolynomialCommitmentType::Raw) => {
-            serve::<GF2Config, GF2Config>(expander_exec_args.port_number).await;
+            serve::<GF2Config, GF2Config>(expander_exec_args.ip_addr, expander_exec_args.port_number).await;
         }
         ("Goldilocks", PolynomialCommitmentType::Raw) => {
-            serve::<GoldilocksConfig, GoldilocksConfig>(expander_exec_args.port_number).await;
+            serve::<GoldilocksConfig, GoldilocksConfig>(expander_exec_args.ip_addr, expander_exec_args.port_number).await;
         }
         ("BabyBear", PolynomialCommitmentType::Raw) => {
-            serve::<BabyBearConfig, BabyBearConfig>(expander_exec_args.port_number).await;
+            serve::<BabyBearConfig, BabyBearConfig>(expander_exec_args.ip_addr, expander_exec_args.port_number).await;
         }
         ("BN254", PolynomialCommitmentType::Raw) => {
-            serve::<BN254Config, BN254Config>(expander_exec_args.port_number).await;
+            serve::<BN254Config, BN254Config>(expander_exec_args.ip_addr, expander_exec_args.port_number).await;
         }
         ("BN254", PolynomialCommitmentType::Hyrax) => {
-            serve::<BN254ConfigSha2Hyrax, BN254Config>(expander_exec_args.port_number).await;
+            serve::<BN254ConfigSha2Hyrax, BN254Config>(expander_exec_args.ip_addr, expander_exec_args.port_number).await;
         }
         ("BN254", PolynomialCommitmentType::KZG) => {
-            serve::<BN254ConfigSha2KZG, BN254Config>(expander_exec_args.port_number).await;
+            serve::<BN254ConfigSha2KZG, BN254Config>(expander_exec_args.ip_addr, expander_exec_args.port_number).await;
         }
         (field_type, pcs_type) => {
             panic!("Combination of {field_type:?} and {pcs_type:?} not supported")
@@ -86,6 +89,7 @@ async fn main() {
 
 #[allow(static_mut_refs)]
 async fn serve<C: GKREngine + 'static, ECCConfig: Config<FieldConfig = C::FieldConfig> + 'static>(
+    ip_addr: String,
     port_number: String,
 ) where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
@@ -115,7 +119,7 @@ async fn serve<C: GKREngine + 'static, ECCConfig: Config<FieldConfig = C::FieldC
             .route("/", get(|| async { "Expander Server is running" }))
             .with_state(state);
 
-        let ip: IpAddr = SERVER_IP.parse().expect("Invalid SERVER_IP");
+        let ip: IpAddr = ip_addr.parse().expect("Invalid SERVER_IP");
         let port_val = port_number.parse::<u16>().unwrap_or_else(|e| {
             eprintln!("Error: Invalid port number '{port_number}'. {e}.");
             std::process::exit(1);
