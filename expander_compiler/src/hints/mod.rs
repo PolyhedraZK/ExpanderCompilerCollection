@@ -8,7 +8,7 @@ use registry::HintCaller;
 use crate::{field::Field, utils::error::Error};
 
 pub fn safe_impl<F: Field>(
-    hint_caller: &mut impl HintCaller<F>,
+    hint_caller: &impl HintCaller<F>,
     hint_id: usize,
     inputs: &[F],
     num_outputs: usize,
