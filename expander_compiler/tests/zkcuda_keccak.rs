@@ -425,9 +425,13 @@ fn zkcuda_keccak_2_helper<P: ProvingSystem<M31Config>>() {
 }
 
 #[test]
-fn zkcuda_keccak_1_2() {
+fn zkcuda_keccak_single_core() {
     zkcuda_keccak_1_helper::<ExpanderGKRProvingSystem<M31Config>>();
-    zkcuda_keccak_1_helper::<ParallelizedExpanderGKRProvingSystem<M31Config>>();
     zkcuda_keccak_2_helper::<ExpanderGKRProvingSystem<M31Config>>();
+}
+
+#[test]
+fn zkcuda_keccak_multi_core() {
+    zkcuda_keccak_1_helper::<ParallelizedExpanderGKRProvingSystem<M31Config>>();
     zkcuda_keccak_2_helper::<ParallelizedExpanderGKRProvingSystem<M31Config>>();
 }

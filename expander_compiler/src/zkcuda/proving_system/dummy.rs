@@ -57,8 +57,6 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
     fn commit(
         _prover_setup: &Self::ProverSetup,
         vals: &[SIMDField<C>],
-        _parallel_count: usize,
-        _is_broadcast: bool,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo) {
         assert!(vals.len() & (vals.len() - 1) == 0);
         (
@@ -71,10 +69,9 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
 
     fn prove_kernel(
         _prover_setup: &Self::ProverSetup,
-        _kernel_id: usize,
         kernel: &Kernel<C>,
-        _commitments: &[Self::Commitment],
-        _commitments_extra_info: &[Self::CommitmentExtraInfo],
+        _commitments: &[&Self::Commitment],
+        _commitments_extra_info: &[&Self::CommitmentExtraInfo],
         commitments_values: &[&[SIMDField<C>]],
         parallel_count: usize,
         is_broadcast: &[bool],
@@ -103,10 +100,9 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
     }
     fn verify_kernel(
         _verifier_setup: &Self::VerifierSetup,
-        _kernel_id: usize,
         kernel: &Kernel<C>,
         proof: &Self::Proof,
-        commitments: &[Self::Commitment],
+        commitments: &[&Self::Commitment],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> bool {
@@ -152,50 +148,39 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
         computation_graph: &ComputationGraph<C>,
         device_memories: &[Vec<SIMDField<C>>],
     ) -> Self::Proof {
-        let commitments = computation_graph
-            .proof_templates()
+        let (commitments, extra_infos) = device_memories
             .iter()
-            .map(|template| {
-                template
-                    .commitment_indices()
-                    .iter()
-                    .zip(template.is_broadcast().iter())
-                    .map(|(x, is_broadcast)| {
-                        <Self as KernelWiseProvingSystem<C>>::commit(
-                            prover_setup,
-                            &device_memories[*x],
-                            next_power_of_two(template.parallel_count()),
-                            *is_broadcast,
-                        )
-                    })
-                    .unzip::<_, _, Vec<_>, Vec<_>>()
+            .map(|device_memory| {
+                <Self as KernelWiseProvingSystem<C>>::commit(prover_setup, &device_memory[..])
             })
-            .collect::<Vec<_>>();
+            .unzip::<_, _, Vec<_>, Vec<_>>();
 
         let proofs: Vec<<Self as KernelWiseProvingSystem<C>>::Proof> = computation_graph
             .proof_templates()
             .iter()
-            .zip(commitments.iter())
-            .map(|(template, commitments_kernel)| {
+            .map(|template| {
+                let (mut local_commitments, mut local_extra_info, mut local_vals) =
+                    (vec![], vec![], vec![]);
+                for idx in template.commitment_indices() {
+                    local_commitments.push(&commitments[*idx]);
+                    local_extra_info.push(&extra_infos[*idx]);
+                    local_vals.push(&device_memories[*idx][..]);
+                }
+
                 <Self as KernelWiseProvingSystem<C>>::prove_kernel(
                     prover_setup,
-                    template.kernel_id(),
                     &computation_graph.kernels()[template.kernel_id()],
-                    &commitments_kernel.0,
-                    &commitments_kernel.1,
-                    &template
-                        .commitment_indices()
-                        .iter()
-                        .map(|x| &device_memories[*x][..])
-                        .collect::<Vec<_>>(),
+                    &local_commitments,
+                    &local_extra_info,
+                    &local_vals,
                     next_power_of_two(template.parallel_count()),
-                    template.is_broadcast(),
+                    &template.is_broadcast(),
                 )
             })
             .collect::<Vec<_>>();
 
         CombinedProof {
-            commitments: commitments.into_iter().map(|x| x.0).collect(),
+            commitments,
             proofs,
         }
     }
@@ -209,16 +194,20 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
             .proofs
             .par_iter()
             .zip(computation_graph.proof_templates().par_iter())
-            .zip(proof.commitments.par_iter())
-            .map(|((proof, template), commitments_kernel)| {
+            .map(|(local_proof, template)| {
+                let local_commitments = template
+                    .commitment_indices()
+                    .iter()
+                    .map(|idx| &proof.commitments[*idx])
+                    .collect::<Vec<_>>();
+
                 <Self as KernelWiseProvingSystem<C>>::verify_kernel(
                     verifier_setup,
-                    template.kernel_id(),
                     &computation_graph.kernels()[template.kernel_id()],
-                    proof,
-                    commitments_kernel,
+                    local_proof,
+                    &local_commitments,
                     next_power_of_two(template.parallel_count()),
-                    template.is_broadcast(),
+                    &template.is_broadcast(),
                 )
             })
             .collect::<Vec<_>>();
