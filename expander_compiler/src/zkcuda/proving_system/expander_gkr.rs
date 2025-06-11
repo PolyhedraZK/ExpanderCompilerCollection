@@ -22,7 +22,7 @@ use gkr_engine::{
     Proof as ExpanderProof, StructuredReferenceString, Transcript,
 };
 use poly_commit::expander_pcs_init_testing_only;
-use polynomials::{EqPolynomial, MultiLinearPoly, RefMultiLinearPoly};
+use polynomials::{EqPolynomial, RefMultiLinearPoly};
 use serdes::ExpSerde;
 use sumcheck::ProverScratchPad;
 
@@ -30,7 +30,7 @@ use sumcheck::ProverScratchPad;
 #[derive(ExpSerde)]
 pub struct ExpanderGKRCommitment<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> {
     pub vals_len: usize,
-    pub commitment: Vec<PCS::Commitment>,
+    pub commitment: PCS::Commitment,
 }
 
 impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
@@ -62,7 +62,7 @@ pub struct ExpanderGKRCommitmentExtraInfo<
     F: FieldEngine,
     PCS: ExpanderPCS<F, PCSField>,
 > {
-    pub scratch: Vec<PCS::ScratchPad>,
+    pub scratch: PCS::ScratchPad,
 }
 
 impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
@@ -78,7 +78,7 @@ impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
 #[allow(clippy::type_complexity)]
 #[derive(ExpSerde)]
 pub struct ExpanderGKRProverSetup<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> {
-    pub p_keys: HashMap<(usize, usize), <PCS::SRS as StructuredReferenceString>::PKey>,
+    pub p_keys: HashMap<usize, <PCS::SRS as StructuredReferenceString>::PKey>,
 }
 
 // implement default
@@ -106,7 +106,7 @@ impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
 #[derive(ExpSerde)]
 pub struct ExpanderGKRVerifierSetup<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>>
 {
-    pub v_keys: HashMap<(usize, usize), <PCS::SRS as StructuredReferenceString>::VKey>,
+    pub v_keys: HashMap<usize, <PCS::SRS as StructuredReferenceString>::VKey>,
 }
 
 // implement default
@@ -156,32 +156,20 @@ where
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
         let mut p_keys = HashMap::new();
         let mut v_keys = HashMap::new();
-        for template in computation_graph.proof_templates.iter() {
-            for (x, is_broadcast) in template
-                .commitment_indices
-                .iter()
-                .zip(template.is_broadcast.iter())
-            {
-                let val_total_len = computation_graph.commitments_lens[*x];
-                let val_actual_len = if *is_broadcast {
-                    val_total_len
-                } else {
-                    val_total_len / template.parallel_count
-                };
-                if p_keys.contains_key(&(val_actual_len, template.parallel_count)) {
-                    continue;
-                }
-                let (_params, p_key, v_key, _scratch) = pcs_testing_setup_fixed_seed::<
-                    C::FieldConfig,
-                    C::TranscriptConfig,
-                    C::PCSConfig,
-                >(
-                    val_actual_len,
-                    &MPIConfig::prover_new(None, None),
-                );
-                p_keys.insert((val_actual_len, template.parallel_count), p_key);
-                v_keys.insert((val_actual_len, template.parallel_count), v_key);
+        for commitment_len in computation_graph.commitments_lens.iter() {
+            if p_keys.contains_key(commitment_len) {
+                continue;
             }
+            let (_params, p_key, v_key, _scratch) = pcs_testing_setup_fixed_seed::<
+                C::FieldConfig,
+                C::TranscriptConfig,
+                C::PCSConfig,
+            >(
+                *commitment_len,
+                &MPIConfig::prover_new(None, None),
+            );
+            p_keys.insert(*commitment_len, p_key);
+            v_keys.insert(*commitment_len, v_key);
         }
 
         (
@@ -193,53 +181,38 @@ where
     fn commit(
         prover_setup: &Self::ProverSetup,
         vals: &[SIMDField<C>],
-        parallel_count: usize,
-        is_broadcast: bool,
     ) -> (Self::Commitment, Self::CommitmentExtraInfo) {
         let timer = Timer::new("commit", true);
 
-        let vals_to_commit = if is_broadcast {
-            vec![vals]
-        } else {
-            vals.chunks(vals.len() / parallel_count).collect::<Vec<_>>()
-        };
-
-        let n_vars = vals_to_commit[0].len().ilog2() as usize;
+        let n_vars = vals.len().ilog2() as usize;
         let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
             n_vars,
-            parallel_count,
+            1,
         );
         let p_key = prover_setup
             .p_keys
-            .get(&(1 << n_vars, parallel_count))
+            .get(&vals.len())
             .unwrap();
 
-        let (commitment, scratch) = vals_to_commit
-            .into_iter()
-            .map(|vals| {
-                let mut scratch =
-                    <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::init_scratch_pad(
-                        &params,
-                        &MPIConfig::default(),
-                    );
+        let mut scratch =
+            <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::init_scratch_pad(
+                &params,
+                &MPIConfig::prover_new(None, None),
+            );
 
-                let commitment =
-                    <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::commit(
-                        &params,
-                        &MPIConfig::default(),
-                        p_key,
-                        &MultiLinearPoly::new(vals.to_vec()),
-                        &mut scratch,
-                    )
-                    .unwrap();
-                (commitment, scratch)
-            })
-            .unzip::<_, _, Vec<_>, Vec<_>>();
+        let commitment =
+            <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::commit(
+                &params,
+                &MPIConfig::prover_new(None, None),
+                p_key,
+                &RefMultiLinearPoly::from_ref(vals),
+                &mut scratch,
+            )
+            .unwrap();
 
-        timer.stop();
         (
             Self::Commitment {
-                vals_len: 1 << n_vars,
+                vals_len: 1 << vals.len(),
                 commitment,
             },
             Self::CommitmentExtraInfo { scratch },
@@ -248,10 +221,9 @@ where
 
     fn prove_kernel(
         prover_setup: &Self::ProverSetup,
-        _kernel_id: usize,
         kernel: &Kernel<ECCConfig>,
-        _commitments: &[Self::Commitment],
-        commitments_extra_info: &[Self::CommitmentExtraInfo],
+        _commitments: &[&Self::Commitment],
+        commitments_extra_info: &[&Self::CommitmentExtraInfo],
         commitments_values: &[&[SIMDField<C>]],
         parallel_count: usize,
         is_broadcast: &[bool],
@@ -285,7 +257,7 @@ where
                 &expander_circuit,
                 &mut prover_scratch,
                 &mut transcript,
-                &MPIConfig::default(),
+                &MPIConfig::prover_new(None, None),
             );
             assert_eq!(
                 claimed_v,
@@ -326,10 +298,9 @@ where
 
     fn verify_kernel(
         verifier_setup: &Self::VerifierSetup,
-        _kernel_id: usize,
         kernel: &Kernel<ECCConfig>,
         proof: &Self::Proof,
-        commitments: &[Self::Commitment],
+        commitments: &[&Self::Commitment],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> bool {
@@ -426,12 +397,70 @@ pub fn max_n_vars<C: FieldEngine>(circuit: &Circuit<C>) -> (usize, usize) {
     (max_num_input_var, max_num_output_var)
 }
 
+/// Challenge ctructure:
+/// llll pppp cccc ssss
+/// Where: 
+///     l is the challenge for the local values
+///     p is the challenge for the parallel index 
+///     c is the selector for the components
+///     s is the challenge for the SIMD values
+/// All little endian.
+/// 
+/// At the moment of commiting, we commited to the values corresponding to
+///     llll pppp ssss
+/// At the end of GKR, we will have the challenge
+///     llll cccc ssss
+/// The pppp part is not included because we're proving kernel-by-kernel.
+/// 
+/// Arguments:
+/// - `challenge`: The gkr challenge: llll cccc ssss
+/// - `total_vals_len`: The length of llll pppp
+/// - `parallel_index`: The index of the parallel execution. pppp part.
+/// - `parallel_count`: The total number of parallel executions. pppp part.
+/// - `is_broadcast`: Whether the challenge is broadcasted or not.
+/// Returns: 
+///     llll pppp ssss challenge
+///     cccc
+fn get_challenge_for_pcs<F: FieldEngine>(
+    gkr_challenge: &ExpanderSingleVarChallenge<F>,
+    total_vals_len: usize,
+    parallel_index: usize,
+    parallel_count: usize,
+    is_broadcast: bool,
+) -> (ExpanderSingleVarChallenge<F>, Vec<F::ChallengeField>) {
+
+    let mut challenge = gkr_challenge.clone();
+    let zero = F::ChallengeField::ZERO;
+    if is_broadcast {
+        let n_vals_vars = total_vals_len.ilog2() as usize;
+        let component_idx_vars = challenge.rz[n_vals_vars..].to_vec();
+        challenge.rz.resize(n_vals_vars, zero);
+        (challenge, component_idx_vars)
+    } else {
+        let n_vals_vars = (total_vals_len / parallel_count).ilog2() as usize;
+        let component_idx_vars = challenge.rz[n_vals_vars..].to_vec();
+        challenge.rz.resize(n_vals_vars, zero);
+
+        let n_index_vars = parallel_count.ilog2() as usize;
+        let index_vars = (0..n_index_vars)
+            .map(|i| {
+                F::ChallengeField::from(
+                    ((parallel_index >> i) & 1) as u32,
+                )
+            })
+            .collect::<Vec<_>>();
+        
+        challenge.rz.extend_from_slice(&index_vars);
+        (challenge, component_idx_vars)
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn prove_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     _kernel: &Kernel<ECCConfig>,
     commitments_values: &[&[SIMDField<C>]],
     p_keys: &ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-    commitments_extra_info: &[ExpanderGKRCommitmentExtraInfo<
+    commitments_extra_info: &[&ExpanderGKRCommitmentExtraInfo<
         C::PCSField,
         C::FieldConfig,
         C::PCSConfig,
@@ -449,54 +478,36 @@ fn prove_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfi
         .zip(commitments_extra_info)
         .zip(is_broadcast)
     {
-        let val_len = if *ib {
-            commitment_val.len()
-        } else {
-            commitment_val.len() / parallel_count
-        };
-        let vals_to_open = if *ib {
-            *commitment_val
-        } else {
-            &commitment_val[val_len * parallel_index..val_len * (parallel_index + 1)]
-        };
-
-        let nb_challenge_vars = val_len.ilog2() as usize;
-        let challenge_vars = challenge.rz[..nb_challenge_vars].to_vec();
+        let val_len = commitment_val.len();
+        let (challenge_for_pcs, _) = get_challenge_for_pcs(
+            challenge,
+            commitment_val.len(),
+            parallel_index,
+            parallel_count,
+            *ib,
+        );
 
         let params =
             <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(val_len, 1);
-        let p_key = p_keys.p_keys.get(&(val_len, parallel_count)).unwrap();
+        let p_key = p_keys.p_keys.get(&val_len).unwrap();
 
-        let poly = RefMultiLinearPoly::from_ref(vals_to_open);
+        let poly = RefMultiLinearPoly::from_ref(commitment_val);
         let v =
             <C::FieldConfig as FieldEngine>::single_core_eval_circuit_vals_at_expander_challenge(
-                vals_to_open,
-                &ExpanderSingleVarChallenge {
-                    rz: challenge_vars.to_vec(),
-                    r_simd: challenge.r_simd.to_vec(),
-                    r_mpi: vec![],
-                },
+                commitment_val,
+                &challenge_for_pcs,
             );
         transcript.append_field_element(&v);
 
         transcript.lock_proof();
-        let scratch_for_parallel_index = if *ib {
-            &extra_info.scratch[0]
-        } else {
-            &extra_info.scratch[parallel_index]
-        };
         let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::open(
             &params,
             &MPIConfig::default(),
             p_key,
             &poly,
-            &ExpanderSingleVarChallenge {
-                rz: challenge_vars.to_vec(),
-                r_simd: challenge.r_simd.to_vec(),
-                r_mpi: vec![],
-            },
+            &challenge_for_pcs,
             transcript,
-            scratch_for_parallel_index,
+            &extra_info.scratch,
         )
         .unwrap();
         transcript.unlock_proof();
@@ -516,7 +527,7 @@ fn verify_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConf
     v_keys: &ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
     challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
     y: &<C::FieldConfig as FieldEngine>::ChallengeField,
-    commitments: &[ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
+    commitments: &[&ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
     is_broadcast: &[bool],
     parallel_index: usize,
     parallel_count: usize,
@@ -532,20 +543,25 @@ where
         .zip(commitments.iter())
         .zip(is_broadcast)
     {
-        let commitment_len =
+        let val_len =
             <ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig> as Commitment<
                 ECCConfig,
             >>::vals_len(commitment);
-        let nb_challenge_vars = commitment_len.ilog2() as usize;
-        let challenge_vars = challenge.rz[..nb_challenge_vars].to_vec();
+        let (challenge_for_pcs, component_idx_vars) = get_challenge_for_pcs(
+            challenge,
+            val_len,
+            parallel_index,
+            parallel_count,
+            *ib,
+        );
 
         let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
-            commitment_len.ilog2() as usize,
+            val_len.ilog2() as usize,
             1,
         );
         let v_key = v_keys
             .v_keys
-            .get(&(commitment_len, parallel_count))
+            .get(&val_len)
             .unwrap();
 
         let claim =
@@ -560,20 +576,11 @@ where
             .unwrap();
 
         transcript.lock_proof();
-        let commitment_for_parallel_index = if *ib {
-            &commitment.commitment[0]
-        } else {
-            &commitment.commitment[parallel_index]
-        };
         let verified = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::verify(
             &params,
             v_key,
-            commitment_for_parallel_index,
-            &ExpanderSingleVarChallenge {
-                rz: challenge_vars,
-                r_simd: challenge.r_simd.to_vec(),
-                r_mpi: vec![],
-            },
+            &commitment.commitment,
+            &challenge_for_pcs,
             claim,
             transcript,
             &opening,
@@ -585,17 +592,8 @@ where
             return false;
         }
 
-        let index_vars = &challenge.rz[nb_challenge_vars..];
-        let index = input.offset / input.len;
-        let index_as_bits = (0..index_vars.len())
-            .map(|i| {
-                <C::FieldConfig as FieldEngine>::ChallengeField::from(((index >> i) & 1) as u32)
-            })
-            .collect::<Vec<_>>();
-        let v_index = EqPolynomial::<<C::FieldConfig as FieldEngine>::ChallengeField>::eq_vec(
-            index_vars,
-            &index_as_bits,
-        );
+        let component_index = input.offset / input.len;
+        let v_index = EqPolynomial::ith_eq_vec_elem(&component_idx_vars, component_index);
 
         target_y += v_index * claim;
     }
@@ -630,42 +628,34 @@ where
         computation_graph: &ComputationGraph<ECCConfig>,
         device_memories: &[DeviceMemory<ECCConfig>],
     ) -> Self::Proof {
-        let commitments = computation_graph
-            .proof_templates
+        let (commitments, extra_infos) = device_memories
             .iter()
-            .map(|template| {
-                template
-                    .commitment_indices
-                    .iter()
-                    .zip(template.is_broadcast.iter())
-                    .map(|(x, is_broadcast)| {
-                        <Self as KernelWiseProvingSystem<ECCConfig>>::commit(
-                            prover_setup,
-                            &device_memories[*x].values,
-                            next_power_of_two(template.parallel_count),
-                            *is_broadcast,
-                        )
-                    })
-                    .unzip::<_, _, Vec<_>, Vec<_>>()
+            .map(|device_memory| {
+                <Self as KernelWiseProvingSystem<ECCConfig>>::commit(
+                    prover_setup,
+                    &device_memory.values[..],
+                )
             })
-            .collect::<Vec<_>>();
+            .unzip::<_, _, Vec<_>, Vec<_>>();
 
         let proofs: Vec<<Self as KernelWiseProvingSystem<ECCConfig>>::Proof> = computation_graph
             .proof_templates
             .iter()
-            .zip(commitments.iter())
-            .map(|(template, commitments_kernel)| {
+            .map(|template| {
+                let (mut local_commitments, mut local_extra_info, mut local_vals) =
+                    (vec![], vec![], vec![]);
+                for idx in &template.commitment_indices {
+                    local_commitments.push(&commitments[*idx]);
+                    local_extra_info.push(&extra_infos[*idx]);
+                    local_vals.push(&device_memories[*idx].values[..]);
+                }
+
                 <Self as KernelWiseProvingSystem<ECCConfig>>::prove_kernel(
                     prover_setup,
-                    template.kernel_id,
                     &computation_graph.kernels[template.kernel_id],
-                    &commitments_kernel.0,
-                    &commitments_kernel.1,
-                    &template
-                        .commitment_indices
-                        .iter()
-                        .map(|x| &device_memories[*x].values[..])
-                        .collect::<Vec<_>>(),
+                    &local_commitments,
+                    &local_extra_info,
+                    &local_vals,
                     next_power_of_two(template.parallel_count),
                     &template.is_broadcast,
                 )
@@ -673,7 +663,7 @@ where
             .collect::<Vec<_>>();
 
         CombinedProof {
-            commitments: commitments.into_iter().map(|x| x.0).collect(),
+            commitments,
             proofs,
         }
     }
@@ -687,14 +677,18 @@ where
             .proofs
             .par_iter()
             .zip(computation_graph.proof_templates.par_iter())
-            .zip(proof.commitments.par_iter())
-            .map(|((proof, template), commitments_kernel)| {
+            .map(|(local_proof, template)| {
+                let local_commitments = template
+                    .commitment_indices
+                    .iter()
+                    .map(|idx| &proof.commitments[*idx])
+                    .collect::<Vec<_>>();
+
                 <Self as KernelWiseProvingSystem<ECCConfig>>::verify_kernel(
                     verifier_setup,
-                    template.kernel_id,
                     &computation_graph.kernels[template.kernel_id],
-                    proof,
-                    commitments_kernel,
+                    local_proof,
+                    &local_commitments,
                     next_power_of_two(template.parallel_count),
                     &template.is_broadcast,
                 )
