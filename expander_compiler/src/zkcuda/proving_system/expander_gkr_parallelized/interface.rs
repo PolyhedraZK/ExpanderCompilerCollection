@@ -2,9 +2,10 @@ use std::fs;
 use std::io::{Cursor, Read};
 
 use crate::circuit::config::Config;
+use crate::frontend::SIMDField;
 use crate::utils::misc::next_power_of_two;
+use crate::zkcuda::context::ComputationGraph;
 use crate::zkcuda::kernel::Kernel;
-use crate::zkcuda::proof::ComputationGraph;
 use crate::zkcuda::proving_system::expander_gkr_parallelized::client::{
     request_exit, request_prove, request_setup,
 };
@@ -53,7 +54,7 @@ where
         is_broadcast: &[bool],
     ) -> bool {
         let timer = Timer::new("verify", true);
-        let mut expander_circuit = kernel.layered_circuit.export_to_expander().flatten::<C>();
+        let mut expander_circuit = kernel.layered_circuit().export_to_expander().flatten::<C>();
         expander_circuit.pre_process_gkr::<C>();
 
         let mut transcript = C::TranscriptConfig::new();
@@ -122,7 +123,7 @@ where
     ) -> bool {
         let mut target_y = <C::FieldConfig as FieldEngine>::ChallengeField::ZERO;
         for ((input, commitment), ib) in kernel
-            .layered_circuit_input
+            .layered_circuit_input()
             .iter()
             .zip(commitments.iter())
             .zip(is_broadcast)
@@ -196,7 +197,7 @@ where
     type Proof = CombinedProof<ECCConfig, ExpanderGKRProvingSystem<C>>;
 
     fn setup(
-        computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
+        computation_graph: &crate::zkcuda::context::ComputationGraph<ECCConfig>,
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
         let setup_timer = Timer::new("setup", true);
 
@@ -210,9 +211,9 @@ where
         fs::write(&setup_filename, bytes).expect("Failed to write computation graph to file");
 
         let max_parallel_count = computation_graph
-            .proof_templates
+            .proof_templates()
             .iter()
-            .map(|t| t.parallel_count)
+            .map(|t| t.parallel_count())
             .max()
             .unwrap_or(1);
 
@@ -236,16 +237,13 @@ where
 
     fn prove(
         _prover_setup: &Self::ProverSetup,
-        _computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
-        device_memories: &[crate::zkcuda::context::DeviceMemory<ECCConfig>],
+        _computation_graph: &crate::zkcuda::context::ComputationGraph<ECCConfig>,
+        device_memories: &[Vec<SIMDField<ECCConfig>>],
     ) -> Self::Proof {
         let timer = Timer::new("prove", true);
 
         SharedMemoryEngine::write_witness_to_shared_memory::<C::FieldConfig>(
-            &device_memories
-                .iter()
-                .map(|m| &m.values[..])
-                .collect::<Vec<_>>(),
+            &device_memories.iter().map(|m| &m[..]).collect::<Vec<_>>(),
         );
         wait_async(request_prove());
 
@@ -261,21 +259,21 @@ where
         let verified = proof
             .proofs
             .par_iter()
-            .zip(computation_graph.proof_templates.par_iter())
+            .zip(computation_graph.proof_templates().par_iter())
             .map(|(local_proof, template)| {
                 let local_commitments = template
-                    .commitment_indices
+                    .commitment_indices()
                     .iter()
                     .map(|idx| &proof.commitments[*idx])
                     .collect::<Vec<_>>();
 
                 Self::verify_kernel(
                     verifier_setup,
-                    &computation_graph.kernels[template.kernel_id],
+                    &computation_graph.kernels()[template.kernel_id()],
                     local_proof,
                     &local_commitments,
-                    next_power_of_two(template.parallel_count),
-                    &template.is_broadcast,
+                    next_power_of_two(template.parallel_count()),
+                    template.is_broadcast(),
                 )
             })
             .collect::<Vec<_>>();

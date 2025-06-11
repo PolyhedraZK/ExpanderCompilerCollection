@@ -1,6 +1,8 @@
+use serdes::ExpSerde;
+
 pub const EMPTY: usize = usize::MAX >> 9;
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, ExpSerde)]
 pub struct InputMapping {
     next_size: usize,
     mapping: Vec<usize>,

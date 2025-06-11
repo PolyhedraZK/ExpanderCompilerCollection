@@ -23,6 +23,7 @@ use super::{
     CircuitField,
 };
 
+#[derive(Clone)]
 pub struct Builder<C: Config> {
     instructions: Vec<SourceInstruction<C>>,
     constraints: Vec<SourceConstraint>,
@@ -600,6 +601,7 @@ impl<C: Config> UnconstrainedAPI<C> for Builder<C> {
     unconstrained_binary_op!(unconstrained_bit_xor, BitXor);
 }
 
+#[derive(Clone)]
 pub struct RootBuilder<C: Config> {
     num_public_inputs: usize,
     current_builders: Vec<(usize, Builder<C>)>,

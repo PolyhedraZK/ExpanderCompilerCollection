@@ -12,7 +12,7 @@ use clap::Parser;
 use expander_compiler::{
     frontend::{BN254Config, BabyBearConfig, Config, GF2Config, GoldilocksConfig, M31Config},
     zkcuda::{
-        proof::ComputationGraph,
+        context::ComputationGraph,
         proving_system::{
             expander_gkr_parallelized::server_utils::{
                 root_main, worker_main, ServerState, GLOBAL_COMMUNICATOR, UNIVERSE,

@@ -1,8 +1,8 @@
 #![allow(clippy::type_complexity)]
 
 use crate::utils::misc::next_power_of_two;
+use crate::zkcuda::context::ComputationGraph;
 use crate::zkcuda::kernel::{Kernel, LayeredCircuitInputVec};
-use crate::zkcuda::proof::ComputationGraph;
 use crate::zkcuda::proving_system::shared_memory_utils::SharedMemoryEngine;
 use crate::zkcuda::proving_system::{
     max_n_vars, pcs_testing_setup_fixed_seed, CombinedProof, ExpanderGKRCommitment,
@@ -291,7 +291,7 @@ fn root_setup<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
 {
     let p_keys = &mut prover_setup.p_keys;
     let v_keys = &mut verifier_setup.v_keys;
-    for commitment_len in computation_graph.unwrap().commitments_lens.iter() {
+    for commitment_len in computation_graph.unwrap().commitments_lens().iter() {
         if p_keys.contains_key(commitment_len) {
             continue;
         }
@@ -327,21 +327,21 @@ where
     };
 
     let proofs = computation_graph
-        .proof_templates
+        .proof_templates()
         .iter()
         .map(|template| {
             let commitment_values = template
-                .commitment_indices
+                .commitment_indices()
                 .iter()
                 .map(|&idx| values[idx].as_ref())
                 .collect::<Vec<_>>();
 
             let gkr_end_state = prove_kernel_gkr::<C, ECCConfig>(
                 global_mpi_config,
-                &computation_graph.kernels[template.kernel_id],
+                &computation_graph.kernels()[template.kernel_id()],
                 &commitment_values,
-                next_power_of_two(template.parallel_count),
-                &template.is_broadcast,
+                next_power_of_two(template.parallel_count()),
+                template.is_broadcast(),
             );
 
             if global_mpi_config.is_root() {
@@ -357,12 +357,12 @@ where
                         prover_setup,
                         &commitment_values,
                         &template
-                            .commitment_indices
+                            .commitment_indices()
                             .iter()
                             .map(|&idx| &extra_infos.as_ref().unwrap()[idx])
                             .collect::<Vec<_>>(),
                         c,
-                        &template.is_broadcast,
+                        template.is_broadcast(),
                         &mut transcript,
                     );
                 });
@@ -465,7 +465,7 @@ where
         })
         .collect::<Vec<_>>();
 
-    let mut expander_circuit = kernel.layered_circuit.export_to_expander().flatten::<C>();
+    let mut expander_circuit = kernel.layered_circuit().export_to_expander().flatten::<C>();
     expander_circuit.pre_process_gkr::<C>();
     let (max_num_input_var, max_num_output_var) = max_n_vars(&expander_circuit);
     let mut prover_scratch = ProverScratchPad::<C::FieldConfig>::new(
@@ -478,7 +478,7 @@ where
     transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
     expander_circuit.layers[0].input_vals = prepare_inputs(
         1usize << expander_circuit.log_input_size(),
-        &kernel.layered_circuit_input,
+        kernel.layered_circuit_input(),
         &local_commitment_values,
     );
     expander_circuit.fill_rnd_coefs(&mut transcript);
