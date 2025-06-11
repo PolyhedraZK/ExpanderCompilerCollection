@@ -410,6 +410,7 @@ pub fn max_n_vars<C: FieldEngine>(circuit: &Circuit<C>) -> (usize, usize) {
 /// - `parallel_index`: The index of the parallel execution. pppp part.
 /// - `parallel_count`: The total number of parallel executions. pppp part.
 /// - `is_broadcast`: Whether the challenge is broadcasted or not.
+/// 
 /// Returns:
 ///     llll pppp ssss challenge
 ///     cccc
