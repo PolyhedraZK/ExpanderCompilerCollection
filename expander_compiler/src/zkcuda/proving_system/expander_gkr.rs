@@ -465,16 +465,13 @@ fn prove_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfi
         .zip(is_broadcast)
     {
         let val_len = commitment_val.len();
-        let (challenge_for_pcs, _) = get_challenge_for_pcs(
-            challenge,
-            val_len,
-            parallel_index,
-            parallel_count,
-            *ib,
-        );
+        let (challenge_for_pcs, _) =
+            get_challenge_for_pcs(challenge, val_len, parallel_index, parallel_count, *ib);
 
-        let params =
-            <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(val_len.ilog2() as usize, 1);
+        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
+            val_len.ilog2() as usize,
+            1,
+        );
         let p_key = p_keys.p_keys.get(&val_len).unwrap();
 
         let poly = RefMultiLinearPoly::from_ref(commitment_val);
@@ -564,6 +561,12 @@ where
             &opening,
         );
         transcript.unlock_proof();
+
+        let mut buffer = vec![];
+        opening
+            .serialize_into(&mut buffer)
+            .expect("Failed to serialize opening");
+        transcript.append_u8_slice(&buffer);
 
         if !verified {
             println!("Failed to verify single pcs opening for parallel index {parallel_index}");
