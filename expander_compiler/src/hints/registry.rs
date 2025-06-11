@@ -57,7 +57,7 @@ impl EmptyHintCaller {
 }
 pub struct StubHintCaller;
 
-pub trait HintCaller<F: Field>: 'static {
+pub trait HintCaller<F: Field>: Sync + 'static {
     fn call(&self, id: usize, args: &[F], num_outputs: usize) -> Result<Vec<F>, Error>;
 }
 
