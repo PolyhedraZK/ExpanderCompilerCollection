@@ -359,7 +359,7 @@ where
         let mut commitment_values_rt = vec![];
         let mut challenges = vec![];
 
-        for (commitment_val, ib) in commitments_values.into_iter().zip(is_broadcast) {
+        for (commitment_val, ib) in commitments_values.iter().zip(is_broadcast) {
             let val_len = commitment_val.len();
             let (challenge_for_pcs, _) =
                 get_challenge_for_pcs(gkr_challenge, val_len, parallel_index, parallel_count, *ib);
@@ -385,11 +385,11 @@ where
         let mut commitments_rt = vec![];
         let mut challenges = vec![];
 
-        for (commitment, ib) in commitments.into_iter().zip(is_broadcast) {
+        for (commitment, ib) in commitments.iter().zip(is_broadcast) {
             let val_len =
                 <ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig> as Commitment<
                     ECCConfig,
-                >>::vals_len(&commitment);
+                >>::vals_len(commitment);
             let (challenge_for_pcs, _) =
                 get_challenge_for_pcs(gkr_challenge, val_len, parallel_index, parallel_count, *ib);
 
