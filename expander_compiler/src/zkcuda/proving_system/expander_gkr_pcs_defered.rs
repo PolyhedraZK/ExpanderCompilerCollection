@@ -615,11 +615,6 @@ where
         let max_num_vars = verifier_setup.v_keys.keys().max().cloned().unwrap_or(0);
         let params =
             <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(max_num_vars, 1);
-        let scratch_pad =
-            <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::init_scratch_pad(
-                &params,
-                &MPIConfig::prover_new(None, None),
-            );
 
         let mut defered_proof_bytes = proof.defered_pcs_opening.bytes.clone();
         let mut cursor = Cursor::new(&mut defered_proof_bytes);
