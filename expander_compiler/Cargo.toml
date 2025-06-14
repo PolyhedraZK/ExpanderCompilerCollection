@@ -59,7 +59,3 @@ path = "src/zkcuda/proving_system/expander_gkr_parallelized/server_bin.rs"
 [[bin]]
 name = "matmul_bench"
 path = "bin/matmul_bench.rs"
-
-[[bin]]
-name = "test_keccak"
-path = "bin/test_keccak.rs"

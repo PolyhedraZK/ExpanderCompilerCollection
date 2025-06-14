@@ -994,7 +994,6 @@ dependencies = [
  "mersenne31",
  "mpi",
  "num_cpus",
- "once_cell",
  "poly_commit",
  "polynomials",
  "rand",

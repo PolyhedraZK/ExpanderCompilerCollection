@@ -1,4 +1,4 @@
-use super::server_utils::{RequestType, get_service_args};
+use super::server_utils::{get_service_args, RequestType};
 
 use reqwest::Client;
 
