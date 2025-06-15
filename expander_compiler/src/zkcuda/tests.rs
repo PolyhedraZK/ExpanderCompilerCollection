@@ -223,7 +223,7 @@ fn zkcuda_2() {
     let result = ctx.copy_raw_to_host(c);
     assert_eq!(result, vec![M31::from(25 * 26 / 2)]);
 
-    type P = ExpanderGKRProvingSystem<M31Config>;
+    type P = Expander<M31Config>;
     let computation_graph = ctx.to_computation_graph();
     let (prover_setup, verifier_setup) = <P as ProvingSystem<M31Config>>::setup(&computation_graph);
     let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);

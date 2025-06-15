@@ -134,12 +134,12 @@ pub struct ExpanderGKRProof {
     pub data: Vec<ExpanderProof>,
 }
 
-pub struct ExpanderGKRProvingSystem<C: GKREngine> {
+pub struct Expander<C: GKREngine> {
     _config: std::marker::PhantomData<C>,
 }
 
 impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>
-    KernelWiseProvingSystem<ECCConfig> for ExpanderGKRProvingSystem<C>
+    KernelWiseProvingSystem<ECCConfig> for Expander<C>
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
@@ -590,7 +590,7 @@ where
 // causing a potential conflict.
 // In this case, generate the implementation with a procedural macro seems to be the best solution.
 impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSystem<ECCConfig>
-    for ExpanderGKRProvingSystem<C>
+    for Expander<C>
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {

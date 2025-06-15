@@ -79,7 +79,6 @@ pub struct ExpanderGKRProverSetup<PCSField: Field, F: FieldEngine, PCS: Expander
     pub p_keys: HashMap<usize, <PCS::SRS as StructuredReferenceString>::PKey>,
 }
 
-// implement default
 impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Default
     for ExpanderGKRProverSetup<PCSField, F, PCS>
 {
@@ -150,11 +149,11 @@ impl<C: GKREngine> Clone for CombinedProof<C> {
     }
 }
 
-pub struct ExpanderGKRProvingSystemPCSDefered<C: GKREngine> {
+pub struct ExpanderPCSDefered<C: GKREngine> {
     _config: std::marker::PhantomData<C>,
 }
 
-impl<C: GKREngine> ExpanderGKRProvingSystemPCSDefered<C>
+impl<C: GKREngine> ExpanderPCSDefered<C>
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
@@ -224,14 +223,14 @@ where
         )
     }
 
-    fn prove_kernel<ECCConfig: Config<FieldConfig = C::FieldConfig>>(
+    fn prove_kernel<'a, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         kernel: &Kernel<ECCConfig>,
-        commitments_values: &[&[SIMDField<C>]],
+        commitments_values: &[&'a [SIMDField<C>]],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> (
         ExpanderGKRProof,
-        Vec<MultiLinearPoly<SIMDField<C>>>,
+        Vec<&'a [SIMDField<C>]>,
         Vec<ExpanderSingleVarChallenge<C::FieldConfig>>,
     ) {
         let timer = Timer::new("prove", true);
@@ -289,15 +288,15 @@ where
         (proof, polys, challenges)
     }
 
-    fn verify_kernel<ECCConfig: Config<FieldConfig = C::FieldConfig>>(
+    fn verify_kernel<'a, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         kernel: &Kernel<ECCConfig>,
-        commitments: &[&ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
+        commitments: &[&'a ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
         proof: &ExpanderGKRProof,
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> (
         bool,
-        Vec<<C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Commitment>,
+        Vec<&'a ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>>,
         Vec<ExpanderSingleVarChallenge<C::FieldConfig>>,
     ) {
         let timer = Timer::new("verify", true);
@@ -346,25 +345,25 @@ where
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn extract_pcs_claims(
-        commitments_values: &[&[SIMDField<C>]],
+    fn extract_pcs_claims<'a>(
+        commitments_values: &[&'a [SIMDField<C>]],
         gkr_challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
         is_broadcast: &[bool],
         parallel_index: usize,
         parallel_count: usize,
     ) -> (
-        Vec<MultiLinearPoly<SIMDField<C>>>,
+        Vec<&'a [SIMDField<C>]>,
         Vec<ExpanderSingleVarChallenge<C::FieldConfig>>,
     ) {
         let mut commitment_values_rt = vec![];
         let mut challenges = vec![];
 
-        for (commitment_val, ib) in commitments_values.iter().zip(is_broadcast) {
+        for (&commitment_val, &ib) in commitments_values.iter().zip(is_broadcast) {
             let val_len = commitment_val.len();
             let (challenge_for_pcs, _) =
-                get_challenge_for_pcs(gkr_challenge, val_len, parallel_index, parallel_count, *ib);
+                get_challenge_for_pcs(gkr_challenge, val_len, parallel_index, parallel_count, ib);
 
-            commitment_values_rt.push(MultiLinearPoly::new(commitment_val.to_vec()));
+            commitment_values_rt.push(commitment_val);
             challenges.push(challenge_for_pcs);
         }
 
@@ -372,20 +371,20 @@ where
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn verifier_extract_pcs_claims<ECCConfig: Config<FieldConfig = C::FieldConfig>>(
-        commitments: &[&ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
+    fn verifier_extract_pcs_claims<'a, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
+        commitments: &[&'a ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
         gkr_challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
         is_broadcast: &[bool],
         parallel_index: usize,
         parallel_count: usize,
     ) -> (
-        Vec<<C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Commitment>,
+        Vec<&'a ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>>,
         Vec<ExpanderSingleVarChallenge<C::FieldConfig>>,
     ) {
         let mut commitments_rt = vec![];
         let mut challenges = vec![];
 
-        for (commitment, ib) in commitments.iter().zip(is_broadcast) {
+        for (&commitment, ib) in commitments.iter().zip(is_broadcast) {
             let val_len =
                 <ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig> as Commitment<
                     ECCConfig,
@@ -393,7 +392,7 @@ where
             let (challenge_for_pcs, _) =
                 get_challenge_for_pcs(gkr_challenge, val_len, parallel_index, parallel_count, *ib);
 
-            commitments_rt.push(commitment.commitment.clone());
+            commitments_rt.push(commitment);
             challenges.push(challenge_for_pcs);
         }
 
@@ -486,15 +485,8 @@ fn get_challenge_for_pcs<F: FieldEngine>(
     }
 }
 
-// TODO: Generate this with procedural macros
-// The idea is to implement the ProvingSystem trait for KernelWiseProvingSystem
-// However, we can not simply implement ProvingSystem<C> for all KernelWiseProvingSystem<C> because
-// If later we want a customized implementation of ProvingSystem for some struct A
-// The compiler will not allow use to do so, complaining that KernelWiseProvingSystem may be later implemented for A
-// causing a potential conflict.
-// In this case, generate the implementation with a procedural macro seems to be the best solution.
 impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSystem<ECCConfig>
-    for ExpanderGKRProvingSystemPCSDefered<C>
+    for ExpanderPCSDefered<C>
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
@@ -544,6 +536,13 @@ where
             polys.extend(local_polys);
             challenges.extend(local_challenges);
         }
+
+        // TODO: Modify the batch opening/verification interface in ExpanderPCS to accept
+        // RefMultiLinearPoly
+        let polys: Vec<_> = polys
+            .into_iter()
+            .map(|poly_vals| MultiLinearPoly::new(poly_vals.to_vec()))
+            .collect();
 
         let mut transcript = C::TranscriptConfig::new();
         let max_num_vars = prover_setup.p_keys.keys().max().cloned().unwrap_or(0);
@@ -610,6 +609,11 @@ where
             commitments.extend(commitments_for_pcs);
             challenges.extend(challenges_for_pcs);
         }
+
+        let commitments: Vec<_> = commitments
+            .into_iter()
+            .map(|commitment| commitment.commitment.clone())
+            .collect();
 
         let mut transcript = C::TranscriptConfig::new();
         let max_num_vars = verifier_setup.v_keys.keys().max().cloned().unwrap_or(0);

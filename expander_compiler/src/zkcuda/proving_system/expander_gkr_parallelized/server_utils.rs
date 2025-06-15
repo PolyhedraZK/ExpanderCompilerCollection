@@ -5,9 +5,8 @@ use crate::zkcuda::kernel::{Kernel, LayeredCircuitInputVec};
 use crate::zkcuda::proof::ComputationGraph;
 use crate::zkcuda::proving_system::shared_memory_utils::SharedMemoryEngine;
 use crate::zkcuda::proving_system::{
-    max_n_vars, pcs_testing_setup_fixed_seed, CombinedProof, ExpanderGKRCommitment,
-    ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof, ExpanderGKRProvingSystem,
-    ExpanderGKRVerifierSetup,
+    max_n_vars, pcs_testing_setup_fixed_seed, CombinedProof, Expander, ExpanderGKRCommitment,
+    ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof, ExpanderGKRVerifierSetup,
 };
 use expander_utils::timer::Timer;
 use mpi::environment::Universe;
@@ -310,7 +309,7 @@ fn prove_request_handler<C, ECCConfig>(
     prover_setup: &ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
     computation_graph: &ComputationGraph<ECCConfig>,
     values: &[impl AsRef<[SIMDField<C>]>],
-) -> Option<CombinedProof<ECCConfig, ExpanderGKRProvingSystem<C>>>
+) -> Option<CombinedProof<ECCConfig, Expander<C>>>
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,

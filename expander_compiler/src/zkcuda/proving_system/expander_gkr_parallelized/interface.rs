@@ -16,7 +16,7 @@ use crate::zkcuda::proving_system::{
 };
 
 use super::super::expander_gkr::{ExpanderGKRProverSetup, ExpanderGKRVerifierSetup};
-use super::super::ExpanderGKRProvingSystem;
+use super::super::Expander;
 use super::server_utils::{SERVER_IP, SERVER_PORT};
 use arith::Field;
 use expander_utils::timer::Timer;
@@ -28,7 +28,7 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIter
 use reqwest::Client;
 use serdes::ExpSerde;
 
-pub struct ParallelizedExpanderGKRProvingSystem<C: GKREngine> {
+pub struct ParallelizedExpander<C: GKREngine> {
     _config: std::marker::PhantomData<C>,
 }
 fn parse_port_number() -> u16 {
@@ -40,7 +40,7 @@ fn parse_port_number() -> u16 {
     *port
 }
 
-impl<C: GKREngine> ParallelizedExpanderGKRProvingSystem<C>
+impl<C: GKREngine> ParallelizedExpander<C>
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
@@ -187,13 +187,13 @@ where
 }
 
 impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSystem<ECCConfig>
-    for ParallelizedExpanderGKRProvingSystem<C>
+    for ParallelizedExpander<C>
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     type ProverSetup = ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
     type VerifierSetup = ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
-    type Proof = CombinedProof<ECCConfig, ExpanderGKRProvingSystem<C>>;
+    type Proof = CombinedProof<ECCConfig, Expander<C>>;
 
     fn setup(
         computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,

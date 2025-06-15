@@ -1,6 +1,6 @@
 #![allow(static_mut_refs)]
 
-use crate::zkcuda::proving_system::{CombinedProof, ExpanderGKRProvingSystem};
+use crate::zkcuda::proving_system::{CombinedProof, Expander};
 use arith::Field;
 use gkr_engine::{ExpanderPCS, FieldEngine, GKREngine};
 use serdes::ExpSerde;
@@ -188,7 +188,7 @@ impl SharedMemoryEngine {
         C: GKREngine,
         ECCConfig: Config<FieldConfig = C::FieldConfig>,
     >(
-        proof: &CombinedProof<ECCConfig, ExpanderGKRProvingSystem<C>>,
+        proof: &CombinedProof<ECCConfig, Expander<C>>,
     ) where
         C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
     {
@@ -198,7 +198,7 @@ impl SharedMemoryEngine {
     pub fn read_proof_from_shared_memory<
         C: GKREngine,
         ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    >() -> CombinedProof<ECCConfig, ExpanderGKRProvingSystem<C>>
+    >() -> CombinedProof<ECCConfig, Expander<C>>
     where
         C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
     {
