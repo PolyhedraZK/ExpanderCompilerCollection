@@ -31,7 +31,7 @@ pub struct DummyProof {
 
 // TODO
 /*#[deprecated(
-    note = "DummyProvingSystem is a dummy implementation for testing purposes. Please use ExpanderGKRProvingSystem."
+    note = "DummyProvingSystem is a dummy implementation for testing purposes. Please use Expander."
 )]*/
 pub struct DummyProvingSystem<C: Config> {
     _config: std::marker::PhantomData<C>,

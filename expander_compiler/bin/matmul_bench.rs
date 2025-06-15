@@ -4,9 +4,7 @@
 use expander_compiler::frontend::{
     BN254Config, BasicAPI, CircuitField, Config, Error, FieldArith, Variable, API,
 };
-use expander_compiler::zkcuda::proving_system::{
-    ExpanderGKRProvingSystem, ParallelizedExpanderGKRProvingSystem, ProvingSystem,
-};
+use expander_compiler::zkcuda::proving_system::{Expander, ParallelizedExpander, ProvingSystem};
 use expander_compiler::zkcuda::{
     context::{call_kernel, Context, Reshape},
     kernel::{compile_with_spec_and_shapes, kernel, IOVecSpec, Kernel},
@@ -81,6 +79,6 @@ fn zkcuda_matmul<C: Config, P: ProvingSystem<C>>() {
 }
 
 fn main() {
-    zkcuda_matmul::<BN254Config, ExpanderGKRProvingSystem<BN254ConfigSha2Hyrax>>();
-    zkcuda_matmul::<BN254Config, ParallelizedExpanderGKRProvingSystem<BN254ConfigSha2Hyrax>>();
+    zkcuda_matmul::<BN254Config, Expander<BN254ConfigSha2Hyrax>>();
+    zkcuda_matmul::<BN254Config, ParallelizedExpander<BN254ConfigSha2Hyrax>>();
 }

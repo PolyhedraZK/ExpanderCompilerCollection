@@ -10,5 +10,7 @@ pub use dummy::*;
 mod expander_gkr;
 pub use expander_gkr::*;
 
+pub mod expander_gkr_pcs_defered;
+
 pub mod expander_gkr_parallelized;
 pub use expander_gkr_parallelized::*;

@@ -1,7 +1,7 @@
 use expander_compiler::field::FieldArith;
 use expander_compiler::frontend::*;
-use expander_compiler::zkcuda::proving_system::ExpanderGKRProvingSystem;
-use expander_compiler::zkcuda::proving_system::ParallelizedExpanderGKRProvingSystem;
+use expander_compiler::zkcuda::proving_system::Expander;
+use expander_compiler::zkcuda::proving_system::ParallelizedExpander;
 use expander_compiler::zkcuda::proving_system::ProvingSystem;
 use expander_compiler::zkcuda::{context::*, kernel::*};
 use rand::{Rng, SeedableRng};
@@ -416,12 +416,12 @@ fn zkcuda_keccak_2_helper<P: ProvingSystem<M31Config>>() {
 
 #[test]
 fn zkcuda_keccak_single_core() {
-    zkcuda_keccak_1_helper::<ExpanderGKRProvingSystem<M31Config>>();
-    zkcuda_keccak_2_helper::<ExpanderGKRProvingSystem<M31Config>>();
+    zkcuda_keccak_1_helper::<Expander<M31Config>>();
+    zkcuda_keccak_2_helper::<Expander<M31Config>>();
 }
 
 #[test]
 fn zkcuda_keccak_multi_core() {
-    zkcuda_keccak_1_helper::<ParallelizedExpanderGKRProvingSystem<M31Config>>();
-    zkcuda_keccak_2_helper::<ParallelizedExpanderGKRProvingSystem<M31Config>>();
+    zkcuda_keccak_1_helper::<ParallelizedExpander<M31Config>>();
+    zkcuda_keccak_2_helper::<ParallelizedExpander<M31Config>>();
 }
