@@ -3,8 +3,12 @@ use expander_compiler::zkcuda::proof::ComputationGraph;
 use expander_compiler::zkcuda::proving_system::expander_gkr_pcs_defered::ExpanderPCSDefered;
 use expander_compiler::zkcuda::proving_system::{Expander, ParallelizedExpander, ProvingSystem};
 use expander_compiler::zkcuda::{context::*, kernel::*};
+use expander_transcript::BytesHashTranscript;
 use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
-use gkr_engine::FieldEngine;
+use gkr_engine::{FieldEngine, GKREngine, GKRScheme, MPIConfig};
+use gkr_hashers::SHA256hasher;
+use halo2curves::bn256::Bn256;
+use poly_commit::HyperUniKZGPCS;
 use serdes::ExpSerde;
 
 fn add_2<C: Config>(api: &mut API<C>, inputs: &mut Vec<Vec<Variable>>) {
@@ -110,7 +114,18 @@ fn zkcuda_1_multi_core() {
 #[test]
 fn zkcuda_1_single_core_pcs_defered() {
     zkcuda_1_expander::<BN254Config, ExpanderPCSDefered<BN254ConfigSha2Hyrax>>();
-    zkcuda_1_expander::<BN254Config, ExpanderPCSDefered<BN254ConfigSha2KZG>>();
+
+    struct BN254ConfigSha2UniKZG;
+
+    impl GKREngine for BN254ConfigSha2UniKZG {
+        type FieldConfig = <BN254Config as GKREngine>::FieldConfig;
+        type MPIConfig = MPIConfig<'static>;
+        type TranscriptConfig = BytesHashTranscript<SHA256hasher>;
+        type PCSConfig = HyperUniKZGPCS<Bn256>;
+        const SCHEME: GKRScheme = GKRScheme::Vanilla;
+    }
+
+    zkcuda_1_expander::<BN254Config, ExpanderPCSDefered<BN254ConfigSha2UniKZG>>();
 }
 
 #[kernel]
