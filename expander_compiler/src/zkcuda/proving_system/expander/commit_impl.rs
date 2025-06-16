@@ -1,11 +1,16 @@
-use gkr_engine::{FieldEngine, GKREngine};
+use expander_utils::timer::Timer;
+use gkr_engine::{ExpanderPCS, FieldEngine, GKREngine, MPIConfig};
+use polynomials::RefMultiLinearPoly;
 
-use crate::frontend::{Config, SIMDField};
+use crate::{frontend::{Config, SIMDField}, zkcuda::proving_system::structs::{ExpanderCommitment, ExpanderCommitmentState}};
 use super::structs::ExpanderProverSetup;
 
 pub fn local_commit_impl<C, ECCConfig>(
     prover_setup: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
     vals: &[SIMDField<C>],
+) -> (
+    ExpanderCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    ExpanderCommitmentState<C::PCSField, C::FieldConfig, C::PCSConfig>
 )
 where 
     C: GKREngine,
@@ -36,10 +41,10 @@ where
 
         timer.stop();
         (
-            Self::Commitment {
+            ExpanderCommitment {
                 vals_len: vals.len(),
                 commitment,
             },
-            Self::CommitmentState { scratch },
+            ExpanderCommitmentState { scratch },
         )
 }

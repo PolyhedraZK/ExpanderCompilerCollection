@@ -7,6 +7,8 @@ use crate::frontend::SIMDField;
 use crate::utils::misc::next_power_of_two;
 use crate::zkcuda::context::DeviceMemory;
 use crate::zkcuda::proof::ComputationGraph;
+use crate::zkcuda::proving_system::commit_impl::local_commit_impl;
+use crate::zkcuda::proving_system::prove_impl::{get_local_vals, prepare_expander_circuit, prove_gkr_with_local_vals};
 use crate::zkcuda::proving_system::setup_impl::local_setup_impl;
 use crate::zkcuda::proving_system::{CombinedProof, KernelWiseProvingSystem, ProvingSystem, traits::Commitment, common::{check_inputs, prepare_inputs}};
 use crate::zkcuda::kernel::Kernel;
@@ -54,36 +56,7 @@ where
         prover_setup: &Self::ProverSetup,
         vals: &[SIMDField<C>],
     ) -> (Self::Commitment, Self::CommitmentState) {
-        let timer = Timer::new("commit", true);
-
-        let n_vars = vals.len().ilog2() as usize;
-        let params =
-            <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(n_vars, 1);
-        let p_key = prover_setup.p_keys.get(&vals.len()).unwrap();
-
-        let mut scratch =
-            <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::init_scratch_pad(
-                &params,
-                &MPIConfig::prover_new(None, None),
-            );
-
-        let commitment = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::commit(
-            &params,
-            &MPIConfig::prover_new(None, None),
-            p_key,
-            &RefMultiLinearPoly::from_ref(vals),
-            &mut scratch,
-        )
-        .unwrap();
-
-        timer.stop();
-        (
-            Self::Commitment {
-                vals_len: vals.len(),
-                commitment,
-            },
-            Self::CommitmentState { scratch },
-        )
+        local_commit_impl::<C, ECCConfig>(prover_setup, vals)
     }
 
     fn prove_kernel(
@@ -98,38 +71,24 @@ where
         let timer = Timer::new("prove", true);
         check_inputs(kernel, commitments_values, parallel_count, is_broadcast);
 
-        let mut expander_circuit = kernel.layered_circuit.export_to_expander().flatten::<C>();
-        expander_circuit.pre_process_gkr::<C>();
-        let (max_num_input_var, max_num_output_var) = max_n_vars(&expander_circuit);
-        let mut prover_scratch =
-            ProverScratchPad::<C::FieldConfig>::new(max_num_input_var, max_num_output_var, 1);
-
+        let (mut expander_circuit, mut prover_scratch) = prepare_expander_circuit::<C, ECCConfig>(kernel, 1);
+        
         let mut proof = ExpanderProof { data: vec![] };
 
         // For each parallel index, generate the GKR proof
-        for i in 0..parallel_count {
+        for parallel_index in 0..parallel_count {
+            // TODO: Init with commitments
             let mut transcript = C::TranscriptConfig::new();
-            transcript.append_u8_slice(&[0u8; 32]); // TODO: Replace with the commitment, and hash an additional a few times
-            expander_circuit.layers[0].input_vals = prepare_inputs(
-                &kernel.layered_circuit,
-                &kernel.layered_circuit_input,
-                commitments_values,
-                is_broadcast,
-                i,
+            let local_vals = get_local_vals(commitments_values, is_broadcast, parallel_index, parallel_count);
+            let challenge = prove_gkr_with_local_vals(
+                &mut expander_circuit, 
+                &mut prover_scratch, 
+                &local_vals, 
+                &kernel.layered_circuit_input, 
+                &mut transcript, 
+                & MPIConfig::prover_new(None, None),
             );
-            expander_circuit.fill_rnd_coefs(&mut transcript);
-            expander_circuit.evaluate();
-            let (claimed_v, challenge) = gkr_prove(
-                &expander_circuit,
-                &mut prover_scratch,
-                &mut transcript,
-                &MPIConfig::prover_new(None, None),
-            );
-            assert_eq!(
-                claimed_v,
-                <C::FieldConfig as FieldEngine>::ChallengeField::from(0)
-            );
-
+            
             prove_input_claim::<C, ECCConfig>(
                 kernel,
                 commitments_values,

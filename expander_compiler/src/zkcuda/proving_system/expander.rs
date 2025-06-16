@@ -5,3 +5,4 @@ pub mod structs;
 pub mod utils;
 pub mod setup_impl;
 pub mod commit_impl;
+pub mod prove_impl;
