@@ -5,8 +5,8 @@ use crate::zkcuda::kernel::{Kernel, LayeredCircuitInputVec};
 use crate::zkcuda::proof::ComputationGraph;
 use crate::zkcuda::proving_system::shared_memory_utils::SharedMemoryEngine;
 use crate::zkcuda::proving_system::{
-    max_n_vars, pcs_testing_setup_fixed_seed, CombinedProof, Expander, ExpanderGKRCommitment,
-    ExpanderGKRCommitmentExtraInfo, ExpanderGKRProof, ExpanderGKRVerifierSetup,
+    max_n_vars, pcs_testing_setup_fixed_seed, CombinedProof, Expander, ExpanderCommitment,
+    ExpanderCommitmentState, ExpanderProof, ExpanderVerifierSetup,
 };
 use expander_utils::timer::Timer;
 use mpi::environment::Universe;
@@ -17,7 +17,7 @@ use serdes::ExpSerde;
 use sumcheck::ProverScratchPad;
 
 use crate::frontend::{Config, SIMDField};
-use crate::zkcuda::proving_system::ExpanderGKRProverSetup;
+use crate::zkcuda::proving_system::ExpanderProverSetup;
 use arith::Field;
 
 use axum::{extract::State, Json};
@@ -54,9 +54,9 @@ where
     pub lock: Arc<Mutex<()>>, // For now we want to ensure that only one request is processed at a time
     pub global_mpi_config: MPIConfig<'static>,
     pub local_mpi_config: Option<MPIConfig<'static>>,
-    pub prover_setup: Arc<Mutex<ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>>>,
+    pub prover_setup: Arc<Mutex<ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>>>,
     pub verifier_setup:
-        Arc<Mutex<ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>>>,
+        Arc<Mutex<ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>>>,
     pub computation_graph: Arc<Mutex<ComputationGraph<ECCConfig>>>,
     pub shutdown_tx: Arc<Mutex<Option<oneshot::Sender<()>>>>,
 }
@@ -171,8 +171,8 @@ pub async fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldC
         lock: Arc::new(Mutex::new(())),
         global_mpi_config: global_mpi_config.clone(),
         local_mpi_config: None,
-        prover_setup: Arc::new(Mutex::new(ExpanderGKRProverSetup::default())),
-        verifier_setup: Arc::new(Mutex::new(ExpanderGKRVerifierSetup::default())),
+        prover_setup: Arc::new(Mutex::new(ExpanderProverSetup::default())),
+        verifier_setup: Arc::new(Mutex::new(ExpanderVerifierSetup::default())),
         computation_graph: Arc::new(Mutex::new(ComputationGraph::default())),
         shutdown_tx: Arc::new(Mutex::new(None)),
     };
@@ -246,8 +246,8 @@ fn setup_request_handler<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldC
     global_mpi_config: &MPIConfig<'static>,
     setup_file: Option<String>,
     computation_graph: &mut ComputationGraph<ECCConfig>,
-    prover_setup: &mut ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-    verifier_setup: &mut ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    prover_setup: &mut ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    verifier_setup: &mut ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
 ) where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
@@ -283,8 +283,8 @@ fn read_circuit<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
 #[allow(clippy::type_complexity)]
 fn root_setup<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     computation_graph: Option<&ComputationGraph<ECCConfig>>,
-    prover_setup: &mut ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-    verifier_setup: &mut ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    prover_setup: &mut ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    verifier_setup: &mut ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
 ) where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
@@ -306,7 +306,7 @@ fn root_setup<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
 
 fn prove_request_handler<C, ECCConfig>(
     global_mpi_config: &MPIConfig<'static>,
-    prover_setup: &ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    prover_setup: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
     computation_graph: &ComputationGraph<ECCConfig>,
     values: &[impl AsRef<[SIMDField<C>]>],
 ) -> Option<CombinedProof<ECCConfig, Expander<C>>>
@@ -366,7 +366,7 @@ where
                     );
                 });
 
-                Some(ExpanderGKRProof {
+                Some(ExpanderProof {
                     data: vec![transcript.finalize_and_get_proof()],
                 })
             } else {
@@ -387,11 +387,11 @@ where
 }
 
 fn root_commit<C: GKREngine>(
-    prover_setup: &ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    prover_setup: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
     vals: &[SIMDField<C>],
 ) -> (
-    ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>,
-    ExpanderGKRCommitmentExtraInfo<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    ExpanderCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    ExpanderCommitmentState<C::PCSField, C::FieldConfig, C::PCSConfig>,
 )
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
@@ -415,11 +415,11 @@ where
     .unwrap();
 
     (
-        ExpanderGKRCommitment {
+        ExpanderCommitment {
             vals_len: vals.len(),
             commitment,
         },
-        ExpanderGKRCommitmentExtraInfo { scratch },
+        ExpanderCommitmentState { scratch },
     )
 }
 
@@ -523,9 +523,9 @@ pub fn get_challenge_for_pcs_with_mpi<F: FieldEngine>(
 
 #[allow(clippy::too_many_arguments)]
 fn root_prove_input_claim<C: GKREngine>(
-    p_keys: &ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    p_keys: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
     commitments_values: &[impl AsRef<[SIMDField<C>]>],
-    commitments_extra_info: &[&ExpanderGKRCommitmentExtraInfo<
+    commitments_extra_info: &[&ExpanderCommitmentState<
         C::PCSField,
         C::FieldConfig,
         C::PCSConfig,

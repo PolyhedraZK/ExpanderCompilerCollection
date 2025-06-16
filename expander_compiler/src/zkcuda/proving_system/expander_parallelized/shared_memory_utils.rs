@@ -9,7 +9,7 @@ use shared_memory::{Shmem, ShmemConf};
 use crate::circuit::config::Config;
 
 use crate::zkcuda::proving_system::expander_gkr::{
-    ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
+    ExpanderProverSetup, ExpanderVerifierSetup,
 };
 
 #[derive(Default)]
@@ -93,8 +93,8 @@ impl SharedMemoryEngine {
         PCS: ExpanderPCS<F, PCSField>,
     >(
         pcs_setup: &(
-            ExpanderGKRProverSetup<PCSField, F, PCS>,
-            ExpanderGKRVerifierSetup<PCSField, F, PCS>,
+            ExpanderProverSetup<PCSField, F, PCS>,
+            ExpanderVerifierSetup<PCSField, F, PCS>,
         ),
     ) {
         Self::write_object_to_shared_memory(
@@ -109,8 +109,8 @@ impl SharedMemoryEngine {
         F: FieldEngine,
         PCS: ExpanderPCS<F, PCSField>,
     >() -> (
-        ExpanderGKRProverSetup<PCSField, F, PCS>,
-        ExpanderGKRVerifierSetup<PCSField, F, PCS>,
+        ExpanderProverSetup<PCSField, F, PCS>,
+        ExpanderVerifierSetup<PCSField, F, PCS>,
     ) {
         Self::read_object_from_shared_memory("pcs_setup", 0)
     }

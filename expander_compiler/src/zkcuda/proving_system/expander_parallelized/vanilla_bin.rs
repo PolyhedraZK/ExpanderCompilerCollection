@@ -14,11 +14,11 @@ use expander_compiler::{
     zkcuda::{
         proof::ComputationGraph,
         proving_system::{
-            expander_parallelized::server_utils::{
+            expander_parallelized::vanilla_utils::{
                 root_main, worker_main, ServerState, GLOBAL_COMMUNICATOR, UNIVERSE,
             },
-            server_utils::SERVER_IP,
-            ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
+            vanilla_utils::SERVER_IP,
+            ExpanderProverSetup, ExpanderVerifierSetup,
         },
     },
 };
@@ -100,8 +100,8 @@ async fn serve<C: GKREngine + 'static, ECCConfig: Config<FieldConfig = C::FieldC
         lock: Arc::new(Mutex::new(())),
         global_mpi_config: global_mpi_config.clone(),
         local_mpi_config: None,
-        prover_setup: Arc::new(Mutex::new(ExpanderGKRProverSetup::default())),
-        verifier_setup: Arc::new(Mutex::new(ExpanderGKRVerifierSetup::default())),
+        prover_setup: Arc::new(Mutex::new(ExpanderProverSetup::default())),
+        verifier_setup: Arc::new(Mutex::new(ExpanderVerifierSetup::default())),
         computation_graph: Arc::new(Mutex::new(ComputationGraph::default())),
         shutdown_tx: Arc::new(Mutex::new(None)),
     };

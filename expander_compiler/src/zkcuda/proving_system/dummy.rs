@@ -43,7 +43,7 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
     type VerifierSetup = ();
     type Proof = DummyProof;
     type Commitment = DummyCommitment<C>;
-    type CommitmentExtraInfo = ();
+    type CommitmentState = ();
 
     fn setup(
         computation_graph: &crate::zkcuda::proof::ComputationGraph<C>,
@@ -60,7 +60,7 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
     fn commit(
         _prover_setup: &Self::ProverSetup,
         vals: &[SIMDField<C>],
-    ) -> (Self::Commitment, Self::CommitmentExtraInfo) {
+    ) -> (Self::Commitment, Self::CommitmentState) {
         assert!(vals.len() & (vals.len() - 1) == 0);
         (
             DummyCommitment {
@@ -74,7 +74,7 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
         _prover_setup: &Self::ProverSetup,
         kernel: &Kernel<C>,
         _commitments: &[&Self::Commitment],
-        _commitments_extra_info: &[&Self::CommitmentExtraInfo],
+        _commitments_extra_info: &[&Self::CommitmentState],
         commitments_values: &[&[SIMDField<C>]],
         parallel_count: usize,
         is_broadcast: &[bool],
