@@ -1,3 +1,5 @@
+#![allow(clippy::type_complexity)]
+
 use std::collections::HashMap;
 use std::io::Cursor;
 
@@ -24,7 +26,6 @@ use polynomials::{MultiLinearPoly, RefMultiLinearPoly};
 use serdes::ExpSerde;
 use sumcheck::ProverScratchPad;
 
-#[allow(clippy::type_complexity)]
 #[derive(ExpSerde)]
 pub struct ExpanderGKRCommitment<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> {
     pub vals_len: usize,
@@ -53,7 +54,6 @@ impl<
     }
 }
 
-#[allow(clippy::type_complexity)]
 #[derive(ExpSerde)]
 pub struct ExpanderGKRCommitmentExtraInfo<
     PCSField: Field,
@@ -73,7 +73,6 @@ impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
     }
 }
 
-#[allow(clippy::type_complexity)]
 #[derive(ExpSerde)]
 pub struct ExpanderGKRProverSetup<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> {
     pub p_keys: HashMap<usize, <PCS::SRS as StructuredReferenceString>::PKey>,
@@ -99,7 +98,6 @@ impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
     }
 }
 
-#[allow(clippy::type_complexity)]
 #[derive(ExpSerde)]
 pub struct ExpanderGKRVerifierSetup<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>>
 {
@@ -165,18 +163,20 @@ where
     ) {
         let mut p_keys = HashMap::new();
         let mut v_keys = HashMap::new();
-        for commitment_len in computation_graph.commitments_lens.iter() {
-            if p_keys.contains_key(commitment_len) {
-                continue;
-            }
-            let (_params, p_key, v_key, _scratch) =
-                pcs_testing_setup_fixed_seed::<C::FieldConfig, C::TranscriptConfig, C::PCSConfig>(
-                    *commitment_len,
-                    &MPIConfig::prover_new(None, None),
-                );
-            p_keys.insert(*commitment_len, p_key);
-            v_keys.insert(*commitment_len, v_key);
-        }
+        let max_commitment_len = computation_graph
+            .commitments_lens
+            .iter()
+            .max()
+            .cloned()
+            .unwrap_or(0);
+
+        let (_params, p_key, v_key, _scratch) =
+            pcs_testing_setup_fixed_seed::<C::FieldConfig, C::TranscriptConfig, C::PCSConfig>(
+                max_commitment_len,
+                &MPIConfig::prover_new(None, None),
+            );
+        p_keys.insert(max_commitment_len, p_key);
+        v_keys.insert(max_commitment_len, v_key);
 
         (
             ExpanderGKRProverSetup { p_keys },
@@ -193,10 +193,18 @@ where
     ) {
         let timer = Timer::new("commit", true);
 
-        let n_vars = vals.len().ilog2() as usize;
+        assert_eq!(prover_setup.p_keys.len(), 1);
+        let actual_len = vals.len();
+        let len_to_commit = prover_setup.p_keys.keys().next().cloned().unwrap();
+        assert!(len_to_commit >= actual_len);
+        let mut vals = vals.to_vec();
+        vals.resize(len_to_commit, SIMDField::<C>::ZERO);
+
+        let p_key = prover_setup.p_keys.get(&len_to_commit).unwrap();
+
+        let n_vars = len_to_commit.ilog2() as usize;
         let params =
             <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(n_vars, 1);
-        let p_key = prover_setup.p_keys.get(&vals.len()).unwrap();
 
         let mut scratch =
             <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::init_scratch_pad(
@@ -208,7 +216,7 @@ where
             &params,
             &MPIConfig::prover_new(None, None),
             p_key,
-            &RefMultiLinearPoly::from_ref(vals),
+            &RefMultiLinearPoly::from_ref(&vals),
             &mut scratch,
         )
         .unwrap();
@@ -216,7 +224,7 @@ where
         timer.stop();
         (
             ExpanderGKRCommitment {
-                vals_len: vals.len(),
+                vals_len: actual_len,
                 commitment,
             },
             ExpanderGKRCommitmentExtraInfo { scratch },
@@ -400,7 +408,6 @@ where
     }
 }
 
-#[allow(clippy::type_complexity)]
 pub fn pcs_testing_setup_fixed_seed<
     'a,
     FConfig: FieldEngine,
@@ -554,6 +561,7 @@ where
                 &MPIConfig::prover_new(None, None),
             );
 
+        transcript.lock_proof();
         let (vals, opening) =
             <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::multi_points_batch_open(
                 &params,
@@ -564,6 +572,7 @@ where
                 &scratch_pad,
                 &mut transcript,
             );
+        transcript.unlock_proof();
 
         let mut bytes = vec![];
         vals.serialize_into(&mut bytes).unwrap();
@@ -628,6 +637,7 @@ where
                 .unwrap();
         let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::BatchOpening::deserialize_from(&mut cursor).unwrap();
 
+        transcript.lock_proof();
         let pcs_verified =
             <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::multi_points_batch_verify(
                 &params,
@@ -638,6 +648,7 @@ where
                 &opening,
                 &mut transcript,
             );
+        transcript.unlock_proof();
 
         pcs_verified
     }
