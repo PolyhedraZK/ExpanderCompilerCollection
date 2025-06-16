@@ -110,6 +110,7 @@ fn zkcuda_1_multi_core() {
 #[test]
 fn zkcuda_1_single_core_pcs_defered() {
     zkcuda_1_expander::<BN254Config, ExpanderPCSDefered<BN254ConfigSha2Hyrax>>();
+    zkcuda_1_expander::<BN254Config, ExpanderPCSDefered<BN254ConfigSha2KZG>>();
 }
 
 #[kernel]
