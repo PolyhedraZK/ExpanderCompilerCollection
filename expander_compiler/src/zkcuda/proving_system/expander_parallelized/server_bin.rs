@@ -14,7 +14,7 @@ use expander_compiler::{
     zkcuda::{
         proof::ComputationGraph,
         proving_system::{
-            expander_gkr_parallelized::server_utils::{
+            expander_parallelized::server_utils::{
                 root_main, worker_main, ServerState, GLOBAL_COMMUNICATOR, UNIVERSE,
             },
             server_utils::SERVER_IP,

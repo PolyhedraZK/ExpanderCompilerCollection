@@ -5,11 +5,11 @@ use crate::circuit::config::Config;
 use crate::utils::misc::next_power_of_two;
 use crate::zkcuda::kernel::Kernel;
 use crate::zkcuda::proof::ComputationGraph;
-use crate::zkcuda::proving_system::expander_gkr_parallelized::client::{
+use crate::zkcuda::proving_system::expander_parallelized::client::{
     request_exit, request_prove, request_setup,
 };
-use crate::zkcuda::proving_system::expander_gkr_parallelized::cmd_utils::start_server;
-use crate::zkcuda::proving_system::expander_gkr_parallelized::shared_memory_utils::SharedMemoryEngine;
+use crate::zkcuda::proving_system::expander_parallelized::cmd_utils::start_server;
+use crate::zkcuda::proving_system::expander_parallelized::shared_memory_utils::SharedMemoryEngine;
 use crate::zkcuda::proving_system::server_utils::get_challenge_for_pcs_with_mpi;
 use crate::zkcuda::proving_system::{
     CombinedProof, Commitment, ExpanderGKRCommitment, ExpanderGKRProof, ProvingSystem,

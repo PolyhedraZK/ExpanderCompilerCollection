@@ -1,6 +1,6 @@
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::proof::ComputationGraph;
-use expander_compiler::zkcuda::proving_system::expander_gkr_pcs_defered::ExpanderPCSDefered;
+use expander_compiler::zkcuda::proving_system::expander_pcs_defered::ExpanderPCSDefered;
 use expander_compiler::zkcuda::proving_system::{Expander, ParallelizedExpander, ProvingSystem};
 use expander_compiler::zkcuda::{context::*, kernel::*};
 use expander_transcript::BytesHashTranscript;

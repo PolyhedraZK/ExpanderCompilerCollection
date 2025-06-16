@@ -7,10 +7,10 @@ pub use common::*;
 mod dummy;
 pub use dummy::*;
 
-mod expander_gkr;
-pub use expander_gkr::*;
+mod expander;
+pub use expander::*;
 
-pub mod expander_gkr_pcs_defered;
+pub mod expander_pcs_defered;
 
-pub mod expander_gkr_parallelized;
-pub use expander_gkr_parallelized::*;
+pub mod expander_parallelized;
+pub use expander_parallelized::*;

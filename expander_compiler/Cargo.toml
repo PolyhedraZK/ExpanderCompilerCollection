@@ -55,7 +55,7 @@ path = "bin/trivial_circuit.rs"
 
 [[bin]]
 name = "expander_serve"
-path = "src/zkcuda/proving_system/expander_gkr_parallelized/server_bin.rs"
+path = "src/zkcuda/proving_system/expander_parallelized/server_bin.rs"
 
 [[bin]]
 name = "matmul_bench"
