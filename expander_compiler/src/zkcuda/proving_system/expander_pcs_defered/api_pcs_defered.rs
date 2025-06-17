@@ -49,6 +49,6 @@ where
         computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
         proof: &Self::Proof,
     ) -> bool {
-        todo!()
+        super::verify_impl::verify(verifier_setup, computation_graph, proof.clone())
     }
 }

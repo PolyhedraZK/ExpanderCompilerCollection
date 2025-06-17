@@ -18,7 +18,9 @@ use crate::{
                     ExpanderCommitment, ExpanderCommitmentState, ExpanderProof, ExpanderProverSetup,
                 },
             },
-            expander_parallelized::prove_impl::{partition_challenge_and_location_for_pcs_mpi, prove_kernel_gkr},
+            expander_parallelized::prove_impl::{
+                partition_challenge_and_location_for_pcs_mpi, prove_kernel_gkr,
+            },
             CombinedProof, Expander,
         },
     },
