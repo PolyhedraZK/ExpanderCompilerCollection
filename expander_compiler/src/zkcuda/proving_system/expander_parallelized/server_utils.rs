@@ -18,10 +18,7 @@ use serdes::ExpSerde;
 use crate::frontend::{Config, SIMDField};
 
 use axum::{extract::State, Json};
-use gkr_engine::Transcript;
-use gkr_engine::{
-    FieldEngine, GKREngine, MPIConfig, MPIEngine,
-};
+use gkr_engine::{FieldEngine, GKREngine, MPIConfig, MPIEngine};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;

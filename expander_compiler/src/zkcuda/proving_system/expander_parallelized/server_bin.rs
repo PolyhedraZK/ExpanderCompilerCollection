@@ -14,11 +14,10 @@ use expander_compiler::{
     zkcuda::{
         proof::ComputationGraph,
         proving_system::{
-            expander_parallelized::vanilla_utils::{
-                root_main, worker_main, ServerState, GLOBAL_COMMUNICATOR, UNIVERSE,
+            expander::structs::{ExpanderProverSetup, ExpanderVerifierSetup},
+            expander_parallelized::server_utils::{
+                root_main, worker_main, ServerState, GLOBAL_COMMUNICATOR, SERVER_IP, UNIVERSE,
             },
-            vanilla_utils::SERVER_IP,
-            ExpanderProverSetup, ExpanderVerifierSetup,
         },
     },
 };
@@ -47,7 +46,7 @@ pub struct ExpanderExecArgs {
 }
 
 #[tokio::main]
-async fn main() {
+pub async fn main() {
     let expander_exec_args = ExpanderExecArgs::parse();
     assert_eq!(
         expander_exec_args.fiat_shamir_hash, "SHA256",

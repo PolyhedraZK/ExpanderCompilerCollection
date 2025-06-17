@@ -1,6 +1,6 @@
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::proof::ComputationGraph;
-use expander_compiler::zkcuda::proving_system::{Expander, ProvingSystem};
+use expander_compiler::zkcuda::proving_system::{Expander, ParallelizedExpander, ProvingSystem};
 use expander_compiler::zkcuda::{context::*, kernel::*};
 use expander_transcript::BytesHashTranscript;
 use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
@@ -99,16 +99,16 @@ fn zkcuda_1_single_core() {
     zkcuda_1_expander::<BN254Config, Expander<BN254ConfigSha2KZG>>();
 }
 
-// #[test]
-// fn zkcuda_1_multi_core() {
-//     zkcuda_1_expander::<M31Config, ParallelizedExpander<M31Config>>();
-//     zkcuda_1_expander::<GF2Config, ParallelizedExpander<GF2Config>>();
-//     zkcuda_1_expander::<GoldilocksConfig, ParallelizedExpander<GoldilocksConfig>>();
-//     zkcuda_1_expander::<BabyBearConfig, ParallelizedExpander<BabyBearConfig>>();
-//     zkcuda_1_expander::<BN254Config, ParallelizedExpander<BN254Config>>();
-//     zkcuda_1_expander::<BN254Config, ParallelizedExpander<BN254ConfigSha2Hyrax>>();
-//     zkcuda_1_expander::<BN254Config, ParallelizedExpander<BN254ConfigSha2KZG>>()
-// }
+#[test]
+fn zkcuda_1_multi_core() {
+    zkcuda_1_expander::<M31Config, ParallelizedExpander<M31Config>>();
+    zkcuda_1_expander::<GF2Config, ParallelizedExpander<GF2Config>>();
+    zkcuda_1_expander::<GoldilocksConfig, ParallelizedExpander<GoldilocksConfig>>();
+    zkcuda_1_expander::<BabyBearConfig, ParallelizedExpander<BabyBearConfig>>();
+    zkcuda_1_expander::<BN254Config, ParallelizedExpander<BN254Config>>();
+    zkcuda_1_expander::<BN254Config, ParallelizedExpander<BN254ConfigSha2Hyrax>>();
+    zkcuda_1_expander::<BN254Config, ParallelizedExpander<BN254ConfigSha2KZG>>()
+}
 
 // #[test]
 // fn zkcuda_1_single_core_pcs_defered() {

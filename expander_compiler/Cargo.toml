@@ -53,9 +53,9 @@ profile = ["expander_utils/profile"]
 name = "trivial_circuit"
 path = "bin/trivial_circuit.rs"
 
-# [[bin]]
-# name = "expander_serve_vanilla"
-# path = "src/zkcuda/proving_system/expander_parallelized/vanilla_bin.rs"
+[[bin]]
+name = "expander_server"
+path = "src/zkcuda/proving_system/expander_parallelized/server_bin.rs"
 
 # [[bin]]
 # name = "matmul_bench"

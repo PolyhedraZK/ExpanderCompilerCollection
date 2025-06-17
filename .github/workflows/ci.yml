@@ -76,7 +76,7 @@ jobs:
         run: brew install openmpi
       - if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install libopenmpi-dev -y
-      - run: cargo build --release --bin expander_serve
+      - run: cargo build --release --bin expander_server
       - run: cargo test
 
   test-rust-avx512:

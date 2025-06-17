@@ -19,7 +19,7 @@ use super::super::Expander;
 use super::server_utils::SERVER_IP;
 use expander_utils::timer::Timer;
 
-use gkr_engine::{FieldEngine, GKREngine, Transcript};
+use gkr_engine::{FieldEngine, GKREngine};
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use reqwest::Client;
 use serdes::ExpSerde;
