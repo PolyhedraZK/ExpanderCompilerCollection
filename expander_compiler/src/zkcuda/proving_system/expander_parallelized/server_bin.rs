@@ -15,8 +15,11 @@ use expander_compiler::{
         proof::ComputationGraph,
         proving_system::{
             expander::structs::{ExpanderProverSetup, ExpanderVerifierSetup},
-            expander_parallelized::server_utils::{
-                root_main, worker_main, ServerState, GLOBAL_COMMUNICATOR, SERVER_IP, UNIVERSE,
+            expander_parallelized::{
+                server_utils::{
+                    root_main, worker_main, ServerState, GLOBAL_COMMUNICATOR, SERVER_IP, UNIVERSE,
+                },
+                structs::{BasicServerFns, ServerFns},
             },
         },
     },
@@ -57,25 +60,40 @@ pub async fn main() {
 
     match (expander_exec_args.field_type.as_str(), pcs_type) {
         ("M31", PolynomialCommitmentType::Raw) => {
-            serve::<M31Config, M31Config>(expander_exec_args.port_number).await;
+            serve::<M31Config, M31Config, BasicServerFns<_, _>>(expander_exec_args.port_number)
+                .await;
         }
         ("GF2", PolynomialCommitmentType::Raw) => {
-            serve::<GF2Config, GF2Config>(expander_exec_args.port_number).await;
+            serve::<GF2Config, GF2Config, BasicServerFns<_, _>>(expander_exec_args.port_number)
+                .await;
         }
         ("Goldilocks", PolynomialCommitmentType::Raw) => {
-            serve::<GoldilocksConfig, GoldilocksConfig>(expander_exec_args.port_number).await;
+            serve::<GoldilocksConfig, GoldilocksConfig, BasicServerFns<_, _>>(
+                expander_exec_args.port_number,
+            )
+            .await;
         }
         ("BabyBear", PolynomialCommitmentType::Raw) => {
-            serve::<BabyBearConfig, BabyBearConfig>(expander_exec_args.port_number).await;
+            serve::<BabyBearConfig, BabyBearConfig, BasicServerFns<_, _>>(
+                expander_exec_args.port_number,
+            )
+            .await;
         }
         ("BN254", PolynomialCommitmentType::Raw) => {
-            serve::<BN254Config, BN254Config>(expander_exec_args.port_number).await;
+            serve::<BN254Config, BN254Config, BasicServerFns<_, _>>(expander_exec_args.port_number)
+                .await;
         }
         ("BN254", PolynomialCommitmentType::Hyrax) => {
-            serve::<BN254ConfigSha2Hyrax, BN254Config>(expander_exec_args.port_number).await;
+            serve::<BN254ConfigSha2Hyrax, BN254Config, BasicServerFns<_, _>>(
+                expander_exec_args.port_number,
+            )
+            .await;
         }
         ("BN254", PolynomialCommitmentType::KZG) => {
-            serve::<BN254ConfigSha2KZG, BN254Config>(expander_exec_args.port_number).await;
+            serve::<BN254ConfigSha2KZG, BN254Config, BasicServerFns<_, _>>(
+                expander_exec_args.port_number,
+            )
+            .await;
         }
         (field_type, pcs_type) => {
             panic!("Combination of {field_type:?} and {pcs_type:?} not supported")
@@ -84,10 +102,12 @@ pub async fn main() {
 }
 
 #[allow(static_mut_refs)]
-async fn serve<C: GKREngine + 'static, ECCConfig: Config<FieldConfig = C::FieldConfig> + 'static>(
-    port_number: String,
-) where
+async fn serve<C, ECCConfig, S>(port_number: String)
+where
+    C: GKREngine + 'static,
+    ECCConfig: Config<FieldConfig = C::FieldConfig> + 'static,
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+    S: ServerFns<C, ECCConfig> + 'static,
 {
     let global_mpi_config = unsafe {
         UNIVERSE = MPIConfig::init();
@@ -110,7 +130,7 @@ async fn serve<C: GKREngine + 'static, ECCConfig: Config<FieldConfig = C::FieldC
         state.shutdown_tx.lock().await.replace(tx);
 
         let app = Router::new()
-            .route("/", post(root_main::<C, ECCConfig>))
+            .route("/", post(root_main::<C, ECCConfig, S>))
             .route("/", get(|| async { "Expander Server is running" }))
             .with_state(state);
 
@@ -130,6 +150,6 @@ async fn serve<C: GKREngine + 'static, ECCConfig: Config<FieldConfig = C::FieldC
             .await
             .unwrap();
     } else {
-        worker_main::<C, ECCConfig>(global_mpi_config).await;
+        worker_main::<C, ECCConfig, S>(global_mpi_config).await;
     }
 }

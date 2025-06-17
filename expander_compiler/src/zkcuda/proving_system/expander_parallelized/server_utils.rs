@@ -7,6 +7,7 @@ use crate::zkcuda::proving_system::expander::structs::{
 };
 use crate::zkcuda::proving_system::expander_parallelized::prove_impl::mpi_prove_impl;
 use crate::zkcuda::proving_system::expander_parallelized::shared_memory_utils::SharedMemoryEngine;
+use crate::zkcuda::proving_system::expander_parallelized::structs::ServerFns;
 use crate::zkcuda::proving_system::{CombinedProof, Expander};
 
 use expander_utils::timer::Timer;
@@ -95,7 +96,7 @@ where
     }
 }
 
-pub async fn root_main<C, ECCConfig>(
+pub async fn root_main<C, ECCConfig, S>(
     State(state): State<ServerState<C, ECCConfig>>,
     Json(request_type): Json<RequestType>,
 ) -> Json<bool>
@@ -103,6 +104,7 @@ where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+    S: ServerFns<C, ECCConfig>,
 {
     let _lock = state.lock.lock().await; // Ensure only one request is processed at a time
     match request_type {
@@ -113,7 +115,7 @@ where
             let mut computation_graph = state.computation_graph.lock().await;
             let mut prover_setup_guard = state.prover_setup.lock().await;
             let mut verifier_setup_guard = state.verifier_setup.lock().await;
-            setup_request_handler::<C, ECCConfig>(
+            S::setup_request_handler(
                 &state.global_mpi_config,
                 Some(setup_file),
                 &mut computation_graph,
@@ -137,7 +139,7 @@ where
             let prover_setup_guard = state.prover_setup.lock().await;
             let computation_graph = state.computation_graph.lock().await;
 
-            let proof = prove_request_handler::<C, ECCConfig>(
+            let proof = S::prove_request_handler(
                 &state.global_mpi_config,
                 &*prover_setup_guard,
                 &*computation_graph,
@@ -164,10 +166,12 @@ where
     axum::Json(true)
 }
 
-pub async fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
-    global_mpi_config: MPIConfig<'static>,
-) where
+pub async fn worker_main<C, ECCConfig, S>(global_mpi_config: MPIConfig<'static>)
+where
+    C: GKREngine,
+    ECCConfig: Config<FieldConfig = C::FieldConfig>,
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+    S: ServerFns<C, ECCConfig>,
 {
     let state = ServerState::<C, ECCConfig> {
         lock: Arc::new(Mutex::new(())),
@@ -188,7 +192,7 @@ pub async fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldC
                 let mut computation_graph = state.computation_graph.lock().await;
                 let mut prover_setup_guard = state.prover_setup.lock().await;
                 let mut verifier_setup_guard = state.verifier_setup.lock().await;
-                setup_request_handler::<C, ECCConfig>(
+                S::setup_request_handler(
                     &state.global_mpi_config,
                     None,
                     &mut computation_graph,
@@ -202,7 +206,7 @@ pub async fn worker_main<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldC
                     SharedMemoryEngine::read_witness_from_shared_memory::<C::FieldConfig>();
                 let prover_setup_guard = state.prover_setup.lock().await;
                 let computation_graph = state.computation_graph.lock().await;
-                let proof = prove_request_handler::<C, ECCConfig>(
+                let proof = S::prove_request_handler(
                     &state.global_mpi_config,
                     &*prover_setup_guard,
                     &*computation_graph,
@@ -230,70 +234,6 @@ pub fn broadcast_request_type(global_mpi_config: &MPIConfig<'static>, request_ty
         panic!("Failed to broadcast request type");
     }
     bytes[0]
-}
-
-pub fn broadcast_string(global_mpi_config: &MPIConfig<'static>, string: Option<String>) -> String {
-    // Broadcast the setup file path to all workers
-    if global_mpi_config.is_root() && string.is_none() {
-        panic!("String must be provided on the root process in broadcast_string");
-    }
-    let mut string_length = string.as_ref().map_or(0, |s| s.len());
-    global_mpi_config.root_broadcast_f(&mut string_length);
-    let mut bytes = string.map_or(vec![0u8; string_length], |s| s.into_bytes());
-    global_mpi_config.root_broadcast_bytes(&mut bytes);
-    String::from_utf8(bytes).expect("Failed to convert broadcasted bytes to String")
-}
-
-pub fn setup_request_handler<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
-    global_mpi_config: &MPIConfig<'static>,
-    setup_file: Option<String>,
-    computation_graph: &mut ComputationGraph<ECCConfig>,
-    prover_setup: &mut ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-    verifier_setup: &mut ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-) where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-{
-    let setup_file = if global_mpi_config.is_root() {
-        let setup_file = setup_file.expect("Setup file path must be provided");
-        broadcast_string(global_mpi_config, Some(setup_file))
-    } else {
-        // Workers will wait for the setup file to be broadcasted
-        broadcast_string(global_mpi_config, None)
-    };
-
-    read_circuit::<C, ECCConfig>(global_mpi_config, setup_file, computation_graph);
-    if global_mpi_config.is_root() {
-        (*prover_setup, *verifier_setup) = local_setup_impl::<C, ECCConfig>(computation_graph);
-    }
-}
-
-pub fn read_circuit<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
-    _global_mpi_config: &MPIConfig<'static>,
-    setup_file: String,
-    computation_graph: &mut ComputationGraph<ECCConfig>,
-) where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-{
-    let computation_graph_bytes =
-        std::fs::read(setup_file).expect("Failed to read computation graph from file");
-    *computation_graph = ComputationGraph::<ECCConfig>::deserialize_from(std::io::Cursor::new(
-        computation_graph_bytes,
-    ))
-    .expect("Failed to deserialize computation graph");
-}
-
-pub fn prove_request_handler<C, ECCConfig>(
-    global_mpi_config: &MPIConfig<'static>,
-    prover_setup: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-    computation_graph: &ComputationGraph<ECCConfig>,
-    values: &[impl AsRef<[SIMDField<C>]>],
-) -> Option<CombinedProof<ECCConfig, Expander<C>>>
-where
-    C: GKREngine,
-    ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-{
-    mpi_prove_impl(global_mpi_config, prover_setup, computation_graph, values)
 }
 
 #[allow(static_mut_refs)]
