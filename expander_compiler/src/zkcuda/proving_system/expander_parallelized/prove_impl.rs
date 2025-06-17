@@ -1,10 +1,29 @@
 use arith::Field;
-use gkr_engine::{ExpanderDualVarChallenge, ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine, Transcript};
-use polynomials::RefMultiLinearPoly;
+use gkr_engine::{
+    ExpanderDualVarChallenge, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig,
+    MPIEngine, Transcript,
+};
 
-use crate::{frontend::{Config, SIMDField}, utils::misc::next_power_of_two, zkcuda::{
-    kernel::Kernel, proof::ComputationGraph, 
-    proving_system::{expander::{commit_impl::local_commit_impl, prove_impl::{get_local_vals, pcs_local_open_impl, prepare_expander_circuit, prove_gkr_with_local_vals}, structs::{ExpanderCommitmentState, ExpanderProof, ExpanderProverSetup}}, expander_parallelized::server_utils::generate_local_mpi_config, CombinedProof, Expander}}};
+use crate::{
+    frontend::{Config, SIMDField},
+    utils::misc::next_power_of_two,
+    zkcuda::{
+        kernel::Kernel,
+        proof::ComputationGraph,
+        proving_system::{
+            expander::{
+                commit_impl::local_commit_impl,
+                prove_impl::{
+                    get_local_vals, pcs_local_open_impl, prepare_expander_circuit,
+                    prove_gkr_with_local_vals,
+                },
+                structs::{ExpanderCommitmentState, ExpanderProof, ExpanderProverSetup},
+            },
+            expander_parallelized::server_utils::generate_local_mpi_config,
+            CombinedProof, Expander,
+        },
+    },
+};
 
 pub fn mpi_prove_impl<C, ECCConfig>(
     global_mpi_config: &MPIConfig<'static>,
@@ -54,7 +73,7 @@ where
                 };
 
                 challenges.iter().for_each(|c| {
-                    root_prove_input_claim::<C>(
+                    partition_single_gkr_claim_and_open_pcs_mpi::<C>(
                         prover_setup,
                         &commitment_values,
                         &template
@@ -87,7 +106,6 @@ where
         None
     }
 }
-
 
 #[allow(clippy::too_many_arguments)]
 pub fn prove_kernel_gkr<C, ECCConfig>(
@@ -162,7 +180,7 @@ pub fn partition_challenge_and_location_for_pcs_mpi<F: FieldEngine>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn root_prove_input_claim<C: GKREngine>(
+fn partition_single_gkr_claim_and_open_pcs_mpi<C: GKREngine>(
     p_keys: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
     commitments_values: &[impl AsRef<[SIMDField<C>]>],
     commitments_extra_info: &[&ExpanderCommitmentState<
@@ -177,14 +195,18 @@ fn root_prove_input_claim<C: GKREngine>(
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let parallel_count = 1 << gkr_challenge.r_mpi.len();
-    for ((commitment_val, extra_info), ib) in commitments_values
+    for ((commitment_val, _extra_info), ib) in commitments_values
         .iter()
         .zip(commitments_extra_info)
         .zip(is_broadcast)
     {
         let val_len = commitment_val.as_ref().len();
-        let (challenge_for_pcs, _) =
-            partition_challenge_and_location_for_pcs_mpi(gkr_challenge, val_len, parallel_count, *ib);
+        let (challenge_for_pcs, _) = partition_challenge_and_location_for_pcs_mpi(
+            gkr_challenge,
+            val_len,
+            parallel_count,
+            *ib,
+        );
 
         pcs_local_open_impl::<C>(
             commitment_val.as_ref(),

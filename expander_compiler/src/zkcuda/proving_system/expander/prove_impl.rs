@@ -136,7 +136,7 @@ where
 /// Returns:
 ///     llll pppp ssss challenge
 ///     cccc
-pub fn partition_challenge_and_location_no_mpi<F: FieldEngine>(
+pub fn partition_challenge_and_location_for_pcs_no_mpi<F: FieldEngine>(
     gkr_challenge: &ExpanderSingleVarChallenge<F>,
     total_vals_len: usize,
     parallel_index: usize,
@@ -171,26 +171,23 @@ pub fn pcs_local_open_impl<C: GKREngine>(
     challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
     p_keys: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
     transcript: &mut C::TranscriptConfig,
-) 
-where
+) where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     assert_eq!(challenge.r_mpi.len(), 0);
 
     let val_len = vals.len();
     let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
-            val_len.ilog2() as usize,
-            1,
-        );
+        val_len.ilog2() as usize,
+        1,
+    );
     let p_key = p_keys.p_keys.get(&val_len).unwrap();
 
     let poly = RefMultiLinearPoly::from_ref(vals);
     // TODO: Change this function in Expander to use rayon.
-    let v =
-        <C::FieldConfig as FieldEngine>::single_core_eval_circuit_vals_at_expander_challenge(
-            vals,
-            &challenge,
-        );
+    let v = <C::FieldConfig as FieldEngine>::single_core_eval_circuit_vals_at_expander_challenge(
+        vals, &challenge,
+    );
     transcript.append_field_element(&v);
 
     transcript.lock_proof();
@@ -217,7 +214,7 @@ where
 }
 
 #[inline(always)]
-pub fn partition_single_gkr_claim_and_open_local_pcs<C: GKREngine>(
+pub fn partition_single_gkr_claim_and_open_pcs_no_mpi<C: GKREngine>(
     gkr_claim: &ExpanderSingleVarChallenge<C::FieldConfig>,
     global_vals: &[impl AsRef<[<C::FieldConfig as FieldEngine>::SimdCircuitField]>],
     p_keys: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
@@ -230,12 +227,10 @@ pub fn partition_single_gkr_claim_and_open_local_pcs<C: GKREngine>(
 {
     for (commitment_val, ib) in global_vals.iter().zip(is_broadcast) {
         let val_len = commitment_val.as_ref().len();
-        let (challenge_for_pcs, _) = partition_challenge_and_location_no_mpi::<C::FieldConfig>(
-            gkr_claim,
-            val_len,
-            parallel_index,
-            parallel_num,
-            *ib,
+        let (challenge_for_pcs, _) = partition_challenge_and_location_for_pcs_no_mpi::<
+            C::FieldConfig,
+        >(
+            gkr_claim, val_len, parallel_index, parallel_num, *ib
         );
 
         pcs_local_open_impl::<C>(
@@ -268,7 +263,7 @@ pub fn partition_gkr_claims_and_open_pcs_no_mpi<C: GKREngine>(
     };
 
     challenges.into_iter().for_each(|challenge| {
-        partition_single_gkr_claim_and_open_local_pcs::<C>(
+        partition_single_gkr_claim_and_open_pcs_no_mpi::<C>(
             &challenge,
             global_vals,
             p_keys,

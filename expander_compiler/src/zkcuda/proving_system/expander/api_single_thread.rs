@@ -13,20 +13,20 @@ use crate::zkcuda::proving_system::expander::prove_impl::{
     prove_gkr_with_local_vals,
 };
 use crate::zkcuda::proving_system::expander::setup_impl::local_setup_impl;
-use crate::zkcuda::proving_system::expander::verify_impl::verify_individual_pcs_opening_and_aggregated_value;
+use crate::zkcuda::proving_system::expander::verify_impl::verify_individual_pcs_opening_and_aggregated_value_no_mpi;
 use crate::zkcuda::proving_system::{
-    common::check_inputs,
-    CombinedProof, KernelWiseProvingSystem, ProvingSystem,
+    common::check_inputs, CombinedProof, KernelWiseProvingSystem, ProvingSystem,
 };
 
-use super::structs::{ExpanderProverSetup, ExpanderVerifierSetup, ExpanderProof, ExpanderCommitment, ExpanderCommitmentState};
+use super::structs::{
+    ExpanderCommitment, ExpanderCommitmentState, ExpanderProof, ExpanderProverSetup,
+    ExpanderVerifierSetup,
+};
 
 use arith::Field;
 use expander_utils::timer::Timer;
 use gkr::gkr_verify;
-use gkr_engine::{
-    FieldEngine, GKREngine, MPIConfig, Transcript,
-};
+use gkr_engine::{FieldEngine, GKREngine, MPIConfig, Transcript};
 
 pub struct Expander<C: GKREngine> {
     _config: std::marker::PhantomData<C>,
@@ -141,7 +141,7 @@ where
                 return false;
             }
 
-            verified &= verify_individual_pcs_opening_and_aggregated_value::<C, ECCConfig>(
+            verified &= verify_individual_pcs_opening_and_aggregated_value_no_mpi::<C, ECCConfig>(
                 &mut cursor,
                 kernel,
                 verifier_setup,

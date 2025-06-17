@@ -13,15 +13,67 @@ use crate::{
     zkcuda::{
         kernel::Kernel,
         proving_system::{
-            expander::prove_impl::partition_challenge_and_location_for_local_pcs,
-            expander::structs::{ExpanderCommitment, ExpanderVerifierSetup},
+            expander::{
+                prove_impl::partition_challenge_and_location_for_pcs_no_mpi,
+                structs::{ExpanderCommitment, ExpanderVerifierSetup},
+            },
             Commitment,
         },
     },
 };
 
+pub fn verify_pcs<C, ECCConfig>(
+    mut proof_reader: impl Read,
+    commitment: &ExpanderCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
+    claim: &<C::FieldConfig as FieldEngine>::ChallengeField,
+    v_keys: &ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    transcript: &mut C::TranscriptConfig,
+) -> bool
+where
+    C: GKREngine,
+    ECCConfig: Config<FieldConfig = C::FieldConfig>,
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
+    let val_len = <ExpanderCommitment<C::PCSField, C::FieldConfig, C::PCSConfig> as Commitment<
+        ECCConfig,
+    >>::vals_len(commitment);
+
+    let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
+        val_len.ilog2() as usize,
+        1,
+    );
+    let v_key = v_keys.v_keys.get(&val_len).unwrap();
+
+    let opening =
+        <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Opening::deserialize_from(
+            &mut proof_reader,
+        )
+        .unwrap();
+
+    transcript.lock_proof();
+    let verified = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::verify(
+        &params,
+        v_key,
+        &commitment.commitment,
+        &challenge,
+        *claim,
+        transcript,
+        &opening,
+    );
+    transcript.unlock_proof();
+
+    let mut buffer = vec![];
+    opening
+        .serialize_into(&mut buffer)
+        .expect("Failed to serialize opening");
+    transcript.append_u8_slice(&buffer);
+
+    verified
+}
+
 #[allow(clippy::too_many_arguments)]
-pub fn verify_individual_pcs_opening_and_aggregated_value_impl<C, ECCConfig>(
+pub fn verify_individual_pcs_opening_and_aggregated_value_no_mpi_impl<C, ECCConfig>(
     mut proof_reader: impl Read,
     kernel: &Kernel<ECCConfig>,
     v_keys: &ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
@@ -50,7 +102,7 @@ where
                 ECCConfig,
             >>::vals_len(commitment);
         let (challenge_for_pcs, component_idx_vars) =
-            partition_challenge_and_location_for_local_pcs(
+            partition_challenge_and_location_for_pcs_no_mpi(
                 challenge,
                 val_len,
                 parallel_index,
@@ -58,43 +110,25 @@ where
                 *ib,
             );
 
-        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
-            val_len.ilog2() as usize,
-            1,
-        );
-        let v_key = v_keys.v_keys.get(&val_len).unwrap();
-
         let claim =
             <C::FieldConfig as FieldEngine>::ChallengeField::deserialize_from(&mut proof_reader)
                 .unwrap();
         transcript.append_field_element(&claim);
 
-        let opening =
-            <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Opening::deserialize_from(
-                &mut proof_reader,
-            )
-            .unwrap();
-
-        transcript.lock_proof();
-        let verified = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::verify(
-            &params,
-            v_key,
-            &commitment.commitment,
+        let verified = verify_pcs::<C, ECCConfig>(
+            &mut proof_reader,
+            commitment,
             &challenge_for_pcs,
-            claim,
+            &claim,
+            v_keys,
             transcript,
-            &opening,
         );
-        transcript.unlock_proof();
-
-        let mut buffer = vec![];
-        opening
-            .serialize_into(&mut buffer)
-            .expect("Failed to serialize opening");
-        transcript.append_u8_slice(&buffer);
 
         if !verified {
-            println!("Failed to verify single pcs opening for parallel index {parallel_index}");
+            println!(
+                "Failed to verify pcs opening for input at offset {}",
+                input.offset
+            );
             return false;
         }
 
@@ -107,7 +141,7 @@ where
     *y == target_y
 }
 
-pub fn verify_individual_pcs_opening_and_aggregated_value<C, ECCConfig>(
+pub fn verify_individual_pcs_opening_and_aggregated_value_no_mpi<C, ECCConfig>(
     mut proof_reader: impl Read,
     kernel: &Kernel<ECCConfig>,
     v_keys: &ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
@@ -141,7 +175,7 @@ where
         .into_iter()
         .zip(claims)
         .all(|(challenge, claim)| {
-            verify_individual_pcs_opening_and_aggregated_value_impl::<C, ECCConfig>(
+            verify_individual_pcs_opening_and_aggregated_value_no_mpi_impl::<C, ECCConfig>(
                 &mut proof_reader,
                 kernel,
                 v_keys,

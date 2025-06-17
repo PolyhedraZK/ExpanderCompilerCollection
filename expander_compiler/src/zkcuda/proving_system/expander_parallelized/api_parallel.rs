@@ -5,17 +5,16 @@ use crate::circuit::config::Config;
 use crate::utils::misc::next_power_of_two;
 use crate::zkcuda::kernel::Kernel;
 use crate::zkcuda::proof::ComputationGraph;
+use crate::zkcuda::proving_system::expander::structs::{
+    ExpanderCommitment, ExpanderProof, ExpanderVerifierSetup,
+};
 use crate::zkcuda::proving_system::expander_parallelized::client::{
     request_exit, request_prove, request_setup,
 };
 use crate::zkcuda::proving_system::expander_parallelized::cmd_utils::start_server;
 use crate::zkcuda::proving_system::expander_parallelized::shared_memory_utils::SharedMemoryEngine;
-use crate::zkcuda::proving_system::server_utils::get_challenge_for_pcs_with_mpi;
-use crate::zkcuda::proving_system::{
-    CombinedProof, Commitment, ProvingSystem,
-};
+use crate::zkcuda::proving_system::{CombinedProof, Commitment, ProvingSystem};
 
-use super::super::expander::structs::{ExpanderGKRProverSetup, ExpanderGKRVerifierSetup, ExpanderGKRCommitment, ExpanderGKRProof,};
 use super::super::Expander;
 use super::server_utils::{SERVER_IP, SERVER_PORT};
 use arith::Field;
@@ -45,10 +44,10 @@ where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     fn verify_kernel<ECCConfig: Config<FieldConfig = C::FieldConfig>>(
-        verifier_setup: &ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+        verifier_setup: &ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
         kernel: &Kernel<ECCConfig>,
-        proof: &ExpanderGKRProof,
-        commitments: &[&ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
+        proof: &ExpanderProof,
+        commitments: &[&ExpanderCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
         parallel_count: usize,
         is_broadcast: &[bool],
     ) -> bool {
@@ -110,10 +109,10 @@ where
     fn verify_input_claim<ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         mut proof_reader: impl Read,
         kernel: &Kernel<ECCConfig>,
-        v_keys: &ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+        v_keys: &ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
         challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
         y: &<C::FieldConfig as FieldEngine>::ChallengeField,
-        commitments: &[&ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
+        commitments: &[&ExpanderCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
         is_broadcast: &[bool],
         parallel_count: usize,
         transcript: &mut C::TranscriptConfig,
@@ -126,7 +125,7 @@ where
             .zip(is_broadcast)
         {
             let val_len =
-                <ExpanderGKRCommitment<C::PCSField, C::FieldConfig, C::PCSConfig> as Commitment<
+                <ExpanderCommitment<C::PCSField, C::FieldConfig, C::PCSConfig> as Commitment<
                     ECCConfig,
                 >>::vals_len(commitment);
             let (challenge_for_pcs, component_idx_vars) =
@@ -189,8 +188,8 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    type ProverSetup = ExpanderGKRProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
-    type VerifierSetup = ExpanderGKRVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
+    type ProverSetup = ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
+    type VerifierSetup = ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
     type Proof = CombinedProof<ECCConfig, Expander<C>>;
 
     fn setup(
@@ -217,7 +216,11 @@ where
         // Keep trying until the server is ready
         let port = parse_port_number();
         let server_url = format!("{SERVER_IP}:{port}");
-        start_server::<C>("../target/release/expander_server", next_power_of_two(max_parallel_count), port);
+        start_server::<C>(
+            "../target/release/expander_server",
+            next_power_of_two(max_parallel_count),
+            port,
+        );
         loop {
             match wait_async(Client::new().get(format!("http://{server_url}/")).send()) {
                 Ok(_) => break,
