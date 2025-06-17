@@ -56,7 +56,7 @@ where
         &params,
         v_key,
         &commitment.commitment,
-        &challenge,
+        challenge,
         *claim,
         transcript,
         &opening,

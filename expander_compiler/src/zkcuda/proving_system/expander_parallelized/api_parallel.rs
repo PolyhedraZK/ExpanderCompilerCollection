@@ -1,12 +1,10 @@
 use std::fs;
-use std::io::{Cursor, Read};
 
 use crate::circuit::config::Config;
 use crate::utils::misc::next_power_of_two;
-use crate::zkcuda::kernel::Kernel;
 use crate::zkcuda::proof::ComputationGraph;
 use crate::zkcuda::proving_system::expander::structs::{
-    ExpanderCommitment, ExpanderProof, ExpanderProverSetup, ExpanderVerifierSetup,
+    ExpanderProverSetup, ExpanderVerifierSetup,
 };
 use crate::zkcuda::proving_system::expander_parallelized::client::{
     request_exit, request_prove, request_setup,
@@ -15,16 +13,13 @@ use crate::zkcuda::proving_system::expander_parallelized::cmd_utils::start_serve
 use crate::zkcuda::proving_system::expander_parallelized::server_utils::parse_port_number;
 use crate::zkcuda::proving_system::expander_parallelized::shared_memory_utils::SharedMemoryEngine;
 use crate::zkcuda::proving_system::expander_parallelized::verify_impl::verify_kernel;
-use crate::zkcuda::proving_system::{CombinedProof, Commitment, ProvingSystem};
+use crate::zkcuda::proving_system::{CombinedProof, ProvingSystem};
 
 use super::super::Expander;
-use super::server_utils::{SERVER_IP, SERVER_PORT};
-use arith::Field;
+use super::server_utils::SERVER_IP;
 use expander_utils::timer::Timer;
 
-use gkr::gkr_verify;
-use gkr_engine::{ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, Transcript};
-use polynomials::EqPolynomial;
+use gkr_engine::{FieldEngine, GKREngine, Transcript};
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use reqwest::Client;
 use serdes::ExpSerde;

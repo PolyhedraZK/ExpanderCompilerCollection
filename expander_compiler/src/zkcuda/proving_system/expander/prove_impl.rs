@@ -186,7 +186,7 @@ pub fn pcs_local_open_impl<C: GKREngine>(
     let poly = RefMultiLinearPoly::from_ref(vals);
     // TODO: Change this function in Expander to use rayon.
     let v = <C::FieldConfig as FieldEngine>::single_core_eval_circuit_vals_at_expander_challenge(
-        vals, &challenge,
+        vals, challenge,
     );
     transcript.append_field_element(&v);
 
@@ -196,7 +196,7 @@ pub fn pcs_local_open_impl<C: GKREngine>(
         &MPIConfig::prover_new(None, None),
         p_key,
         &poly,
-        &challenge,
+        challenge,
         transcript,
         &<C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::init_scratch_pad(
             &params,

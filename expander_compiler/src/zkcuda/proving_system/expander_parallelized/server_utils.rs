@@ -1,13 +1,6 @@
 #![allow(clippy::type_complexity)]
 
-use crate::utils::misc::next_power_of_two;
-use crate::zkcuda::kernel::{Kernel, LayeredCircuitInputVec};
 use crate::zkcuda::proof::ComputationGraph;
-use crate::zkcuda::proving_system::expander::commit_impl::local_commit_impl;
-use crate::zkcuda::proving_system::expander::prove_impl::{
-    get_local_vals, prepare_expander_circuit, prepare_inputs_with_local_vals,
-    prove_gkr_with_local_vals,
-};
 use crate::zkcuda::proving_system::expander::setup_impl::local_setup_impl;
 use crate::zkcuda::proving_system::expander::structs::{
     ExpanderProverSetup, ExpanderVerifierSetup,
@@ -20,16 +13,14 @@ use expander_utils::timer::Timer;
 use mpi::environment::Universe;
 use mpi::topology::SimpleCommunicator;
 use mpi::traits::Communicator;
-use polynomials::RefMultiLinearPoly;
 use serdes::ExpSerde;
 
 use crate::frontend::{Config, SIMDField};
-use arith::Field;
 
 use axum::{extract::State, Json};
 use gkr_engine::Transcript;
 use gkr_engine::{
-    ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine,
+    FieldEngine, GKREngine, MPIConfig, MPIEngine,
 };
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
