@@ -1,8 +1,10 @@
+//! This module provides functionality to export layered circuits to expander circuits.
 use crate::circuit::config::CircuitField;
 
 use super::{Circuit, Config, CrossLayerInputType, Input, InputUsize, NormalInputType};
 
 impl<C: Config> Circuit<C, NormalInputType> {
+    /// Exports the layered circuit to an expander circuit.
     pub fn export_to_expander<
         DestConfig: gkr_engine::FieldEngine<CircuitField = CircuitField<C>>,
     >(
@@ -70,6 +72,7 @@ impl<C: Config> Circuit<C, NormalInputType> {
         }
     }
 
+    /// Exports the layered circuit to an expander circuit and flattens it.
     pub fn export_to_expander_flatten(&self) -> expander_circuit::Circuit<C::FieldConfig> {
         let circuit = self.export_to_expander::<C::FieldConfig>();
         let mut flattened = circuit.flatten::<C>();
@@ -79,6 +82,7 @@ impl<C: Config> Circuit<C, NormalInputType> {
 }
 
 impl<C: Config> Circuit<C, CrossLayerInputType> {
+    /// Exports the layered circuit to a cross-layer recursive circuit.
     pub fn export_to_expander<
         DestConfig: gkr_engine::FieldEngine<CircuitField = CircuitField<C>>,
     >(

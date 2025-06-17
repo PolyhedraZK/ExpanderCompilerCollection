@@ -1,3 +1,5 @@
+//! This module provides functionality to optimize layered circuits.
+
 use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
@@ -97,10 +99,15 @@ impl<C: Config, I: InputType> Ord for GateCustom<C, I> {
     }
 }
 
+/// Trait for gates that can be optimized.
 trait GateOpt<C: Config, I: InputType>: PartialEq + Ord + Clone {
+    /// Adds a coefficient to the gate's coefficient.
     fn coef_add(&mut self, coef: Coef<C>);
+    /// Checks if the gate can be merged with another gate.
     fn can_merge_with(&self, other: &Self) -> bool;
+    /// Gets the coefficient of the gate.
     fn get_coef(&self) -> Coef<C>;
+    /// Adds an offset to the gate's inputs and output.
     fn add_offset(&self, in_offset: &I::InputUsize, out_offset: usize) -> Self;
 }
 
@@ -162,6 +169,7 @@ impl<C: Config, I: InputType> GateOpt<C, I> for GateCustom<C, I> {
     }
 }
 
+/// Deduplicates gates in a vector, merging gates that can be merged and removing zero coefficients.
 fn dedup_gates<C: Config, I: InputType, G: GateOpt<C, I>>(gates: &mut Vec<G>, trim_zero: bool) {
     gates.sort();
     let mut lst = 0;
@@ -193,6 +201,7 @@ fn dedup_gates<C: Config, I: InputType, G: GateOpt<C, I>>(gates: &mut Vec<G>, tr
     }
 }
 
+/// Represents a gate in a circuit, which can be of different types.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum UniGate<C: Config, I: InputType> {
     Mul(GateMul<C, I>),
@@ -202,6 +211,7 @@ enum UniGate<C: Config, I: InputType> {
 }
 
 impl<C: Config, I: InputType> Segment<C, I> {
+    /// Deduplicates gates in the segment, merging gates that can be merged and adding constant gates for unused outputs.
     fn dedup_gates(&mut self) {
         let mut occured_outputs = vec![false; self.num_outputs];
         for gate in self.gate_muls.iter_mut() {
@@ -245,6 +255,7 @@ impl<C: Config, I: InputType> Segment<C, I> {
         self.gate_consts.sort();
     }
 
+    /// Samples a specified number of gates from the segment, ensuring that the gates are unique.
     fn sample_gates(&self, num_gates: usize, mut rng: impl RngCore) -> HashSet<UniGate<C, I>> {
         let tot_gates = self.num_all_gates();
         let mut ids: HashSet<usize> = HashSet::new();
@@ -275,6 +286,7 @@ impl<C: Config, I: InputType> Segment<C, I> {
         gates
     }
 
+    /// Returns a set of all gates in the segment, including multiplication, addition, constant, and custom gates.
     fn all_gates(&self) -> HashSet<UniGate<C, I>> {
         let mut gates = HashSet::new();
         for gate in self.gate_muls.iter() {
@@ -292,6 +304,7 @@ impl<C: Config, I: InputType> Segment<C, I> {
         gates
     }
 
+    /// Returns the total number of gates in the segment, including multiplication, addition, constant, and custom gates.
     fn num_all_gates(&self) -> usize {
         self.gate_muls.len()
             + self.gate_adds.len()
@@ -299,6 +312,7 @@ impl<C: Config, I: InputType> Segment<C, I> {
             + self.gate_customs.len()
     }
 
+    /// Removes gates from the segment that are present in the provided set of gates.
     fn remove_gates(&mut self, gates: &HashSet<UniGate<C, I>>) {
         let mut new_gates = Vec::new();
         for gate in self.gate_muls.iter() {
@@ -330,6 +344,7 @@ impl<C: Config, I: InputType> Segment<C, I> {
         self.gate_customs = new_gates;
     }
 
+    /// Creates a new segment from a set of gates, deduplicating and sorting them.
     fn from_uni_gates(gates: &HashSet<UniGate<C, I>>) -> Self {
         let mut gate_muls = Vec::new();
         let mut gate_adds = Vec::new();
@@ -396,12 +411,15 @@ impl<C: Config, I: InputType> Segment<C, I> {
 }
 
 impl<C: Config, I: InputType> Circuit<C, I> {
+    /// Deduplicates gates in all segments of the circuit, merging gates that can be merged and removing zero coefficients.
     pub fn dedup_gates(&mut self) {
         for segment in self.segments.iter_mut() {
             segment.dedup_gates();
         }
     }
 
+    /// Expands gates in a segment by adding offsets based on the previous segments.
+    /// It takes a function `should_expand` to determine whether to expand a sub-segment.
     fn expand_gates<T: GateOpt<C, I>, F: Fn(usize) -> bool, G: Fn(&Segment<C, I>) -> &Vec<T>>(
         &self,
         segment_id: usize,
@@ -427,6 +445,7 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         gates
     }
 
+    /// Expands a segment by merging gates and adjusting offsets based on the previous segments.
     fn expand_segment<F: Fn(usize) -> bool>(
         &self,
         segment_id: usize,
@@ -497,6 +516,7 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         }
     }
 
+    /// Expands small segments in the circuit, merging them into larger segments based on usage and gate count.
     pub fn expand_small_segments(&self) -> Self {
         const EXPAND_USE_COUNT_LIMIT: usize = 1;
         const EXPAND_GATE_COUNT_LIMIT: usize = 4;
@@ -585,6 +605,7 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         }
     }
 
+    /// Finds common parts in the circuit segments, merging segments that share a significant number of gates.
     pub fn find_common_parts(&self) -> Self {
         const SAMPLE_PER_SEGMENT: usize = 100;
         const COMMON_THRESHOLD_PERCENT: usize = 5;

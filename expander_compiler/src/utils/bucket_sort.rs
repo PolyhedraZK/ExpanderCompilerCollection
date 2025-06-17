@@ -1,3 +1,5 @@
+//! This module provides a bucket sort implementation, with a customizable bucket function.
+
 pub fn bucket_sort<T: Ord + Clone + Default, F: Fn(&T) -> usize>(
     arr: Vec<T>,
     f: F,
