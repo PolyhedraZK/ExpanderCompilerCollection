@@ -5,7 +5,8 @@ use crate::{
     zkcuda::proving_system::{
         expander::structs::{ExpanderProverSetup, ExpanderVerifierSetup},
         expander_parallelized::client_utils::{
-            client_launch_server_and_setup, client_send_witness_and_prove,
+            client_launch_server_and_setup, client_send_witness_and_prove, wait_async,
+            ClientHttpHelper,
         },
         CombinedProof, Expander, ProvingSystem,
     },
@@ -50,5 +51,9 @@ where
         proof: &Self::Proof,
     ) -> bool {
         super::verify_impl::verify(verifier_setup, computation_graph, proof.clone())
+    }
+
+    fn post_process() {
+        wait_async(ClientHttpHelper::request_exit())
     }
 }

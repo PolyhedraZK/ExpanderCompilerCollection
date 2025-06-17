@@ -192,7 +192,8 @@ where
 
     let commitments_ref = verified_with_pcs_claims
         .iter()
-        .flat_map(|(_, c, _)| c).copied()
+        .flat_map(|(_, c, _)| c)
+        .copied()
         .collect::<Vec<_>>();
 
     let challenges = verified_with_pcs_claims
