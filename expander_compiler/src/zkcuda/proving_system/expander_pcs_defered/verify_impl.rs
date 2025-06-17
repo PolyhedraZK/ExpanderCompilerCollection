@@ -113,7 +113,7 @@ where
     let mut cursor = Cursor::new(&mut defered_proof_bytes);
 
     let commitments: Vec<_> = commitments
-        .into_iter()
+        .iter()
         .map(|commitment| commitment.commitment.clone())
         .collect();
     let vals =
@@ -131,7 +131,7 @@ where
             &params,
             verifier_setup.v_keys.get(&max_num_vars).unwrap(),
             &commitments,
-            &challenges,
+            challenges,
             &vals,
             &opening,
             &mut transcript,
@@ -192,15 +192,12 @@ where
 
     let commitments_ref = verified_with_pcs_claims
         .iter()
-        .map(|(_, c, _)| c)
-        .flatten()
-        .map(|&commitment| commitment)
+        .flat_map(|(_, c, _)| c).copied()
         .collect::<Vec<_>>();
 
     let challenges = verified_with_pcs_claims
         .iter()
-        .map(|(_, _, c)| c.clone())
-        .flatten()
+        .flat_map(|(_, _, c)| c.clone())
         .collect::<Vec<_>>();
 
     let pcs_verified = verify_defered_pcs_opening::<C, ECCConfig>(

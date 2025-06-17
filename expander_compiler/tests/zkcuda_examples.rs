@@ -1,8 +1,8 @@
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::proof::ComputationGraph;
-use expander_compiler::zkcuda::proving_system::expander_pcs_defered::BN254ConfigSha2UniKZG;
+// use expander_compiler::zkcuda::proving_system::expander_pcs_defered::BN254ConfigSha2UniKZG;
 use expander_compiler::zkcuda::proving_system::{
-    Expander, ExpanderPCSDefered, ParallelizedExpander, ProvingSystem,
+    Expander, ParallelizedExpander, ProvingSystem,
 };
 use expander_compiler::zkcuda::{context::*, kernel::*};
 
@@ -109,8 +109,8 @@ fn zkcuda_1_multi_core() {
     zkcuda_1_expander::<BN254Config, ParallelizedExpander<BN254ConfigSha2Hyrax>>();
     zkcuda_1_expander::<BN254Config, ParallelizedExpander<BN254ConfigSha2KZG>>();
 
-    zkcuda_1_expander::<BN254Config, ExpanderPCSDefered<BN254ConfigSha2Hyrax>>();
-    zkcuda_1_expander::<BN254Config, ExpanderPCSDefered<BN254ConfigSha2UniKZG>>();
+    // zkcuda_1_expander::<BN254Config, ExpanderPCSDefered<BN254ConfigSha2Hyrax>>();
+    // zkcuda_1_expander::<BN254Config, ExpanderPCSDefered<BN254ConfigSha2UniKZG>>();
 }
 
 #[kernel]
