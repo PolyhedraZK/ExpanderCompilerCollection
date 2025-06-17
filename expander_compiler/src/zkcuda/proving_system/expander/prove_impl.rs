@@ -1,10 +1,12 @@
 use arith::Field;
 use expander_circuit::Circuit;
 use gkr::gkr_prove;
-use gkr_engine::{ExpanderDualVarChallenge, FieldEngine, GKREngine, MPIConfig};
+use gkr_engine::{ExpanderDualVarChallenge, ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, Transcript};
+use polynomials::RefMultiLinearPoly;
+use serdes::ExpSerde;
 use sumcheck::ProverScratchPad;
 
-use crate::{frontend::Config, zkcuda::kernel::{Kernel, LayeredCircuitInputVec}};
+use crate::{frontend::Config, zkcuda::{kernel::{Kernel, LayeredCircuitInputVec}, proving_system::structs::ExpanderProverSetup}};
 
 /// ECCCircuit -> ExpanderCircuit
 /// Returns an additional prover scratch pad for later use in GKR.
@@ -102,4 +104,161 @@ where
         <C::FieldConfig as FieldEngine>::ChallengeField::from(0)
     );
     challenge
+}
+
+/// Challenge ctructure:
+/// llll pppp cccc ssss
+/// Where:
+///     l is the challenge for the local values
+///     p is the challenge for the parallel index
+///     c is the selector for the components
+///     s is the challenge for the SIMD values
+/// All little endian.
+///
+/// At the moment of commiting, we commited to the values corresponding to
+///     llll pppp ssss
+/// At the end of GKR, we will have the challenge
+///     llll cccc ssss
+/// The pppp part is not included because we're proving kernel-by-kernel.
+///
+/// Arguments:
+/// - `challenge`: The gkr challenge: llll cccc ssss
+/// - `total_vals_len`: The length of llll pppp
+/// - `parallel_index`: The index of the parallel execution. pppp part.
+/// - `parallel_count`: The total number of parallel executions. pppp part.
+/// - `is_broadcast`: Whether the challenge is broadcasted or not.
+///
+/// Returns:
+///     llll pppp ssss challenge
+///     cccc
+pub fn partition_challenge_and_location_for_local_pcs<F: FieldEngine>(
+    gkr_challenge: &ExpanderSingleVarChallenge<F>,
+    total_vals_len: usize,
+    parallel_index: usize,
+    parallel_count: usize,
+    is_broadcast: bool,
+) -> (ExpanderSingleVarChallenge<F>, Vec<F::ChallengeField>) {
+    let mut challenge = gkr_challenge.clone();
+    let zero = F::ChallengeField::ZERO;
+    if is_broadcast {
+        let n_vals_vars = total_vals_len.ilog2() as usize;
+        let component_idx_vars = challenge.rz[n_vals_vars..].to_vec();
+        challenge.rz.resize(n_vals_vars, zero);
+        (challenge, component_idx_vars)
+    } else {
+        let n_vals_vars = (total_vals_len / parallel_count).ilog2() as usize;
+        let component_idx_vars = challenge.rz[n_vals_vars..].to_vec();
+        challenge.rz.resize(n_vals_vars, zero);
+
+        let n_index_vars = parallel_count.ilog2() as usize;
+        let index_vars = (0..n_index_vars)
+            .map(|i| F::ChallengeField::from(((parallel_index >> i) & 1) as u32))
+            .collect::<Vec<_>>();
+
+        challenge.rz.extend_from_slice(&index_vars);
+        (challenge, component_idx_vars)
+    }
+}
+
+#[inline(always)]
+pub fn partition_single_gkr_claim_and_open_local_pcs<C: GKREngine>(
+    gkr_claim: &ExpanderSingleVarChallenge<C::FieldConfig>,
+    global_vals: &[impl AsRef<[<C::FieldConfig as FieldEngine>::SimdCircuitField]>],
+    p_keys: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    is_broadcast: &[bool],
+    parallel_index: usize,
+    parallel_num: usize,
+    transcript: &mut C::TranscriptConfig,
+    mpi_config: &MPIConfig,
+) 
+where C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>
+{
+    for (commitment_val, ib) in global_vals
+        .iter()
+        .zip(is_broadcast)
+    {
+        let val_len = commitment_val.as_ref().len();
+        let (challenge_for_pcs, _) =
+            partition_challenge_and_location_for_local_pcs::<C::FieldConfig>(
+                gkr_claim,
+                val_len,
+                parallel_index,
+                parallel_num,
+                *ib,
+            );
+
+        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
+            val_len.ilog2() as usize,
+            1,
+        );
+        let p_key = p_keys.p_keys.get(&val_len).unwrap();
+
+        let poly = RefMultiLinearPoly::from_ref(commitment_val.as_ref());
+        let v =
+            <C::FieldConfig as FieldEngine>::single_core_eval_circuit_vals_at_expander_challenge(
+                commitment_val.as_ref(),
+                &challenge_for_pcs,
+            );
+        transcript.append_field_element(&v);
+
+        transcript.lock_proof();
+        let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::open(
+            &params,
+            &MPIConfig::prover_new(None, None),
+            p_key,
+            &poly,
+            &challenge_for_pcs,
+            transcript,
+            &<C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::init_scratch_pad(
+                &params,
+                mpi_config,
+            ),
+        )
+        .unwrap();
+        transcript.unlock_proof();
+
+        let mut buffer = vec![];
+        opening
+            .serialize_into(&mut buffer)
+            .expect("Failed to serialize opening");
+        transcript.append_u8_slice(&buffer);
+    }
+}
+
+
+pub fn partition_gkr_claims_and_open_local_pcs<C: GKREngine>(
+    gkr_claim: &ExpanderDualVarChallenge<C::FieldConfig>,
+    global_vals: &[impl AsRef<[<C::FieldConfig as FieldEngine>::SimdCircuitField]>],
+    p_keys: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    is_broadcast: &[bool],
+    parallel_index: usize,
+    parallel_num: usize,
+    transcript: &mut C::TranscriptConfig,
+    mpi_config: &MPIConfig,
+) 
+where C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>
+{
+    let challenges = if let Some(challenge_y) = gkr_claim.challenge_y() {
+        vec![
+            gkr_claim.challenge_x(),
+            challenge_y,
+        ]
+    } else {
+        vec![gkr_claim.challenge_x()]
+    };
+
+    challenges
+        .into_iter()
+        .for_each(|challenge| {
+            partition_single_gkr_claim_and_open_local_pcs::<C>(
+                &challenge,
+                global_vals,
+                p_keys,
+                is_broadcast,
+                parallel_index,
+                parallel_num,
+                transcript,
+                mpi_config,
+            );
+        });
 }

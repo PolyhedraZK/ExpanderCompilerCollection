@@ -8,7 +8,7 @@ use crate::utils::misc::next_power_of_two;
 use crate::zkcuda::context::DeviceMemory;
 use crate::zkcuda::proof::ComputationGraph;
 use crate::zkcuda::proving_system::commit_impl::local_commit_impl;
-use crate::zkcuda::proving_system::prove_impl::{get_local_vals, prepare_expander_circuit, prove_gkr_with_local_vals};
+use crate::zkcuda::proving_system::prove_impl::{get_local_vals, partition_gkr_claims_and_open_local_pcs, prepare_expander_circuit, prove_gkr_with_local_vals};
 use crate::zkcuda::proving_system::setup_impl::local_setup_impl;
 use crate::zkcuda::proving_system::{CombinedProof, KernelWiseProvingSystem, ProvingSystem, traits::Commitment, common::{check_inputs, prepare_inputs}};
 use crate::zkcuda::kernel::Kernel;
@@ -63,7 +63,7 @@ where
         prover_setup: &Self::ProverSetup,
         kernel: &Kernel<ECCConfig>,
         _commitments: &[&Self::Commitment],
-        commitments_extra_info: &[&Self::CommitmentState],
+        _commitments_extra_info: &[&Self::CommitmentState],
         commitments_values: &[&[SIMDField<C>]],
         parallel_count: usize,
         is_broadcast: &[bool],
@@ -75,12 +75,12 @@ where
         
         let mut proof = ExpanderProof { data: vec![] };
 
-        // For each parallel index, generate the GKR proof
+        // For each parallel index, generate the GKR and PCS opening proof
         for parallel_index in 0..parallel_count {
             // TODO: Init with commitments
             let mut transcript = C::TranscriptConfig::new();
             let local_vals = get_local_vals(commitments_values, is_broadcast, parallel_index, parallel_count);
-            let challenge = prove_gkr_with_local_vals(
+            let challenge = prove_gkr_with_local_vals::<C>(
                 &mut expander_circuit, 
                 &mut prover_scratch, 
                 &local_vals, 
@@ -89,30 +89,16 @@ where
                 & MPIConfig::prover_new(None, None),
             );
             
-            prove_input_claim::<C, ECCConfig>(
-                kernel,
-                commitments_values,
+            partition_gkr_claims_and_open_local_pcs::<C>(
+                &challenge,
+                &local_vals,
                 prover_setup,
-                commitments_extra_info,
-                &challenge.challenge_x(),
                 is_broadcast,
-                i,
+                parallel_index,
                 parallel_count,
                 &mut transcript,
+                &MPIConfig::prover_new(None, None),
             );
-            if let Some(challenge_y) = challenge.challenge_y() {
-                prove_input_claim::<C, ECCConfig>(
-                    kernel,
-                    commitments_values,
-                    prover_setup,
-                    commitments_extra_info,
-                    &challenge_y,
-                    is_broadcast,
-                    i,
-                    parallel_count,
-                    &mut transcript,
-                );
-            }
 
             proof.data.push(transcript.finalize_and_get_proof());
         }
@@ -192,60 +178,6 @@ where
 }
 
 
-/// Challenge ctructure:
-/// llll pppp cccc ssss
-/// Where:
-///     l is the challenge for the local values
-///     p is the challenge for the parallel index
-///     c is the selector for the components
-///     s is the challenge for the SIMD values
-/// All little endian.
-///
-/// At the moment of commiting, we commited to the values corresponding to
-///     llll pppp ssss
-/// At the end of GKR, we will have the challenge
-///     llll cccc ssss
-/// The pppp part is not included because we're proving kernel-by-kernel.
-///
-/// Arguments:
-/// - `challenge`: The gkr challenge: llll cccc ssss
-/// - `total_vals_len`: The length of llll pppp
-/// - `parallel_index`: The index of the parallel execution. pppp part.
-/// - `parallel_count`: The total number of parallel executions. pppp part.
-/// - `is_broadcast`: Whether the challenge is broadcasted or not.
-///
-/// Returns:
-///     llll pppp ssss challenge
-///     cccc
-fn get_challenge_for_pcs<F: FieldEngine>(
-    gkr_challenge: &ExpanderSingleVarChallenge<F>,
-    total_vals_len: usize,
-    parallel_index: usize,
-    parallel_count: usize,
-    is_broadcast: bool,
-) -> (ExpanderSingleVarChallenge<F>, Vec<F::ChallengeField>) {
-    let mut challenge = gkr_challenge.clone();
-    let zero = F::ChallengeField::ZERO;
-    if is_broadcast {
-        let n_vals_vars = total_vals_len.ilog2() as usize;
-        let component_idx_vars = challenge.rz[n_vals_vars..].to_vec();
-        challenge.rz.resize(n_vals_vars, zero);
-        (challenge, component_idx_vars)
-    } else {
-        let n_vals_vars = (total_vals_len / parallel_count).ilog2() as usize;
-        let component_idx_vars = challenge.rz[n_vals_vars..].to_vec();
-        challenge.rz.resize(n_vals_vars, zero);
-
-        let n_index_vars = parallel_count.ilog2() as usize;
-        let index_vars = (0..n_index_vars)
-            .map(|i| F::ChallengeField::from(((parallel_index >> i) & 1) as u32))
-            .collect::<Vec<_>>();
-
-        challenge.rz.extend_from_slice(&index_vars);
-        (challenge, component_idx_vars)
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
 fn prove_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     _kernel: &Kernel<ECCConfig>,
@@ -264,48 +196,7 @@ fn prove_input_claim<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfi
 ) where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    for ((commitment_val, extra_info), ib) in commitments_values
-        .iter()
-        .zip(commitments_extra_info)
-        .zip(is_broadcast)
-    {
-        let val_len = commitment_val.len();
-        let (challenge_for_pcs, _) =
-            get_challenge_for_pcs(challenge, val_len, parallel_index, parallel_count, *ib);
-
-        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
-            val_len.ilog2() as usize,
-            1,
-        );
-        let p_key = p_keys.p_keys.get(&val_len).unwrap();
-
-        let poly = RefMultiLinearPoly::from_ref(commitment_val);
-        let v =
-            <C::FieldConfig as FieldEngine>::single_core_eval_circuit_vals_at_expander_challenge(
-                commitment_val,
-                &challenge_for_pcs,
-            );
-        transcript.append_field_element(&v);
-
-        transcript.lock_proof();
-        let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::open(
-            &params,
-            &MPIConfig::prover_new(None, None),
-            p_key,
-            &poly,
-            &challenge_for_pcs,
-            transcript,
-            &extra_info.scratch,
-        )
-        .unwrap();
-        transcript.unlock_proof();
-
-        let mut buffer = vec![];
-        opening
-            .serialize_into(&mut buffer)
-            .expect("Failed to serialize opening");
-        transcript.append_u8_slice(&buffer);
-    }
+    
 }
 
 #[allow(clippy::too_many_arguments)]
