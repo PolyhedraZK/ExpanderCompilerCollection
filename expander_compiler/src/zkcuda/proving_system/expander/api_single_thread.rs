@@ -95,7 +95,7 @@ where
 
             partition_gkr_claims_and_open_pcs_no_mpi::<C>(
                 &challenge,
-                &commitments_values,
+                commitments_values,
                 prover_setup,
                 is_broadcast,
                 parallel_index,

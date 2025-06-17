@@ -1,22 +1,18 @@
 #![allow(clippy::type_complexity)]
 
 use crate::zkcuda::proof::ComputationGraph;
-use crate::zkcuda::proving_system::expander::setup_impl::local_setup_impl;
 use crate::zkcuda::proving_system::expander::structs::{
     ExpanderProverSetup, ExpanderVerifierSetup,
 };
-use crate::zkcuda::proving_system::expander_parallelized::prove_impl::mpi_prove_impl;
 use crate::zkcuda::proving_system::expander_parallelized::shared_memory_utils::SharedMemoryEngine;
 use crate::zkcuda::proving_system::expander_parallelized::structs::ServerFns;
-use crate::zkcuda::proving_system::{CombinedProof, Expander};
 
 use expander_utils::timer::Timer;
 use mpi::environment::Universe;
 use mpi::topology::SimpleCommunicator;
 use mpi::traits::Communicator;
-use serdes::ExpSerde;
 
-use crate::frontend::{Config, SIMDField};
+use crate::frontend::Config;
 
 use axum::{extract::State, Json};
 use gkr_engine::{FieldEngine, GKREngine, MPIConfig, MPIEngine};
