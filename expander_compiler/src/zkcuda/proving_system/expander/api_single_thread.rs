@@ -13,7 +13,7 @@ use crate::zkcuda::proving_system::expander::prove_impl::{
     prove_gkr_with_local_vals,
 };
 use crate::zkcuda::proving_system::expander::setup_impl::local_setup_impl;
-use crate::zkcuda::proving_system::expander::verify_impl::verify_individual_pcs_opening_and_aggregated_value_no_mpi;
+use crate::zkcuda::proving_system::expander::verify_impl::verify_pcs_opening_and_aggregation_no_mpi;
 use crate::zkcuda::proving_system::{
     common::check_inputs, CombinedProof, KernelWiseProvingSystem, ProvingSystem,
 };
@@ -141,7 +141,7 @@ where
                 return false;
             }
 
-            verified &= verify_individual_pcs_opening_and_aggregated_value_no_mpi::<C, ECCConfig>(
+            verified &= verify_pcs_opening_and_aggregation_no_mpi::<C, ECCConfig>(
                 &mut cursor,
                 kernel,
                 verifier_setup,

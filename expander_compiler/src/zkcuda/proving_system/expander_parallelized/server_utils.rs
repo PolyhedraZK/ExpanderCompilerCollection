@@ -40,6 +40,15 @@ use tokio::sync::{oneshot, Mutex};
 pub static SERVER_IP: &str = "127.0.0.1";
 pub static SERVER_PORT: Lazy<SyncMutex<u16>> = Lazy::new(|| SyncMutex::new(3000));
 
+pub fn parse_port_number() -> u16 {
+    let mut port = SERVER_PORT.lock().unwrap();
+    *port = std::env::var("PORT_NUMBER")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(*port);
+    *port
+}
+
 #[derive(Serialize, Deserialize)]
 pub enum RequestType {
     Setup(String), // The path to the computation graph setup file

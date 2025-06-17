@@ -73,7 +73,7 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn verify_individual_pcs_opening_and_aggregated_value_no_mpi_impl<C, ECCConfig>(
+pub fn verify_pcs_opening_and_aggregation_no_mpi_impl<C, ECCConfig>(
     mut proof_reader: impl Read,
     kernel: &Kernel<ECCConfig>,
     v_keys: &ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
@@ -141,7 +141,7 @@ where
     *y == target_y
 }
 
-pub fn verify_individual_pcs_opening_and_aggregated_value_no_mpi<C, ECCConfig>(
+pub fn verify_pcs_opening_and_aggregation_no_mpi<C, ECCConfig>(
     mut proof_reader: impl Read,
     kernel: &Kernel<ECCConfig>,
     v_keys: &ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
@@ -175,7 +175,7 @@ where
         .into_iter()
         .zip(claims)
         .all(|(challenge, claim)| {
-            verify_individual_pcs_opening_and_aggregated_value_no_mpi_impl::<C, ECCConfig>(
+            verify_pcs_opening_and_aggregation_no_mpi_impl::<C, ECCConfig>(
                 &mut proof_reader,
                 kernel,
                 v_keys,

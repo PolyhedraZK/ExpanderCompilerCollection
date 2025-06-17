@@ -6,13 +6,15 @@ use crate::utils::misc::next_power_of_two;
 use crate::zkcuda::kernel::Kernel;
 use crate::zkcuda::proof::ComputationGraph;
 use crate::zkcuda::proving_system::expander::structs::{
-    ExpanderCommitment, ExpanderProof, ExpanderVerifierSetup,
+    ExpanderCommitment, ExpanderProof, ExpanderProverSetup, ExpanderVerifierSetup,
 };
 use crate::zkcuda::proving_system::expander_parallelized::client::{
     request_exit, request_prove, request_setup,
 };
 use crate::zkcuda::proving_system::expander_parallelized::cmd_utils::start_server;
+use crate::zkcuda::proving_system::expander_parallelized::server_utils::parse_port_number;
 use crate::zkcuda::proving_system::expander_parallelized::shared_memory_utils::SharedMemoryEngine;
+use crate::zkcuda::proving_system::expander_parallelized::verify_impl::verify_kernel;
 use crate::zkcuda::proving_system::{CombinedProof, Commitment, ProvingSystem};
 
 use super::super::Expander;
@@ -29,158 +31,6 @@ use serdes::ExpSerde;
 
 pub struct ParallelizedExpander<C: GKREngine> {
     _config: std::marker::PhantomData<C>,
-}
-pub fn parse_port_number() -> u16 {
-    let mut port = SERVER_PORT.lock().unwrap();
-    *port = std::env::var("PORT_NUMBER")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(*port);
-    *port
-}
-
-impl<C: GKREngine> ParallelizedExpander<C>
-where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-{
-    fn verify_kernel<ECCConfig: Config<FieldConfig = C::FieldConfig>>(
-        verifier_setup: &ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-        kernel: &Kernel<ECCConfig>,
-        proof: &ExpanderProof,
-        commitments: &[&ExpanderCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
-        parallel_count: usize,
-        is_broadcast: &[bool],
-    ) -> bool {
-        let timer = Timer::new("verify", true);
-        let mut expander_circuit = kernel.layered_circuit.export_to_expander().flatten::<C>();
-        expander_circuit.pre_process_gkr::<C>();
-
-        let mut transcript = C::TranscriptConfig::new();
-        expander_circuit.fill_rnd_coefs(&mut transcript);
-
-        let mut cursor = Cursor::new(&proof.data[0].bytes);
-        let (mut verified, challenge, claimed_v0, claimed_v1) = gkr_verify(
-            parallel_count,
-            &expander_circuit,
-            &[],
-            &<C::FieldConfig as FieldEngine>::ChallengeField::ZERO,
-            &mut transcript,
-            &mut cursor,
-        );
-
-        if !verified {
-            println!("Failed to verify GKR proof");
-            return false;
-        }
-
-        verified &= Self::verify_input_claim::<ECCConfig>(
-            &mut cursor,
-            kernel,
-            verifier_setup,
-            &challenge.challenge_x(),
-            &claimed_v0,
-            commitments,
-            is_broadcast,
-            parallel_count,
-            &mut transcript,
-        );
-        if let Some(challenge_y) = challenge.challenge_y() {
-            verified &= Self::verify_input_claim::<ECCConfig>(
-                &mut cursor,
-                kernel,
-                verifier_setup,
-                &challenge_y,
-                &claimed_v1.unwrap(),
-                commitments,
-                is_broadcast,
-                parallel_count,
-                &mut transcript,
-            );
-        }
-        if !verified {
-            println!("Failed to verify overall pcs");
-            return false;
-        }
-        timer.stop();
-        true
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn verify_input_claim<ECCConfig: Config<FieldConfig = C::FieldConfig>>(
-        mut proof_reader: impl Read,
-        kernel: &Kernel<ECCConfig>,
-        v_keys: &ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-        challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
-        y: &<C::FieldConfig as FieldEngine>::ChallengeField,
-        commitments: &[&ExpanderCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
-        is_broadcast: &[bool],
-        parallel_count: usize,
-        transcript: &mut C::TranscriptConfig,
-    ) -> bool {
-        let mut target_y = <C::FieldConfig as FieldEngine>::ChallengeField::ZERO;
-        for ((input, commitment), ib) in kernel
-            .layered_circuit_input
-            .iter()
-            .zip(commitments.iter())
-            .zip(is_broadcast)
-        {
-            let val_len =
-                <ExpanderCommitment<C::PCSField, C::FieldConfig, C::PCSConfig> as Commitment<
-                    ECCConfig,
-                >>::vals_len(commitment);
-            let (challenge_for_pcs, component_idx_vars) =
-                get_challenge_for_pcs_with_mpi(challenge, val_len, parallel_count, *ib);
-
-            let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
-                val_len.ilog2() as usize,
-                1,
-            );
-            let v_key = v_keys.v_keys.get(&val_len).unwrap();
-
-            let claim = <C::FieldConfig as FieldEngine>::ChallengeField::deserialize_from(
-                &mut proof_reader,
-            )
-            .unwrap();
-            transcript.append_field_element(&claim);
-
-            let opening =
-                <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Opening::deserialize_from(
-                    &mut proof_reader,
-                )
-                .unwrap();
-
-            transcript.lock_proof();
-            let verified = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::verify(
-                &params,
-                v_key,
-                &commitment.commitment,
-                &challenge_for_pcs,
-                claim,
-                transcript,
-                &opening,
-            );
-            transcript.unlock_proof();
-
-            if !verified {
-                println!("Failed to verify single pcs opening");
-                return false;
-            }
-
-            let mut buffer = vec![];
-            opening
-                .serialize_into(&mut buffer)
-                .expect("Failed to serialize opening");
-            transcript.append_u8_slice(&buffer);
-
-            let component_index = input.offset / input.len;
-            let v_index = EqPolynomial::ith_eq_vec_elem(&component_idx_vars, component_index);
-
-            target_y += v_index * claim;
-        }
-
-        // overall claim verification
-        *y == target_y
-    }
 }
 
 impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSystem<ECCConfig>
@@ -213,7 +63,6 @@ where
             .max()
             .unwrap_or(1);
 
-        // Keep trying until the server is ready
         let port = parse_port_number();
         let server_url = format!("{SERVER_IP}:{port}");
         start_server::<C>(
@@ -221,6 +70,8 @@ where
             next_power_of_two(max_parallel_count),
             port,
         );
+
+        // Keep trying until the server is ready
         loop {
             match wait_async(Client::new().get(format!("http://{server_url}/")).send()) {
                 Ok(_) => break,
@@ -270,7 +121,7 @@ where
                     .map(|idx| &proof.commitments[*idx])
                     .collect::<Vec<_>>();
 
-                Self::verify_kernel(
+                verify_kernel::<C, ECCConfig>(
                     verifier_setup,
                     &computation_graph.kernels[template.kernel_id],
                     local_proof,
