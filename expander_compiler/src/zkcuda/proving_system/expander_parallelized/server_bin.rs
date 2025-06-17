@@ -1,34 +1,12 @@
-use std::{
-    net::{IpAddr, SocketAddr},
-    str::FromStr,
-    sync::Arc,
-};
+use std::str::FromStr;
 
-use axum::{
-    routing::{get, post},
-    Router,
-};
 use clap::Parser;
 use expander_compiler::{
-    frontend::{BN254Config, BabyBearConfig, Config, GF2Config, GoldilocksConfig, M31Config},
-    zkcuda::{
-        proof::ComputationGraph,
-        proving_system::{
-            expander::structs::{ExpanderProverSetup, ExpanderVerifierSetup},
-            expander_parallelized::{
-                server_utils::{
-                    root_main, serve, worker_main, ServerState, GLOBAL_COMMUNICATOR, SERVER_IP,
-                    UNIVERSE,
-                },
-                structs::ServerFns,
-                ParallelizedExpander,
-            },
-        },
-    },
+    frontend::{BN254Config, BabyBearConfig, GF2Config, GoldilocksConfig, M31Config},
+    zkcuda::proving_system::expander_parallelized::{server_utils::serve, ParallelizedExpander},
 };
 use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
-use gkr_engine::{FieldEngine, GKREngine, MPIConfig, MPIEngine, PolynomialCommitmentType};
-use tokio::sync::{oneshot, Mutex};
+use gkr_engine::PolynomialCommitmentType;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
