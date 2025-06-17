@@ -1,5 +1,4 @@
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
-use std::collections::HashMap;
 use std::io::{Cursor, Read};
 
 use crate::circuit::config::Config;
@@ -16,26 +15,18 @@ use crate::zkcuda::proving_system::prove_impl::{
 use crate::zkcuda::proving_system::setup_impl::local_setup_impl;
 use crate::zkcuda::proving_system::verify_impl::verify_individual_pcs_opening_and_aggregated_value;
 use crate::zkcuda::proving_system::{
-    common::{check_inputs, prepare_inputs},
-    traits::Commitment,
+    common::check_inputs,
     CombinedProof, KernelWiseProvingSystem, ProvingSystem,
 };
 
-use super::structs::*;
-use super::utils::*;
+use super::structs::{ExpanderProverSetup, ExpanderVerifierSetup, ExpanderProof, ExpanderCommitment, ExpanderCommitmentState};
 
 use arith::Field;
-use expander_circuit::Circuit;
 use expander_utils::timer::Timer;
-use gkr::{gkr_prove, gkr_verify};
+use gkr::gkr_verify;
 use gkr_engine::{
-    ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig,
-    StructuredReferenceString, Transcript,
+    FieldEngine, GKREngine, MPIConfig, Transcript,
 };
-use poly_commit::expander_pcs_init_testing_only;
-use polynomials::{EqPolynomial, RefMultiLinearPoly};
-use serdes::ExpSerde;
-use sumcheck::ProverScratchPad;
 
 pub struct Expander<C: GKREngine> {
     _config: std::marker::PhantomData<C>,

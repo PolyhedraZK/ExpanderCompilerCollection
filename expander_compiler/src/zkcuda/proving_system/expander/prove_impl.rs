@@ -59,7 +59,7 @@ pub fn get_local_vals<'vals_life, F: Field>(
         .zip(is_broadcast.iter())
         .map(|(vals, is_broadcast)| {
             if *is_broadcast {
-                &vals.as_ref()
+                vals.as_ref()
             } else {
                 let local_val_len = vals.as_ref().len() / parallel_num;
                 &vals.as_ref()[local_val_len * parallel_index..local_val_len * (parallel_num + 1)]
@@ -103,7 +103,7 @@ where
     expander_circuit.fill_rnd_coefs(transcript);
     expander_circuit.evaluate();
     let (claimed_v, challenge) =
-        gkr_prove(&expander_circuit, prover_scratch, transcript, &mpi_config);
+        gkr_prove(expander_circuit, prover_scratch, transcript, mpi_config);
     assert_eq!(
         claimed_v,
         <C::FieldConfig as FieldEngine>::ChallengeField::from(0)

@@ -1,7 +1,6 @@
-use std::io::{Cursor, Read};
+use std::io::Read;
 
 use arith::Field;
-use expander_circuit::Circuit;
 use gkr_engine::{
     ExpanderDualVarChallenge, ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine,
     Transcript,
@@ -140,7 +139,7 @@ where
 
     challenges
         .into_iter()
-        .zip(claims.into_iter())
+        .zip(claims)
         .all(|(challenge, claim)| {
             verify_individual_pcs_opening_and_aggregated_value_impl::<C, ECCConfig>(
                 &mut proof_reader,
