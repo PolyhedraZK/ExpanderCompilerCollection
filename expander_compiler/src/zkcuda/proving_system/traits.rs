@@ -30,7 +30,7 @@ pub trait KernelWiseProvingSystem<C: Config> {
         prover_setup: &Self::ProverSetup,
         kernel: &Kernel<C>,
         commitments: &[&Self::Commitment],
-        commitments_extra_info: &[&Self::CommitmentState],
+        commitments_state: &[&Self::CommitmentState],
         commitments_values: &[&[SIMDField<C>]],
         parallel_count: usize,
         is_broadcast: &[bool],

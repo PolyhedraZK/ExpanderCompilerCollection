@@ -8,7 +8,7 @@ use crate::{
         proving_system::{
             expander::structs::{ExpanderProverSetup, ExpanderVerifierSetup},
             expander_parallelized::{
-                cmd_utils::start_server, server_utils::parse_port_number,
+                cmd_utils::start_server, server_ctrl::parse_port_number,
                 shared_memory_utils::SharedMemoryEngine,
             },
             CombinedProof, Expander,
@@ -16,7 +16,7 @@ use crate::{
     },
 };
 
-use super::server_utils::{RequestType, SERVER_IP, SERVER_PORT};
+use super::server_ctrl::{RequestType, SERVER_IP, SERVER_PORT};
 
 use expander_utils::timer::Timer;
 use gkr_engine::{FieldEngine, GKREngine};

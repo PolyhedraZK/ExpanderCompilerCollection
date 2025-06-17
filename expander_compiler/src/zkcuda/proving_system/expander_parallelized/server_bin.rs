@@ -3,30 +3,13 @@ use std::str::FromStr;
 use clap::Parser;
 use expander_compiler::{
     frontend::{BN254Config, BabyBearConfig, GF2Config, GoldilocksConfig, M31Config},
-    zkcuda::proving_system::expander_parallelized::{server_utils::serve, ParallelizedExpander},
+    zkcuda::proving_system::expander_parallelized::{
+        server_ctrl::{serve, ExpanderExecArgs},
+        ParallelizedExpander,
+    },
 };
 use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
 use gkr_engine::PolynomialCommitmentType;
-
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-pub struct ExpanderExecArgs {
-    /// M31, GF2, BN254, Goldilocks, BabyBear
-    #[arg(short, long, default_value = "M31")]
-    pub field_type: String,
-
-    /// Fiat-Shamir Hash: SHA256, or Poseidon, or MiMC5
-    #[arg(short, long, default_value = "SHA256")]
-    pub fiat_shamir_hash: String,
-
-    /// Polynomial Commitment Scheme: Raw, or Orion
-    #[arg(short, long, default_value = "Raw")]
-    pub poly_commit: String,
-
-    /// The port number for the server to listen on.
-    #[arg(short, long, default_value = "Port")]
-    pub port_number: String,
-}
 
 #[tokio::main]
 pub async fn main() {

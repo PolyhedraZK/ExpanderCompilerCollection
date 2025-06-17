@@ -161,27 +161,7 @@ where
         ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
         ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
     ) {
-        let mut p_keys = HashMap::new();
-        let mut v_keys = HashMap::new();
-        let max_commitment_len = computation_graph
-            .commitments_lens
-            .iter()
-            .max()
-            .cloned()
-            .unwrap_or(0);
-
-        let (_params, p_key, v_key, _scratch) =
-            pcs_testing_setup_fixed_seed::<C::FieldConfig, C::TranscriptConfig, C::PCSConfig>(
-                max_commitment_len,
-                &MPIConfig::prover_new(None, None),
-            );
-        p_keys.insert(max_commitment_len, p_key);
-        v_keys.insert(max_commitment_len, v_key);
-
-        (
-            ExpanderProverSetup { p_keys },
-            ExpanderVerifierSetup { v_keys },
-        )
+        
     }
 
     fn commit(
@@ -515,7 +495,7 @@ where
         computation_graph: &ComputationGraph<ECCConfig>,
         device_memories: &[DeviceMemory<ECCConfig>],
     ) -> Self::Proof {
-        let (commitments, extra_infos) = device_memories
+        let (commitments, states) = device_memories
             .iter()
             .map(|device_memory| Self::commit(prover_setup, &device_memory.values[..]))
             .unzip::<_, _, Vec<_>, Vec<_>>();
@@ -525,11 +505,11 @@ where
         let mut challenges = vec![];
 
         for template in computation_graph.proof_templates.iter() {
-            let (mut local_commitments, mut local_extra_info, mut local_vals) =
+            let (mut local_commitments, mut local_state, mut local_vals) =
                 (vec![], vec![], vec![]);
             for idx in &template.commitment_indices {
                 local_commitments.push(&commitments[*idx]);
-                local_extra_info.push(&extra_infos[*idx]);
+                local_state.push(&states[*idx]);
                 local_vals.push(&device_memories[*idx].values[..]);
             }
 

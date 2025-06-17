@@ -19,7 +19,7 @@ use crate::{
                 },
                 structs::{ExpanderCommitmentState, ExpanderProof, ExpanderProverSetup},
             },
-            expander_parallelized::server_utils::generate_local_mpi_config,
+            expander_parallelized::server_ctrl::generate_local_mpi_config,
             CombinedProof, Expander,
         },
     },
@@ -36,12 +36,12 @@ where
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    let (commitments, extra_infos) = if global_mpi_config.is_root() {
-        let (commitments, extra_infos) = values
+    let (commitments, states) = if global_mpi_config.is_root() {
+        let (commitments, states) = values
             .iter()
             .map(|value| local_commit_impl::<C, ECCConfig>(prover_setup, value.as_ref()))
             .unzip::<_, _, Vec<_>, Vec<_>>();
-        (Some(commitments), Some(extra_infos))
+        (Some(commitments), Some(states))
     } else {
         (None, None)
     };
@@ -79,7 +79,7 @@ where
                         &template
                             .commitment_indices
                             .iter()
-                            .map(|&idx| &extra_infos.as_ref().unwrap()[idx])
+                            .map(|&idx| &states.as_ref().unwrap()[idx])
                             .collect::<Vec<_>>(),
                         c,
                         &template.is_broadcast,
@@ -183,11 +183,7 @@ pub fn partition_challenge_and_location_for_pcs_mpi<F: FieldEngine>(
 fn partition_single_gkr_claim_and_open_pcs_mpi<C: GKREngine>(
     p_keys: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
     commitments_values: &[impl AsRef<[SIMDField<C>]>],
-    commitments_extra_info: &[&ExpanderCommitmentState<
-        C::PCSField,
-        C::FieldConfig,
-        C::PCSConfig,
-    >],
+    commitments_state: &[&ExpanderCommitmentState<C::PCSField, C::FieldConfig, C::PCSConfig>],
     gkr_challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
     is_broadcast: &[bool],
     transcript: &mut C::TranscriptConfig,
@@ -195,9 +191,9 @@ fn partition_single_gkr_claim_and_open_pcs_mpi<C: GKREngine>(
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let parallel_count = 1 << gkr_challenge.r_mpi.len();
-    for ((commitment_val, _extra_info), ib) in commitments_values
+    for ((commitment_val, _state), ib) in commitments_values
         .iter()
-        .zip(commitments_extra_info)
+        .zip(commitments_state)
         .zip(is_broadcast)
     {
         let val_len = commitment_val.as_ref().len();
