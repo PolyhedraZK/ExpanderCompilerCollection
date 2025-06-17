@@ -1,4 +1,4 @@
-pub mod client;
+pub mod client_utils;
 pub mod cmd_utils;
 pub mod prove_impl;
 pub mod server_utils;

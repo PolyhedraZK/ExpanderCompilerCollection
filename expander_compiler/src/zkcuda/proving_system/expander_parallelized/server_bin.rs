@@ -17,9 +17,11 @@ use expander_compiler::{
             expander::structs::{ExpanderProverSetup, ExpanderVerifierSetup},
             expander_parallelized::{
                 server_utils::{
-                    root_main, worker_main, ServerState, GLOBAL_COMMUNICATOR, SERVER_IP, UNIVERSE,
+                    root_main, serve, worker_main, ServerState, GLOBAL_COMMUNICATOR, SERVER_IP,
+                    UNIVERSE,
                 },
-                structs::{BasicServerFns, ServerFns},
+                structs::ServerFns,
+                ParallelizedExpander,
             },
         },
     },
@@ -60,96 +62,45 @@ pub async fn main() {
 
     match (expander_exec_args.field_type.as_str(), pcs_type) {
         ("M31", PolynomialCommitmentType::Raw) => {
-            serve::<M31Config, M31Config, BasicServerFns<_, _>>(expander_exec_args.port_number)
+            serve::<M31Config, M31Config, ParallelizedExpander<_>>(expander_exec_args.port_number)
                 .await;
         }
         ("GF2", PolynomialCommitmentType::Raw) => {
-            serve::<GF2Config, GF2Config, BasicServerFns<_, _>>(expander_exec_args.port_number)
+            serve::<GF2Config, GF2Config, ParallelizedExpander<_>>(expander_exec_args.port_number)
                 .await;
         }
         ("Goldilocks", PolynomialCommitmentType::Raw) => {
-            serve::<GoldilocksConfig, GoldilocksConfig, BasicServerFns<_, _>>(
+            serve::<GoldilocksConfig, GoldilocksConfig, ParallelizedExpander<_>>(
                 expander_exec_args.port_number,
             )
             .await;
         }
         ("BabyBear", PolynomialCommitmentType::Raw) => {
-            serve::<BabyBearConfig, BabyBearConfig, BasicServerFns<_, _>>(
+            serve::<BabyBearConfig, BabyBearConfig, ParallelizedExpander<_>>(
                 expander_exec_args.port_number,
             )
             .await;
         }
         ("BN254", PolynomialCommitmentType::Raw) => {
-            serve::<BN254Config, BN254Config, BasicServerFns<_, _>>(expander_exec_args.port_number)
-                .await;
+            serve::<BN254Config, BN254Config, ParallelizedExpander<_>>(
+                expander_exec_args.port_number,
+            )
+            .await;
         }
         ("BN254", PolynomialCommitmentType::Hyrax) => {
-            serve::<BN254ConfigSha2Hyrax, BN254Config, BasicServerFns<_, _>>(
+            serve::<BN254ConfigSha2Hyrax, BN254Config, ParallelizedExpander<_>>(
                 expander_exec_args.port_number,
             )
             .await;
         }
         ("BN254", PolynomialCommitmentType::KZG) => {
-            serve::<BN254ConfigSha2KZG, BN254Config, BasicServerFns<_, _>>(
+            serve::<BN254ConfigSha2KZG, BN254Config, ParallelizedExpander<_>>(
                 expander_exec_args.port_number,
             )
             .await;
         }
         (field_type, pcs_type) => {
-            panic!("Combination of {field_type:?} and {pcs_type:?} not supported")
+            panic!("Combination of {field_type:?} and {pcs_type:?} not supported for parallelized expander proving system.");
         }
-    }
-}
-
-#[allow(static_mut_refs)]
-async fn serve<C, ECCConfig, S>(port_number: String)
-where
-    C: GKREngine + 'static,
-    ECCConfig: Config<FieldConfig = C::FieldConfig> + 'static,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-    S: ServerFns<C, ECCConfig> + 'static,
-{
-    let global_mpi_config = unsafe {
-        UNIVERSE = MPIConfig::init();
-        GLOBAL_COMMUNICATOR = UNIVERSE.as_ref().map(|u| u.world());
-        MPIConfig::prover_new(UNIVERSE.as_ref(), GLOBAL_COMMUNICATOR.as_ref())
-    };
-
-    let state = ServerState {
-        lock: Arc::new(Mutex::new(())),
-        global_mpi_config: global_mpi_config.clone(),
-        local_mpi_config: None,
-        prover_setup: Arc::new(Mutex::new(ExpanderProverSetup::default())),
-        verifier_setup: Arc::new(Mutex::new(ExpanderVerifierSetup::default())),
-        computation_graph: Arc::new(Mutex::new(ComputationGraph::default())),
-        shutdown_tx: Arc::new(Mutex::new(None)),
-    };
-
-    if global_mpi_config.is_root() {
-        let (tx, rx) = oneshot::channel::<()>();
-        state.shutdown_tx.lock().await.replace(tx);
-
-        let app = Router::new()
-            .route("/", post(root_main::<C, ECCConfig, S>))
-            .route("/", get(|| async { "Expander Server is running" }))
-            .with_state(state);
-
-        let ip: IpAddr = SERVER_IP.parse().expect("Invalid SERVER_IP");
-        let port_val = port_number.parse::<u16>().unwrap_or_else(|e| {
-            eprintln!("Error: Invalid port number '{port_number}'. {e}.");
-            std::process::exit(1);
-        });
-        let addr = SocketAddr::new(ip, port_val);
-        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-        println!("Server running at http://{addr}");
-        axum::serve(listener, app.into_make_service())
-            .with_graceful_shutdown(async {
-                rx.await.ok();
-                println!("Shutting down server...");
-            })
-            .await
-            .unwrap();
-    } else {
-        worker_main::<C, ECCConfig, S>(global_mpi_config).await;
     }
 }

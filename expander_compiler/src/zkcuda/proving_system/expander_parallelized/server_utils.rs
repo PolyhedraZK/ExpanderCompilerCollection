@@ -7,6 +7,8 @@ use crate::zkcuda::proving_system::expander::structs::{
 use crate::zkcuda::proving_system::expander_parallelized::shared_memory_utils::SharedMemoryEngine;
 use crate::zkcuda::proving_system::expander_parallelized::structs::ServerFns;
 
+use axum::routing::{get, post};
+use axum::Router;
 use expander_utils::timer::Timer;
 use mpi::environment::Universe;
 use mpi::topology::SimpleCommunicator;
@@ -18,6 +20,7 @@ use axum::{extract::State, Json};
 use gkr_engine::{FieldEngine, GKREngine, MPIConfig, MPIEngine};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use std::sync::Mutex as SyncMutex;
 use tokio::sync::{oneshot, Mutex};
@@ -254,5 +257,58 @@ pub fn generate_local_mpi_config(
         }))
     } else {
         None
+    }
+}
+
+#[allow(static_mut_refs)]
+pub async fn serve<C, ECCConfig, S>(port_number: String)
+where
+    C: GKREngine + 'static,
+    ECCConfig: Config<FieldConfig = C::FieldConfig> + 'static,
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+    S: ServerFns<C, ECCConfig> + 'static,
+{
+    let global_mpi_config = unsafe {
+        UNIVERSE = MPIConfig::init();
+        GLOBAL_COMMUNICATOR = UNIVERSE.as_ref().map(|u| u.world());
+        MPIConfig::prover_new(UNIVERSE.as_ref(), GLOBAL_COMMUNICATOR.as_ref())
+    };
+
+    let state = ServerState {
+        lock: Arc::new(Mutex::new(())),
+        global_mpi_config: global_mpi_config.clone(),
+        local_mpi_config: None,
+        prover_setup: Arc::new(Mutex::new(ExpanderProverSetup::default())),
+        verifier_setup: Arc::new(Mutex::new(ExpanderVerifierSetup::default())),
+        computation_graph: Arc::new(Mutex::new(ComputationGraph::default())),
+        shutdown_tx: Arc::new(Mutex::new(None)),
+    };
+
+    if global_mpi_config.is_root() {
+        let (tx, rx) = oneshot::channel::<()>();
+        state.shutdown_tx.lock().await.replace(tx);
+
+        let app = Router::new()
+            .route("/", post(root_main::<C, ECCConfig, S>))
+            .route("/", get(|| async { "Expander Server is running" }))
+            .with_state(state);
+
+        let ip: IpAddr = SERVER_IP.parse().expect("Invalid SERVER_IP");
+        let port_val = port_number.parse::<u16>().unwrap_or_else(|e| {
+            eprintln!("Error: Invalid port number '{port_number}'. {e}.");
+            std::process::exit(1);
+        });
+        let addr = SocketAddr::new(ip, port_val);
+        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        println!("Server running at http://{addr}");
+        axum::serve(listener, app.into_make_service())
+            .with_graceful_shutdown(async {
+                rx.await.ok();
+                println!("Shutting down server...");
+            })
+            .await
+            .unwrap();
+    } else {
+        worker_main::<C, ECCConfig, S>(global_mpi_config).await;
     }
 }

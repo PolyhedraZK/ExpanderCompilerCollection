@@ -1,7 +1,15 @@
 use gkr_engine::{FieldEngine, GKREngine};
 
-use crate::{frontend::Config, zkcuda::proving_system::{expander::structs::{ExpanderProverSetup, ExpanderVerifierSetup}, expander_pcs_defered::structs::KernelWiseProofPCSDefered, ProvingSystem}};
-
+use crate::{
+    frontend::Config,
+    zkcuda::proving_system::{
+        expander::structs::{ExpanderProverSetup, ExpanderVerifierSetup},
+        expander_parallelized::client_utils::{
+            client_launch_server_and_setup, client_send_witness_and_prove,
+        },
+        CombinedProof, Expander, ProvingSystem,
+    },
+};
 
 pub struct ExpanderPCSDefered<C: GKREngine> {
     _config: std::marker::PhantomData<C>,
@@ -17,18 +25,23 @@ where
 
     type VerifierSetup = ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
 
-    type Proof = KernelWiseProofPCSDefered<C>;
+    type Proof = CombinedProof<ECCConfig, Expander<C>>;
 
-    fn setup(computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>) -> (Self::ProverSetup, Self::VerifierSetup) {
-        todo!()
+    fn setup(
+        computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
+    ) -> (Self::ProverSetup, Self::VerifierSetup) {
+        client_launch_server_and_setup::<C, ECCConfig>(
+            "../target/release/expander_server_pcs_defered",
+            computation_graph,
+        )
     }
 
     fn prove(
-        prover_setup: &Self::ProverSetup,
-        computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
+        _prover_setup: &Self::ProverSetup,
+        _computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
         device_memories: &[crate::zkcuda::context::DeviceMemory<ECCConfig>],
     ) -> Self::Proof {
-        todo!()
+        client_send_witness_and_prove(device_memories)
     }
 
     fn verify(

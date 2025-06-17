@@ -13,7 +13,8 @@ pub use dummy::*;
 pub mod expander;
 pub use expander::api_single_thread::*;
 
-// pub mod expander_pcs_defered;
-
 pub mod expander_parallelized;
 pub use expander_parallelized::api_parallel::*;
+
+pub mod expander_pcs_defered;
+pub use expander_pcs_defered::api_pcs_defered::*;

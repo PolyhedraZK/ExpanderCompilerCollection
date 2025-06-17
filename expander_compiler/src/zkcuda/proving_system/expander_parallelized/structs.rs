@@ -11,7 +11,7 @@ use crate::{
                 structs::{ExpanderProverSetup, ExpanderVerifierSetup},
             },
             expander_parallelized::prove_impl::mpi_prove_impl,
-            CombinedProof, Expander,
+            CombinedProof, Expander, ParallelizedExpander,
         },
     },
 };
@@ -38,11 +38,7 @@ where
     ) -> Option<CombinedProof<ECCConfig, Expander<C>>>;
 }
 
-pub struct BasicServerFns<C, ECCConfig> {
-    _config: std::marker::PhantomData<(C, ECCConfig)>,
-}
-
-impl<C, ECCConfig> ServerFns<C, ECCConfig> for BasicServerFns<C, ECCConfig>
+impl<C, ECCConfig> ServerFns<C, ECCConfig> for ParallelizedExpander<C>
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
