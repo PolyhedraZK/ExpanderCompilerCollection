@@ -1,5 +1,4 @@
-mod api_single_thread;
-pub use api_single_thread::*;
+pub mod api_single_thread;
 
 pub mod commit_impl;
 pub mod prove_impl;

@@ -13,8 +13,8 @@ use crate::{
     zkcuda::{
         kernel::Kernel,
         proving_system::{
-            prove_impl::partition_challenge_and_location_for_local_pcs,
-            structs::{ExpanderCommitment, ExpanderVerifierSetup},
+            expander::prove_impl::partition_challenge_and_location_for_local_pcs,
+            expander::structs::{ExpanderCommitment, ExpanderVerifierSetup},
             Commitment,
         },
     },

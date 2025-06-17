@@ -6,7 +6,7 @@ use crate::{
     frontend::Config,
     zkcuda::{
         proof::ComputationGraph,
-        proving_system::{
+        proving_system::expander::{
             structs::{ExpanderProverSetup, ExpanderVerifierSetup},
             utils::pcs_testing_setup_fixed_seed,
         },

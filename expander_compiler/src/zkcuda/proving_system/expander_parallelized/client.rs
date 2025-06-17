@@ -1,4 +1,4 @@
-use super::vanilla_utils::{RequestType, SERVER_IP, SERVER_PORT};
+use super::server_utils::{RequestType, SERVER_IP, SERVER_PORT};
 
 use reqwest::Client;
 

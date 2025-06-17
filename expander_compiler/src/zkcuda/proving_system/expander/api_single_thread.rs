@@ -7,13 +7,13 @@ use crate::utils::misc::next_power_of_two;
 use crate::zkcuda::context::DeviceMemory;
 use crate::zkcuda::kernel::Kernel;
 use crate::zkcuda::proof::ComputationGraph;
-use crate::zkcuda::proving_system::commit_impl::local_commit_impl;
-use crate::zkcuda::proving_system::prove_impl::{
-    get_local_vals, partition_gkr_claims_and_open_local_pcs, prepare_expander_circuit,
+use crate::zkcuda::proving_system::expander::commit_impl::local_commit_impl;
+use crate::zkcuda::proving_system::expander::prove_impl::{
+    get_local_vals, partition_gkr_claims_and_open_pcs_no_mpi, prepare_expander_circuit,
     prove_gkr_with_local_vals,
 };
-use crate::zkcuda::proving_system::setup_impl::local_setup_impl;
-use crate::zkcuda::proving_system::verify_impl::verify_individual_pcs_opening_and_aggregated_value;
+use crate::zkcuda::proving_system::expander::setup_impl::local_setup_impl;
+use crate::zkcuda::proving_system::expander::verify_impl::verify_individual_pcs_opening_and_aggregated_value;
 use crate::zkcuda::proving_system::{
     common::check_inputs,
     CombinedProof, KernelWiseProvingSystem, ProvingSystem,
@@ -93,7 +93,7 @@ where
                 &MPIConfig::prover_new(None, None),
             );
 
-            partition_gkr_claims_and_open_local_pcs::<C>(
+            partition_gkr_claims_and_open_pcs_no_mpi::<C>(
                 &challenge,
                 &local_vals,
                 prover_setup,

@@ -5,7 +5,7 @@ use polynomials::RefMultiLinearPoly;
 use super::structs::ExpanderProverSetup;
 use crate::{
     frontend::{Config, SIMDField},
-    zkcuda::proving_system::structs::{ExpanderCommitment, ExpanderCommitmentState},
+    zkcuda::proving_system::expander::structs::{ExpanderCommitment, ExpanderCommitmentState},
 };
 
 pub fn local_commit_impl<C, ECCConfig>(

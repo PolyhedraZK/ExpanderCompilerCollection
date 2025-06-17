@@ -8,7 +8,7 @@ use shared_memory::{Shmem, ShmemConf};
 
 use crate::circuit::config::Config;
 
-use crate::zkcuda::proving_system::expander_gkr::{
+use crate::zkcuda::proving_system::expander::structs::{
     ExpanderProverSetup, ExpanderVerifierSetup,
 };
 
