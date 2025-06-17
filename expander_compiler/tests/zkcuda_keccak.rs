@@ -2,7 +2,6 @@ use expander_compiler::field::FieldArith;
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::proving_system::Expander;
 use expander_compiler::zkcuda::proving_system::ParallelizedExpander;
-// use expander_compiler::zkcuda::proving_system::ParallelizedExpander;
 use expander_compiler::zkcuda::proving_system::ProvingSystem;
 use expander_compiler::zkcuda::{context::*, kernel::*};
 use rand::{Rng, SeedableRng};

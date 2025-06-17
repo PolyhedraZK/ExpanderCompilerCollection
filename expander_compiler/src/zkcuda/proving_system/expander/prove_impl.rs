@@ -62,7 +62,7 @@ pub fn get_local_vals<'vals_life, F: Field>(
                 vals.as_ref()
             } else {
                 let local_val_len = vals.as_ref().len() / parallel_num;
-                &vals.as_ref()[local_val_len * parallel_index..local_val_len * (parallel_num + 1)]
+                &vals.as_ref()[local_val_len * parallel_index..local_val_len * (parallel_index + 1)]
             }
         })
         .collect::<Vec<_>>()
@@ -214,7 +214,7 @@ pub fn pcs_local_open_impl<C: GKREngine>(
 }
 
 #[inline(always)]
-pub fn partition_single_gkr_claim_and_open_pcs_no_mpi<C: GKREngine>(
+pub fn partition_gkr_claims_and_open_pcs_no_mpi_impl<C: GKREngine>(
     gkr_claim: &ExpanderSingleVarChallenge<C::FieldConfig>,
     global_vals: &[impl AsRef<[<C::FieldConfig as FieldEngine>::SimdCircuitField]>],
     p_keys: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
@@ -263,7 +263,7 @@ pub fn partition_gkr_claims_and_open_pcs_no_mpi<C: GKREngine>(
     };
 
     challenges.into_iter().for_each(|challenge| {
-        partition_single_gkr_claim_and_open_pcs_no_mpi::<C>(
+        partition_gkr_claims_and_open_pcs_no_mpi_impl::<C>(
             &challenge,
             global_vals,
             p_keys,
