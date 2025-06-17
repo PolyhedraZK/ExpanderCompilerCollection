@@ -1,5 +1,5 @@
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
-use std::io::{Cursor, Read};
+use std::io::Cursor;
 
 use crate::circuit::config::Config;
 use crate::frontend::SIMDField;
