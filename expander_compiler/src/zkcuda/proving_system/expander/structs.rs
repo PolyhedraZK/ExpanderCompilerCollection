@@ -40,11 +40,7 @@ impl<
 /// For Raw, KZG, and Hyrax, this is not needed, so the scratchpad can be empty.
 #[allow(clippy::type_complexity)]
 #[derive(ExpSerde)]
-pub struct ExpanderCommitmentState<
-    PCSField: Field,
-    F: FieldEngine,
-    PCS: ExpanderPCS<F, PCSField>,
-> {
+pub struct ExpanderCommitmentState<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> {
     pub scratch: PCS::ScratchPad,
 }
 
@@ -86,13 +82,11 @@ impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
     }
 }
 
-
 /// The verifier setup contains the verification keys for the verifier, which are used to verify the proofs.
 /// The keys are indexed by the length of values committed to, allowing for different setups based on the length of the values.
 #[allow(clippy::type_complexity)]
 #[derive(ExpSerde)]
-pub struct ExpanderVerifierSetup<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>>
-{
+pub struct ExpanderVerifierSetup<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> {
     pub v_keys: HashMap<usize, <PCS::SRS as StructuredReferenceString>::VKey>,
 }
 
@@ -121,4 +115,3 @@ impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
 pub struct ExpanderProof {
     pub data: Vec<BytesProof>,
 }
-

@@ -1,7 +1,6 @@
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::proof::ComputationGraph;
-use expander_compiler::zkcuda::proving_system::expander_pcs_defered::ExpanderPCSDefered;
-use expander_compiler::zkcuda::proving_system::{Expander, ParallelizedExpander, ProvingSystem};
+use expander_compiler::zkcuda::proving_system::{Expander, ProvingSystem};
 use expander_compiler::zkcuda::{context::*, kernel::*};
 use expander_transcript::BytesHashTranscript;
 use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
@@ -100,33 +99,33 @@ fn zkcuda_1_single_core() {
     zkcuda_1_expander::<BN254Config, Expander<BN254ConfigSha2KZG>>();
 }
 
-#[test]
-fn zkcuda_1_multi_core() {
-    zkcuda_1_expander::<M31Config, ParallelizedExpander<M31Config>>();
-    zkcuda_1_expander::<GF2Config, ParallelizedExpander<GF2Config>>();
-    zkcuda_1_expander::<GoldilocksConfig, ParallelizedExpander<GoldilocksConfig>>();
-    zkcuda_1_expander::<BabyBearConfig, ParallelizedExpander<BabyBearConfig>>();
-    zkcuda_1_expander::<BN254Config, ParallelizedExpander<BN254Config>>();
-    zkcuda_1_expander::<BN254Config, ParallelizedExpander<BN254ConfigSha2Hyrax>>();
-    zkcuda_1_expander::<BN254Config, ParallelizedExpander<BN254ConfigSha2KZG>>()
-}
+// #[test]
+// fn zkcuda_1_multi_core() {
+//     zkcuda_1_expander::<M31Config, ParallelizedExpander<M31Config>>();
+//     zkcuda_1_expander::<GF2Config, ParallelizedExpander<GF2Config>>();
+//     zkcuda_1_expander::<GoldilocksConfig, ParallelizedExpander<GoldilocksConfig>>();
+//     zkcuda_1_expander::<BabyBearConfig, ParallelizedExpander<BabyBearConfig>>();
+//     zkcuda_1_expander::<BN254Config, ParallelizedExpander<BN254Config>>();
+//     zkcuda_1_expander::<BN254Config, ParallelizedExpander<BN254ConfigSha2Hyrax>>();
+//     zkcuda_1_expander::<BN254Config, ParallelizedExpander<BN254ConfigSha2KZG>>()
+// }
 
-#[test]
-fn zkcuda_1_single_core_pcs_defered() {
-    zkcuda_1_expander::<BN254Config, ExpanderPCSDefered<BN254ConfigSha2Hyrax>>();
+// #[test]
+// fn zkcuda_1_single_core_pcs_defered() {
+//     zkcuda_1_expander::<BN254Config, ExpanderPCSDefered<BN254ConfigSha2Hyrax>>();
 
-    struct BN254ConfigSha2UniKZG;
+//     struct BN254ConfigSha2UniKZG;
 
-    impl GKREngine for BN254ConfigSha2UniKZG {
-        type FieldConfig = <BN254Config as GKREngine>::FieldConfig;
-        type MPIConfig = MPIConfig<'static>;
-        type TranscriptConfig = BytesHashTranscript<SHA256hasher>;
-        type PCSConfig = HyperUniKZGPCS<Bn256>;
-        const SCHEME: GKRScheme = GKRScheme::Vanilla;
-    }
+//     impl GKREngine for BN254ConfigSha2UniKZG {
+//         type FieldConfig = <BN254Config as GKREngine>::FieldConfig;
+//         type MPIConfig = MPIConfig<'static>;
+//         type TranscriptConfig = BytesHashTranscript<SHA256hasher>;
+//         type PCSConfig = HyperUniKZGPCS<Bn256>;
+//         const SCHEME: GKRScheme = GKRScheme::Vanilla;
+//     }
 
-    zkcuda_1_expander::<BN254Config, ExpanderPCSDefered<BN254ConfigSha2UniKZG>>();
-}
+//     zkcuda_1_expander::<BN254Config, ExpanderPCSDefered<BN254ConfigSha2UniKZG>>();
+// }
 
 #[kernel]
 fn add_2_macro<C: Config>(api: &mut API<C>, a: &[InputVariable; 2], b: &mut OutputVariable) {

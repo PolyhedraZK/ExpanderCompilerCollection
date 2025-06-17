@@ -2,7 +2,6 @@ use expander_circuit::Circuit as ExpanderCircuit;
 use gkr_engine::{ExpanderPCS, FieldEngine, MPIConfig, StructuredReferenceString, Transcript};
 use poly_commit::expander_pcs_init_testing_only;
 
-
 #[allow(clippy::type_complexity)]
 pub fn pcs_testing_setup_fixed_seed<
     'a,
