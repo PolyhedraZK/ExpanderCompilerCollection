@@ -1,3 +1,5 @@
+//! This module provides the main API for defining and compiling circuits.
+
 use builder::RootBuilder;
 
 use crate::circuit::layered::{CrossLayerInputType, NormalInputType};
@@ -25,6 +27,7 @@ pub use macros::memorized;
 pub use witness::WitnessSolver;
 
 pub mod internal {
+    //! This module provides internal utilities for circuit definition and compilation.
     pub use super::circuit::{
         declare_circuit_default, declare_circuit_dump_into, declare_circuit_field_type,
         declare_circuit_load_from, declare_circuit_num_vars,
@@ -34,7 +37,7 @@ pub mod internal {
 }
 
 pub mod extra {
-
+    //! This module provides additional utilities for circuit definition and compilation.
     pub use super::api::UnconstrainedAPI;
     pub use super::debug::DebugBuilder;
     pub use super::sub_circuit::{
@@ -45,6 +48,7 @@ pub mod extra {
 
     use super::{internal, CircuitField, Config, Define, Variable};
 
+    /// This function evaluates a circuit struct with the given assignment and hint caller, returning the outputs.
     pub fn debug_eval<
         C: Config,
         Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone,
@@ -76,16 +80,19 @@ pub mod extra {
 #[cfg(test)]
 mod tests;
 
+/// This struct represents the result of compiling a circuit into a layered circuit.
 pub struct CompileResult<C: Config> {
     pub witness_solver: WitnessSolver<C>,
     pub layered_circuit: layered::Circuit<C, NormalInputType>,
 }
 
+/// This struct represents the result of compiling a circuit into a layered circuit with cross-layer input type.
 pub struct CompileResultCrossLayer<C: Config> {
     pub witness_solver: WitnessSolver<C>,
     pub layered_circuit: layered::Circuit<C, CrossLayerInputType>,
 }
 
+/// Builds a source-IR root circuit from a given circuit definition.
 fn build<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone>(
     circuit: &Cir,
 ) -> ir::source::RootCircuit<C> {
@@ -100,6 +107,7 @@ fn build<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + 
     root_builder.build()
 }
 
+/// Compiles a circuit into a layered circuit with the given options.
 pub fn compile<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone>(
     circuit: &Cir,
     options: CompileOptions,
@@ -112,6 +120,7 @@ pub fn compile<C: Config, Cir: internal::DumpLoadTwoVariables<Variable> + Define
     })
 }
 
+/// Compiles a circuit into a layered circuit with cross-layer input type and the given options.
 pub fn compile_cross_layer<
     C: Config,
     Cir: internal::DumpLoadTwoVariables<Variable> + Define<C> + Clone,

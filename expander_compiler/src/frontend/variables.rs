@@ -1,9 +1,17 @@
+//! This module provides traits and implementations for dumping and loading variables in circuits.
+
 use super::builder::Variable;
 use crate::field::Field;
 
+/// This trait defines methods for dumping and loading variables in a circuit.
+///
+/// This trait should be automatically implemented for circuit structs.
 pub trait DumpLoadVariables<T: Sized + Clone> {
+    /// Dumps the variable into a vector of variables.
     fn dump_into(&self, vars: &mut Vec<T>);
+    /// Loads the variable from a slice of variables.
     fn load_from(&mut self, vars: &mut &[T]);
+    /// Returns the number of variables this type represents.
     fn num_vars(&self) -> usize;
 }
 

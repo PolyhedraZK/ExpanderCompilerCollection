@@ -1,3 +1,5 @@
+//! This crate provides macros for the Expander Compiler, including `memorized` and `kernel` attributes, and `call_kernel` macro.
+
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{
@@ -79,6 +81,15 @@ fn analyze_type_structure(ty: &Type, allow_primitive: bool) -> Option<(ParamKind
     None
 }
 
+/// This macro defines a function that can be used to memorize the results of a computation.
+///
+/// It generates a new function with the same signature as the original function, but with an additional layer of caching.
+/// The generated function will hash the input parameters and check if the result is already cached.
+/// If the result is cached, it will return the cached result; otherwise, it will call the original function and cache the result.
+///
+/// The function signature must have at least one argument, which is the API argument.
+///
+/// The name of the generated function will be `memorized_<original_function_name>`.
 #[proc_macro_attribute]
 pub fn memorized(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as ItemFn);
@@ -490,6 +501,12 @@ fn generate_flatten_code(
     quote! { #loop_code }
 }
 
+/// This macro defines a kernel function that can be used in the Expander Compiler.
+///
+/// It generates a new function to compile the kernel, which will be used to create a `Kernel` object.
+/// The kernel function must have at least one argument, which is the API argument.
+///
+/// The name of the generated function will be `compile_<original_function_name>`.
 #[proc_macro_attribute]
 pub fn kernel(_attr: TokenStream, item: TokenStream) -> TokenStream {
     // eprintln!("Input tokens: {:#?}", item);
@@ -650,6 +667,9 @@ impl Parse for KernelCall {
     }
 }
 
+/// This macro generates code to call a kernel function with the provided context and arguments.
+///
+/// It collects all argument names, handles mutable arguments, and generates the necessary code to call the kernel.
 #[proc_macro]
 pub fn call_kernel(input: TokenStream) -> TokenStream {
     let KernelCall {
@@ -658,10 +678,8 @@ pub fn call_kernel(input: TokenStream) -> TokenStream {
         args,
     } = parse_macro_input!(input as KernelCall);
 
-    // 收集所有参数名
     let arg_names: Vec<_> = args.iter().map(|arg| &arg.name).collect();
 
-    // 分别收集可变参数的名称和索引
     let mut_vars: Vec<_> = args
         .iter()
         .enumerate()
@@ -674,7 +692,6 @@ pub fn call_kernel(input: TokenStream) -> TokenStream {
         quote! { #var_name = io[#idx].clone(); }
     });
 
-    // 生成代码
     let expanded = quote! {
         let mut io = [#(#arg_names),*];
         #ctx.call_kernel(&#kernel_name, &mut io);

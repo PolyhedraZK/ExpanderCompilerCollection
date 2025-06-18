@@ -1,3 +1,5 @@
+//! This module provides the `WitnessSolver` struct and its methods for solving circuit witness assignments.
+
 pub use crate::circuit::ir::hint_normalized::witness_solver::WitnessSolver;
 use crate::{
     circuit::layered::witness::Witness,
@@ -7,6 +9,7 @@ use crate::{
 use super::{internal, CircuitField, Config, Error};
 
 impl<C: Config> WitnessSolver<C> {
+    /// Solves the witness for a given set of raw inputs.
     pub fn solve_witness<Cir: internal::DumpLoadTwoVariables<CircuitField<C>>>(
         &self,
         assignment: &Cir,
@@ -14,6 +17,7 @@ impl<C: Config> WitnessSolver<C> {
         self.solve_witness_with_hints(assignment, &mut EmptyHintCaller)
     }
 
+    /// Solves the witness for a given set of raw inputs with hints.
     pub fn solve_witness_with_hints<Cir: internal::DumpLoadTwoVariables<CircuitField<C>>>(
         &self,
         assignment: &Cir,
@@ -25,6 +29,7 @@ impl<C: Config> WitnessSolver<C> {
         self.solve_witness_from_raw_inputs(vars, public_vars, hint_caller)
     }
 
+    /// Solves the witness for a set of assignments, where each assignment is a circuit struct.
     pub fn solve_witnesses<Cir: internal::DumpLoadTwoVariables<CircuitField<C>>>(
         &self,
         assignments: &[Cir],
@@ -32,6 +37,8 @@ impl<C: Config> WitnessSolver<C> {
         self.solve_witnesses_with_hints(assignments, &mut EmptyHintCaller)
     }
 
+    /// Solves the witness for a set of assignments, where each assignment is a circuit struct,
+    /// using a hint caller to provide additional hints.
     pub fn solve_witnesses_with_hints<Cir: internal::DumpLoadTwoVariables<CircuitField<C>>>(
         &self,
         assignments: &[Cir],

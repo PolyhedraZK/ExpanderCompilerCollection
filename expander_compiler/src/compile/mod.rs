@@ -1,3 +1,5 @@
+//! This module provides the main compilation steps for converting an source-IR root circuit into a layered circuit.
+
 use crate::{
     builder,
     circuit::{
@@ -15,10 +17,17 @@ mod random_circuit_tests;
 #[cfg(test)]
 mod tests;
 
+/// Options for the compilation process.
 #[derive(Debug, Clone)]
 pub struct CompileOptions {
+    /// Limit for the number of fanouts for multiplication gates.
     pub mul_fanout_limit: Option<usize>,
+    /// Whether to allow reordering of inputs during compilation.
     pub allow_input_reorder: bool,
+    /// Optimization level for the compilation process.
+    /// 1 - basic optimizations, 2 - additional optimizations, 3 - aggressive optimizations.
+    /// The default is 3, which is the most aggressive.
+    /// Currently, the only supported values are 1, 2, and 3.
     pub opt_level: usize,
 }
 
@@ -33,18 +42,22 @@ impl Default for CompileOptions {
 }
 
 impl CompileOptions {
+    /// Add a limit for the number of fanouts for multiplication gates.
     pub fn with_mul_fanout_limit(mut self, mul_fanout_limit: usize) -> Self {
         self.mul_fanout_limit = Some(mul_fanout_limit);
         self
     }
+    /// Disable the reordering of inputs during compilation.
     pub fn without_input_reorder(mut self) -> Self {
         self.allow_input_reorder = false;
         self
     }
+    /// Set the optimization level for the compilation process.
     pub fn with_opt_level(mut self, opt_level: usize) -> Self {
         self.opt_level = opt_level;
         self
     }
+    /// Validate the compilation options.
     pub fn validate(&self) -> Result<(), Error> {
         if self.mul_fanout_limit.is_some() && self.mul_fanout_limit.unwrap() <= 1 {
             return Err(Error::UserError("mul_fanout_limit must be > 1".to_string()));
@@ -93,6 +106,7 @@ fn print_stat(stat_name: &str, stat: usize, is_last: bool) {
     }
 }
 
+/// First step of the compilation process. Source-IR -> Hint-Normalized-IR
 pub fn compile_step_1<C: Config>(
     r_source: &ir::source::RootCircuit<C>,
     options: CompileOptions,
@@ -145,6 +159,7 @@ pub fn compile_step_1<C: Config>(
     Ok((r_hint_normalized_opt, src_im))
 }
 
+/// Second step of the compilation process. Hint-Less-IR -> Dest-IR
 pub fn compile_step_2<C: Config, I: InputType>(
     r_hint_less: ir::hint_less::RootCircuit<C>,
     options: CompileOptions,
@@ -255,6 +270,7 @@ pub fn compile_step_2<C: Config, I: InputType>(
     Ok((r_dest_opt, hl_im))
 }
 
+/// Third step of the compilation process. Layered Circuit optimizations.
 pub fn compile_step_3<C: Config, I: InputType>(
     mut lc: layered::Circuit<C, I>,
     options: CompileOptions,
@@ -285,6 +301,7 @@ pub fn compile_step_3<C: Config, I: InputType>(
     Ok(lc)
 }
 
+/// Fourth step of the compilation process. Final optimizations on the hint-exported circuit.
 pub fn compile_step_4<C: Config>(
     r_hint_exported: ir::hint_normalized::RootCircuit<C>,
     src_im: &mut InputMapping,
@@ -304,12 +321,14 @@ pub fn compile_step_4<C: Config>(
     Ok(r_hint_exported_opt)
 }
 
+/// Main function to compile an IR root circuit into a layered circuit.
 pub fn compile<C: Config, I: InputType>(
     r_source: &ir::source::RootCircuit<C>,
 ) -> Result<(ir::hint_normalized::RootCircuit<C>, layered::Circuit<C, I>), Error> {
     compile_with_options(r_source, CompileOptions::default())
 }
 
+/// Print statistics of the hint normalized IR.
 pub fn print_ir_stats<C: Config>(r_hint_normalized: &ir::hint_normalized::RootCircuit<C>) {
     let ho_stats = r_hint_normalized.get_stats();
     print_info("built hint normalized ir");
@@ -320,6 +339,7 @@ pub fn print_ir_stats<C: Config>(r_hint_normalized: &ir::hint_normalized::RootCi
     print_stat("numTerms", ho_stats.num_terms, true);
 }
 
+/// Print statistics of the layered circuit.
 pub fn print_layered_circuit_stats<C: Config, I: InputType>(lc: &layered::Circuit<C, I>) {
     let lc_stats = lc.get_stats();
     print_info("built layered circuit");
@@ -334,6 +354,7 @@ pub fn print_layered_circuit_stats<C: Config, I: InputType>(lc: &layered::Circui
     print_stat("totalCost", lc_stats.total_cost, true);
 }
 
+/// Compile an IR root circuit into a layered circuit with specified options.
 pub fn compile_with_options<C: Config, I: InputType>(
     r_source: &ir::source::RootCircuit<C>,
     options: CompileOptions,
