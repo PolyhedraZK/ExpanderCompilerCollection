@@ -159,7 +159,7 @@ fn rangeproof_zkcuda_test() {
     let a = a.reshape(&[1]);
     call_kernel!(ctx, kernel, a);
 
-    type P = ExpanderGKRProvingSystem<M31Config>;
+    type P = Expander<M31Config>;
     let computation_graph = ctx.to_computation_graph();
     let (prover_setup, verifier_setup) = <P as ProvingSystem<M31Config>>::setup(&computation_graph);
     let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
@@ -181,7 +181,7 @@ fn rangeproof_zkcuda_test_fail() {
     let a = a.reshape(&[1]);
     call_kernel!(ctx, kernel, a);
 
-    type P = ExpanderGKRProvingSystem<M31Config>;
+    type P = Expander<M31Config>;
     let computation_graph = ctx.to_computation_graph();
     let (prover_setup, verifier_setup) = <P as ProvingSystem<M31Config>>::setup(&computation_graph);
     let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);

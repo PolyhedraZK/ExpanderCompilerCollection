@@ -1,9 +1,11 @@
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::proof::ComputationGraph;
+use expander_compiler::zkcuda::proving_system::expander_pcs_defered::BN254ConfigSha2UniKZG;
 use expander_compiler::zkcuda::proving_system::{
-    ExpanderGKRProvingSystem, ParallelizedExpanderGKRProvingSystem, ProvingSystem,
+    Expander, ExpanderPCSDefered, ParallelizedExpander, ProvingSystem,
 };
 use expander_compiler::zkcuda::{context::*, kernel::*};
+
 use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
 use gkr_engine::FieldEngine;
 use serdes::ExpSerde;
@@ -88,24 +90,27 @@ fn zkcuda_1_expander<C: Config, P: ProvingSystem<C>>() {
 
 #[test]
 fn zkcuda_1_single_core() {
-    zkcuda_1_expander::<GF2Config, ExpanderGKRProvingSystem<GF2Config>>();
-    zkcuda_1_expander::<M31Config, ExpanderGKRProvingSystem<M31Config>>();
-    zkcuda_1_expander::<GoldilocksConfig, ExpanderGKRProvingSystem<GoldilocksConfig>>();
-    zkcuda_1_expander::<BabyBearConfig, ExpanderGKRProvingSystem<BabyBearConfig>>();
-    zkcuda_1_expander::<BN254Config, ExpanderGKRProvingSystem<BN254Config>>();
-    zkcuda_1_expander::<BN254Config, ExpanderGKRProvingSystem<BN254ConfigSha2Hyrax>>();
-    zkcuda_1_expander::<BN254Config, ExpanderGKRProvingSystem<BN254ConfigSha2KZG>>();
+    zkcuda_1_expander::<GF2Config, Expander<GF2Config>>();
+    zkcuda_1_expander::<M31Config, Expander<M31Config>>();
+    zkcuda_1_expander::<GoldilocksConfig, Expander<GoldilocksConfig>>();
+    zkcuda_1_expander::<BabyBearConfig, Expander<BabyBearConfig>>();
+    zkcuda_1_expander::<BN254Config, Expander<BN254Config>>();
+    zkcuda_1_expander::<BN254Config, Expander<BN254ConfigSha2Hyrax>>();
+    zkcuda_1_expander::<BN254Config, Expander<BN254ConfigSha2KZG>>();
 }
 
 #[test]
 fn zkcuda_1_multi_core() {
-    zkcuda_1_expander::<M31Config, ParallelizedExpanderGKRProvingSystem<M31Config>>();
-    zkcuda_1_expander::<GF2Config, ParallelizedExpanderGKRProvingSystem<GF2Config>>();
-    zkcuda_1_expander::<GoldilocksConfig, ParallelizedExpanderGKRProvingSystem<GoldilocksConfig>>();
-    zkcuda_1_expander::<BabyBearConfig, ParallelizedExpanderGKRProvingSystem<BabyBearConfig>>();
-    zkcuda_1_expander::<BN254Config, ParallelizedExpanderGKRProvingSystem<BN254Config>>();
-    zkcuda_1_expander::<BN254Config, ParallelizedExpanderGKRProvingSystem<BN254ConfigSha2Hyrax>>();
-    zkcuda_1_expander::<BN254Config, ParallelizedExpanderGKRProvingSystem<BN254ConfigSha2KZG>>()
+    zkcuda_1_expander::<M31Config, ParallelizedExpander<M31Config>>();
+    zkcuda_1_expander::<GF2Config, ParallelizedExpander<GF2Config>>();
+    zkcuda_1_expander::<GoldilocksConfig, ParallelizedExpander<GoldilocksConfig>>();
+    zkcuda_1_expander::<BabyBearConfig, ParallelizedExpander<BabyBearConfig>>();
+    zkcuda_1_expander::<BN254Config, ParallelizedExpander<BN254Config>>();
+    zkcuda_1_expander::<BN254Config, ParallelizedExpander<BN254ConfigSha2Hyrax>>();
+    zkcuda_1_expander::<BN254Config, ParallelizedExpander<BN254ConfigSha2KZG>>();
+
+    zkcuda_1_expander::<BN254Config, ExpanderPCSDefered<BN254ConfigSha2Hyrax>>();
+    zkcuda_1_expander::<BN254Config, ExpanderPCSDefered<BN254ConfigSha2UniKZG>>();
 }
 
 #[kernel]
@@ -148,14 +153,10 @@ fn zkcuda_2() {
     assert_eq!(result, M31::from(32 * 33 / 2));
 
     let computation_graph = ctx.to_computation_graph();
-    let (prover_setup, verifier_setup) =
-        ExpanderGKRProvingSystem::<M31Config>::setup(&computation_graph);
-    let proof = ExpanderGKRProvingSystem::<M31Config>::prove(
-        &prover_setup,
-        &computation_graph,
-        &ctx.device_memories,
-    );
-    assert!(ExpanderGKRProvingSystem::<M31Config>::verify(
+    let (prover_setup, verifier_setup) = Expander::<M31Config>::setup(&computation_graph);
+    let proof =
+        Expander::<M31Config>::prove(&prover_setup, &computation_graph, &ctx.device_memories);
+    assert!(Expander::<M31Config>::verify(
         &verifier_setup,
         &computation_graph,
         &proof
@@ -165,7 +166,7 @@ fn zkcuda_2() {
 #[test]
 fn zkcuda_2_simd() {
     use arith::SimdField;
-    type P = ExpanderGKRProvingSystem<M31Config>;
+    type P = Expander<M31Config>;
 
     let kernel_add_2_tmp: Kernel<M31Config> = compile_add_2_macro().unwrap();
     let kernel_add_16: Kernel<M31Config> = compile_add_16_macro().unwrap();
@@ -253,7 +254,7 @@ fn zkcuda_2_simd_autopack() {
         assert_eq!(result[k], M31::from((32 * 33 / 2 + 32 * k) as u32));
     }
 
-    type P = ExpanderGKRProvingSystem<M31Config>;
+    type P = Expander<M31Config>;
     let computation_graph = ctx.to_computation_graph();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
@@ -309,7 +310,7 @@ fn zkcuda_to_binary() {
         ]
     );
 
-    type P = ExpanderGKRProvingSystem<M31Config>;
+    type P = Expander<M31Config>;
     let computation_graph = ctx.to_computation_graph();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
@@ -330,7 +331,7 @@ fn zkcuda_assertion() {
     let b = ctx.copy_to_device(&M31::from(10u32), false).reshape(&[1]);
     call_kernel!(ctx, kernel_tmp, a, b);
 
-    type P = ExpanderGKRProvingSystem<M31Config>;
+    type P = Expander<M31Config>;
     let computation_graph = ctx.to_computation_graph();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
@@ -347,7 +348,7 @@ fn zkcuda_assertion_fail() {
     let b = ctx.copy_to_device(&M31::from(9u32), false).reshape(&[1]);
     call_kernel!(ctx, kernel_tmp, a, b);
 
-    type P = ExpanderGKRProvingSystem<M31Config>;
+    type P = Expander<M31Config>;
     let computation_graph = ctx.to_computation_graph();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);

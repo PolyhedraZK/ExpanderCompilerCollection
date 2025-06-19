@@ -31,7 +31,7 @@ pub struct DummyProof {
 
 // TODO
 /*#[deprecated(
-    note = "DummyProvingSystem is a dummy implementation for testing purposes. Please use ExpanderGKRProvingSystem."
+    note = "DummyProvingSystem is a dummy implementation for testing purposes. Please use Expander."
 )]*/
 pub struct DummyProvingSystem<C: Config> {
     _config: std::marker::PhantomData<C>,
@@ -43,7 +43,7 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
     type VerifierSetup = ();
     type Proof = DummyProof;
     type Commitment = DummyCommitment<C>;
-    type CommitmentExtraInfo = ();
+    type CommitmentState = ();
 
     fn setup(
         computation_graph: &crate::zkcuda::proof::ComputationGraph<C>,
@@ -60,7 +60,7 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
     fn commit(
         _prover_setup: &Self::ProverSetup,
         vals: &[SIMDField<C>],
-    ) -> (Self::Commitment, Self::CommitmentExtraInfo) {
+    ) -> (Self::Commitment, Self::CommitmentState) {
         assert!(vals.len() & (vals.len() - 1) == 0);
         (
             DummyCommitment {
@@ -74,7 +74,7 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
         _prover_setup: &Self::ProverSetup,
         kernel: &Kernel<C>,
         _commitments: &[&Self::Commitment],
-        _commitments_extra_info: &[&Self::CommitmentExtraInfo],
+        _commitments_state: &[&Self::CommitmentState],
         commitments_values: &[&[SIMDField<C>]],
         parallel_count: usize,
         is_broadcast: &[bool],
@@ -151,7 +151,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
         computation_graph: &ComputationGraph<C>,
         device_memories: &[DeviceMemory<C>],
     ) -> Self::Proof {
-        let (commitments, extra_infos) = device_memories
+        let (commitments, states) = device_memories
             .iter()
             .map(|device_memory| {
                 <Self as KernelWiseProvingSystem<C>>::commit(
@@ -165,11 +165,11 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
             .proof_templates
             .iter()
             .map(|template| {
-                let (mut local_commitments, mut local_extra_info, mut local_vals) =
+                let (mut local_commitments, mut local_state, mut local_vals) =
                     (vec![], vec![], vec![]);
                 for idx in &template.commitment_indices {
                     local_commitments.push(&commitments[*idx]);
-                    local_extra_info.push(&extra_infos[*idx]);
+                    local_state.push(&states[*idx]);
                     local_vals.push(&device_memories[*idx].values[..]);
                 }
 
@@ -177,7 +177,7 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
                     prover_setup,
                     &computation_graph.kernels[template.kernel_id],
                     &local_commitments,
-                    &local_extra_info,
+                    &local_state,
                     &local_vals,
                     next_power_of_two(template.parallel_count),
                     &template.is_broadcast,
