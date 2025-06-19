@@ -1,3 +1,6 @@
+//! This module contains the context for the zkCUDA frontend.
+//! It provides functionality to manage device memory, compile kernels, and execute computations.
+
 use arith::SimdField;
 use serdes::ExpSerde;
 
@@ -24,11 +27,13 @@ use super::{
 
 pub use macros::call_kernel;
 
+/// Device memory is similar to that of CUDA
 struct DeviceMemory<C: Config> {
     values: Vec<SIMDField<C>>,
     required_shape_products: Vec<usize>,
 }
 
+/// DeviceMemoryHandleRaw is a handle to the device memory, which is similar to a CUDA memory pointer.
 #[derive(Clone, Debug, ExpSerde)]
 pub struct DeviceMemoryHandleRaw {
     id: usize,
@@ -37,6 +42,10 @@ pub struct DeviceMemoryHandleRaw {
 
 pub type DeviceMemoryHandle = Option<DeviceMemoryHandleRaw>;
 
+/// KernelCall represents a call to a kernel, including the kernel ID, number of parallel executions,
+/// input and output device memory handles, and whether each input/output is broadcasted.
+///
+/// `kernel_id` refers to the index in `kernel_primitives` pool.
 #[derive(Clone, ExpSerde)]
 pub struct KernelCall {
     kernel_id: usize,
@@ -46,6 +55,10 @@ pub struct KernelCall {
     is_broadcast: Vec<bool>,
 }
 
+/// ProofTemplate represents a template for a proof, including the kernel ID, indices of commitments,
+/// bit orders of commitments, the number of parallel executions, and whether each commitment is broadcasted.
+///
+/// `kernel_id` refers to the index in `kernels` pool.
 #[derive(PartialEq, Eq, Clone, Debug, ExpSerde)]
 pub struct ProofTemplate {
     kernel_id: usize,
@@ -56,23 +69,31 @@ pub struct ProofTemplate {
 }
 
 impl ProofTemplate {
+    /// Returns the kernel ID associated with this proof template.
     pub fn kernel_id(&self) -> usize {
         self.kernel_id
     }
+    /// Returns the indices of commitments in this proof template.
     pub fn commitment_indices(&self) -> &[usize] {
         &self.commitment_indices
     }
+    /// Returns the bit orders of commitments in this proof template.
     pub fn commitment_bit_orders(&self) -> &[BitOrder] {
         &self.commitment_bit_orders
     }
+    /// Returns the number of parallel executions for this proof template.
     pub fn parallel_count(&self) -> usize {
         self.parallel_count
     }
+    /// Returns whether each commitment in this proof template is broadcasted.
     pub fn is_broadcast(&self) -> &[bool] {
         &self.is_broadcast
     }
 }
 
+/// ComputationGraph represents a graph of computations, including kernels, commitments lengths,
+/// and proof templates.
+/// It is used for proving and verification in zkCUDA.
 #[derive(Default, Clone, Debug, ExpSerde)]
 pub struct ComputationGraph<C: Config> {
     kernels: Vec<Kernel<C>>,
@@ -81,17 +102,25 @@ pub struct ComputationGraph<C: Config> {
 }
 
 impl<C: Config> ComputationGraph<C> {
+    /// Returns the kernels in this computation graph.
     pub fn kernels(&self) -> &[Kernel<C>] {
         &self.kernels
     }
+    /// Returns the lengths of commitments in this computation graph.
     pub fn commitments_lens(&self) -> &[usize] {
         &self.commitments_lens
     }
+    /// Returns the proof templates in this computation graph.
     pub fn proof_templates(&self) -> &[ProofTemplate] {
         &self.proof_templates
     }
 }
 
+/// ContextState represents the current state of the context.
+/// It can be one of the following:
+/// - ComputationGraphNotDone: The computation graph is not yet compiled or loaded.
+/// - ComputationGraphDone: The computation graph has been compiled or loaded.
+/// - WitnessDone: The witness has been solved.
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum ContextState {
     ComputationGraphNotDone,
@@ -99,6 +128,10 @@ pub enum ContextState {
     WitnessDone,
 }
 
+/// Context represents the main context for zkCUDA computations.
+/// It manages device memory, kernel primitives, kernel calls, proof templates, and the current state
+/// of the context. It also provides methods for copying data to and from device memory, calling
+/// kernels, compiling computation graphs, and solving witnesses.
 pub struct Context<C: Config, H: HintCaller<CircuitField<C>> = EmptyHintCaller> {
     kernel_primitives: Pool<KernelPrimitive<C>>,
     kernels: Pool<Kernel<C>>,
@@ -116,6 +149,7 @@ impl<C: Config> Default for Context<C> {
     }
 }
 
+/// Ensures that the DeviceMemoryHandle is not empty and returns the raw handle.
 fn ensure_handle(handle: DeviceMemoryHandle) -> DeviceMemoryHandleRaw {
     match handle {
         Some(handle) => handle,
@@ -123,6 +157,7 @@ fn ensure_handle(handle: DeviceMemoryHandle) -> DeviceMemoryHandleRaw {
     }
 }
 
+/// Converts a vector of CircuitField to a vector of SIMDField by repeating each element
 fn pack_vec<C: Config>(v: &[CircuitField<C>]) -> Vec<SIMDField<C>> {
     v.iter()
         .map(|x| {
@@ -135,11 +170,13 @@ fn pack_vec<C: Config>(v: &[CircuitField<C>]) -> Vec<SIMDField<C>> {
         .collect::<Vec<_>>()
 }
 
+/// Unpacks a vector of SIMDField into a vector of CircuitField by taking the first element of each SIMDField
 fn unpack_vec<C: Config>(v: &[SIMDField<C>]) -> Vec<CircuitField<C>> {
     v.iter().map(|x| x.unpack()[0]).collect()
 }
 
-// returns Option<is_broadcast>
+/// Checks if the kernel shape is compatible with the input/output shape.
+/// Returns Option<is_broadcast>
 fn check_shape_compat(
     kernel_shape: &Shape,
     io_shape: &Shape,
@@ -186,6 +223,7 @@ impl Transpose for DeviceMemoryHandle {
     }
 }
 
+/// Converts a vector of SIMDField to a DeviceMemoryHandle by creating a new DeviceMemory
 fn make_device_mem<C: Config>(
     device_memories: &mut Vec<DeviceMemory<C>>,
     values: Vec<SIMDField<C>>,
@@ -204,6 +242,7 @@ fn make_device_mem<C: Config>(
 }
 
 impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
+    /// Creates a new Context with the given hint caller.
     pub fn new(hint_caller: H) -> Self {
         Context {
             kernel_primitives: Pool::new(),
@@ -216,6 +255,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         }
     }
 
+    /// Copies data from host memory to device memory.
     pub fn copy_to_device<T: VecShaped<CircuitField<C>>>(
         &mut self,
         host_memory: &T,
@@ -225,6 +265,8 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         make_device_mem(&mut self.device_memories, simd_flat, shape)
     }
 
+    /// Copies data from host memory to device memory and packs it into SIMD format.
+    /// The first dimension of the shape is expected to be SIMDField::PACK_SIZE.
     pub fn copy_to_device_and_pack_simd<T: VecShaped<CircuitField<C>>>(
         &mut self,
         host_memory: &T,
@@ -233,6 +275,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         make_device_mem(&mut self.device_memories, flat, shape)
     }
 
+    /// Copies SIMD data from host memory to device memory.
     pub fn copy_simd_to_device<T: VecShaped<SIMDField<C>>>(
         &mut self,
         host_memory: &T,
@@ -241,6 +284,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         make_device_mem(&mut self.device_memories, flat, shape)
     }
 
+    /// Copies data from device memory to host memory.
     pub fn copy_to_host<T: VecShaped<CircuitField<C>> + Default>(
         &self,
         device_memory_handle: DeviceMemoryHandle,
@@ -255,6 +299,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         )
     }
 
+    /// Copies SIMD data from device memory to host memory and unpacks it.
     pub fn copy_to_host_and_unpack_simd<T: VecShaped<CircuitField<C>> + Default>(
         &self,
         device_memory_handle: DeviceMemoryHandle,
@@ -269,6 +314,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         )
     }
 
+    /// Copies SIMD data from device memory to host memory without unpacking.
     pub fn copy_simd_to_host<T: VecShaped<SIMDField<C>> + Default>(
         &self,
         device_memory_handle: DeviceMemoryHandle,
@@ -301,6 +347,8 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         }
     }
 
+    /// Calls a kernel with the given number of parallel executions and input/output device memory handles.
+    /// This function is called by the `call_kernel!` macro.
     pub fn call_kernel(
         &mut self,
         kernel: &KernelPrimitive<C>,
@@ -464,6 +512,8 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         Ok(())
     }
 
+    /// Returns the current device memory shapes.
+    /// These shapes are probably not final, as they may change during the computation graph compilation.
     fn get_current_device_memory_shapes(&self) -> Vec<Shape> {
         self.device_memories
             .iter()
@@ -471,6 +521,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             .collect()
     }
 
+    /// Propagates the device memory shapes requirements and returns the final shapes.
     fn propagate_and_get_shapes(&mut self) -> Vec<Shape> {
         let mut dm_shapes = self.get_current_device_memory_shapes();
         loop {
@@ -543,6 +594,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         }
     }
 
+    /// Compiles or loads the computation graph.
     fn compile_or_load_computation_graph(
         &mut self,
         cg: Option<ComputationGraph<C>>,
@@ -701,16 +753,18 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         }
     }
 
+    /// Compiles the computation graph and returns it.
     pub fn compile_computation_graph(&mut self) -> Result<ComputationGraph<C>, Error> {
         Ok(self.compile_or_load_computation_graph(None)?.unwrap())
     }
 
+    /// Loads a computation graph.
     pub fn load_computation_graph(&mut self, cg: ComputationGraph<C>) -> Result<(), Error> {
         let _ = self.compile_or_load_computation_graph(Some(cg))?;
         Ok(())
     }
 
-    // actually, this function computes hints
+    /// This function computes hints.
     pub fn solve_witness(&mut self) -> Result<(), Error> {
         match self.state {
             ContextState::ComputationGraphNotDone => {
@@ -850,6 +904,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         Ok(())
     }
 
+    /// Exports the device memories as a vector of SIMDField.
     pub fn export_device_memories(&self) -> Vec<Vec<SIMDField<C>>> {
         assert_eq!(
             self.state,

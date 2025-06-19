@@ -1,7 +1,10 @@
+//! This module provides functionality for flattening and unflattening vectors with a specific shape.
+
 use arith::SimdField;
 
 use crate::field::FieldRaw;
 
+/// A trait for types that can be flattened and unflattened with a specific shape.
 pub trait VecShaped<T: Clone + Default> {
     fn flatten_shaped(&self, to: &mut Vec<T>) -> Vec<usize>;
     fn unflatten_shaped<'a>(&mut self, s: &'a [T], shape: &[usize]) -> &'a [T];
@@ -58,12 +61,14 @@ where
     }
 }
 
+/// Flattens a shaped vector into a flat vector and returns the shape.
 pub fn flatten_shaped<T: FieldRaw, V: VecShaped<T>>(v: &V) -> (Vec<T>, Vec<usize>) {
     let mut to = Vec::new();
     let shape = v.flatten_shaped(&mut to).into_iter().rev().collect();
     (to, shape)
 }
 
+/// Unflattens a flat vector into a shaped vector, checking the shape.
 pub fn unflatten_shaped<T: FieldRaw, V: VecShaped<T> + Default>(mut s: &[T], shape: &[usize]) -> V {
     let mut v = V::default();
     s = v.unflatten_shaped(s, shape);
@@ -75,6 +80,7 @@ pub fn unflatten_shaped<T: FieldRaw, V: VecShaped<T> + Default>(mut s: &[T], sha
 
 // Auto pack simd
 
+/// Flattens a shaped vector into a flat vector and returns the shape, packing the elements into SIMD vectors.
 pub fn flatten_shaped_pack_simd<F: FieldRaw, V: VecShaped<F>, SimdF: SimdField<Scalar = F>>(
     v: &V,
 ) -> (Vec<SimdF>, Vec<usize>) {
@@ -93,6 +99,7 @@ pub fn flatten_shaped_pack_simd<F: FieldRaw, V: VecShaped<F>, SimdF: SimdField<S
     (to_simd, shape[1..].to_vec())
 }
 
+/// Unflattens a flat vector into a shaped vector, checking the shape, unpacking the elements from SIMD vectors.
 pub fn unflatten_shaped_unpack_simd<
     F: FieldRaw,
     V: VecShaped<F> + Default,

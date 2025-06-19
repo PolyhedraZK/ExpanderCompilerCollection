@@ -397,19 +397,19 @@ impl<C: Config> Builder<C> {
     /// It does the following loop until only one expression remains:
     ///
     /// 1. Find the two smallest expressions in terms of the comparison defined by `cmp_expr_for_mul`.
-    /// It will have the smallest layer, then the smallest length, and finally the lexicographical order.
+    ///    It will have the smallest layer, then the smallest length, and finally the lexicographical order.
     ///
     /// 2. If one of the expressions is constant, multiply it with the other expression and continue.
     ///
     /// 3. If the multiplication can't be done directly (e.g., one expression is quadratic),
-    /// it will be compressed into a single variable.
+    ///    it will be compressed into a single variable.
     ///
     /// 4. If the multiplication can be done directly, but the cost of compressing is lower,
-    /// it will compress one of the expressions into a single variable.
+    ///    it will compress one of the expressions into a single variable.
     ///
     /// 5. Now the two expressions are both linear, and the cost is acceptable,
-    /// so the multiplication is done by multiplying each term of the first expression with each term of the second expression.
-    /// The result is added to the heap for further processing.
+    ///    so the multiplication is done by multiplying each term of the first expression with each term of the second expression.
+    ///    The result is added to the heap for further processing.
     fn mul_vec(&mut self, vars: &[usize]) -> Expression<C> {
         use crate::utils::heap::{pop, push};
         assert!(vars.len() >= 2);
