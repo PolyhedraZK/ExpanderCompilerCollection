@@ -1,7 +1,8 @@
-// Handwritten binary min-heap with custom comparator
+//! Binary min-heap with custom comparator
 
 use std::cmp::Ordering;
 
+/// Push an element into the heap, maintaining the heap property.
 pub fn push<F: Fn(usize, usize) -> Ordering>(s: &mut Vec<usize>, x: usize, cmp: F) {
     s.push(x);
     let mut i = s.len() - 1;
@@ -16,6 +17,7 @@ pub fn push<F: Fn(usize, usize) -> Ordering>(s: &mut Vec<usize>, x: usize, cmp: 
     }
 }
 
+/// Pop the minimum element from the heap, maintaining the heap property.
 pub fn pop<F: Fn(usize, usize) -> Ordering>(s: &mut Vec<usize>, cmp: F) -> Option<usize> {
     if s.is_empty() {
         return None;

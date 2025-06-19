@@ -1,3 +1,5 @@
+//! This module contains the zkCUDA provers for the circuit compiler.
+
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 

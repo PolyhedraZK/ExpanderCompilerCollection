@@ -1,3 +1,5 @@
+//! This module provides a dummy implementation of a proving system for testing purposes in zkCUDA backends.
+
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serdes::ExpSerde;
 

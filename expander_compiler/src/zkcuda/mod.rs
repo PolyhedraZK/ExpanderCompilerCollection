@@ -1,3 +1,5 @@
+//! This module contains the zkCUDA frontend and prover for the circuit compiler.
+
 pub mod context;
 pub mod kernel;
 pub mod proving_system;

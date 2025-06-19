@@ -1,3 +1,7 @@
+//! This module defines the hint-normalized IR (based on the `common` IR) for the circuit.
+//! This is the second stage of the IR, where instructions are normalized to several basic types.
+//! This IR is also used as the witness solver.
+
 use std::collections::HashMap;
 
 use crate::field::FieldArith;
@@ -24,21 +28,28 @@ mod tests;
 pub mod serde;
 pub mod witness_solver;
 
+/// Instruction set for the hint-normalized IR.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Instruction<C: Config> {
+    /// Linear combination instruction.
     LinComb(expr::LinComb<C>),
+    /// Multiplication instruction with multiple inputs.
     Mul(Vec<usize>),
+    /// Hint instruction, similar to gnark hint.
     Hint {
         hint_id: usize,
         inputs: Vec<usize>,
         num_outputs: usize,
     },
+    /// Constant-like instruction, which can be a constant, public input, or random value.
     ConstantLike(Coef<C>),
+    /// Sub-circuit call instruction, which calls another circuit with specified inputs and outputs.
     SubCircuitCall {
         sub_circuit_id: usize,
         inputs: Vec<usize>,
         num_outputs: usize,
     },
+    /// Custom gate instruction, which represents a custom gate with a specific type and inputs.
     CustomGate {
         gate_type: usize,
         inputs: Vec<usize>,
@@ -443,6 +454,10 @@ impl<C: Config> Circuit<C> {
 }
 
 impl<C: Config> RootCircuit<C> {
+    /// This function takes a root circuit A as input, returns a tuple of two circuits (B, C).
+    /// B is a hint-less circuit with all hints removed, and C is a circuit with hints exported as outputs.
+    /// The composition `B(C(input))` is equivalent to `A(input)`.
+    /// B is used for later compilation, and C is used for witness solving.
     pub fn remove_and_export_hints(&self) -> (super::hint_less::RootCircuit<C>, Self) {
         let mut sub_hint_sizes = HashMap::new();
         let order = self.topo_order();
@@ -477,11 +492,16 @@ impl<C: Config> RootCircuit<C> {
         )
     }
 
+    /// This function adds back removed inputs to the root circuit.
+    /// In last stage of compilation, we add back removed inputs to the witness solver.
     pub fn add_back_removed_inputs(&mut self, im: &InputMapping) {
         let c0 = self.circuits.get(&0).unwrap().add_back_removed_inputs(im);
         self.circuits.insert(0, c0);
     }
 
+    /// Evaluates the circuit with given inputs and public inputs.
+    /// This function is marked as safe, since it's deterministic.
+    /// It panics if random coefficients are used in the circuit (they should not be used in witness solving).
     pub fn eval_safe(
         &self,
         inputs: Vec<CircuitField<C>>,
@@ -530,6 +550,7 @@ impl<C: Config> RootCircuit<C> {
         Ok(res)
     }
 
+    /// Similar to `eval_safe`, but uses SIMD field for inputs and outputs.
     pub fn eval_safe_simd<SF: arith::SimdField<Scalar = CircuitField<C>>>(
         &self,
         inputs: Vec<SF>,

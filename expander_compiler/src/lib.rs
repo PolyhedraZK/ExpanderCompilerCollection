@@ -1,3 +1,5 @@
+//! Main crate for the Expander Compiler
+
 #![feature(min_specialization)]
 #![allow(clippy::manual_div_ceil)]
 

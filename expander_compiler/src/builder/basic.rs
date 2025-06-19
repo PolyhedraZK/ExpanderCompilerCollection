@@ -1,3 +1,5 @@
+//! Basic builder.
+
 use std::collections::{BinaryHeap, HashMap};
 
 use crate::{
@@ -14,67 +16,93 @@ use crate::{
     utils::{error::Error, pool::Pool},
 };
 
-/*
-    Builder process:
-    Ir(in_vars) --> Builder(mid_vars) --> Ir(out_vars)
-    Each in_var corresponds to an out_var
-    Each mid_var corresponds to 1. an out_var, or 2. an internal variable of mid_vars
-    Each out_var corresponds to an expression of mid_vars
-    Also, each internal variable points to kx+b where x is an out_var
-
-    A "var" means mid_var by default
-*/
-
+/// The root builder is used to process the input root circuit, generating an output circuit.
+///
+/// Builder process:
+/// Ir(in_vars) --> Builder(mid_vars) --> Ir(out_vars)
+/// Each in_var corresponds to an out_var.
+/// Each mid_var corresponds to 1. an out_var, or 2. an internal variable of mid_vars.
+/// Each out_var corresponds to an expression of mid_vars.
+/// Also, each internal variable points to kx+b where x is an out_var.
+///
+/// A "var" means mid_var by default.
+///
+/// The root builder can process different input and output IR configurations,
+/// allowing for flexibility in how circuits are built and transformed.
 pub struct RootBuilder<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>> {
+    /// The root circuit being processed.
     pub rc: &'a ir::common::RootCircuit<IrcIn>,
+    /// Builders for each circuit in the root circuit.
     pub builders: HashMap<usize, Builder<'a, C, IrcIn, IrcOut>>,
+    /// Output circuits generated from the input circuits.
     pub out_circuits: HashMap<usize, ir::common::Circuit<IrcOut>>,
 }
 
+/// The builder for a specific circuit
 pub struct Builder<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>> {
+    /// The input circuit being processed.
     pub in_circuit: &'a ir::common::Circuit<IrcIn>,
+    /// The ID of the input circuit.
     pub in_circuit_id: usize,
 
-    // map for constraints
-    // if it's known to be true (e.g. in previous gates or in sub circuits), mark it
-    // if it's required to be true, assert it
+    /// Map for constraints.
+    ///
+    /// If it's known to be true (e.g. in previous gates or in sub circuits), mark it.
+    /// If it's required to be true, assert it.
     pub constraints: HashMap<
         <IrcOut::Constraint as Constraint<C>>::Type,
         HashMap<Expression<C>, ConstraintStatus>,
     >,
 
-    // out_var mapped to expression of mid_vars
+    /// Out_var mapped to expression of mid_vars
     pub out_var_exprs: Vec<Expression<C>>,
 
-    // pool of mid_vars
-    // for internal variables, the expression is actual expression
-    // for in_vars, the expression is a fake expression with only one term
+    /// Pool of mid_vars
+    ///
+    /// For internal variables, the expression is actual expression.
+    /// For in_vars, the expression is a fake expression with only one term.
     pub mid_vars: Pool<Expression<C>>,
-    // each internal variable points to kx+b where x is an out_var
+    /// Each internal variable points to kx+b where x is an out_var
     pub mid_to_out: Vec<Option<OutVarRef<C>>>,
-    // inverse of out_var_exprs
+    /// Inverse of out_var_exprs
     pub mid_expr_to_out: HashMap<Expression<C>, usize>,
 
-    // in_var to out_var
+    /// In_var to out_var
     pub in_to_out: Vec<usize>,
 
-    // output instructions
+    /// Output instructions
     pub out_insns: Vec<IrcOut::Instruction>,
 }
 
+/// Reference to an output variable in the circuit.
+/// This reference means that the variable is represented as kx + b,
+/// where x is the index of an output variable.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct OutVarRef<C: Config> {
+    /// The index of the output variable.
     pub x: usize,
+    /// The coefficient k in the expression kx + b.
     pub k: CircuitField<C>,
+    /// The constant term b in the expression kx + b.
     pub b: CircuitField<C>,
 }
 
+/// Status of a constraint in the circuit.
+///
+/// `Marked` means the constraint is known to be true, while `Asserted` means it is required to be true.
+///
+/// For example, in an binary AND operation, if we asserted that `a` and `b` are both binary,
+/// we can mark the result `c = a * b` as binary without asserting it again.
 #[derive(Debug, Clone)]
 pub enum ConstraintStatus {
     Marked,
     Asserted,
 }
 
+/// Metadata for a linear combination in the circuit.
+///
+/// This struct is used in the `lin_comb_inner` function to compute linear combinations of variables.
+/// For details, see the `lin_comb_inner` function documentation.
 pub struct LinMeta {
     pub l_id: usize,
     pub t_id: usize,
@@ -90,6 +118,8 @@ impl PartialEq for LinMeta {
 impl Eq for LinMeta {}
 
 impl Ord for LinMeta {
+    /// Compare two `LinMeta` instances.
+    /// Since `BinaryHeap` is a max-heap, we reverse the order to get a min-heap behavior.
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.vars.cmp(&other.vars).reverse()
     }
@@ -101,12 +131,17 @@ impl PartialOrd for LinMeta {
     }
 }
 
+/// Result of transforming an instruction from input IR to output IR.
 pub enum InsnTransformResult<C: Config, IrcOut: IrConfig<Config = C>> {
+    /// The transformed instruction in the output IR.
     Insn(IrcOut::Instruction),
+    /// A list of output variable IDs that correspond to the transformed instruction.
     Vars(Vec<usize>),
+    /// An error occurred during the transformation.
     Err(Error),
 }
 
+/// Trait for transforming and executing instructions.
 pub trait InsnTransformAndExecute<
     'a,
     C: Config,
@@ -114,16 +149,19 @@ pub trait InsnTransformAndExecute<
     IrcOut: IrConfig<Config = C>,
 >
 {
+    /// Transforms an input instruction to an output instruction.
     fn transform_in_to_out(
         &mut self,
         in_insn: &IrcIn::Instruction,
     ) -> InsnTransformResult<C, IrcOut>;
+    /// Executes an output instruction, potentially using a root builder for additional context.
     fn execute_out<'b>(
         &mut self,
         out_insn: &IrcOut::Instruction,
         root: Option<&'b RootBuilder<'a, C, IrcIn, IrcOut>>,
     ) where
         'a: 'b;
+    /// Transforms an input constraint to an output constraint.
     fn transform_in_con_to_out(
         &mut self,
         in_con: &IrcIn::Constraint,
@@ -133,6 +171,7 @@ pub trait InsnTransformAndExecute<
 impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
     Builder<'a, C, IrcIn, IrcOut>
 {
+    /// Creates a new builder for the given input circuit.
     pub fn new(in_circuit_id: usize, in_circuit: &'a ir::common::Circuit<IrcIn>) -> Self {
         let mut res: Builder<'a, C, IrcIn, IrcOut> = Builder {
             in_circuit,
@@ -150,10 +189,12 @@ impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
         res
     }
 
+    /// Returns the constant value of an output variable by its ID, if it is constant.
     pub fn constant_value(&self, out_var_id: usize) -> Option<CircuitField<C>> {
         self.out_var_exprs[out_var_id].constant_value()
     }
 
+    /// Creates a new variable in the mid_vars pool and returns its ID.
     fn new_var(&mut self) -> usize {
         let id = self.mid_vars.len();
         assert_eq!(
@@ -164,6 +205,7 @@ impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
         id
     }
 
+    /// Adds `n` new output variables to the builder.
     pub fn add_out_vars(&mut self, n: usize) {
         let start = self.mid_vars.len();
         for i in 0..n {
@@ -174,6 +216,7 @@ impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
         self.fix_mid_to_out(n);
     }
 
+    /// Adds a linear combination to the output variables.
     pub fn add_lin_comb(&mut self, lcs: &LinComb<C>) {
         let mut vars: Vec<&Expression<C>> = lcs
             .terms
@@ -199,6 +242,7 @@ impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
         self.fix_mid_to_out(1);
     }
 
+    /// Adds a multiplication of two output variables to the output variables.
     pub fn add_mul_vec(&mut self, mut vars: Vec<usize>) {
         assert!(vars.len() >= 2);
         vars.sort_by(|a, b| self.out_var_exprs[*a].cmp(&self.out_var_exprs[*b]));
@@ -214,11 +258,13 @@ impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
         self.fix_mid_to_out(1);
     }
 
+    /// Adds a constant to the output variables.
     pub fn add_const(&mut self, c: CircuitField<C>) {
         self.out_var_exprs.push(Expression::new_const(c));
         self.fix_mid_to_out(1);
     }
 
+    /// Adds an assertion to a constraint on an output variable.
     pub fn assert(
         &mut self,
         constraint_type: <IrcOut::Constraint as Constraint<C>>::Type,
@@ -232,6 +278,7 @@ impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
             .or_insert(ConstraintStatus::Asserted);
     }
 
+    /// Marks a constraint on an output variable as known to be true.
     pub fn mark(
         &mut self,
         constraint_type: <IrcOut::Constraint as Constraint<C>>::Type,
@@ -244,6 +291,7 @@ impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
             .insert(expr, ConstraintStatus::Marked);
     }
 
+    /// Adds input variables to the builder.
     fn add_input(&mut self) {
         let n = self.in_circuit.get_num_inputs_all();
         self.add_out_vars(n);
@@ -252,6 +300,7 @@ impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
         }
     }
 
+    /// Fixes the mapping from mid_vars to out_vars after adding new output variables.
     pub fn fix_mid_to_out(&mut self, n: usize) {
         for i in 1..=n {
             let id = self.out_var_exprs.len() - i;
@@ -289,6 +338,7 @@ impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
         }
     }
 
+    /// Prepare input variables and add output variables for a sub-circuit call.
     pub fn sub_circuit_call<'b>(
         &mut self,
         _sub_circuit_id: usize,
@@ -311,6 +361,7 @@ impl<'a, C: Config, IrcIn: IrConfig<Config = C>, IrcOut: IrConfig<Config = C>>
 where
     Builder<'a, C, IrcIn, IrcOut>: InsnTransformAndExecute<'a, C, IrcIn, IrcOut>,
 {
+    /// Executes an output instruction, potentially using a root builder for additional context.
     pub fn push_insn_with_root<'b>(
         &mut self,
         out_insn: IrcOut::Instruction,
@@ -328,9 +379,11 @@ where
             None
         }
     }
+    /// Pushes an output instruction to the builder and returns the ID of the output variable if it has one output.
     pub fn push_insn(&mut self, out_insn: IrcOut::Instruction) -> Option<usize> {
         self.push_insn_with_root(out_insn, None)
     }
+    /// Pushes an output instruction with multiple outputs to the builder and returns the IDs of the output variables.
     pub fn push_insn_multi_out(&mut self, out_insn: IrcOut::Instruction) -> Vec<usize> {
         let num_out = out_insn.num_outputs();
         self.out_insns.push(out_insn.clone());
@@ -342,6 +395,7 @@ where
         out_var_ids
     }
 
+    /// Processes an input instruction and transforms it to an output instruction.
     fn process_insn<'b>(
         &mut self,
         in_insn: &IrcIn::Instruction,
@@ -369,6 +423,7 @@ where
         Ok(())
     }
 
+    /// Processes an input constraint and transforms it to an output constraint.
     fn process_con(&mut self, in_con: &IrcIn::Constraint) -> Result<(), Error> {
         let in_mapped = in_con.replace_var(|x| self.in_to_out[x]);
         let out_con = self.transform_in_con_to_out(&in_mapped)?;
@@ -377,6 +432,8 @@ where
     }
 }
 
+/// Converts an expression to a single variable expression.
+/// The result is guaranteed to be in the form `kx + b`.
 fn to_single<C: Config>(mid_vars: &mut Pool<Expression<C>>, expr: &Expression<C>) -> Expression<C> {
     let (e, coef, constant) = strip_constants(expr);
     if e.len() == 1 && e.degree() <= 1 {
@@ -386,6 +443,8 @@ fn to_single<C: Config>(mid_vars: &mut Pool<Expression<C>>, expr: &Expression<C>
     unstrip_constants_single(idx, coef, constant)
 }
 
+/// Converts an expression to a single variable expression.
+/// The result is guaranteed to be in the form `kx + b`, and `x`, `k`, `b` are returned separately.
 fn to_single_stripped<C: Config>(
     mid_vars: &mut Pool<Expression<C>>,
     expr: &Expression<C>,
@@ -398,6 +457,8 @@ fn to_single_stripped<C: Config>(
     (idx, coef, constant)
 }
 
+/// Converts an expression to a single variable expression.
+/// The result is guaranteed to be in the form `x`, where `x` is a variable ID. No constant term or coefficient is allowed.
 pub fn to_really_single<C: Config>(
     mid_vars: &mut Pool<Expression<C>>,
     e: &Expression<C>,
@@ -409,6 +470,8 @@ pub fn to_really_single<C: Config>(
     Expression::from_terms_sorted(vec![Term::new_linear(CircuitField::<C>::one(), idx)])
 }
 
+/// Tries to get a single variable ID from an expression.
+/// If the expression is already registered as a single variable in `mid_vars`, it returns the ID.
 pub fn try_get_really_single_id<C: Config>(
     mid_vars: &Pool<Expression<C>>,
     e: &Expression<C>,
@@ -420,6 +483,8 @@ pub fn try_get_really_single_id<C: Config>(
     mid_vars.try_get_idx(e)
 }
 
+/// Strips constants from an expression and returns the expression without constants,
+/// the coefficient of the first term, and the constant term.
 fn strip_constants<C: Config>(
     expr: &Expression<C>,
 ) -> (Expression<C>, CircuitField<C>, CircuitField<C>) {
@@ -443,6 +508,9 @@ fn strip_constants<C: Config>(
     (Expression::from_terms_sorted(e), v, cst)
 }
 
+/// Unstrips constants from a single variable expression.
+/// It takes a variable ID, a coefficient, and a constant term,
+/// and returns an expression in the form `coef * var + constant`.
 fn unstrip_constants_single<C: Config>(
     vid: usize,
     coef: CircuitField<C>,
@@ -456,9 +524,23 @@ fn unstrip_constants_single<C: Config>(
     Expression::from_terms(e)
 }
 
+/// Thresholds for compressing expressions in linear combinations and multiplications.
+/// If an expression has more than `COMPRESS_THRESHOLD_ADD` terms, it will be compressed
+/// to a single variable expression.
 const COMPRESS_THRESHOLD_ADD: usize = 10;
 const COMPRESS_THRESHOLD_MUL: usize = 40;
 
+/// Computes a linear combination of multiple expressions.
+///
+/// This function computes `sum(var_coef(i) * vars[i])` for all `vars[i]`.
+///
+/// It maintains a heap of `LinMeta`, where each `LinMeta` is a pointer to a term in `vars[i]`.
+///
+/// In `LinMeta`, `l_id` is the index of the variable in `vars`, and `t_id` is the index of the term in that variable.
+/// The `vars` field is the current variable's `VarSpec`, for comparing terms in the heap.
+///
+/// The function always takes the first term in the heap, and adds it to the result, until the heap is empty.
+/// The result is guaranteed to be sorted by `VarSpec`.
 fn lin_comb_inner<C: Config, F: Fn(usize) -> CircuitField<C>>(
     vars: Vec<&Expression<C>>,
     var_coef: F,
@@ -531,6 +613,7 @@ fn lin_comb_inner<C: Config, F: Fn(usize) -> CircuitField<C>>(
     }
 }
 
+/// Multiplies two expressions and returns the result as a new expression.
 fn mul_two_expr<C: Config>(
     a: &Expression<C>,
     b: &Expression<C>,
@@ -586,9 +669,11 @@ fn mul_two_expr<C: Config>(
     )
 }
 
+/// Type alias for the result of processing a circuit.
 pub type ProcessOk<'a, C, IrcIn, IrcOut> =
     (ir::common::Circuit<IrcOut>, Builder<'a, C, IrcIn, IrcOut>);
 
+/// Processes a circuit and returns the transformed circuit along with the builder.
 pub fn process_circuit<
     'b,
     'a: 'b,
@@ -639,6 +724,7 @@ where
     Ok((new_circuit, builder))
 }
 
+/// Processes the root circuit and returns a new root circuit with transformed instructions and constraints.
 pub fn process_root_circuit<
     'a,
     C: Config + 'a,

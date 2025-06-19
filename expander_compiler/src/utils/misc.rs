@@ -1,5 +1,8 @@
+//! Miscellaneous utility functions for the expander compiler.
+
 use std::collections::{HashMap, HashSet};
 
+/// Returns the next power of two greater than or equal to `x`.
 pub fn next_power_of_two(x: usize) -> usize {
     let mut padk: usize = 0;
     while (1 << padk) < x {
@@ -8,6 +11,7 @@ pub fn next_power_of_two(x: usize) -> usize {
     1 << padk
 }
 
+/// Returns whether the input graph is a DAG and its topological order.
 pub fn topo_order_and_is_dag(
     vertices: &HashSet<usize>,
     edges: &HashMap<usize, HashSet<usize>>,
@@ -17,7 +21,7 @@ pub fn topo_order_and_is_dag(
     (queue, is_dag)
 }
 
-// must be a DAG
+/// Returns the topological order of the input graph.
 pub fn topo_order(vertices: &HashSet<usize>, edges: &HashMap<usize, HashSet<usize>>) -> Vec<usize> {
     let mut queue: Vec<usize> = Vec::new();
     let mut in_deg: HashMap<usize, usize> = HashMap::new();

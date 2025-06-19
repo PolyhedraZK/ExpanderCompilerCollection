@@ -1,27 +1,33 @@
+//! This module provides functionality to gather statistics about a layered circuit.
+
 use crate::circuit::config::Config;
 
 use super::{Circuit, InputType, InputUsize};
 
 pub struct Stats {
-    // number of layers in the final circuit
+    /// Number of layers in the final circuit
     pub num_layers: usize,
-    // number of segments
+    /// Number of segments
     pub num_segments: usize,
-    // number of used input variables
+    /// Number of used input variables
     pub num_inputs: usize,
-    // number of mul/add/cst gates in all circuits (unexpanded)
+    /// Number of multiplication gates in all circuits (unexpanded)
     pub num_total_mul: usize,
+    /// Number of addition gates in all circuits (unexpanded)
     pub num_total_add: usize,
+    /// Number of constant gates in all circuits (unexpanded)
     pub num_total_cst: usize,
-    // number of mul/add/cst gates in expanded form of all layers
+    /// Number of multiplication gates in expanded form of all layers
     pub num_expanded_mul: usize,
+    /// Number of addition gates in expanded form of all layers
     pub num_expanded_add: usize,
+    /// Number of constant gates in expanded form of all layers
     pub num_expanded_cst: usize,
-    // number of total gates in the final circuit (except input gates)
+    /// Number of total gates in the final circuit (except input gates)
     pub num_total_gates: usize,
-    // number of actually used gates used in the final circuit
+    /// Number of actually used gates used in the final circuit
     pub num_used_gates: usize,
-    // total cost according to some formula
+    /// Total cost according to some formula
     pub total_cost: usize,
 }
 
@@ -32,6 +38,7 @@ struct CircuitStats {
 }
 
 impl<C: Config, I: InputType> Circuit<C, I> {
+    /// Get the statistics of the circuit.
     pub fn get_stats(&self) -> Stats {
         let mut m: Vec<CircuitStats> = Vec::with_capacity(self.segments.len());
         let mut ar = Stats {

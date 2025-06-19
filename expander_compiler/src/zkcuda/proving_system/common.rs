@@ -1,3 +1,5 @@
+//! This module provides functionality for preparing inputs for layered circuits in zkCUDA backends.
+
 use crate::{
     circuit::{
         config::{Config, SIMDField},

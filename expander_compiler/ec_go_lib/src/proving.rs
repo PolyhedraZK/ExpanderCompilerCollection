@@ -1,3 +1,5 @@
+//! This module provides the FFI API for proving functions.
+
 use std::ptr;
 use std::slice;
 
@@ -65,6 +67,7 @@ fn verify_circuit_file_inner<C: config::Config>(
     Ok(executor::verify::<C>(&mut circuit, mpi_config, &proof, &claimed_v) as u8)
 }
 
+/// This function proves a circuit file with the given witness and configuration ID.
 #[no_mangle]
 pub extern "C" fn prove_circuit_file(
     circuit_filename: ByteArray,
@@ -98,6 +101,7 @@ pub extern "C" fn prove_circuit_file(
     }
 }
 
+/// This function verifies a circuit file with the given witness, proof, and configuration ID.
 #[no_mangle]
 pub extern "C" fn verify_circuit_file(
     circuit_filename: ByteArray,

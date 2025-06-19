@@ -1,3 +1,5 @@
+//! This module defines traits and structures for proving systems in zkCUDA backends.
+
 use serdes::ExpSerde;
 
 use super::super::{context::ComputationGraph, kernel::Kernel};

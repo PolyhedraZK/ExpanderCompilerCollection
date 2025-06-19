@@ -1,3 +1,5 @@
+//! This module contains the expression used in the IR.
+
 use std::{
     fmt,
     io::{Read, Write},
@@ -9,22 +11,29 @@ use serdes::{ExpSerde, SerdeResult};
 use crate::circuit::config::{CircuitField, Config};
 use crate::field::FieldArith;
 
+/// The `Term` struct represents a term in an expression, which consists of a coefficient and a variable specification.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Term<C: Config> {
     pub coef: CircuitField<C>,
     pub vars: VarSpec,
 }
 
+/// The `VarSpec` enum represents the specification of variables in a term.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum VarSpec {
+    /// Represents a constant term.
     Const,
+    /// Represents a linear term with a single variable.
     Linear(usize),
+    /// Represents a quadratic term with two variables.
     Quad(usize, usize),
+    /// Represents a custom gate term with a specific gate type and inputs.
     Custom {
         gate_type: usize,
         inputs: Vec<usize>,
     },
-    RandomLinear(usize), // in this case, coef will be ignored
+    /// Represents a random linear term, where the coefficient will be ignored.
+    RandomLinear(usize),
 }
 
 impl VarSpec {
@@ -50,6 +59,8 @@ impl VarSpec {
             VarSpec::RandomLinear(_) => true,
         }
     }
+    /// Multiplies two `VarSpec` instances and returns the resulting `VarSpec`.
+    /// If the multiplication is invalid (e.g., multiplying a linear term with a quadratic term), it panics.
     pub fn mul(a: &Self, b: &Self) -> Self {
         match (a, b) {
             (VarSpec::Const, VarSpec::Const) => VarSpec::Const,
@@ -78,6 +89,7 @@ impl VarSpec {
             (_, VarSpec::RandomLinear(_)) => panic!("unexpected situation: RandomLinear"),
         }
     }
+    /// Replaces the variable indices in the `VarSpec` with new indices according to the provided function.
     pub fn replace_vars<F: Fn(usize) -> usize>(&self, f: F) -> Self {
         match self {
             VarSpec::Const => VarSpec::Const,
@@ -110,18 +122,21 @@ impl<C: Config> PartialOrd for Term<C> {
 }
 
 impl<C: Config> Term<C> {
+    /// Creates a new constant term with the given value.
     pub fn new_const(value: CircuitField<C>) -> Self {
         Term {
             coef: value,
             vars: VarSpec::Const,
         }
     }
+    /// Creates a new linear term with the given value and variable index.
     pub fn new_linear(value: CircuitField<C>, index: usize) -> Self {
         Term {
             coef: value,
             vars: VarSpec::Linear(index),
         }
     }
+    /// Creates a new quadratic term with the given value and variable indices.
     pub fn new_quad(value: CircuitField<C>, index1: usize, index2: usize) -> Self {
         Term {
             coef: value,
@@ -132,6 +147,7 @@ impl<C: Config> Term<C> {
             },
         }
     }
+    /// Creates a new random linear term with the given index.
     pub fn new_random_linear(index: usize) -> Self {
         Term {
             coef: CircuitField::<C>::one(),
@@ -153,6 +169,8 @@ impl<C: Config> Default for Term<C> {
 }
 
 impl<C: Config> Term<C> {
+    /// Multiplies two terms and returns the resulting term.
+    /// If the multiplication is invalid (e.g., multiplying a linear term with a quadratic term), it panics.
     pub fn mul(&self, other: &Self) -> Self {
         Term {
             coef: self.coef * other.coef,
@@ -203,6 +221,7 @@ impl<C: Config> fmt::Display for Term<C> {
     }
 }
 
+/// The `Expression` struct represents a mathematical expression consisting of multiple terms.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Expression<C: Config> {
     terms: Vec<Term<C>>,
@@ -261,21 +280,25 @@ fn compress_identical_terms<C: Config>(terms: &mut Vec<Term<C>>) {
 }
 
 impl<C: Config> Expression<C> {
+    /// Creates a new expression with a single constant term.
     pub fn new_const(value: CircuitField<C>) -> Self {
         Expression {
             terms: vec![Term::new_const(value)],
         }
     }
+    /// Creates a new expression with a single linear term.
     pub fn new_linear(value: CircuitField<C>, index: usize) -> Self {
         Expression {
             terms: vec![Term::new_linear(value, index)],
         }
     }
+    /// Creates a new expression with a single quadratic term.
     pub fn new_quad(value: CircuitField<C>, index1: usize, index2: usize) -> Self {
         Expression {
             terms: vec![Term::new_quad(value, index1, index2)],
         }
     }
+    /// Creates a new expression with a single custom term.
     pub fn new_custom(value: CircuitField<C>, gate_type: usize, inputs: Vec<usize>) -> Self {
         Expression {
             terms: vec![Term {
@@ -284,6 +307,7 @@ impl<C: Config> Expression<C> {
             }],
         }
     }
+    /// Creates a new expression from a list of terms, normalizing each term and sorting them.
     pub fn from_terms(mut terms: Vec<Term<C>>) -> Self {
         for term in terms.iter_mut() {
             term.normalize();
@@ -292,6 +316,8 @@ impl<C: Config> Expression<C> {
         compress_identical_terms(&mut terms);
         Expression { terms }
     }
+    /// Creates a new expression from a list of terms, ensuring they are sorted and normalized.
+    /// If it's not sorted, it's undefined behavior.
     pub fn from_terms_sorted(mut terms: Vec<Term<C>>) -> Self {
         if terms.is_empty() {
             terms.push(Term::default());
@@ -302,9 +328,11 @@ impl<C: Config> Expression<C> {
         assert!(terms.windows(2).all(|w| w[0].vars < w[1].vars));
         Expression { terms }
     }
+    /// Creates an empty expression, which is considered invalid.
     pub fn invalid() -> Self {
         Expression { terms: vec![] }
     }
+    /// Get variable indices from the expression.
     pub fn get_vars<R: std::iter::FromIterator<usize>>(&self) -> R {
         self.iter()
             .flat_map(|term| match &term.vars {
@@ -316,6 +344,7 @@ impl<C: Config> Expression<C> {
             })
             .collect()
     }
+    /// Replaces variable indices in the expression according to the provided function.
     pub fn replace_vars<F: Fn(usize) -> usize>(&self, f: F) -> Self {
         let terms = self
             .iter()
@@ -326,6 +355,7 @@ impl<C: Config> Expression<C> {
             .collect();
         Expression { terms }
     }
+    /// Returns the degree of the expression.
     pub fn degree(&self) -> usize {
         let mut has_linear = false;
         for term in self.iter() {
@@ -343,6 +373,7 @@ impl<C: Config> Expression<C> {
             0
         }
     }
+    /// Returns the count of terms with different degrees in the expression.
     pub fn count_of_degrees(&self) -> [usize; 3] {
         let mut res = [0; 3];
         for term in self.iter() {
@@ -356,6 +387,7 @@ impl<C: Config> Expression<C> {
         }
         res
     }
+    /// Returns the constant value of the expression if it consists of a single constant term.
     pub fn constant_value(&self) -> Option<CircuitField<C>> {
         if self.terms.len() == 1 && self.terms[0].vars == VarSpec::Const {
             Some(self.terms[0].coef)
@@ -363,6 +395,7 @@ impl<C: Config> Expression<C> {
             None
         }
     }
+    /// Multiplies the expression by a constant value, returning a new expression.
     pub fn mul_constant(&self, value: CircuitField<C>) -> Self {
         if value.is_zero() {
             return Expression::default();
@@ -376,20 +409,29 @@ impl<C: Config> Expression<C> {
                 .collect(),
         )
     }
+    /// Converts the expression to a vector of terms.
     pub fn to_terms(self) -> Vec<Term<C>> {
         self.terms
     }
 }
 
+/// Linear combination term, which consists of a variable index and a coefficient.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, ExpSerde)]
 pub struct LinCombTerm<C: Config> {
+    /// The variable index in the circuit.
     pub var: usize,
+    /// The coefficient of the term.
     pub coef: CircuitField<C>,
 }
 
+/// A linear combination, which is a sum of terms with coefficients and a constant.
+/// It is used to represent linear expressions in the circuit,
+/// especially in early stages of compilation where expressions are not yet normalized.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct LinComb<C: Config> {
+    /// The terms in the linear combination.
     pub terms: Vec<LinCombTerm<C>>,
+    /// The constant term in the linear combination.
     pub constant: CircuitField<C>,
 }
 
@@ -403,9 +445,11 @@ impl<C: Config> Default for LinComb<C> {
 }
 
 impl<C: Config> LinComb<C> {
+    /// Gets the variable indices from the linear combination.
     pub fn get_vars(&self) -> Vec<usize> {
         self.terms.iter().map(|term| term.var).collect()
     }
+    /// Replaces the variable indices in the linear combination according to the provided function.
     pub fn replace_vars<F: Fn(usize) -> usize>(&self, f: F) -> Self {
         LinComb {
             terms: self
@@ -419,6 +463,7 @@ impl<C: Config> LinComb<C> {
             constant: self.constant,
         }
     }
+    /// Creates a linear combination representing the expression `kx + b`, where `x` is a variable index, `k` is a coefficient, and `b` is a constant.
     pub fn from_kx_plus_b(x: usize, k: CircuitField<C>, b: CircuitField<C>) -> Self {
         if x == 0 || k.is_zero() {
             LinComb {
@@ -432,6 +477,7 @@ impl<C: Config> LinComb<C> {
             }
         }
     }
+    /// Evaluates the linear combination using the provided values for the variables.
     pub fn eval(&self, values: &[CircuitField<C>]) -> CircuitField<C> {
         let mut res = self.constant;
         for term in self.terms.iter() {
@@ -439,6 +485,7 @@ impl<C: Config> LinComb<C> {
         }
         res
     }
+    /// Evaluates the linear combination using SIMD values for the variables.
     pub fn eval_simd<SF: arith::SimdField<Scalar = CircuitField<C>>>(&self, values: &[SF]) -> SF {
         let mut res = SF::one().scale(&self.constant);
         for term in self.terms.iter() {

@@ -1,12 +1,20 @@
+//! This module provides statistics gathering functionality for the circuit IR.
+
 use std::collections::HashMap;
 
 use super::{Instruction, IrConfig, RootCircuit};
 
+/// This struct contains statistics about the circuit IR.
 pub struct Stats {
+    /// The number of inputs in the root circuit.
     pub num_inputs: usize,
+    /// The number of instructions in the root circuit.
     pub num_insns: usize,
+    /// The number of terms in the root circuit.
     pub num_terms: usize,
+    /// The number of variables in the root circuit.
     pub num_variables: usize,
+    /// The number of constraints in the root circuit.
     pub num_constraints: usize,
 }
 
@@ -23,6 +31,7 @@ struct StatsContext<'a, Irc: IrConfig> {
 }
 
 impl<Irc: IrConfig> RootCircuit<Irc> {
+    /// Returns the statistics of the root circuit.
     pub fn get_stats(&self) -> Stats {
         let mut sc = StatsContext {
             rc: self,

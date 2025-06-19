@@ -1,3 +1,5 @@
+//! This module provides witness related functionality for layered circuits.
+
 use std::any::{Any, TypeId};
 use std::mem;
 
@@ -7,17 +9,26 @@ use serdes::{ExpSerde, SerdeResult};
 use super::{Circuit, InputType};
 use crate::circuit::config::{CircuitField, Config, SIMDField};
 
+/// Union type for witness values, either scalar or SIMD.
 #[derive(Clone, Debug)]
 pub enum WitnessValues<C: Config> {
     Scalar(Vec<CircuitField<C>>),
     Simd(Vec<SIMDField<C>>),
 }
 
+/// Represents a witness for a layered circuit.
+/// It may contain one or more witnesses, each with a set of inputs and public inputs.
+/// The values can be stored either as scalar fields or SIMD fields.
 #[derive(Clone, Debug)]
 pub struct Witness<C: Config> {
+    /// Number of witnesses, i.e., number of evaluations of the circuit.
     pub num_witnesses: usize,
+    /// Number of inputs per witness.
     pub num_inputs_per_witness: usize,
+    /// Number of public inputs per witness.
     pub num_public_inputs_per_witness: usize,
+    /// Values of the witness, either scalar or SIMD.
+    /// Values are stored in the order of inputs followed by public inputs for each witness.
     pub values: WitnessValues<C>,
 }
 
@@ -86,6 +97,7 @@ fn use_simd<C: Config>(num_witnesses: usize) -> bool {
 
 type UnpackedBlock<C> = Vec<(Vec<CircuitField<C>>, Vec<CircuitField<C>>)>;
 
+/// An iterator over the witnesses in scalar form.
 pub struct WitnessIteratorScalar<'a, C: Config> {
     witness: &'a Witness<C>,
     index: usize,
@@ -126,6 +138,7 @@ impl<'a, C: Config> Iterator for WitnessIteratorScalar<'a, C> {
     }
 }
 
+/// An iterator over the witnesses in SIMD form.
 pub struct WitnessIteratorSimd<'a, C: Config> {
     witness: &'a Witness<C>,
     index: usize,
@@ -159,6 +172,7 @@ impl<'a, C: Config> Iterator for WitnessIteratorSimd<'a, C> {
 }
 
 impl<C: Config> Witness<C> {
+    /// Creates an iterator over the witnesses in scalar form.
     pub fn iter_scalar(&self) -> WitnessIteratorScalar<'_, C> {
         WitnessIteratorScalar {
             witness: self,
@@ -167,6 +181,7 @@ impl<C: Config> Witness<C> {
         }
     }
 
+    /// Creates an iterator over the witnesses in SIMD form.
     pub fn iter_simd(&self) -> WitnessIteratorSimd<'_, C> {
         WitnessIteratorSimd {
             witness: self,
@@ -234,17 +249,20 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         (constraints, outputs)
     }
 
+    /// Runs the circuit with the given witness and returns the constraints.
     pub fn run(&self, witness: &Witness<C>) -> Vec<bool> {
         let (constraints, _) = self.run_inner(witness, false);
         constraints
     }
 
+    /// Runs the circuit with the given witness and returns the outputs.
     pub fn run_with_output(&self, witness: &Witness<C>) -> (Vec<bool>, Vec<Vec<CircuitField<C>>>) {
         self.run_inner(witness, true)
     }
 }
 
 impl<C: Config> Witness<C> {
+    /// Converts the witness to SIMD format if applicable.
     pub fn to_simd<T>(&self) -> (Vec<T>, Vec<T>)
     where
         T: arith::SimdField<Scalar = CircuitField<C>> + 'static,

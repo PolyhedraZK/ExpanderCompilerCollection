@@ -1,3 +1,5 @@
+//! This module defines the compilation context for a layered circuit.
+
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -13,92 +15,108 @@ use super::layer_layout::merge_layouts;
 use super::layer_layout::{LayerLayout, LayerLayoutContext, LayerReq};
 use super::CompileOptions;
 
+/// The main compilation context for a layered circuit.
 pub struct CompileContext<'a, C: Config, I: InputType> {
-    // the root circuit
+    /// The root circuit
     pub rc: &'a IrRootCircuit<C>,
 
-    // for each circuit ir, we need a context to store some intermediate information
+    /// For each circuit ir, we need a context to store some intermediate information
     pub circuits: HashMap<usize, IrContext<'a, C>>,
 
-    // topo-sorted order
+    /// Topo-sorted order
     pub order: Vec<usize>,
 
-    // all generated layer layouts
+    /// All generated layer layouts
     pub layer_layout_pool: Pool<LayerLayout>,
     pub layer_req_to_layout: HashMap<LayerReq, usize>,
 
-    // compiled layered circuits
+    /// Compiled layered circuits
     pub compiled_circuits: Vec<Segment<C, I>>,
-    pub conncected_wires: HashMap<Vec<usize>, usize>,
 
-    // layout id of each layer
+    /// Layout id of each layer
     pub layout_ids: Vec<usize>,
-    // compiled circuit id of each layer
+    /// Compiled circuit id of each layer
     pub layers: Vec<usize>,
 
-    // input order
+    /// Input order
     pub input_order: Vec<usize>,
 
+    /// Whether the root circuit has constraints
     pub root_has_constraints: bool,
 
+    /// Compilation options
     pub opts: CompileOptions,
 }
 
+/// The context for a specific IR circuit, containing information about variables, layers, and constraints.
 pub struct IrContext<'a, C: Config> {
+    /// Reference to the IR circuit
     pub circuit: &'a IrCircuit<C>,
 
-    pub num_var: usize,          // number of variables in the circuit
-    pub num_sub_circuits: usize, // number of sub circuits
+    /// number of variables in the circuit
+    pub num_var: usize,
+    /// number of sub circuits
+    pub num_sub_circuits: usize,
 
-    // for each variable, we need to find the min and max layer it should exist.
-    // we assume input layer = 0, and output layer is at least 1
-    // it includes only variables mentioned in instructions, so internal variables in sub circuits are ignored here.
+    /// For each variable, we need to find the min and max layer it should exist.
+    /// We assume input layer = 0, and output layer is at least 1.
+    /// It includes only variables mentioned in instructions, so internal variables in sub circuits are ignored here.
     pub min_layer: Vec<usize>,
     pub max_layer: Vec<usize>,
     pub occured_layers: Vec<Vec<usize>>,
     pub output_layer: usize,
 
-    // for each layer i, the minimum layer j that there exists gate j->i
+    /// For each layer i, the minimum layer j that there exists gate j->i
     pub min_used_layer: Vec<usize>,
 
-    pub output_order: HashMap<usize, usize>, // outputOrder[x] == y -> x is the y-th output
+    /// outputOrder[x] == y -> x is the y-th output
+    pub output_order: HashMap<usize, usize>,
 
+    /// Sub circuit information
     pub sub_circuit_loc_map: HashMap<usize, usize>,
     pub sub_circuit_insn_ids: Vec<usize>,
     pub sub_circuit_insn_refs: Vec<SubCircuitInsn<'a>>,
     pub sub_circuit_start_layer: Vec<usize>,
 
-    // combined constraints of each layer
+    /// Combined constraints of each layer
     pub combined_constraints: Vec<Option<CombinedConstraint>>,
 
     pub internal_variable_expr: HashMap<usize, &'a Expression<C>>,
     pub constant_like_variables: HashMap<usize, Coef<C>>,
 
-    // layer layout contexts
+    /// Layer layout contexts
     pub lcs: Vec<LayerLayoutContext>,
 }
 
+/// Represents a combined constraint.
+///
+/// In most circuit configurations, we have many constraints in each layer.
+/// They are randomly combined into a single variable, and that variable is used as the final output.
 #[derive(Default, Clone, Debug)]
 pub struct CombinedConstraint {
-    // id of this combined variable
+    /// id of this combined variable
     pub id: usize,
-    // id of combined variables
+    /// id of combined variables
     pub variables: Vec<usize>,
-    // id of sub circuits (it will combine their combined constraints)
-    // if a sub circuit has a combined output in this layer, it must be unique. So circuit id is sufficient.
-    // = {x} means subCircuitInsnIds[x]
+    /// id of sub circuits (it will combine their combined constraints).
+    /// if a sub circuit has a combined output in this layer, it must be unique. So circuit id is sufficient.
+    /// = {x} means subCircuitInsnIds[x]
     pub sub_circuit_ids: Vec<usize>,
 }
 
+/// Represents a sub-circuit instruction.
 pub struct SubCircuitInsn<'a> {
     pub sub_circuit_id: usize,
     pub inputs: &'a Vec<usize>,
     pub outputs: Vec<usize>,
 }
 
+/// Extra pre-allocated size for min/max layers and other vectors.
+/// This is to avoid frequent reallocations during the compilation process.
 const EXTRA_PRE_ALLOC_SIZE: usize = 1000;
 
 impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
+    /// Compiles the root circuit into a layered circuit.
     pub fn compile(&mut self) {
         // 1. do a toposort of the circuits
         self.dfs_topo_sort(0);
@@ -144,6 +162,7 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
         self.input_order = self.record_input_order();
     }
 
+    /// Since it's guranteed to be a DAG, we can do a DFS to get the topo order.
     fn dfs_topo_sort(&mut self, id: usize) {
         if self.circuits.contains_key(&id) {
             return;
@@ -198,6 +217,7 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
         );
     }
 
+    /// Computes the minimum and maximum layers of each variable for a given circuit.
     fn compute_min_max_layers(&mut self, circuit_id: usize) {
         // variables
         // 0..nbVariable: normal variables

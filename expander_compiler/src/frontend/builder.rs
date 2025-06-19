@@ -1,3 +1,5 @@
+//! Implementation of the main frontend builder.
+
 use std::collections::HashMap;
 use std::convert::From;
 
@@ -23,6 +25,7 @@ use super::{
     CircuitField,
 };
 
+/// Builder for constructing a source-IR circuit from frontend API calls.
 #[derive(Clone)]
 pub struct Builder<C: Config> {
     instructions: Vec<SourceInstruction<C>>,
@@ -32,6 +35,7 @@ pub struct Builder<C: Config> {
     num_inputs: usize,
 }
 
+/// Represents a variable in the circuit, identified by a unique ID.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Variable {
     id: usize,
@@ -54,27 +58,32 @@ impl From<usize> for Variable {
     }
 }
 
+/// Returns the ID of a variable.
 pub fn get_variable_id(v: Variable) -> usize {
     v.id
 }
 
+/// Ensures that a variable is valid (not the default variable with ID 0).
 pub fn ensure_variable_valid(v: Variable) {
     if v.id == 0 {
         panic!("Variable(0) is not allowed in API calls");
     }
 }
 
+/// Ensures that a list of variables are valid (not the default variable with ID 0).
 pub fn ensure_variables_valid(vs: &[Variable]) {
     for v in vs {
         ensure_variable_valid(*v);
     }
 }
 
+/// Represents a variable or a constant value in the circuit.
 pub enum VariableOrValue<F: Field> {
     Variable(Variable),
     Value(F),
 }
 
+/// Trait for converting a value or variable to a `VariableOrValue`.
 pub trait ToVariableOrValue<F: Field>: Clone {
     fn convert_to_variable_or_value(self) -> VariableOrValue<F>;
 }
@@ -108,6 +117,7 @@ impl<F: Field> ToVariableOrValue<F> for &Variable {
 }
 
 impl<C: Config> Builder<C> {
+    /// Creates a new `Builder` instance with the specified number of inputs.
     pub fn new(num_inputs: usize) -> (Self, Vec<Variable>) {
         (
             Builder {
@@ -121,6 +131,7 @@ impl<C: Config> Builder<C> {
         )
     }
 
+    /// Builds the source-IR circuit with the specified outputs.
     pub fn build(self, outputs: &[Variable]) -> source::Circuit<C> {
         source::Circuit {
             instructions: self.instructions,
@@ -601,6 +612,7 @@ impl<C: Config> UnconstrainedAPI<C> for Builder<C> {
     unconstrained_binary_op!(unconstrained_bit_xor, BitXor);
 }
 
+/// RootBuilder is the main builder for constructing a circuit with sub-circuits.
 #[derive(Clone)]
 pub struct RootBuilder<C: Config> {
     num_public_inputs: usize,
@@ -786,6 +798,7 @@ impl<C: Config> RootAPI<C> for RootBuilder<C> {
 }
 
 impl<C: Config> RootBuilder<C> {
+    /// Creates a new `RootBuilder` with the specified number of inputs and public inputs.
     pub fn new(
         num_inputs: usize,
         num_public_inputs: usize,
@@ -811,6 +824,7 @@ impl<C: Config> RootBuilder<C> {
         )
     }
 
+    /// Builds the root circuit from the collected sub-circuits and outputs.
     pub fn build(self) -> source::RootCircuit<C> {
         let mut circuits = self.sub_circuits;
         assert_eq!(self.current_builders.len(), 1);
@@ -824,6 +838,7 @@ impl<C: Config> RootBuilder<C> {
         }
     }
 
+    /// Returns a mutable reference to the last builder in the current builders stack.
     pub fn last_builder(&mut self) -> &mut Builder<C> {
         &mut self.current_builders.last_mut().unwrap().1
     }

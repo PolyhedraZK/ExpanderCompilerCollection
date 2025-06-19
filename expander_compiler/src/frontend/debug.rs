@@ -1,3 +1,5 @@
+//! This module provides a debug builder for evaluating circuits in a debug mode.
+
 use std::collections::HashMap;
 
 use crate::{
@@ -23,6 +25,7 @@ use super::{
     CircuitField, Variable,
 };
 
+/// This struct represents a debug builder for circuits, which allows for debugging and evaluation of circuit operations.
 pub struct DebugBuilder<C: Config, H: HintCaller<CircuitField<C>>> {
     values: Vec<CircuitField<C>>,
     sub_circuit_output_structure: HashMap<usize, Vec<usize>>,
@@ -501,6 +504,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> RootAPI<C> for DebugBuilder<C, H
 }
 
 impl<C: Config, H: HintCaller<CircuitField<C>>> DebugBuilder<C, H> {
+    /// Creates a new `DebugBuilder` with the given inputs, public inputs, and hint caller.
     pub fn new(
         inputs: Vec<CircuitField<C>>,
         public_inputs: Vec<CircuitField<C>>,
@@ -555,6 +559,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> DebugBuilder<C, H> {
         }
     }
 
+    /// Returns the outputs of the circuit as a vector of `CircuitField<C>`.
     pub fn get_outputs(&self) -> Vec<CircuitField<C>> {
         self.outputs
             .iter()

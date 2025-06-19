@@ -1,29 +1,37 @@
+//! This module provides utilities for handling shapes, axes, and bit orders in the context of computation graphs.
+
 use serdes::ExpSerde;
 
 use crate::{circuit::input_mapping::InputMapping, utils::misc::next_power_of_two};
 
+/// Shape is a vector of dimension lengths that defines the shape of a tensor or array.
 pub type Shape = Vec<usize>;
+/// Axes is a vector of indices that defines the order of dimensions in a tensor or array.
 pub type Axes = Vec<usize>;
-/*
-Bit order definition:
-Suppose bit_order = [a_0, a_1, a_2, ...]
-Then when we read the i-th position, where i = sum(b_j * 2^j), b_j = 0 or 1,
-we will read the j-th position, where j = sum(b_j * 2^(a_j)).
-*/
+/// BitOrder is a vector of indices that defines the order in which bits are read from a vector.
+///
+/// Definition:
+/// Suppose bit_order = [a_0, a_1, a_2, ...].
+/// Then when we read the i-th position, where i = sum(b_j * 2^j), b_j = 0 or 1,
+/// we will read the j-th position, where j = sum(b_j * 2^(a_j)).
 pub type BitOrder = Vec<usize>;
 
+/// Returns a new shape with the given dimension length prepended to the front of the shape.
 pub fn shape_prepend(shape: &Shape, x: usize) -> Shape {
     let mut shape = shape.clone();
     shape.insert(0, x);
     shape
 }
 
+/// ShapeHistory is a structure that keeps track of the history of shapes and axes transformations.
+/// These informations are used to determine what initial layout of the vector is needed
 #[derive(Debug, Clone, ExpSerde)]
 pub struct ShapeHistory {
     vec_len: usize,
     entries: Vec<Entry>,
 }
 
+/// Entry is a structure that represents a single entry in the shape history.
 #[derive(Debug, Clone, ExpSerde)]
 struct Entry {
     shape: Shape,
@@ -31,6 +39,9 @@ struct Entry {
 }
 
 impl Entry {
+    /// Minimize the number of terms in the shape by merging consecutive dimensions.
+    /// If `keep_first_dim` is true, the first dimension will not be merged with
+    /// the next one, even if they are consecutive.
     fn minimize(&self, keep_first_dim: bool) -> Self {
         let axes = match &self.axes {
             None => {
@@ -73,12 +84,16 @@ impl Entry {
             axes: Some(new_axes),
         }
     }
+    /// Returns the transposed shape based on the current axes.
     fn transposed_shape(&self) -> Shape {
         match &self.axes {
             None => self.shape.clone(),
             Some(axes) => axes.iter().map(|&a| self.shape[a]).collect(),
         }
     }
+    /// Given a shape, returns the transposed shape based on the current axes.
+    /// The input shape must be more detailed than the current shape,
+    /// i.e., it must contain all dimensions of the current shape.
     fn transpose_shape(&self, shape: &[(usize, usize)]) -> Vec<(usize, usize)> {
         if self.axes.is_none() {
             return shape.to_vec();
@@ -105,6 +120,7 @@ impl Entry {
         }
         res
     }
+    /// Undo the transposition of shape products.
     fn undo_transpose_shape_products(&self, products: &[usize]) -> Vec<usize> {
         if self.axes.is_none() {
             return products.to_vec();
@@ -133,22 +149,28 @@ impl Entry {
     }
 }
 
+/// Trait for reshaping.
 pub trait Reshape {
     fn reshape(&self, new_shape: &[usize]) -> Self;
 }
 
+/// Trait for transposing.
+/// This is not production ready yet.
 pub trait Transpose {
     fn transpose(&self, axes: &[usize]) -> Self;
 }
 
+/// Returns the length of the vector represented by the shape.
 pub fn shape_vec_len(shape: &[usize]) -> usize {
     shape.iter().product()
 }
 
+/// Returns the length of the vector represented by the shape, where each dimension length is padded to the next power of two.
 pub fn shape_vec_padded_len(shape: &[usize]) -> usize {
     shape.iter().map(|&x| next_power_of_two(x)).product()
 }
 
+/// Returns the prefix products of the shape, where each element is the product of all previous dimensions.
 pub fn prefix_products(shape: &[usize]) -> Vec<usize> {
     let mut products = Vec::with_capacity(shape.len() + 1);
     let mut product = 1;
@@ -160,6 +182,7 @@ pub fn prefix_products(shape: &[usize]) -> Vec<usize> {
     products
 }
 
+/// Given a vector of products, returns the shape of the tensor represented by these products.
 pub fn prefix_products_to_shape(products: &[usize]) -> Vec<usize> {
     let mut shape = Vec::with_capacity(products.len() - 1);
     for i in 1..products.len() {
@@ -168,6 +191,7 @@ pub fn prefix_products_to_shape(products: &[usize]) -> Vec<usize> {
     shape
 }
 
+/// Merges two shape products, ensuring that they are compatible.
 pub fn merge_shape_products(a: &[usize], b: &[usize]) -> Vec<usize> {
     assert_eq!(a[0], 1);
     assert_eq!(b[0], 1);
@@ -181,11 +205,13 @@ pub fn merge_shape_products(a: &[usize], b: &[usize]) -> Vec<usize> {
     all
 }
 
+/// Keeps the shape products until the given dimension length.
 pub fn keep_shape_products_until(shape: &[usize], x: usize) -> Vec<usize> {
     let p = shape.iter().position(|&y| y == x).unwrap();
     shape[..=p].to_vec()
 }
 
+/// Keeps the shape until the given dimension length.
 pub fn keep_shape_until(shape: &[usize], x: usize) -> Vec<usize> {
     let mut p = 1;
     if x == 1 {
@@ -200,6 +226,7 @@ pub fn keep_shape_until(shape: &[usize], x: usize) -> Vec<usize> {
     unreachable!()
 }
 
+/// Keeps the shape since the given dimension length.
 pub fn keep_shape_since(shape: &[usize], x: usize) -> Vec<usize> {
     let mut p = 1;
     if x == 1 {
@@ -214,6 +241,7 @@ pub fn keep_shape_since(shape: &[usize], x: usize) -> Vec<usize> {
     unreachable!()
 }
 
+/// Returns an input mapping for the given shape, where the mapping is padded to the next power of two.
 pub fn shape_padded_mapping(shape: &[usize]) -> InputMapping {
     let mut cur = vec![0];
     let mut step = 1;
@@ -229,6 +257,7 @@ pub fn shape_padded_mapping(shape: &[usize]) -> InputMapping {
 }
 
 impl ShapeHistory {
+    /// Creates a new ShapeHistory with the given initial shape.
     pub fn new(initial_shape: Shape) -> Self {
         Self {
             vec_len: shape_vec_len(&initial_shape),
@@ -239,9 +268,10 @@ impl ShapeHistory {
         }
     }
 
-    // Suppose we need to ensure that the current shape is legal
-    // This function returns a list of dimension lengths where the initial vector must be split
-    // split_first_dim: first dimension of current shape will be split
+    /// Suppose we need to ensure that the current shape is legal.
+    /// This function returns a list of dimension lengths where the initial vector must be split.
+    ///
+    /// split_first_dim: first dimension of current shape will be split
     pub fn get_initial_split_list(&self, split_first_dim: bool) -> Vec<usize> {
         let last_entry = self.entries.last().unwrap().minimize(split_first_dim);
         let mut split_list = prefix_products(&last_entry.shape);
@@ -255,6 +285,7 @@ impl ShapeHistory {
         split_list
     }
 
+    /// Returns the transposed shape and bit order for the given shape.
     pub fn get_transposed_shape_and_bit_order(&self, shape: &[usize]) -> (Shape, BitOrder) {
         let mut cur = None;
         let initial_shape = || {
@@ -299,6 +330,7 @@ impl ShapeHistory {
         )
     }
 
+    /// Returns the current shape of the last entry in the history.
     pub fn shape(&self) -> Shape {
         let last_entry = self.entries.last().unwrap();
         match &last_entry.axes {
@@ -307,6 +339,7 @@ impl ShapeHistory {
         }
     }
 
+    /// Permutes a vector according to the shape history.
     pub fn permute_vec<T: Default + Clone>(&self, s: &[T]) -> Vec<T> {
         let mut idx = None;
         for e in self.entries.iter() {

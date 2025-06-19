@@ -1,3 +1,5 @@
+//! This module provides functionality to detect and optimize chains of linear combinations and multiplications in the circuit IR.
+
 use expr::{LinComb, LinCombTerm};
 
 use crate::{circuit::ir::common::Instruction as _, frontend::CircuitField};
@@ -5,6 +7,7 @@ use crate::{circuit::ir::common::Instruction as _, frontend::CircuitField};
 use super::{expr, Circuit, Config, FieldArith, Instruction, RootCircuit};
 
 impl<C: Config> Circuit<C> {
+    /// Detects and optimizes chains of linear combinations and multiplications in the circuit.
     pub fn detect_chains(&mut self) {
         let mut var_insn_id = vec![self.instructions.len(); self.num_inputs + 1];
         let mut is_add = vec![false; self.instructions.len() + 1];
@@ -140,7 +143,8 @@ impl<C: Config> Circuit<C> {
 }
 
 impl<C: Config> RootCircuit<C> {
-    // this function must be used with remove_unreachable
+    /// Detects and optimizes chains of linear combinations and multiplications in all circuits.
+    /// This function must be used with remove_unreachable, since it generates null instructions.
     pub fn detect_chains(&mut self) {
         for (_, circuit) in self.circuits.iter_mut() {
             circuit.detect_chains();

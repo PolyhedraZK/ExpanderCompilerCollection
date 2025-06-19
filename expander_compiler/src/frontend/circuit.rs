@@ -1,3 +1,6 @@
+//! This module provides macros and traits for defining circuit structures.
+
+/// This macro defines the field type for circuit variables.
 #[macro_export]
 macro_rules! declare_circuit_field_type {
     (@type Variable) => {
@@ -21,6 +24,7 @@ macro_rules! declare_circuit_field_type {
     };
 }
 
+/// This macro defines the `dump_into` method for circuit variables.
 #[macro_export]
 macro_rules! declare_circuit_dump_into {
     ($field_value:expr, @type Variable, $vars:expr, $public_vars:expr) => {
@@ -47,6 +51,7 @@ macro_rules! declare_circuit_dump_into {
     };
 }
 
+/// This macro defines the `load_from` method for circuit variables.
 #[macro_export]
 macro_rules! declare_circuit_load_from {
     ($field_value:expr, @type Variable, $vars:expr, $public_vars:expr) => {
@@ -73,6 +78,7 @@ macro_rules! declare_circuit_load_from {
     };
 }
 
+/// This macro defines the `num_vars` method for circuit variables, counting the number of variables.
 #[macro_export]
 macro_rules! declare_circuit_num_vars {
     ($field_value:expr, @type Variable, $cnt_sec:expr, $cnt_pub:expr, $array_cnt:expr) => {
@@ -97,6 +103,7 @@ macro_rules! declare_circuit_num_vars {
     };
 }
 
+/// This macro defines the default value for circuit variables.
 #[macro_export]
 macro_rules! declare_circuit_default {
     (@type Variable) => {
@@ -112,6 +119,12 @@ macro_rules! declare_circuit_default {
     };
 }
 
+/// This macro declares a circuit structure with fields of various types.
+///
+/// It implements the `DumpLoadTwoVariables` trait for the circuit, allowing it to dump
+/// and load its fields into/from a vector of variables.
+/// It also implements `Clone` and `Default` traits for the circuit structure.
+/// The fields can be of type `Variable`, `PublicVariable`, or arrays of these types
 #[macro_export]
 macro_rules! declare_circuit {
     ($struct_name:ident { $($field_name:ident : $field_type:tt),* $(,)? }) => {
@@ -166,6 +179,9 @@ use crate::circuit::config::Config;
 
 use super::api::RootAPI;
 
+/// This trait defines a circuit structure that can be compiled.
+/// It requires the implementation of a `define` method that takes a builder
+/// and defines the circuit using that builder.
 pub trait Define<C: Config> {
     fn define<Builder: RootAPI<C>>(&self, api: &mut Builder);
 }

@@ -1,3 +1,5 @@
+//! This modules implements the `Display` trait for the `Instruction` enum in the dest IR.
+
 use std::fmt;
 
 use super::{Config, Instruction};

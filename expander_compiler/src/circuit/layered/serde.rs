@@ -1,3 +1,5 @@
+//! This module provides serialization and deserialization for the layered circuit structure.
+
 use std::io::{Error as IoError, Read, Write};
 
 use arith::Field;

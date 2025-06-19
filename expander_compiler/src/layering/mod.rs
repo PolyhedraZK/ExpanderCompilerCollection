@@ -1,3 +1,7 @@
+//! This module compiles an IR root circuit into a layered circuit.
+//!
+//! For more details, see the comments in the private modules.
+
 use std::collections::HashMap;
 
 use crate::{
@@ -19,10 +23,12 @@ mod wire;
 #[cfg(test)]
 mod tests;
 
+/// Options for the compilation process.
 pub struct CompileOptions {
     pub allow_input_reorder: bool,
 }
 
+/// Main function to compile an IR root circuit into a layered circuit.
 pub fn compile<C: Config, I: InputType>(
     rc: &ir::dest::RootCircuit<C>,
     opts: CompileOptions,
@@ -34,7 +40,6 @@ pub fn compile<C: Config, I: InputType>(
         layer_layout_pool: Pool::new(),
         layer_req_to_layout: HashMap::new(),
         compiled_circuits: Vec::new(),
-        conncected_wires: HashMap::new(),
         layout_ids: Vec::new(),
         layers: Vec::new(),
         input_order: Vec::new(),

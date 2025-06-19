@@ -1,3 +1,7 @@
+//! This module transforms the hint-less IR into a dest IR, based on the basic builder.
+//!
+//! It provides more optimizations compared to the basic builder.
+
 use std::collections::{BinaryHeap, HashMap};
 
 use crate::{
@@ -24,41 +28,48 @@ use crate::{
 
 use super::basic::LinMeta;
 
+/// Threshold for compressing expressions into single variables.
 const COMPRESS_THRESHOLD: usize = 64;
 
+/// Root builder for the final build process.
 struct RootBuilder<C: Config> {
     builders: HashMap<usize, Builder<C>>,
     out_circuits: HashMap<usize, OutCircuit<C>>,
 }
 
+/// Builder for the final build process.
 struct Builder<C: Config> {
-    // in_var ref counts
+    /// In_var ref counts
     in_var_ref_counts: Vec<InVarRefCounts>,
 
-    // in_var mapped to expression of mid_vars
+    /// In_var mapped to expression of mid_vars
     in_var_exprs: Vec<Expression<C>>,
 
-    // pool of stripped mid_vars
-    // for internal variables, the expression is actual expression
-    // for in_vars, the expression is a fake expression with only one term
+    /// Pool of stripped mid_vars
+    ///
+    /// For internal variables, the expression is actual expression.
+    /// For in_vars, the expression is a fake expression with only one term.
     stripped_mid_vars: Pool<MidVarKey<C>>,
-    // mid_var i = k*(expr)+b
+    /// Mid_var i = k*(expr)+b
     mid_var_coefs: Vec<MidVarCoef<C>>,
-    // expected layer of mid_var, input==0
+    /// Expected layer of mid_var, input==0
     mid_var_layer: Vec<usize>,
 
-    // (effective mid_var id, insn)
+    /// Each entry is (effective mid_var id, insn)
     out_insns: Vec<(usize, OutInstruction<C>)>,
 
+    /// Estimated output layer of the circuit
     output_layer: usize,
 }
 
+/// Key for the stripped mid_vars pool.
 #[derive(Hash, PartialEq, Eq, Clone)]
 struct MidVarKey<C: Config> {
     expr: Expression<C>,
     is_force_single: bool,
 }
 
+/// MidVarCoef represents the coefficients for a mid variable.
 #[derive(Debug, Clone)]
 struct MidVarCoef<C: Config> {
     k: CircuitField<C>,
@@ -66,6 +77,9 @@ struct MidVarCoef<C: Config> {
     b: CircuitField<C>,
 }
 
+/// InVarRefCounts keeps track of how many times an in_var is referenced
+///
+/// It contains counts for addition, multiplication, and single references.
 #[derive(Debug, Clone, Default)]
 struct InVarRefCounts {
     add: usize,
@@ -84,6 +98,7 @@ impl<C: Config> Default for MidVarCoef<C> {
 }
 
 impl<C: Config> Builder<C> {
+    /// Creates a new Builder instance with initialized values.
     fn new() -> Self {
         let mut res = Builder {
             in_var_ref_counts: vec![InVarRefCounts::default()],
@@ -101,6 +116,7 @@ impl<C: Config> Builder<C> {
         res
     }
 
+    /// Creates a new variable for the given layer.
     fn new_var(&mut self, layer: usize) -> usize {
         let id = self.stripped_mid_vars.len();
         assert_eq!(
@@ -115,6 +131,7 @@ impl<C: Config> Builder<C> {
         id
     }
 
+    /// Adds `n` new input-IR variables for the given layer.
     fn add_in_vars(&mut self, n: usize, layer: usize) {
         let start = self.stripped_mid_vars.len();
         for i in 0..n {
@@ -124,10 +141,15 @@ impl<C: Config> Builder<C> {
         }
     }
 
+    /// Adds a constant to the input-IR variable expressions.
     fn add_const(&mut self, c: CircuitField<C>) {
         self.in_var_exprs.push(Expression::new_const(c));
     }
 
+    /// Returns a single variable expression for the given `expr`.
+    /// If `expr` is already a single variable, it returns it unchanged.
+    /// If `expr` is not a single variable, it strips constants and adds an instruction to make it single.
+    /// (Single means kx+b)
     fn make_single(&mut self, expr: Expression<C>) -> Expression<C> {
         let (e, coef, constant) = strip_constants(&expr);
         if e.len() == 1 && e.degree() <= 1 {
@@ -149,6 +171,7 @@ impl<C: Config> Builder<C> {
         unstrip_constants_single(idx, coef, constant, &self.mid_var_coefs[idx])
     }
 
+    /// Attempts to return a single variable expression for the given `expr`.
     fn try_make_single(&self, expr: Expression<C>) -> Expression<C> {
         let (e, coef, constant) = strip_constants(&expr);
         if e.len() == 1 && e.degree() <= 1 {
@@ -163,6 +186,8 @@ impl<C: Config> Builder<C> {
         }
     }
 
+    /// Makes a really single variable from the given expression.
+    /// (Really single means kx+b where k=1 and b=0)
     fn make_really_single(&mut self, e: Expression<C>) -> usize {
         if e.len() == 1 && e.degree() == 1 && e[0].coef == CircuitField::<C>::one() {
             match e[0].vars {
@@ -203,6 +228,7 @@ impl<C: Config> Builder<C> {
         idx
     }
 
+    /// Returns the layer of the given variable specification.
     fn layer_of_varspec(&self, vs: &VarSpec) -> usize {
         match vs {
             VarSpec::Linear(v) => self.mid_var_layer[*v],
@@ -219,6 +245,8 @@ impl<C: Config> Builder<C> {
         }
     }
 
+    /// Returns the layer of the given expression.
+    /// This is the maximum layer of its variable specifications.
     fn layer_of_expr(&self, e: &Expression<C>) -> usize {
         e.iter()
             .map(|term| self.layer_of_varspec(&term.vars))
@@ -226,6 +254,7 @@ impl<C: Config> Builder<C> {
             .unwrap()
     }
 
+    /// Process a linear combination and return the resulting expression.
     fn lin_comb(&mut self, lcs: &LinComb<C>) -> Expression<C> {
         let mut vars: Vec<Expression<C>> = lcs
             .terms
@@ -244,6 +273,8 @@ impl<C: Config> Builder<C> {
         })
     }
 
+    /// Process a linear combination with a custom coefficient function.
+    /// This is almost the same as `lin_comb_inner` in `basic` builder.
     fn lin_comb_inner<F: Fn(usize) -> CircuitField<C>>(
         &mut self,
         mut vars: Vec<Expression<C>>,
@@ -302,6 +333,9 @@ impl<C: Config> Builder<C> {
         }
     }
 
+    /// Adds terms in a layered manner.
+    ///
+    /// It always adds terms that are in the lowest layer, and adds the sum with variable in next layer.
     fn layered_add(&mut self, mut terms: Vec<Term<C>>) -> Expression<C> {
         if terms.len() <= 1 {
             return Expression::from_terms_sorted(terms);
@@ -343,6 +377,7 @@ impl<C: Config> Builder<C> {
         Expression::from_terms(cur_terms)
     }
 
+    /// Compares two expressions for multiplication.
     fn cmp_expr_for_mul(&self, a: &Expression<C>, b: &Expression<C>) -> std::cmp::Ordering {
         let la = self.layer_of_expr(a);
         let lb = self.layer_of_expr(b);
@@ -357,6 +392,24 @@ impl<C: Config> Builder<C> {
         a.cmp(b)
     }
 
+    /// Multiplies a vector of variables and returns the resulting expression.
+    ///
+    /// It does the following loop until only one expression remains:
+    ///
+    /// 1. Find the two smallest expressions in terms of the comparison defined by `cmp_expr_for_mul`.
+    ///    It will have the smallest layer, then the smallest length, and finally the lexicographical order.
+    ///
+    /// 2. If one of the expressions is constant, multiply it with the other expression and continue.
+    ///
+    /// 3. If the multiplication can't be done directly (e.g., one expression is quadratic),
+    ///    it will be compressed into a single variable.
+    ///
+    /// 4. If the multiplication can be done directly, but the cost of compressing is lower,
+    ///    it will compress one of the expressions into a single variable.
+    ///
+    /// 5. Now the two expressions are both linear, and the cost is acceptable,
+    ///    so the multiplication is done by multiplying each term of the first expression with each term of the second expression.
+    ///    The result is added to the heap for further processing.
     fn mul_vec(&mut self, vars: &[usize]) -> Expression<C> {
         use crate::utils::heap::{pop, push};
         assert!(vars.len() >= 2);
@@ -469,6 +522,9 @@ impl<C: Config> Builder<C> {
         exprs.swap_remove(final_pos)
     }
 
+    /// Adds an expression to the in_var_exprs and checks if it should be compressed into a single variable.
+    ///
+    /// The check is based on the reference counts and the degree count of the expression.
     fn add_and_check_if_should_make_single(&mut self, e: Expression<C>) {
         let ref_count = self.in_var_ref_counts[self.in_var_exprs.len()].clone();
         let degree_count = e.count_of_degrees();
@@ -491,6 +547,8 @@ impl<C: Config> Builder<C> {
     }
 }
 
+/// Strips constants from the expression and returns the expression without constants,
+/// the coefficient of the first term, and the constant value.
 fn strip_constants<C: Config>(
     expr: &Expression<C>,
 ) -> (Expression<C>, CircuitField<C>, CircuitField<C>) {
@@ -514,6 +572,7 @@ fn strip_constants<C: Config>(
     (Expression::from_terms_sorted(e), v, cst)
 }
 
+/// Unstrips constants from a single variable expression.
 fn unstrip_constants_single<C: Config>(
     vid: usize,
     coef: CircuitField<C>,
@@ -533,6 +592,7 @@ fn unstrip_constants_single<C: Config>(
     Expression::from_terms(e)
 }
 
+/// Processes a circuit and returns the output circuit and the builder.
 fn process_circuit<C: Config>(
     root: &mut RootBuilder<C>,
     circuit: &InCircuit<C>,
@@ -718,6 +778,9 @@ fn process_circuit<C: Config>(
     ))
 }
 
+/// Processes the root circuit and returns the output root circuit.
+///
+/// For details, see the comments of private functions in this module.
 pub fn process<C: Config>(rc: &InRootCircuit<C>) -> Result<OutRootCircuit<C>, Error> {
     let mut root: RootBuilder<C> = RootBuilder {
         builders: HashMap::new(),

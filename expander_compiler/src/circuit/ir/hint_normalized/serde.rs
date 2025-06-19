@@ -1,3 +1,5 @@
+//! This module provides serialization and deserialization for the `Instruction` enum in the hint-normalized IR.
+
 use std::io::{Error as IoError, Read, Write};
 
 use serdes::{ExpSerde, SerdeResult};

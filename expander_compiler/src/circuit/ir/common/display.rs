@@ -1,3 +1,5 @@
+//! This module provides the `Display` implementation for the `Circuit` and `RootCircuit` types.
+
 use std::fmt;
 
 use super::{Circuit, Instruction, IrConfig, RootCircuit};

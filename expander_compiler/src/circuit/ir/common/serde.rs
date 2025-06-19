@@ -1,3 +1,5 @@
+//! This module provides serialization and deserialization functionality for the circuit IR.
+
 use std::{
     collections::HashMap,
     io::{Error as IoError, Read, Write},

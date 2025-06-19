@@ -1,3 +1,5 @@
+//! This module provides the FFI API for compilation functions.
+
 use libc::{c_ulong, malloc};
 use std::ptr;
 use std::slice;
@@ -9,6 +11,7 @@ use serdes::ExpSerde;
 
 use super::{match_config_id, ByteArray, Config};
 
+/// This struct represents the result of the compilation process.
 #[repr(C)]
 pub struct CompileResult {
     ir_witness_gen: ByteArray,
@@ -107,6 +110,7 @@ fn to_compile_result(result: Result<(Vec<u8>, Vec<u8>), String>) -> CompileResul
     }
 }
 
+/// This function compiles the IR source code into a layered circuit and a witness generator.
 #[no_mangle]
 pub extern "C" fn compile(ir_source: ByteArray, config_id: c_ulong) -> CompileResult {
     let ir_source = unsafe { slice::from_raw_parts(ir_source.data, ir_source.length as usize) };

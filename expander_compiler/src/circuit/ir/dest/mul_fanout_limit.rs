@@ -1,11 +1,14 @@
+//! This module contains the implementation of the optimization that reduces the fanout of the input variables in multiplication gates.
+//!
+//! There are two ways to reduce the fanout of a variable:
+//!
+//! 1. Copy the whole expression to a new variable. This will copy all gates, and may increase the number of gates by a lot.
+//!
+//! 2. Create a relay expression of the variable. This may increase the layer of the circuit by 1.
+
 use super::*;
 
-// This module contains the implementation of the optimization that reduces the fanout of the input variables in multiplication gates.
-// There are two ways to reduce the fanout of a variable:
-// 1. Copy the whole expression to a new variable. This will copy all gates, and may increase the number of gates by a lot.
-// 2. Create a relay expression of the variable. This may increase the layer of the circuit by 1.
-
-// These are the limits for the first method.
+/// These are the limits for the first method.
 const MAX_COPIES_OF_VARIABLES: usize = 4;
 const MAX_COPIES_OF_GATES: usize = 64;
 
@@ -222,6 +225,7 @@ impl<C: Config> CircuitRelaxed<C> {
 }
 
 impl<C: Config> RootCircuitRelaxed<C> {
+    /// Solves the multiplication fanout limit for all circuits in the root circuit.
     pub fn solve_mul_fanout_limit(&self, limit: usize) -> RootCircuitRelaxed<C> {
         if limit <= 1 {
             panic!("limit must be greater than 1");

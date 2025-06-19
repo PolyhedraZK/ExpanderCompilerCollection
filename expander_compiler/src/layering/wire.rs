@@ -1,3 +1,7 @@
+//! This module provides the implementation for connecting wires in a layered circuit.
+//!
+//! It works after the layer layout is prepared, and connects the wires between layers.
+
 use std::collections::HashMap;
 
 use crate::{
@@ -126,6 +130,7 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
         LayoutQuery { var_pos }
     }
 
+    /// Connects wires between layers based on the provided layout IDs.
     pub fn connect_wires(&mut self, layout_ids: &[usize]) -> Vec<usize> {
         let layouts = layout_ids
             .iter()
@@ -217,16 +222,6 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
             });
         }
 
-        let mut cached_ress = Vec::with_capacity(ic.output_layer);
-        for i in 1..=ic.output_layer {
-            let key = layout_ids[ic.min_used_layer[i]..=i].to_vec();
-            cached_ress.push(self.conncected_wires.get(&key).cloned());
-        }
-        let all_cached = cached_ress.iter().all(|x| x.is_some());
-        if all_cached {
-            return cached_ress.into_iter().map(|x| x.unwrap()).collect();
-        }
-
         // connect sub circuits
         for (i, insn_id) in ic.sub_circuit_insn_ids.iter().enumerate() {
             let insn = &ic.sub_circuit_insn_refs[i];
@@ -278,70 +273,68 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
             if ic.min_layer[x] != 0 {
                 let next_layer = ic.min_layer[x];
                 let cur_layer = next_layer - 1;
-                if cached_ress[cur_layer].is_none() {
-                    let res = &mut ress[cur_layer];
-                    let aq = &lqs[cur_layer];
-                    let bq = &lqs[next_layer];
-                    let pos = if let Some(p) = bq.var_pos.get(&x) {
-                        *p
-                    } else {
-                        assert_eq!(cur_layer + 1, ic.output_layer);
-                        continue;
-                    };
-                    if let Some(value) = ic.constant_like_variables.get(&x) {
-                        res.gate_consts.push(GateConst {
-                            inputs: [],
-                            output: pos,
-                            coef: value.clone(),
-                        });
-                    } else if ic.internal_variable_expr.contains_key(&x) {
-                        for term in ic.internal_variable_expr[&x].iter() {
-                            match &term.vars {
-                                VarSpec::Const => {
-                                    res.gate_consts.push(GateConst {
-                                        inputs: [],
-                                        output: pos,
-                                        coef: Coef::Constant(term.coef),
-                                    });
-                                }
-                                VarSpec::Linear(vid) => {
-                                    res.gate_adds.push(GateAdd {
-                                        inputs: [I::Input::new(0, aq.var_pos[vid])],
-                                        output: pos,
-                                        coef: Coef::Constant(term.coef),
-                                    });
-                                }
-                                VarSpec::Quad(vid0, vid1) => {
-                                    let x = aq.var_pos[vid0];
-                                    let y = aq.var_pos[vid1];
-                                    let inputs = if x < y { [x, y] } else { [y, x] };
-                                    res.gate_muls.push(GateMul {
-                                        inputs: [
-                                            I::Input::new(0, inputs[0]),
-                                            I::Input::new(0, inputs[1]),
-                                        ],
-                                        output: pos,
-                                        coef: Coef::Constant(term.coef),
-                                    });
-                                }
-                                VarSpec::Custom { gate_type, inputs } => {
-                                    res.gate_customs.push(GateCustom {
-                                        gate_type: *gate_type,
-                                        inputs: inputs
-                                            .iter()
-                                            .map(|x| I::Input::new(0, aq.var_pos[x]))
-                                            .collect(),
-                                        output: pos,
-                                        coef: Coef::Constant(term.coef),
-                                    });
-                                }
-                                VarSpec::RandomLinear(vid) => {
-                                    res.gate_adds.push(GateAdd {
-                                        inputs: [I::Input::new(0, aq.var_pos[vid])],
-                                        output: pos,
-                                        coef: Coef::Random,
-                                    });
-                                }
+                let res = &mut ress[cur_layer];
+                let aq = &lqs[cur_layer];
+                let bq = &lqs[next_layer];
+                let pos = if let Some(p) = bq.var_pos.get(&x) {
+                    *p
+                } else {
+                    assert_eq!(cur_layer + 1, ic.output_layer);
+                    continue;
+                };
+                if let Some(value) = ic.constant_like_variables.get(&x) {
+                    res.gate_consts.push(GateConst {
+                        inputs: [],
+                        output: pos,
+                        coef: value.clone(),
+                    });
+                } else if ic.internal_variable_expr.contains_key(&x) {
+                    for term in ic.internal_variable_expr[&x].iter() {
+                        match &term.vars {
+                            VarSpec::Const => {
+                                res.gate_consts.push(GateConst {
+                                    inputs: [],
+                                    output: pos,
+                                    coef: Coef::Constant(term.coef),
+                                });
+                            }
+                            VarSpec::Linear(vid) => {
+                                res.gate_adds.push(GateAdd {
+                                    inputs: [I::Input::new(0, aq.var_pos[vid])],
+                                    output: pos,
+                                    coef: Coef::Constant(term.coef),
+                                });
+                            }
+                            VarSpec::Quad(vid0, vid1) => {
+                                let x = aq.var_pos[vid0];
+                                let y = aq.var_pos[vid1];
+                                let inputs = if x < y { [x, y] } else { [y, x] };
+                                res.gate_muls.push(GateMul {
+                                    inputs: [
+                                        I::Input::new(0, inputs[0]),
+                                        I::Input::new(0, inputs[1]),
+                                    ],
+                                    output: pos,
+                                    coef: Coef::Constant(term.coef),
+                                });
+                            }
+                            VarSpec::Custom { gate_type, inputs } => {
+                                res.gate_customs.push(GateCustom {
+                                    gate_type: *gate_type,
+                                    inputs: inputs
+                                        .iter()
+                                        .map(|x| I::Input::new(0, aq.var_pos[x]))
+                                        .collect(),
+                                    output: pos,
+                                    coef: Coef::Constant(term.coef),
+                                });
+                            }
+                            VarSpec::RandomLinear(vid) => {
+                                res.gate_adds.push(GateAdd {
+                                    inputs: [I::Input::new(0, aq.var_pos[vid])],
+                                    output: pos,
+                                    coef: Coef::Random,
+                                });
                             }
                         }
                     }
@@ -353,42 +346,38 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
                     .iter()
                     .zip(ic.occured_layers[x].iter().skip(1))
                 {
-                    if cached_ress[next_layer - 1].is_none() {
-                        let res = &mut ress[next_layer - 1];
-                        let aq = &lqs[*cur_layer];
-                        let bq = &lqs[*next_layer];
-                        let pos = if let Some(p) = bq.var_pos.get(&x) {
-                            *p
-                        } else {
-                            assert_eq!(*next_layer, ic.output_layer);
-                            continue;
-                        };
-                        res.gate_adds.push(GateAdd {
-                            inputs: [I::Input::new(next_layer - cur_layer - 1, aq.var_pos[&x])],
-                            output: pos,
-                            coef: Coef::Constant(CircuitField::<C>::one()),
-                        });
-                    }
+                    let res = &mut ress[next_layer - 1];
+                    let aq = &lqs[*cur_layer];
+                    let bq = &lqs[*next_layer];
+                    let pos = if let Some(p) = bq.var_pos.get(&x) {
+                        *p
+                    } else {
+                        assert_eq!(*next_layer, ic.output_layer);
+                        continue;
+                    };
+                    res.gate_adds.push(GateAdd {
+                        inputs: [I::Input::new(next_layer - cur_layer - 1, aq.var_pos[&x])],
+                        output: pos,
+                        coef: Coef::Constant(CircuitField::<C>::one()),
+                    });
                 }
             } else {
                 for cur_layer in ic.min_layer[x]..ic.max_layer[x] {
                     let next_layer = cur_layer + 1;
-                    if cached_ress[cur_layer].is_none() {
-                        let res = &mut ress[cur_layer];
-                        let aq = &lqs[cur_layer];
-                        let bq = &lqs[next_layer];
-                        let pos = if let Some(p) = bq.var_pos.get(&x) {
-                            *p
-                        } else {
-                            assert_eq!(next_layer, ic.output_layer);
-                            continue;
-                        };
-                        res.gate_adds.push(GateAdd {
-                            inputs: [I::Input::new(0, aq.var_pos[&x])],
-                            output: pos,
-                            coef: Coef::Constant(CircuitField::<C>::one()),
-                        });
-                    }
+                    let res = &mut ress[cur_layer];
+                    let aq = &lqs[cur_layer];
+                    let bq = &lqs[next_layer];
+                    let pos = if let Some(p) = bq.var_pos.get(&x) {
+                        *p
+                    } else {
+                        assert_eq!(next_layer, ic.output_layer);
+                        continue;
+                    };
+                    res.gate_adds.push(GateAdd {
+                        inputs: [I::Input::new(0, aq.var_pos[&x])],
+                        output: pos,
+                        coef: Coef::Constant(CircuitField::<C>::one()),
+                    });
                 }
             }
         }
@@ -455,11 +444,7 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
 
         let mut ress_ids = Vec::new();
 
-        for (res, cache) in ress.iter().zip(cached_ress.iter()) {
-            if let Some(cache) = cache {
-                ress_ids.push(*cache);
-                continue;
-            }
+        for res in ress.iter() {
             let res_id = self.compiled_circuits.len();
             self.compiled_circuits.push(res.clone());
             ress_ids.push(res_id);

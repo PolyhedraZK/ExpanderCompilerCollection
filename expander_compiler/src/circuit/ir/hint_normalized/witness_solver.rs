@@ -1,3 +1,5 @@
+//! This module provides the `WitnessSolver` struct for solving witness values in a circuit.
+
 use crate::circuit::{
     config::{CircuitField, SIMDField},
     layered::witness::{Witness, WitnessValues},
@@ -28,6 +30,7 @@ impl<C: Config> WitnessSolver<C> {
         Ok((a, res_len))
     }
 
+    /// Solves the witness from raw inputs.
     pub fn solve_witness_from_raw_inputs(
         &self,
         vars: Vec<CircuitField<C>>,
@@ -44,6 +47,7 @@ impl<C: Config> WitnessSolver<C> {
         })
     }
 
+    /// Solves the multiple witnesses from raw inputs.
     pub fn solve_witnesses_from_raw_inputs<
         F: Fn(usize) -> (Vec<CircuitField<C>>, Vec<CircuitField<C>>),
     >(

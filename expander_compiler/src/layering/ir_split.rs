@@ -1,3 +1,8 @@
+//! This module provides the implementation for splitting circuits into single-layer segments.
+//!
+//! It contains another implementation of the layering process, which is used to split circuits into segments that can be executed in a single or several layers.
+//! This algorithm can deal with sub-circuit with different input layers, and it performs better when there are many sub-circuit calls.
+
 use core::panic;
 use std::collections::{HashMap, HashSet};
 
@@ -12,6 +17,7 @@ use crate::{
     utils::pool::Pool,
 };
 
+/// This context is used to store the state during the splitting process.
 struct SplitContext<'a, C: Config> {
     // the root circuit
     rc: &'a IrRootCircuit<C>,
@@ -44,6 +50,7 @@ enum SplitVarRef {
 }
 
 impl<'a, C: Config> SplitContext<'a, C> {
+    /// Computes the output layers of each ouput variable for a given circuit and input layers.
     fn compute_output_layers(&mut self, circuit_id: usize, input_layers: Vec<usize>) {
         let circuit = &self.rc.circuits[&circuit_id];
         let mut var_layers = vec![0];
@@ -93,6 +100,7 @@ impl<'a, C: Config> SplitContext<'a, C> {
             .insert((circuit_id, input_layers), cc_occured_layers);
     }
 
+    /// Expands sub-circuit calls in the circuit, replacing them with the corresponding segments.
     fn expand_sub_circuit_calls_phase1(
         &mut self,
         circuit_id: usize,
@@ -215,6 +223,7 @@ impl<'a, C: Config> SplitContext<'a, C> {
         )
     }
 
+    /// Splits a circuit into segments based on the provided split layers.
     fn split_circuit(&mut self, circuit_id: usize, input_layers: Vec<usize>, split_at: &[usize]) {
         let pre_split_at = split_at;
         let mut split_at_set: HashSet<usize> = split_at.iter().cloned().collect();
@@ -465,6 +474,8 @@ impl<'a, C: Config> SplitContext<'a, C> {
     }
 }
 
+/// Splits the given root circuit into single-layer segments.
+/// Actually, it's not always single-layer, but the input and output variable in new segments will be in the same layer.
 pub fn split_to_single_layer<C: Config>(root: &IrRootCircuit<C>) -> IrRootCircuit<C> {
     let mut ctx = SplitContext {
         rc: root,
