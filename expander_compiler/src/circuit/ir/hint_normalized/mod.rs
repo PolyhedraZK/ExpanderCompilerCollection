@@ -208,7 +208,7 @@ impl<C: Config> Instruction<C> {
         &self,
         values: &[CircuitField<C>],
         public_inputs: &[CircuitField<C>],
-        hint_caller: &mut impl HintCaller<CircuitField<C>>,
+        hint_caller: &impl HintCaller<CircuitField<C>>,
     ) -> EvalResult<C> {
         if let Instruction::ConstantLike(coef) = self {
             return match coef {
@@ -486,7 +486,7 @@ impl<C: Config> RootCircuit<C> {
         &self,
         inputs: Vec<CircuitField<C>>,
         public_inputs: &[CircuitField<C>],
-        hint_caller: &mut impl HintCaller<CircuitField<C>>,
+        hint_caller: &impl HintCaller<CircuitField<C>>,
     ) -> Result<Vec<CircuitField<C>>, Error> {
         assert_eq!(inputs.len(), self.input_size());
         self.eval_sub_safe(&self.circuits[&0], inputs, public_inputs, hint_caller)
@@ -497,7 +497,7 @@ impl<C: Config> RootCircuit<C> {
         circuit: &Circuit<C>,
         inputs: Vec<CircuitField<C>>,
         public_inputs: &[CircuitField<C>],
-        hint_caller: &mut impl HintCaller<CircuitField<C>>,
+        hint_caller: &impl HintCaller<CircuitField<C>>,
     ) -> Result<Vec<CircuitField<C>>, Error> {
         let mut values = vec![CircuitField::<C>::zero(); 1];
         values.extend(inputs);
@@ -534,7 +534,7 @@ impl<C: Config> RootCircuit<C> {
         &self,
         inputs: Vec<SF>,
         public_inputs: &[SF],
-        hint_caller: &mut impl HintCaller<CircuitField<C>>,
+        hint_caller: &impl HintCaller<CircuitField<C>>,
     ) -> Result<Vec<SF>, Error> {
         assert_eq!(inputs.len(), self.input_size());
         let mut result_values = Vec::new();
@@ -553,7 +553,7 @@ impl<C: Config> RootCircuit<C> {
         circuit: &Circuit<C>,
         inputs: Vec<SF>,
         public_inputs: &[SF],
-        hint_caller: &mut impl HintCaller<CircuitField<C>>,
+        hint_caller: &impl HintCaller<CircuitField<C>>,
         result_values: &mut Vec<SF>,
     ) -> Result<(), Error> {
         let mut values = vec![SF::zero(); 1];
