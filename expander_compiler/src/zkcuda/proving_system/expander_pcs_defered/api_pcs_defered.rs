@@ -1,7 +1,7 @@
 use gkr_engine::{FieldEngine, GKREngine};
 
 use crate::{
-    frontend::Config,
+    frontend::{Config, SIMDField},
     zkcuda::proving_system::{
         expander::structs::{ExpanderProverSetup, ExpanderVerifierSetup},
         expander_parallelized::client_utils::{
@@ -29,7 +29,7 @@ where
     type Proof = CombinedProof<ECCConfig, Expander<C>>;
 
     fn setup(
-        computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
+        computation_graph: &crate::zkcuda::context::ComputationGraph<ECCConfig>,
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
         client_launch_server_and_setup::<C, ECCConfig>(
             "../target/release/expander_server_pcs_defered",
@@ -39,15 +39,15 @@ where
 
     fn prove(
         _prover_setup: &Self::ProverSetup,
-        _computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
-        device_memories: &[crate::zkcuda::context::DeviceMemory<ECCConfig>],
+        _computation_graph: &crate::zkcuda::context::ComputationGraph<ECCConfig>,
+        device_memories: &[Vec<SIMDField<ECCConfig>>],
     ) -> Self::Proof {
         client_send_witness_and_prove(device_memories)
     }
 
     fn verify(
         verifier_setup: &Self::VerifierSetup,
-        computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
+        computation_graph: &crate::zkcuda::context::ComputationGraph<ECCConfig>,
         proof: &Self::Proof,
     ) -> bool {
         super::verify_impl::verify(verifier_setup, computation_graph, proof.clone())

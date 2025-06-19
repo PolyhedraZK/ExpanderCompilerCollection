@@ -10,7 +10,7 @@ use crate::{
     frontend::{Config, SIMDField},
     utils::misc::next_power_of_two,
     zkcuda::{
-        proof::ComputationGraph,
+        context::ComputationGraph,
         proving_system::{
             expander::{
                 commit_impl::local_commit_impl,
@@ -129,21 +129,21 @@ where
     let mut challenges = vec![];
 
     let proofs = computation_graph
-        .proof_templates
+        .proof_templates()
         .iter()
         .map(|template| {
             let commitment_values = template
-                .commitment_indices
+                .commitment_indices()
                 .iter()
                 .map(|&idx| values[idx].as_ref())
                 .collect::<Vec<_>>();
 
             let gkr_end_state = prove_kernel_gkr::<C, ECCConfig>(
                 global_mpi_config,
-                &computation_graph.kernels[template.kernel_id],
+                &computation_graph.kernels()[template.kernel_id()],
                 &commitment_values,
-                next_power_of_two(template.parallel_count),
-                &template.is_broadcast,
+                next_power_of_two(template.parallel_count()),
+                template.is_broadcast(),
             );
 
             if global_mpi_config.is_root() {
@@ -154,8 +154,8 @@ where
                 let (local_vals_ref, local_challenges) = extract_pcs_claims::<C>(
                     &commitment_values,
                     &challenge,
-                    &template.is_broadcast,
-                    next_power_of_two(template.parallel_count),
+                    template.is_broadcast(),
+                    next_power_of_two(template.parallel_count()),
                 );
 
                 vals_ref.extend(local_vals_ref);

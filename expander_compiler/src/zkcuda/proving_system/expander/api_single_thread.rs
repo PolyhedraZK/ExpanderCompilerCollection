@@ -4,9 +4,8 @@ use std::io::Cursor;
 use crate::circuit::config::Config;
 use crate::frontend::SIMDField;
 use crate::utils::misc::next_power_of_two;
-use crate::zkcuda::context::DeviceMemory;
+use crate::zkcuda::context::ComputationGraph;
 use crate::zkcuda::kernel::Kernel;
-use crate::zkcuda::proof::ComputationGraph;
 use crate::zkcuda::proving_system::expander::commit_impl::local_commit_impl;
 use crate::zkcuda::proving_system::expander::prove_impl::{
     get_local_vals, partition_gkr_claims_and_open_pcs_no_mpi, prepare_expander_circuit,
@@ -45,7 +44,7 @@ where
     type CommitmentState = ExpanderCommitmentState<C::PCSField, C::FieldConfig, C::PCSConfig>;
 
     fn setup(
-        computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
+        computation_graph: &crate::zkcuda::context::ComputationGraph<ECCConfig>,
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
         local_setup_impl::<C, ECCConfig>(computation_graph)
     }
@@ -88,7 +87,7 @@ where
                 &mut expander_circuit,
                 &mut prover_scratch,
                 &local_vals,
-                &kernel.layered_circuit_input,
+                kernel.layered_circuit_input(),
                 &mut transcript,
                 &MPIConfig::prover_new(None, None),
             );
@@ -119,7 +118,7 @@ where
         is_broadcast: &[bool],
     ) -> bool {
         let timer = Timer::new("verify", true);
-        let mut expander_circuit = kernel.layered_circuit.export_to_expander().flatten::<C>();
+        let mut expander_circuit = kernel.layered_circuit().export_to_expander().flatten::<C>();
         expander_circuit.pre_process_gkr::<C>();
 
         for i in 0..parallel_count {
@@ -190,38 +189,38 @@ where
     fn prove(
         prover_setup: &Self::ProverSetup,
         computation_graph: &ComputationGraph<ECCConfig>,
-        device_memories: &[DeviceMemory<ECCConfig>],
+        device_memories: &[Vec<SIMDField<ECCConfig>>],
     ) -> Self::Proof {
         let (commitments, states) = device_memories
             .iter()
             .map(|device_memory| {
                 <Self as KernelWiseProvingSystem<ECCConfig>>::commit(
                     prover_setup,
-                    &device_memory.values[..],
+                    &device_memory[..],
                 )
             })
             .unzip::<_, _, Vec<_>, Vec<_>>();
 
         let proofs: Vec<<Self as KernelWiseProvingSystem<ECCConfig>>::Proof> = computation_graph
-            .proof_templates
+            .proof_templates()
             .iter()
             .map(|template| {
                 let (mut local_commitments, mut local_state, mut local_vals) =
                     (vec![], vec![], vec![]);
-                for idx in &template.commitment_indices {
+                for idx in template.commitment_indices() {
                     local_commitments.push(&commitments[*idx]);
                     local_state.push(&states[*idx]);
-                    local_vals.push(&device_memories[*idx].values[..]);
+                    local_vals.push(&device_memories[*idx][..]);
                 }
 
                 <Self as KernelWiseProvingSystem<ECCConfig>>::prove_kernel(
                     prover_setup,
-                    &computation_graph.kernels[template.kernel_id],
+                    &computation_graph.kernels()[template.kernel_id()],
                     &local_commitments,
                     &local_state,
                     &local_vals,
-                    next_power_of_two(template.parallel_count),
-                    &template.is_broadcast,
+                    next_power_of_two(template.parallel_count()),
+                    template.is_broadcast(),
                 )
             })
             .collect::<Vec<_>>();
@@ -240,21 +239,21 @@ where
         let verified = proof
             .proofs
             .par_iter()
-            .zip(computation_graph.proof_templates.par_iter())
+            .zip(computation_graph.proof_templates().par_iter())
             .map(|(local_proof, template)| {
                 let local_commitments = template
-                    .commitment_indices
+                    .commitment_indices()
                     .iter()
                     .map(|idx| &proof.commitments[*idx])
                     .collect::<Vec<_>>();
 
                 <Self as KernelWiseProvingSystem<ECCConfig>>::verify_kernel(
                     verifier_setup,
-                    &computation_graph.kernels[template.kernel_id],
+                    &computation_graph.kernels()[template.kernel_id()],
                     local_proof,
                     &local_commitments,
-                    next_power_of_two(template.parallel_count),
-                    &template.is_broadcast,
+                    next_power_of_two(template.parallel_count()),
+                    template.is_broadcast(),
                 )
             })
             .collect::<Vec<_>>();

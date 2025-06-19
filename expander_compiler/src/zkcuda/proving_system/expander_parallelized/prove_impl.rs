@@ -8,8 +8,8 @@ use crate::{
     frontend::{Config, SIMDField},
     utils::misc::next_power_of_two,
     zkcuda::{
+        context::ComputationGraph,
         kernel::Kernel,
-        proof::ComputationGraph,
         proving_system::{
             expander::{
                 commit_impl::local_commit_impl,
@@ -47,21 +47,21 @@ where
     };
 
     let proofs = computation_graph
-        .proof_templates
+        .proof_templates()
         .iter()
         .map(|template| {
             let commitment_values = template
-                .commitment_indices
+                .commitment_indices()
                 .iter()
                 .map(|&idx| values[idx].as_ref())
                 .collect::<Vec<_>>();
 
             let gkr_end_state = prove_kernel_gkr::<C, ECCConfig>(
                 global_mpi_config,
-                &computation_graph.kernels[template.kernel_id],
+                &computation_graph.kernels()[template.kernel_id()],
                 &commitment_values,
-                next_power_of_two(template.parallel_count),
-                &template.is_broadcast,
+                next_power_of_two(template.parallel_count()),
+                template.is_broadcast(),
             );
 
             if global_mpi_config.is_root() {
@@ -77,12 +77,12 @@ where
                         prover_setup,
                         &commitment_values,
                         &template
-                            .commitment_indices
+                            .commitment_indices()
                             .iter()
                             .map(|&idx| &states.as_ref().unwrap()[idx])
                             .collect::<Vec<_>>(),
                         c,
-                        &template.is_broadcast,
+                        template.is_broadcast(),
                         &mut transcript,
                     );
                 });
@@ -146,7 +146,7 @@ where
         &mut expander_circuit,
         &mut prover_scratch,
         &local_commitment_values,
-        &kernel.layered_circuit_input,
+        kernel.layered_circuit_input(),
         &mut transcript,
         &local_mpi_config,
     );

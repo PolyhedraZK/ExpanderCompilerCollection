@@ -13,8 +13,8 @@ use crate::{
     frontend::Config,
     utils::misc::next_power_of_two,
     zkcuda::{
+        context::ComputationGraph,
         kernel::Kernel,
-        proof::ComputationGraph,
         proving_system::{
             expander::structs::{ExpanderCommitment, ExpanderProof, ExpanderVerifierSetup},
             expander_parallelized::prove_impl::partition_challenge_and_location_for_pcs_mpi,
@@ -69,7 +69,7 @@ where
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    let mut expander_circuit = kernel.layered_circuit.export_to_expander().flatten::<C>();
+    let mut expander_circuit = kernel.layered_circuit().export_to_expander().flatten::<C>();
     expander_circuit.pre_process_gkr::<C>();
 
     let mut transcript = C::TranscriptConfig::new();
@@ -156,18 +156,18 @@ where
     let verified_with_pcs_claims = proof
         .proofs
         .par_iter()
-        .zip(computation_graph.proof_templates.par_iter())
+        .zip(computation_graph.proof_templates().par_iter())
         .map(|(local_proof, template)| {
             let local_commitments = template
-                .commitment_indices
+                .commitment_indices()
                 .iter()
                 .map(|idx| &proof.commitments[*idx])
                 .collect::<Vec<_>>();
 
             let (verified, challenge) = verify_gkr::<C, ECCConfig>(
-                &computation_graph.kernels[template.kernel_id],
+                &computation_graph.kernels()[template.kernel_id()],
                 local_proof,
-                next_power_of_two(template.parallel_count),
+                next_power_of_two(template.parallel_count()),
             );
 
             assert!(challenge.challenge_y().is_none());
@@ -176,8 +176,8 @@ where
             let (local_commitments, challenges) = verifier_extract_pcs_claims::<C, ECCConfig>(
                 &local_commitments,
                 &challenge,
-                &template.is_broadcast,
-                next_power_of_two(template.parallel_count),
+                template.is_broadcast(),
+                next_power_of_two(template.parallel_count()),
             );
 
             (verified, local_commitments, challenges)

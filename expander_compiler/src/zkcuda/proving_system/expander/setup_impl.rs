@@ -5,7 +5,7 @@ use gkr_engine::{FieldEngine, GKREngine, MPIConfig};
 use crate::{
     frontend::Config,
     zkcuda::{
-        proof::ComputationGraph,
+        context::ComputationGraph,
         proving_system::expander::{
             structs::{ExpanderProverSetup, ExpanderVerifierSetup},
             utils::pcs_testing_setup_fixed_seed,
@@ -26,7 +26,7 @@ where
 {
     let mut p_keys = HashMap::new();
     let mut v_keys = HashMap::new();
-    for commitment_len in computation_graph.commitments_lens.iter() {
+    for commitment_len in computation_graph.commitments_lens().iter() {
         if p_keys.contains_key(commitment_len) {
             continue;
         }

@@ -1,117 +1,10 @@
 use expander_compiler::frontend::*;
-use expander_compiler::zkcuda::proof::ComputationGraph;
-use expander_compiler::zkcuda::proving_system::expander_pcs_defered::BN254ConfigSha2UniKZG;
-use expander_compiler::zkcuda::proving_system::{
-    Expander, ExpanderPCSDefered, ParallelizedExpander, ProvingSystem,
-};
+use expander_compiler::zkcuda::proving_system::{Expander, ParallelizedExpander, ProvingSystem};
+use expander_compiler::zkcuda::shape::Reshape;
 use expander_compiler::zkcuda::{context::*, kernel::*};
 
 use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
-use gkr_engine::FieldEngine;
 use serdes::ExpSerde;
-
-fn add_2<C: Config>(api: &mut API<C>, inputs: &mut Vec<Vec<Variable>>) {
-    let a = inputs[0][0];
-    let b = inputs[0][1];
-    let sum = api.add(a, b);
-    inputs[1][0] = sum;
-}
-
-fn add_16<C: Config>(api: &mut API<C>, inputs: &mut Vec<Vec<Variable>>) {
-    let mut sum = api.constant(0);
-    for i in 0..16 {
-        sum = api.add(sum, inputs[0][i]);
-    }
-    inputs[1][0] = sum;
-}
-
-fn zkcuda_1_expander<C: Config, P: ProvingSystem<C>>() {
-    let kernel_add_2: Kernel<C> = compile_with_spec(
-        add_2,
-        &[
-            IOVecSpec {
-                len: 2,
-                is_input: true,
-                is_output: false,
-            },
-            IOVecSpec {
-                len: 1,
-                is_input: false,
-                is_output: true,
-            },
-        ],
-    )
-    .unwrap();
-    let kernel_add_16: Kernel<C> = compile_with_spec(
-        add_16,
-        &[
-            IOVecSpec {
-                len: 16,
-                is_input: true,
-                is_output: false,
-            },
-            IOVecSpec {
-                len: 1,
-                is_input: false,
-                is_output: true,
-            },
-        ],
-    )
-    .unwrap();
-
-    let mut ctx = Context::<C>::default();
-    let mut a = vec![];
-    for i in 0..32 {
-        a.push(<C::FieldConfig as FieldEngine>::CircuitField::from(
-            i + 1_u32,
-        ));
-    }
-    let a = ctx.copy_raw_to_device(&a);
-    let mut io = vec![a, None];
-    ctx.call_kernel_raw(&kernel_add_2, &mut io, 16, &[false, false]);
-    let b = io[1].clone();
-    let mut io = vec![b, None];
-    ctx.call_kernel_raw(&kernel_add_16, &mut io, 1, &[false, false]);
-    let c = io[1].clone();
-    let result = ctx.copy_raw_to_host(c);
-    assert_eq!(
-        result,
-        vec![<C::FieldConfig as FieldEngine>::CircuitField::from(
-            32 * 33 / 2
-        )]
-    );
-
-    let computation_graph = ctx.to_computation_graph();
-    let (prover_setup, verifier_setup) = P::setup(&computation_graph);
-    let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
-    assert!(P::verify(&verifier_setup, &computation_graph, &proof));
-    P::post_process();
-}
-
-#[test]
-fn zkcuda_1_single_core() {
-    zkcuda_1_expander::<GF2Config, Expander<GF2Config>>();
-    zkcuda_1_expander::<M31Config, Expander<M31Config>>();
-    zkcuda_1_expander::<GoldilocksConfig, Expander<GoldilocksConfig>>();
-    zkcuda_1_expander::<BabyBearConfig, Expander<BabyBearConfig>>();
-    zkcuda_1_expander::<BN254Config, Expander<BN254Config>>();
-    zkcuda_1_expander::<BN254Config, Expander<BN254ConfigSha2Hyrax>>();
-    zkcuda_1_expander::<BN254Config, Expander<BN254ConfigSha2KZG>>();
-}
-
-#[test]
-fn zkcuda_1_multi_core() {
-    zkcuda_1_expander::<M31Config, ParallelizedExpander<M31Config>>();
-    zkcuda_1_expander::<GF2Config, ParallelizedExpander<GF2Config>>();
-    zkcuda_1_expander::<GoldilocksConfig, ParallelizedExpander<GoldilocksConfig>>();
-    zkcuda_1_expander::<BabyBearConfig, ParallelizedExpander<BabyBearConfig>>();
-    zkcuda_1_expander::<BN254Config, ParallelizedExpander<BN254Config>>();
-    zkcuda_1_expander::<BN254Config, ParallelizedExpander<BN254ConfigSha2Hyrax>>();
-    zkcuda_1_expander::<BN254Config, ParallelizedExpander<BN254ConfigSha2KZG>>();
-
-    zkcuda_1_expander::<BN254Config, ExpanderPCSDefered<BN254ConfigSha2Hyrax>>();
-    zkcuda_1_expander::<BN254Config, ExpanderPCSDefered<BN254ConfigSha2UniKZG>>();
-}
 
 #[kernel]
 fn add_2_macro<C: Config>(api: &mut API<C>, a: &[InputVariable; 2], b: &mut OutputVariable) {
@@ -127,53 +20,84 @@ fn add_16_macro<C: Config>(api: &mut API<C>, a: &[InputVariable; 16], b: &mut Ou
     *b = sum;
 }
 
-#[test]
-fn zkcuda_2() {
-    let kernel_add_2: Kernel<M31Config> = compile_add_2_macro().unwrap();
-    let kernel_add_16: Kernel<M31Config> = compile_add_16_macro().unwrap();
-    println!("{:?}", kernel_add_2.io_shapes);
-    println!("{:?}", kernel_add_16.io_shapes);
+fn zkcuda_test<C: Config, P: ProvingSystem<C>>() {
+    let kernel_add_2: KernelPrimitive<C> = compile_add_2_macro().unwrap();
+    let kernel_add_16: KernelPrimitive<C> = compile_add_16_macro().unwrap();
+    println!("{:?}", kernel_add_2.io_shapes());
+    println!("{:?}", kernel_add_16.io_shapes());
 
-    let mut ctx: Context<M31Config> = Context::default();
-    let mut a: Vec<Vec<M31>> = vec![];
+    let mut ctx: Context<C> = Context::default();
+    let mut a: Vec<Vec<CircuitField<C>>> = vec![];
     for i in 0..16 {
         a.push(vec![]);
         for j in 0..2 {
-            a[i].push(M31::from((i * 2 + j + 1) as u32));
+            a[i].push(CircuitField::<C>::from((i * 2 + j + 1) as u32));
         }
     }
-    let a = ctx.copy_to_device(&a, false);
+    let a = ctx.copy_to_device(&a);
     let mut b: DeviceMemoryHandle = None;
-    call_kernel!(ctx, kernel_add_2, a, mut b);
+    call_kernel!(ctx, kernel_add_2, 16, a, mut b).unwrap();
     let b = b.reshape(&[1, 16]);
     let mut c: DeviceMemoryHandle = None;
-    call_kernel!(ctx, kernel_add_16, b, mut c);
+    call_kernel!(ctx, kernel_add_16, 1, b, mut c).unwrap();
     let c = c.reshape(&[]);
-    let result: M31 = ctx.copy_to_host(c);
-    assert_eq!(result, M31::from(32 * 33 / 2));
+    let result: CircuitField<C> = ctx.copy_to_host(c);
+    assert_eq!(result, CircuitField::<C>::from(32 * 33 / 2));
 
-    let computation_graph = ctx.to_computation_graph();
-    let (prover_setup, verifier_setup) = Expander::<M31Config>::setup(&computation_graph);
-    let proof =
-        Expander::<M31Config>::prove(&prover_setup, &computation_graph, &ctx.device_memories);
-    assert!(Expander::<M31Config>::verify(
-        &verifier_setup,
+    let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.solve_witness().unwrap();
+    let (prover_setup, verifier_setup) = P::setup(&computation_graph);
+    let proof = P::prove(
+        &prover_setup,
         &computation_graph,
-        &proof
-    ));
+        &ctx.export_device_memories(),
+    );
+    assert!(P::verify(&verifier_setup, &computation_graph, &proof));
+    P::post_process();
 }
 
 #[test]
-fn zkcuda_2_simd() {
-    use arith::SimdField;
-    type P = Expander<M31Config>;
+#[allow(deprecated)]
+fn zkcuda_test_single_core_dummy() {
+    // DO NOT USE DUMMY PROVING SYSTEM IN PRODUCTION!!!
+    zkcuda_test::<
+        M31Config,
+        expander_compiler::zkcuda::proving_system::DummyProvingSystem<M31Config>,
+    >();
+}
 
-    let kernel_add_2_tmp: Kernel<M31Config> = compile_add_2_macro().unwrap();
-    let kernel_add_16: Kernel<M31Config> = compile_add_16_macro().unwrap();
+#[test]
+fn zkcuda_test_single_core() {
+    zkcuda_test::<GF2Config, Expander<GF2Config>>();
+    zkcuda_test::<M31Config, Expander<M31Config>>();
+    zkcuda_test::<GoldilocksConfig, Expander<GoldilocksConfig>>();
+    zkcuda_test::<BabyBearConfig, Expander<BabyBearConfig>>();
+    zkcuda_test::<BN254Config, Expander<BN254Config>>();
+    zkcuda_test::<BN254Config, Expander<BN254ConfigSha2Hyrax>>();
+    zkcuda_test::<BN254Config, Expander<BN254ConfigSha2KZG>>();
+}
+
+#[test]
+fn zkcuda_test_multi_core() {
+    zkcuda_test::<M31Config, ParallelizedExpander<M31Config>>();
+    zkcuda_test::<GF2Config, ParallelizedExpander<GF2Config>>();
+    zkcuda_test::<GoldilocksConfig, ParallelizedExpander<GoldilocksConfig>>();
+    zkcuda_test::<BabyBearConfig, ParallelizedExpander<BabyBearConfig>>();
+    zkcuda_test::<BN254Config, ParallelizedExpander<BN254Config>>();
+    zkcuda_test::<BN254Config, ParallelizedExpander<BN254ConfigSha2Hyrax>>();
+    zkcuda_test::<BN254Config, ParallelizedExpander<BN254ConfigSha2KZG>>();
+}
+
+fn zkcuda_test_simd_prepare_ctx() -> Context<M31Config> {
+    use arith::SimdField;
+
+    let kernel_add_2_tmp: KernelPrimitive<M31Config> = compile_add_2_macro().unwrap();
+    let kernel_add_16: KernelPrimitive<M31Config> = compile_add_16_macro().unwrap();
 
     let mut buf: Vec<u8> = Vec::new();
     kernel_add_2_tmp.serialize_into(&mut buf).unwrap();
-    let kernel_add_2: Kernel<M31Config> = Kernel::deserialize_from(&mut buf.as_slice()).unwrap();
+    let kernel_add_2: KernelPrimitive<M31Config> =
+        KernelPrimitive::deserialize_from(&mut buf.as_slice()).unwrap();
 
     let mut ctx: Context<M31Config> = Context::default();
     let mut a: Vec<Vec<mersenne31::M31x16>> = vec![];
@@ -187,25 +111,38 @@ fn zkcuda_2_simd() {
             a[i].push(mersenne31::M31x16::pack(&tmp));
         }
     }
-    let a = ctx.copy_simd_to_device(&a, false);
+    let a = ctx.copy_simd_to_device(&a);
     let mut b = None;
-    call_kernel!(ctx, kernel_add_2, a, mut b);
+    call_kernel!(ctx, kernel_add_2, 16, a, mut b).unwrap();
     let b = b.reshape(&[1, 16]);
     let mut c = None;
-    call_kernel!(ctx, kernel_add_16, b, mut c);
+    call_kernel!(ctx, kernel_add_16, 1, b, mut c).unwrap();
     let c = c.reshape(&[]);
     let result: mersenne31::M31x16 = ctx.copy_simd_to_host(c);
     let result = result.unpack();
     for k in 0..16 {
         assert_eq!(result[k], M31::from((32 * 33 / 2 + 32 * k) as u32));
     }
+    ctx
+}
 
-    let computation_graph = ctx.to_computation_graph();
+#[test]
+fn zkcuda_test_simd() {
+    type P = Expander<M31Config>;
+
+    let mut ctx = zkcuda_test_simd_prepare_ctx();
+
+    let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.solve_witness().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
-    let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
+    let proof = P::prove(
+        &prover_setup,
+        &computation_graph,
+        &ctx.export_device_memories(),
+    );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 
-    // test serde
+    // test proof serde and verification
     let mut buf_cg: Vec<u8> = Vec::new();
     computation_graph.serialize_into(&mut buf_cg).unwrap();
     let mut buf_proof: Vec<u8> = Vec::new();
@@ -220,16 +157,29 @@ fn zkcuda_2_simd() {
     assert!(P::verify(&verifier_setup2, &computation_graph2, &proof2));
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
     assert!(P::verify(&verifier_setup2, &computation_graph2, &proof));
+
+    // test load computation graph
+    let mut ctx3: Context<M31Config> = zkcuda_test_simd_prepare_ctx();
+    let (prover_setup3, _verifier_setup3) = P::setup(&computation_graph2);
+    ctx3.load_computation_graph(computation_graph2).unwrap();
+    ctx3.solve_witness().unwrap();
+    let proof3 = P::prove(
+        &prover_setup3,
+        &computation_graph,
+        &ctx3.export_device_memories(),
+    );
+    assert!(P::verify(&verifier_setup2, &computation_graph, &proof3));
 }
 
 #[test]
-fn zkcuda_2_simd_autopack() {
-    let kernel_add_2_tmp: Kernel<M31Config> = compile_add_2_macro().unwrap();
-    let kernel_add_16: Kernel<M31Config> = compile_add_16_macro().unwrap();
+fn zkcuda_test_simd_autopack() {
+    let kernel_add_2_tmp: KernelPrimitive<M31Config> = compile_add_2_macro().unwrap();
+    let kernel_add_16: KernelPrimitive<M31Config> = compile_add_16_macro().unwrap();
 
     let mut buf: Vec<u8> = Vec::new();
     kernel_add_2_tmp.serialize_into(&mut buf).unwrap();
-    let kernel_add_2: Kernel<M31Config> = Kernel::deserialize_from(&mut buf.as_slice()).unwrap();
+    let kernel_add_2: KernelPrimitive<M31Config> =
+        KernelPrimitive::deserialize_from(&mut buf.as_slice()).unwrap();
 
     let mut ctx: Context<M31Config> = Context::default();
     let mut a: Vec<Vec<Vec<M31>>> = vec![];
@@ -242,12 +192,12 @@ fn zkcuda_2_simd_autopack() {
             }
         }
     }
-    let a = ctx.copy_to_device_and_pack_simd(&a, false);
+    let a = ctx.copy_to_device_and_pack_simd(&a);
     let mut b = None;
-    call_kernel!(ctx, kernel_add_2, a, mut b);
+    call_kernel!(ctx, kernel_add_2, 16, a, mut b).unwrap();
     let b = b.reshape(&[1, 16]);
     let mut c = None;
-    call_kernel!(ctx, kernel_add_16, b, mut c);
+    call_kernel!(ctx, kernel_add_16, 1, b, mut c).unwrap();
     let c = c.reshape(&[]);
     let result: Vec<M31> = ctx.copy_to_host_and_unpack_simd(c);
     for k in 0..16 {
@@ -255,9 +205,14 @@ fn zkcuda_2_simd_autopack() {
     }
 
     type P = Expander<M31Config>;
-    let computation_graph = ctx.to_computation_graph();
+    let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.solve_witness().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
-    let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
+    let proof = P::prove(
+        &prover_setup,
+        &computation_graph,
+        &ctx.export_device_memories(),
+    );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 }
 
@@ -286,14 +241,14 @@ fn zkcuda_to_binary() {
     let mut hint_registry = HintRegistry::<M31>::new();
     hint_registry.register("myhint.tobinary", to_binary_hint);
 
-    let kernel: Kernel<M31Config> = compile_convert_to_binary().unwrap();
+    let kernel: KernelPrimitive<M31Config> = compile_convert_to_binary().unwrap();
     let mut ctx: Context<M31Config, _> = Context::new(hint_registry);
 
     let a = M31::from(0x55);
-    let a = ctx.copy_to_device(&a, false);
+    let a = ctx.copy_to_device(&a);
     let a = a.reshape(&[1]);
     let mut b: DeviceMemoryHandle = None;
-    call_kernel!(ctx, kernel, a, mut b);
+    call_kernel!(ctx, kernel, 1, a, mut b).unwrap();
     let b = b.reshape(&[8]);
     let result: Vec<M31> = ctx.copy_to_host(b);
     assert_eq!(
@@ -311,9 +266,16 @@ fn zkcuda_to_binary() {
     );
 
     type P = Expander<M31Config>;
-    let computation_graph = ctx.to_computation_graph();
+    let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.solve_witness().unwrap();
+    println!("{:?}", computation_graph);
+    println!("{:?}", ctx.export_device_memories());
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
-    let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
+    let proof = P::prove(
+        &prover_setup,
+        &computation_graph,
+        &ctx.export_device_memories(),
+    );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 }
 
@@ -324,33 +286,43 @@ fn assertion<C: Config>(api: &mut API<C>, a: &InputVariable, b: &InputVariable) 
 
 #[test]
 fn zkcuda_assertion() {
-    let kernel_tmp: Kernel<M31Config> = compile_assertion().unwrap();
+    let kernel_tmp: KernelPrimitive<M31Config> = compile_assertion().unwrap();
 
     let mut ctx: Context<M31Config> = Context::default();
-    let a = ctx.copy_to_device(&M31::from(10u32), false).reshape(&[1]);
-    let b = ctx.copy_to_device(&M31::from(10u32), false).reshape(&[1]);
-    call_kernel!(ctx, kernel_tmp, a, b);
+    let a = ctx.copy_to_device(&M31::from(10u32)).reshape(&[1]);
+    let b = ctx.copy_to_device(&M31::from(10u32)).reshape(&[1]);
+    call_kernel!(ctx, kernel_tmp, 1, a, b).unwrap();
 
     type P = Expander<M31Config>;
-    let computation_graph = ctx.to_computation_graph();
+    let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.solve_witness().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
-    let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
+    let proof = P::prove(
+        &prover_setup,
+        &computation_graph,
+        &ctx.export_device_memories(),
+    );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 }
 
 #[test]
 #[should_panic]
 fn zkcuda_assertion_fail() {
-    let kernel_tmp: Kernel<M31Config> = compile_assertion().unwrap();
+    let kernel_tmp: KernelPrimitive<M31Config> = compile_assertion().unwrap();
 
     let mut ctx: Context<M31Config> = Context::default();
-    let a = ctx.copy_to_device(&M31::from(10u32), false).reshape(&[1]);
-    let b = ctx.copy_to_device(&M31::from(9u32), false).reshape(&[1]);
-    call_kernel!(ctx, kernel_tmp, a, b);
+    let a = ctx.copy_to_device(&M31::from(10u32)).reshape(&[1]);
+    let b = ctx.copy_to_device(&M31::from(9u32)).reshape(&[1]);
+    call_kernel!(ctx, kernel_tmp, 1, a, b).unwrap();
 
     type P = Expander<M31Config>;
-    let computation_graph = ctx.to_computation_graph();
+    let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.solve_witness().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
-    let proof = P::prove(&prover_setup, &computation_graph, &ctx.device_memories);
+    let proof = P::prove(
+        &prover_setup,
+        &computation_graph,
+        &ctx.export_device_memories(),
+    );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 }

@@ -61,6 +61,6 @@ path = "src/zkcuda/proving_system/expander_parallelized/server_bin.rs"
 name = "expander_server_pcs_defered"
 path = "src/zkcuda/proving_system/expander_pcs_defered/server_bin.rs"
 
-# [[bin]]
-# name = "matmul_bench"
-# path = "bin/matmul_bench.rs"
+[[bin]]
+name = "matmul_bench"
+path = "bin/matmul_bench.rs"

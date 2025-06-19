@@ -1,10 +1,10 @@
 use std::fs;
 
 use crate::{
-    frontend::Config,
+    frontend::{Config, SIMDField},
     utils::misc::next_power_of_two,
     zkcuda::{
-        proof::ComputationGraph,
+        context::ComputationGraph,
         proving_system::{
             expander::structs::{ExpanderProverSetup, ExpanderVerifierSetup},
             expander_parallelized::{
@@ -86,9 +86,9 @@ where
     fs::write(&setup_filename, bytes).expect("Failed to write computation graph to file");
 
     let max_parallel_count = computation_graph
-        .proof_templates
+        .proof_templates()
         .iter()
-        .map(|t| t.parallel_count)
+        .map(|t| t.parallel_count())
         .max()
         .unwrap_or(1);
 
@@ -112,7 +112,7 @@ where
 }
 
 pub fn client_send_witness_and_prove<C, ECCConfig>(
-    device_memories: &[crate::zkcuda::context::DeviceMemory<ECCConfig>],
+    device_memories: &[Vec<SIMDField<ECCConfig>>],
 ) -> CombinedProof<ECCConfig, Expander<C>>
 where
     C: GKREngine,
@@ -122,10 +122,7 @@ where
     let timer = Timer::new("prove", true);
 
     SharedMemoryEngine::write_witness_to_shared_memory::<C::FieldConfig>(
-        &device_memories
-            .iter()
-            .map(|m| &m.values[..])
-            .collect::<Vec<_>>(),
+        &device_memories.iter().map(|m| &m[..]).collect::<Vec<_>>(),
     );
     wait_async(ClientHttpHelper::request_prove());
 

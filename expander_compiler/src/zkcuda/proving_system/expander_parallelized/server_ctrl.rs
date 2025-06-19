@@ -1,6 +1,6 @@
 #![allow(clippy::type_complexity)]
 
-use crate::zkcuda::proof::ComputationGraph;
+use crate::zkcuda::context::ComputationGraph;
 use crate::zkcuda::proving_system::expander::structs::{
     ExpanderProverSetup, ExpanderVerifierSetup,
 };

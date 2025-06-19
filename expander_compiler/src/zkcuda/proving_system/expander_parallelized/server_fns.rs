@@ -4,7 +4,7 @@ use serdes::ExpSerde;
 use crate::{
     frontend::{Config, SIMDField},
     zkcuda::{
-        proof::ComputationGraph,
+        context::ComputationGraph,
         proving_system::{
             expander::{
                 setup_impl::local_setup_impl,

@@ -3,7 +3,7 @@ use gkr_engine::{FieldEngine, MPIEngine};
 use crate::{
     frontend::Config,
     zkcuda::{
-        proof::ComputationGraph,
+        context::ComputationGraph,
         proving_system::{
             expander::structs::{ExpanderProverSetup, ExpanderVerifierSetup},
             expander_parallelized::server_fns::{broadcast_string, read_circuit, ServerFns},

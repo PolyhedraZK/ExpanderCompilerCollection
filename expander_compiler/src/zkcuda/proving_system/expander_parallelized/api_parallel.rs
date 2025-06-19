@@ -1,6 +1,7 @@
 use crate::circuit::config::Config;
+use crate::frontend::SIMDField;
 use crate::utils::misc::next_power_of_two;
-use crate::zkcuda::proof::ComputationGraph;
+use crate::zkcuda::context::ComputationGraph;
 use crate::zkcuda::proving_system::expander::structs::{
     ExpanderProverSetup, ExpanderVerifierSetup,
 };
@@ -29,7 +30,7 @@ where
     type Proof = CombinedProof<ECCConfig, Expander<C>>;
 
     fn setup(
-        computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
+        computation_graph: &crate::zkcuda::context::ComputationGraph<ECCConfig>,
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
         client_launch_server_and_setup::<C, ECCConfig>(
             "../target/release/expander_server",
@@ -39,8 +40,8 @@ where
 
     fn prove(
         _prover_setup: &Self::ProverSetup,
-        _computation_graph: &crate::zkcuda::proof::ComputationGraph<ECCConfig>,
-        device_memories: &[crate::zkcuda::context::DeviceMemory<ECCConfig>],
+        _computation_graph: &crate::zkcuda::context::ComputationGraph<ECCConfig>,
+        device_memories: &[Vec<SIMDField<ECCConfig>>],
     ) -> Self::Proof {
         client_send_witness_and_prove(device_memories)
     }
@@ -53,21 +54,21 @@ where
         let verified = proof
             .proofs
             .par_iter()
-            .zip(computation_graph.proof_templates.par_iter())
+            .zip(computation_graph.proof_templates().par_iter())
             .map(|(local_proof, template)| {
                 let local_commitments = template
-                    .commitment_indices
+                    .commitment_indices()
                     .iter()
                     .map(|idx| &proof.commitments[*idx])
                     .collect::<Vec<_>>();
 
                 verify_kernel::<C, ECCConfig>(
                     verifier_setup,
-                    &computation_graph.kernels[template.kernel_id],
+                    &computation_graph.kernels()[template.kernel_id()],
                     local_proof,
                     &local_commitments,
-                    next_power_of_two(template.parallel_count),
-                    &template.is_broadcast,
+                    next_power_of_two(template.parallel_count()),
+                    template.is_broadcast(),
                 )
             })
             .collect::<Vec<_>>();

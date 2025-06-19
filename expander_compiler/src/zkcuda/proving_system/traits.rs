@@ -1,11 +1,8 @@
 use serdes::ExpSerde;
 
-use super::super::{kernel::Kernel, proof::ComputationGraph};
+use super::super::{context::ComputationGraph, kernel::Kernel};
 
-use crate::{
-    circuit::config::{Config, SIMDField},
-    zkcuda::context::DeviceMemory,
-};
+use crate::circuit::config::{Config, SIMDField};
 
 pub trait Commitment<C: Config>: Clone + ExpSerde {
     fn vals_len(&self) -> usize;
@@ -73,7 +70,7 @@ pub trait ProvingSystem<C: Config> {
     fn prove(
         prover_setup: &Self::ProverSetup,
         computation_graph: &ComputationGraph<C>,
-        device_memories: &[DeviceMemory<C>],
+        device_memories: &[Vec<SIMDField<C>>],
     ) -> Self::Proof;
 
     fn verify(

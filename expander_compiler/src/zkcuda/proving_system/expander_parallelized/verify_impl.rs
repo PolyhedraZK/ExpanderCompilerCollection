@@ -38,7 +38,7 @@ where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let timer = Timer::new("verify", true);
-    let mut expander_circuit = kernel.layered_circuit.export_to_expander().flatten::<C>();
+    let mut expander_circuit = kernel.layered_circuit().export_to_expander().flatten::<C>();
     expander_circuit.pre_process_gkr::<C>();
 
     let mut transcript = C::TranscriptConfig::new();
@@ -99,7 +99,7 @@ where
 {
     let mut target_y = <C::FieldConfig as FieldEngine>::ChallengeField::ZERO;
     for ((input, commitment), ib) in kernel
-        .layered_circuit_input
+        .layered_circuit_input()
         .iter()
         .zip(commitments.iter())
         .zip(is_broadcast)
