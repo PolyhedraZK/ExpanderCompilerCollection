@@ -6,7 +6,7 @@ use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input,
     punctuated::Punctuated,
-    FnArg, Ident, ItemFn, PatType, Result, ReturnType, Token, Type,
+    Expr, FnArg, Ident, ItemFn, PatType, Result, ReturnType, Token, Type,
 };
 
 #[derive(Debug)]
@@ -548,7 +548,7 @@ pub fn kernel(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     let (is_input, is_output) = get_variable_spec(inner_ty);
                     let total_len = calculate_array_total_len(&ref_type.elem);
                     let shape = get_array_shape(&ref_type.elem);
-                    shapes.push(quote! { Some(vec![#shape]) });
+                    shapes.push(quote! { vec![#shape] });
 
                     specs.push(quote! {
                         IOVecSpec {
@@ -608,7 +608,7 @@ pub fn kernel(_attr: TokenStream, item: TokenStream) -> TokenStream {
             #(#stmts)*
         }
 
-        fn #compile_fn_name<C: Config>() -> Result<Kernel<C>, Error> {
+        fn #compile_fn_name<C: Config>() -> Result<KernelPrimitive<C>, Error> {
             compile_with_spec_and_shapes(
                 |api: &mut API<C>, inputs: &mut Vec<Vec<Variable>>| {
                     #(#unflatten_code)*
@@ -636,6 +636,7 @@ struct KernelArg {
 struct KernelCall {
     ctx: Ident,
     kernel_name: Ident,
+    num_parallel: Expr,
     args: Punctuated<KernelArg, Token![,]>,
 }
 
@@ -656,12 +657,15 @@ impl Parse for KernelCall {
         input.parse::<Token![,]>()?;
         let kernel_name = input.parse()?;
         input.parse::<Token![,]>()?;
+        let num_parallel = input.parse()?;
+        input.parse::<Token![,]>()?;
 
         let args = Punctuated::parse_terminated(input)?;
 
         Ok(KernelCall {
             ctx,
             kernel_name,
+            num_parallel,
             args,
         })
     }
@@ -675,6 +679,7 @@ pub fn call_kernel(input: TokenStream) -> TokenStream {
     let KernelCall {
         ctx,
         kernel_name,
+        num_parallel,
         args,
     } = parse_macro_input!(input as KernelCall);
 
@@ -693,9 +698,12 @@ pub fn call_kernel(input: TokenStream) -> TokenStream {
     });
 
     let expanded = quote! {
-        let mut io = [#(#arg_names),*];
-        #ctx.call_kernel(&#kernel_name, &mut io);
-        #(#mut_assignments)*
+        {
+            let mut io = [#(#arg_names),*];
+            let res = #ctx.call_kernel(&#kernel_name, #num_parallel, &mut io);
+            #(#mut_assignments)*
+            res
+        }
     };
 
     expanded.into()

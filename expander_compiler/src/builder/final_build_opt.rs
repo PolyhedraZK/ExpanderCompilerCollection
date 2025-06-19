@@ -21,7 +21,7 @@ use crate::{
         },
         layered::Coef,
     },
-    field::FieldArith,
+    field::{Field, FieldArith},
     frontend::CircuitField,
     utils::{error::Error, pool::Pool},
 };
@@ -162,7 +162,7 @@ impl<C: Config> Builder<C> {
         if idx == self.mid_var_coefs.len() {
             self.mid_var_coefs.push(MidVarCoef {
                 k: coef,
-                kinv: coef.inv().unwrap(),
+                kinv: coef.optimistic_inv().unwrap(),
                 b: constant,
             });
             self.mid_var_layer.push(self.layer_of_expr(&e) + 1);
@@ -203,7 +203,7 @@ impl<C: Config> Builder<C> {
         if idx == self.mid_var_coefs.len() {
             self.mid_var_coefs.push(MidVarCoef {
                 k: coef,
-                kinv: coef.inv().unwrap(),
+                kinv: coef.optimistic_inv().unwrap(),
                 b: constant,
             });
             self.mid_var_layer.push(self.layer_of_expr(&e) + 1);
@@ -565,7 +565,7 @@ fn strip_constants<C: Config>(
         return (Expression::default(), CircuitField::<C>::one(), cst);
     }
     let v = e[0].coef;
-    let vi = v.inv().unwrap();
+    let vi = v.optimistic_inv().unwrap();
     for term in e.iter_mut() {
         term.coef *= vi;
     }

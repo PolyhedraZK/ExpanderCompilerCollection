@@ -1,11 +1,8 @@
 use serdes::ExpSerde;
 
-use super::super::{kernel::Kernel, proof::ComputationGraph};
+use super::super::{context::ComputationGraph, kernel::Kernel};
 
-use crate::{
-    circuit::config::{Config, SIMDField},
-    zkcuda::context::DeviceMemory,
-};
+use crate::circuit::config::{Config, SIMDField};
 
 pub trait Commitment<C: Config>: Clone + ExpSerde {
     fn vals_len(&self) -> usize;
@@ -16,21 +13,21 @@ pub trait KernelWiseProvingSystem<C: Config> {
     type VerifierSetup: Clone + Send + Sync + ExpSerde;
     type Proof: Clone + Send + Sync + ExpSerde;
     type Commitment: Commitment<C> + Send + Sync + ExpSerde;
-    type CommitmentExtraInfo: Clone + Send + Sync + ExpSerde;
+    type CommitmentState: Clone + Send + Sync + ExpSerde;
 
     fn setup(computation_graph: &ComputationGraph<C>) -> (Self::ProverSetup, Self::VerifierSetup);
 
     fn commit(
         prover_setup: &Self::ProverSetup,
         vals: &[SIMDField<C>],
-    ) -> (Self::Commitment, Self::CommitmentExtraInfo);
+    ) -> (Self::Commitment, Self::CommitmentState);
 
     #[allow(clippy::too_many_arguments)]
     fn prove_kernel(
         prover_setup: &Self::ProverSetup,
         kernel: &Kernel<C>,
         commitments: &[&Self::Commitment],
-        commitments_extra_info: &[&Self::CommitmentExtraInfo],
+        commitments_state: &[&Self::CommitmentState],
         commitments_values: &[&[SIMDField<C>]],
         parallel_count: usize,
         is_broadcast: &[bool],
@@ -73,7 +70,7 @@ pub trait ProvingSystem<C: Config> {
     fn prove(
         prover_setup: &Self::ProverSetup,
         computation_graph: &ComputationGraph<C>,
-        device_memories: &[DeviceMemory<C>],
+        device_memories: &[Vec<SIMDField<C>>],
     ) -> Self::Proof;
 
     fn verify(

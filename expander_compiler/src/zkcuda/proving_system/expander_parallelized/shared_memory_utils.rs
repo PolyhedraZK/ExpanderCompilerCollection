@@ -1,6 +1,6 @@
 #![allow(static_mut_refs)]
 
-use crate::zkcuda::proving_system::{CombinedProof, ExpanderGKRProvingSystem};
+use crate::zkcuda::proving_system::{CombinedProof, Expander};
 use arith::Field;
 use gkr_engine::{ExpanderPCS, FieldEngine, GKREngine};
 use serdes::ExpSerde;
@@ -8,8 +8,8 @@ use shared_memory::{Shmem, ShmemConf};
 
 use crate::circuit::config::Config;
 
-use crate::zkcuda::proving_system::expander_gkr::{
-    ExpanderGKRProverSetup, ExpanderGKRVerifierSetup,
+use crate::zkcuda::proving_system::expander::structs::{
+    ExpanderProverSetup, ExpanderVerifierSetup,
 };
 
 #[derive(Default)]
@@ -93,8 +93,8 @@ impl SharedMemoryEngine {
         PCS: ExpanderPCS<F, PCSField>,
     >(
         pcs_setup: &(
-            ExpanderGKRProverSetup<PCSField, F, PCS>,
-            ExpanderGKRVerifierSetup<PCSField, F, PCS>,
+            ExpanderProverSetup<PCSField, F, PCS>,
+            ExpanderVerifierSetup<PCSField, F, PCS>,
         ),
     ) {
         Self::write_object_to_shared_memory(
@@ -109,8 +109,8 @@ impl SharedMemoryEngine {
         F: FieldEngine,
         PCS: ExpanderPCS<F, PCSField>,
     >() -> (
-        ExpanderGKRProverSetup<PCSField, F, PCS>,
-        ExpanderGKRVerifierSetup<PCSField, F, PCS>,
+        ExpanderProverSetup<PCSField, F, PCS>,
+        ExpanderVerifierSetup<PCSField, F, PCS>,
     ) {
         Self::read_object_from_shared_memory("pcs_setup", 0)
     }
@@ -188,7 +188,7 @@ impl SharedMemoryEngine {
         C: GKREngine,
         ECCConfig: Config<FieldConfig = C::FieldConfig>,
     >(
-        proof: &CombinedProof<ECCConfig, ExpanderGKRProvingSystem<C>>,
+        proof: &CombinedProof<ECCConfig, Expander<C>>,
     ) where
         C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
     {
@@ -198,7 +198,7 @@ impl SharedMemoryEngine {
     pub fn read_proof_from_shared_memory<
         C: GKREngine,
         ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    >() -> CombinedProof<ECCConfig, ExpanderGKRProvingSystem<C>>
+    >() -> CombinedProof<ECCConfig, Expander<C>>
     where
         C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
     {

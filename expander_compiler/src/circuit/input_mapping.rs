@@ -2,6 +2,8 @@
 //! In compilation, some inputs may be removed, and the mapping is used to
 //! ensure that the remaining inputs are correctly mapped to their new positions.
 
+use serdes::ExpSerde;
+
 /// The `EMPTY` constant represents an unused position in the mapping.
 pub const EMPTY: usize = usize::MAX >> 9;
 
@@ -10,7 +12,7 @@ pub const EMPTY: usize = usize::MAX >> 9;
 /// If `mapping[i]` is `EMPTY`, it means that the input at position `i` is removed
 /// during the mapping process.
 /// The `next_size` field indicates the size of the next input vector after mapping.
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, ExpSerde)]
 pub struct InputMapping {
     next_size: usize,
     mapping: Vec<usize>,

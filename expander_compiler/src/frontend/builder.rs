@@ -26,6 +26,7 @@ use super::{
 };
 
 /// Builder for constructing a source-IR circuit from frontend API calls.
+#[derive(Clone)]
 pub struct Builder<C: Config> {
     instructions: Vec<SourceInstruction<C>>,
     constraints: Vec<SourceConstraint>,
@@ -612,6 +613,7 @@ impl<C: Config> UnconstrainedAPI<C> for Builder<C> {
 }
 
 /// RootBuilder is the main builder for constructing a circuit with sub-circuits.
+#[derive(Clone)]
 pub struct RootBuilder<C: Config> {
     num_public_inputs: usize,
     current_builders: Vec<(usize, Builder<C>)>,

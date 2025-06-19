@@ -16,18 +16,18 @@ pub fn check_inputs<C: Config>(
     parallel_count: usize,
     is_broadcast: &[bool],
 ) {
-    if kernel.layered_circuit_input.len() != values.len() {
+    if kernel.layered_circuit_input().len() != values.len() {
         panic!("Input size mismatch");
     }
-    if kernel.layered_circuit_input.len() != is_broadcast.len() {
+    if kernel.layered_circuit_input().len() != is_broadcast.len() {
         panic!("Input size mismatch");
     }
-    for i in 0..kernel.layered_circuit_input.len() {
+    for i in 0..kernel.layered_circuit_input().len() {
         if is_broadcast[i] {
-            if kernel.layered_circuit_input[i].len != values[i].len() {
+            if kernel.layered_circuit_input()[i].len != values[i].len() {
                 panic!("Input size mismatch");
             }
-        } else if kernel.layered_circuit_input[i].len * parallel_count != values[i].len() {
+        } else if kernel.layered_circuit_input()[i].len * parallel_count != values[i].len() {
             panic!("Input size mismatch");
         }
     }
