@@ -176,7 +176,7 @@ where
             let (local_commitments, challenges) = verifier_extract_pcs_claims::<C, ECCConfig>(
                 &local_commitments,
                 &challenge,
-                &template.is_broadcast(),
+                template.is_broadcast(),
                 next_power_of_two(template.parallel_count()),
             );
 

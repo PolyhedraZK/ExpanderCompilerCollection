@@ -61,7 +61,7 @@ where
                 &computation_graph.kernels()[template.kernel_id()],
                 &commitment_values,
                 next_power_of_two(template.parallel_count()),
-                &template.is_broadcast(),
+                template.is_broadcast(),
             );
 
             if global_mpi_config.is_root() {
@@ -82,7 +82,7 @@ where
                             .map(|&idx| &states.as_ref().unwrap()[idx])
                             .collect::<Vec<_>>(),
                         c,
-                        &template.is_broadcast(),
+                        template.is_broadcast(),
                         &mut transcript,
                     );
                 });
@@ -146,7 +146,7 @@ where
         &mut expander_circuit,
         &mut prover_scratch,
         &local_commitment_values,
-        &kernel.layered_circuit_input(),
+        kernel.layered_circuit_input(),
         &mut transcript,
         &local_mpi_config,
     );

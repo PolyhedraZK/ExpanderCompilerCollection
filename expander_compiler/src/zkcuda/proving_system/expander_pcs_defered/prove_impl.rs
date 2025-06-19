@@ -143,7 +143,7 @@ where
                 &computation_graph.kernels()[template.kernel_id()],
                 &commitment_values,
                 next_power_of_two(template.parallel_count()),
-                &template.is_broadcast(),
+                template.is_broadcast(),
             );
 
             if global_mpi_config.is_root() {
@@ -154,7 +154,7 @@ where
                 let (local_vals_ref, local_challenges) = extract_pcs_claims::<C>(
                     &commitment_values,
                     &challenge,
-                    &template.is_broadcast(),
+                    template.is_broadcast(),
                     next_power_of_two(template.parallel_count()),
                 );
 

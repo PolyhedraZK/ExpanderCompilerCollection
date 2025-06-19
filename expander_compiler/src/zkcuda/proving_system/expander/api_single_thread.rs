@@ -87,7 +87,7 @@ where
                 &mut expander_circuit,
                 &mut prover_scratch,
                 &local_vals,
-                &kernel.layered_circuit_input(),
+                kernel.layered_circuit_input(),
                 &mut transcript,
                 &MPIConfig::prover_new(None, None),
             );
@@ -220,7 +220,7 @@ where
                     &local_state,
                     &local_vals,
                     next_power_of_two(template.parallel_count()),
-                    &template.is_broadcast(),
+                    template.is_broadcast(),
                 )
             })
             .collect::<Vec<_>>();
@@ -253,7 +253,7 @@ where
                     local_proof,
                     &local_commitments,
                     next_power_of_two(template.parallel_count()),
-                    &template.is_broadcast(),
+                    template.is_broadcast(),
                 )
             })
             .collect::<Vec<_>>();
