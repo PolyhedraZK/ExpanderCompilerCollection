@@ -112,7 +112,7 @@ dependencies = [
 [[package]]
 name = "arith"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#9da1c1429483bbed8e8048542a3b6eb898d505fc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
 dependencies = [
  "ark-std",
  "criterion",
@@ -268,9 +268,9 @@ dependencies = [
 
 [[package]]
 name = "autocfg"
-version = "1.4.0"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
+checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "axum"
@@ -330,7 +330,7 @@ dependencies = [
 [[package]]
 name = "babybear"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#9da1c1429483bbed8e8048542a3b6eb898d505fc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
 dependencies = [
  "arith",
  "ark-std",
@@ -383,7 +383,7 @@ dependencies = [
 [[package]]
 name = "bin"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#9da1c1429483bbed8e8048542a3b6eb898d505fc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
 dependencies = [
  "arith",
  "babybear",
@@ -589,7 +589,7 @@ dependencies = [
 [[package]]
 name = "circuit"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#9da1c1429483bbed8e8048542a3b6eb898d505fc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
 dependencies = [
  "arith",
  "ark-std",
@@ -702,7 +702,7 @@ dependencies = [
 [[package]]
 name = "config_macros"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#9da1c1429483bbed8e8048542a3b6eb898d505fc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
 dependencies = [
  "gkr_engine",
  "gkr_hashers",
@@ -817,7 +817,7 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 [[package]]
 name = "crosslayer_prototype"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#9da1c1429483bbed8e8048542a3b6eb898d505fc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
 dependencies = [
  "arith",
  "env_logger",
@@ -1143,7 +1143,7 @@ dependencies = [
 [[package]]
 name = "gf2"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#9da1c1429483bbed8e8048542a3b6eb898d505fc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
 dependencies = [
  "arith",
  "ark-std",
@@ -1160,7 +1160,7 @@ dependencies = [
 [[package]]
 name = "gf2_128"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#9da1c1429483bbed8e8048542a3b6eb898d505fc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
 dependencies = [
  "arith",
  "ark-std",
@@ -1179,7 +1179,7 @@ checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 [[package]]
 name = "gkr"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#9da1c1429483bbed8e8048542a3b6eb898d505fc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
 dependencies = [
  "arith",
  "ark-std",
@@ -1212,7 +1212,7 @@ dependencies = [
 [[package]]
 name = "gkr_engine"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#9da1c1429483bbed8e8048542a3b6eb898d505fc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
 dependencies = [
  "arith",
  "babybear",
@@ -1231,7 +1231,7 @@ dependencies = [
 [[package]]
 name = "gkr_hashers"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#9da1c1429483bbed8e8048542a3b6eb898d505fc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
 dependencies = [
  "arith",
  "halo2curves",
@@ -1249,7 +1249,7 @@ checksum = "a8d1add55171497b4705a648c6b583acafb01d58050a51727785f0b2c8e0a2b2"
 [[package]]
 name = "goldilocks"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#9da1c1429483bbed8e8048542a3b6eb898d505fc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
 dependencies = [
  "arith",
  "ark-std",
@@ -1770,9 +1770,9 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "libc"
-version = "0.2.173"
+version = "0.2.174"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8cfeafaffdbc32176b64fb251369d52ea9f0a8fbc6f8759edffef7b525d64bb"
+checksum = "1171693293099992e19cddea4e8b849964e9846f4acee11b3948bcc337be8776"
 
 [[package]]
 name = "libffi"
@@ -1870,7 +1870,7 @@ dependencies = [
 [[package]]
 name = "mersenne31"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#9da1c1429483bbed8e8048542a3b6eb898d505fc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
 dependencies = [
  "arith",
  "ark-std",
@@ -2248,7 +2248,7 @@ dependencies = [
 [[package]]
 name = "poly_commit"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#9da1c1429483bbed8e8048542a3b6eb898d505fc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
 dependencies = [
  "arith",
  "ark-std",
@@ -2273,7 +2273,7 @@ dependencies = [
 [[package]]
 name = "polynomials"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#9da1c1429483bbed8e8048542a3b6eb898d505fc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
 dependencies = [
  "arith",
  "ark-std",
@@ -2347,9 +2347,9 @@ dependencies = [
 
 [[package]]
 name = "r-efi"
-version = "5.2.0"
+version = "5.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74765f6d916ee2faa39bc8e68e4f3ed8949b48cccdac59983d287a7cb71ce9c5"
+checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
 
 [[package]]
 name = "radium"
@@ -2694,7 +2694,7 @@ dependencies = [
 [[package]]
 name = "serdes"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#9da1c1429483bbed8e8048542a3b6eb898d505fc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
 dependencies = [
  "ethnum",
  "halo2curves",
@@ -2705,7 +2705,7 @@ dependencies = [
 [[package]]
 name = "serdes_derive"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#9da1c1429483bbed8e8048542a3b6eb898d505fc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2829,7 +2829,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 [[package]]
 name = "sumcheck"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#9da1c1429483bbed8e8048542a3b6eb898d505fc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
 dependencies = [
  "arith",
  "circuit",
@@ -3093,7 +3093,7 @@ dependencies = [
 [[package]]
 name = "transcript"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#9da1c1429483bbed8e8048542a3b6eb898d505fc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
 dependencies = [
  "arith",
  "gkr_engine",
@@ -3116,7 +3116,7 @@ dependencies = [
 [[package]]
 name = "tree"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#9da1c1429483bbed8e8048542a3b6eb898d505fc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
 dependencies = [
  "arith",
  "ark-std",
@@ -3218,7 +3218,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 [[package]]
 name = "utils"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#9da1c1429483bbed8e8048542a3b6eb898d505fc"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
 dependencies = [
  "colored",
 ]
@@ -3783,18 +3783,18 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.25"
+version = "0.8.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1702d9583232ddb9174e01bb7c15a2ab8fb1bc6f227aa1233858c351a3ba0cb"
+checksum = "1039dd0d3c310cf05de012d8a39ff557cb0d23087fd44cad61df08fc31907a2f"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.25"
+version = "0.8.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28a6e20d751156648aa063f3800b706ee209a32c0b4d9f24be3d980b01be55ef"
+checksum = "9ecf5b4cc5364572d7f4c329661bcc82724222973f2cab6f050a4e5c22f75181"
 dependencies = [
  "proc-macro2",
  "quote",

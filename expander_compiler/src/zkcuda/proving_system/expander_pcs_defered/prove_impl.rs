@@ -3,7 +3,7 @@ use gkr_engine::{
     ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine,
     Proof as BytesProof, Transcript,
 };
-use polynomials::MultiLinearPoly;
+use polynomials::RefMultiLinearPoly;
 use serdes::ExpSerde;
 
 use crate::{
@@ -67,7 +67,7 @@ where
     // TODO: Efficiency
     let polys: Vec<_> = vals
         .iter()
-        .map(|v| MultiLinearPoly::new(v.to_vec()))
+        .map(|v| RefMultiLinearPoly::from_ref(v))
         .collect();
 
     // TODO: Soundness
