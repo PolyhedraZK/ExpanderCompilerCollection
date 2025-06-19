@@ -1,5 +1,5 @@
 use expander_compiler::frontend::*;
-use expander_compiler::zkcuda::proving_system::ExpanderGKRProvingSystem;
+use expander_compiler::zkcuda::proving_system::Expander;
 use expander_compiler::zkcuda::proving_system::ProvingSystem;
 use expander_compiler::zkcuda::shape::Reshape;
 use expander_compiler::zkcuda::{context::*, kernel::*};
@@ -86,7 +86,7 @@ fn zkcuda_matmul_sum() {
     let result: M31 = ctx.copy_to_host(g);
     assert_eq!(result, expected_result);
 
-    type P = ExpanderGKRProvingSystem<M31Config>;
+    type P = Expander<M31Config>;
     let computation_graph = ctx.compile_computation_graph().unwrap();
     ctx.solve_witness().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);

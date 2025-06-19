@@ -129,7 +129,7 @@ fn context_shape_test_1_impl<P: ProvingSystem<M31Config>>() {
 #[allow(deprecated)]
 fn context_shape_test_1() {
     context_shape_test_1_impl::<DummyProvingSystem<M31Config>>();
-    context_shape_test_1_impl::<ExpanderGKRProvingSystem<M31Config>>();
+    context_shape_test_1_impl::<Expander<M31Config>>();
 }
 
 /*
