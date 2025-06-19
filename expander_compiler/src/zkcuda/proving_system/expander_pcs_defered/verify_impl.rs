@@ -103,6 +103,8 @@ where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+    <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Commitment:
+        AsRef<<C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Commitment>,
 {
     let mut transcript = C::TranscriptConfig::new();
     let max_num_vars = verifier_setup.v_keys.keys().max().cloned().unwrap_or(0);
@@ -112,10 +114,10 @@ where
     let mut defered_proof_bytes = proof.bytes.clone();
     let mut cursor = Cursor::new(&mut defered_proof_bytes);
 
-    let commitments: Vec<_> = commitments
+    let commitments = commitments
         .iter()
-        .map(|commitment| commitment.commitment.clone())
-        .collect();
+        .map(|commitment| &commitment.commitment)
+        .collect::<Vec<_>>();
     let vals =
         Vec::<<C::FieldConfig as FieldEngine>::ChallengeField>::deserialize_from(&mut cursor)
             .unwrap();
@@ -150,6 +152,8 @@ where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+    <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Commitment:
+        AsRef<<C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Commitment>,
 {
     let pcs_batch_opening = proof.proofs.pop().unwrap();
 

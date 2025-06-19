@@ -1,4 +1,4 @@
-use gkr_engine::{FieldEngine, GKREngine};
+use gkr_engine::{ExpanderPCS, FieldEngine, GKREngine};
 
 use crate::{
     frontend::{Config, SIMDField},
@@ -21,6 +21,8 @@ where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+    <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Commitment:
+        AsRef<<C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Commitment>,
 {
     type ProverSetup = ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
 
