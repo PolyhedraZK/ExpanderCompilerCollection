@@ -20,7 +20,7 @@ impl<C: Config> WitnessSolver<C> {
         &self,
         vars: Vec<CircuitField<C>>,
         public_vars: Vec<CircuitField<C>>,
-        hint_caller: &mut impl HintCaller<CircuitField<C>>,
+        hint_caller: &impl HintCaller<CircuitField<C>>,
     ) -> Result<(Vec<CircuitField<C>>, usize), Error> {
         assert_eq!(vars.len(), self.circuit.input_size());
         assert_eq!(public_vars.len(), self.circuit.num_public_inputs);
@@ -35,7 +35,7 @@ impl<C: Config> WitnessSolver<C> {
         &self,
         vars: Vec<CircuitField<C>>,
         public_vars: Vec<CircuitField<C>>,
-        hint_caller: &mut impl HintCaller<CircuitField<C>>,
+        hint_caller: &impl HintCaller<CircuitField<C>>,
     ) -> Result<Witness<C>, Error> {
         let (values, num_inputs_per_witness) =
             self.solve_witness_inner(vars, public_vars, hint_caller)?;
@@ -54,7 +54,7 @@ impl<C: Config> WitnessSolver<C> {
         &self,
         num_witnesses: usize,
         f: F,
-        hint_caller: &mut impl HintCaller<CircuitField<C>>,
+        hint_caller: &impl HintCaller<CircuitField<C>>,
     ) -> Result<Witness<C>, Error> {
         let mut values = Vec::new();
         let mut num_inputs_per_witness = 0;

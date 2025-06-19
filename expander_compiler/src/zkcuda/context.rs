@@ -2,6 +2,7 @@
 //! It provides functionality to manage device memory, compile kernels, and execute computations.
 
 use arith::SimdField;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serdes::ExpSerde;
 
 use crate::{
@@ -435,6 +436,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             }
             *ir_inputs = values;
         }
+        let mut ir_inputs_per_parallel = Vec::new();
         for parallel_i in 0..num_parallel {
             let mut ir_inputs = vec![SIMDField::<C>::zero(); kernel.ir_for_calling().input_size()];
             for (i, ((input, input_start), input_end)) in ios
@@ -454,10 +456,18 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                     chunk_sizes[i],
                 );
             }
-            let ir_outputs =
+            ir_inputs_per_parallel.push(ir_inputs);
+        }
+        let ir_outputs_per_parallel: Vec<Result<Vec<SIMDField<C>>, Error>> = ir_inputs_per_parallel
+            .into_par_iter()
+            .map(|ir_inputs| {
                 kernel
                     .ir_for_calling()
-                    .eval_safe_simd(ir_inputs, &[], &mut self.hint_caller)?;
+                    .eval_safe_simd(ir_inputs, &[], &self.hint_caller)
+            })
+            .collect();
+        for ir_outputs in ir_outputs_per_parallel {
+            let ir_outputs = ir_outputs?;
             for (((spec, output_start), output_end), out) in kernel
                 .io_specs()
                 .iter()
@@ -838,7 +848,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 *ir_inputs = values;
             }
 
-            let mut hints_all = Vec::new();
+            let mut hints_inputs_per_parallel = Vec::new();
             for parallel_i in 0..kernel_call.num_parallel {
                 let mut inputs = vec![SIMDField::<C>::zero(); hint_solver.input_size()];
 
@@ -881,9 +891,18 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                         *chunk_size,
                     );
                 }
-                let hints = hint_solver.eval_safe_simd(inputs, &[], &mut self.hint_caller)?;
-                hints_all.extend(hints);
+                hints_inputs_per_parallel.push(inputs);
             }
+            let hints_per_parallel: Vec<Result<Vec<SIMDField<C>>, Error>> =
+                hints_inputs_per_parallel
+                    .into_par_iter()
+                    .map(|inputs| hint_solver.eval_safe_simd(inputs, &[], &self.hint_caller))
+                    .collect();
+            let mut hints_all = Vec::new();
+            for hints in hints_per_parallel {
+                hints_all.extend(hints?);
+            }
+
             let hints_len = hints_all.len();
             let hints_id = make_device_mem(&mut self.device_memories, hints_all, vec![hints_len])
                 .unwrap()
