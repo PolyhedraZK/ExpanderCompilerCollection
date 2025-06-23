@@ -112,7 +112,7 @@ dependencies = [
 [[package]]
 name = "arith"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#f4f91e2959e22898d6a9ea49876d5329e70b31ad"
 dependencies = [
  "ark-std",
  "criterion",
@@ -263,7 +263,7 @@ checksum = "e539d3fca749fcee5236ab05e93a52867dd549cc157c8cb7f99595f3cedffdb5"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -330,7 +330,7 @@ dependencies = [
 [[package]]
 name = "babybear"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#f4f91e2959e22898d6a9ea49876d5329e70b31ad"
 dependencies = [
  "arith",
  "ark-std",
@@ -377,13 +377,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73cfa06eb56d71f2bb1874b101a50c3ba29fcf3ff7dd8de274e473929459863b"
 dependencies = [
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
 ]
 
 [[package]]
 name = "bin"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#f4f91e2959e22898d6a9ea49876d5329e70b31ad"
 dependencies = [
  "arith",
  "babybear",
@@ -430,7 +430,7 @@ dependencies = [
  "regex",
  "rustc-hash",
  "shlex",
- "syn 2.0.103",
+ "syn 2.0.104",
  "which",
 ]
 
@@ -589,7 +589,7 @@ dependencies = [
 [[package]]
 name = "circuit"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#f4f91e2959e22898d6a9ea49876d5329e70b31ad"
 dependencies = [
  "arith",
  "ark-std",
@@ -674,7 +674,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -702,14 +702,14 @@ dependencies = [
 [[package]]
 name = "config_macros"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#f4f91e2959e22898d6a9ea49876d5329e70b31ad"
 dependencies = [
  "gkr_engine",
  "gkr_hashers",
  "poly_commit",
  "proc-macro2",
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
  "transcript",
 ]
 
@@ -817,7 +817,7 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 [[package]]
 name = "crosslayer_prototype"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#f4f91e2959e22898d6a9ea49876d5329e70b31ad"
 dependencies = [
  "arith",
  "env_logger",
@@ -891,7 +891,7 @@ checksum = "97369cbbc041bc366949bc74d34658d6cda5621039731c6310521892a3a20ae0"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -956,12 +956,12 @@ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
 name = "errno"
-version = "0.3.12"
+version = "0.3.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cea14ef9355e3beab063703aa9dab15afd25f0667c341310c1e5274bb1d0da18"
+checksum = "778e2ac28f6c47af28e4907f13ffd1e1ddbd400980a9abd7c8df189bf578a5ad"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1143,7 +1143,7 @@ dependencies = [
 [[package]]
 name = "gf2"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#f4f91e2959e22898d6a9ea49876d5329e70b31ad"
 dependencies = [
  "arith",
  "ark-std",
@@ -1160,7 +1160,7 @@ dependencies = [
 [[package]]
 name = "gf2_128"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#f4f91e2959e22898d6a9ea49876d5329e70b31ad"
 dependencies = [
  "arith",
  "ark-std",
@@ -1179,7 +1179,7 @@ checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 [[package]]
 name = "gkr"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#f4f91e2959e22898d6a9ea49876d5329e70b31ad"
 dependencies = [
  "arith",
  "ark-std",
@@ -1212,7 +1212,7 @@ dependencies = [
 [[package]]
 name = "gkr_engine"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#f4f91e2959e22898d6a9ea49876d5329e70b31ad"
 dependencies = [
  "arith",
  "babybear",
@@ -1231,7 +1231,7 @@ dependencies = [
 [[package]]
 name = "gkr_hashers"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#f4f91e2959e22898d6a9ea49876d5329e70b31ad"
 dependencies = [
  "arith",
  "halo2curves",
@@ -1249,7 +1249,7 @@ checksum = "a8d1add55171497b4705a648c6b583acafb01d58050a51727785f0b2c8e0a2b2"
 [[package]]
 name = "goldilocks"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#f4f91e2959e22898d6a9ea49876d5329e70b31ad"
 dependencies = [
  "arith",
  "ark-std",
@@ -1740,7 +1740,7 @@ checksum = "03343451ff899767262ec32146f6d559dd759fdadf42ff0e227c7c48f72594b4"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -1843,7 +1843,7 @@ version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -1870,7 +1870,7 @@ dependencies = [
 [[package]]
 name = "mersenne31"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#f4f91e2959e22898d6a9ea49876d5329e70b31ad"
 dependencies = [
  "arith",
  "ark-std",
@@ -2099,7 +2099,7 @@ checksum = "a948666b637a0f465e8564c73e89d4dde00d72d4d473cc972f390fc3dcee7d9c"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -2196,7 +2196,7 @@ checksum = "6e918e4ff8c4549eb882f14b3a4bc8c8bc93de829416eacf579f1207a8fbf861"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -2248,7 +2248,7 @@ dependencies = [
 [[package]]
 name = "poly_commit"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#f4f91e2959e22898d6a9ea49876d5329e70b31ad"
 dependencies = [
  "arith",
  "ark-std",
@@ -2273,7 +2273,7 @@ dependencies = [
 [[package]]
 name = "polynomials"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#f4f91e2959e22898d6a9ea49876d5329e70b31ad"
 dependencies = [
  "arith",
  "ark-std",
@@ -2319,12 +2319,12 @@ dependencies = [
 
 [[package]]
 name = "prettyplease"
-version = "0.2.34"
+version = "0.2.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6837b9e10d61f45f987d50808f83d1ee3d206c66acf650c3e4ae2e1f6ddedf55"
+checksum = "061c1221631e079b26479d25bbf2275bfe5917ae8419cd7e34f13bfc2aa7539a"
 dependencies = [
  "proc-macro2",
- "syn 2.0.103",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -2654,7 +2654,7 @@ checksum = "5b0276cf7f2c73365f7157c8123c21cd9a50fbbd844757af28ca1f5925fc2a00"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -2694,7 +2694,7 @@ dependencies = [
 [[package]]
 name = "serdes"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#f4f91e2959e22898d6a9ea49876d5329e70b31ad"
 dependencies = [
  "ethnum",
  "halo2curves",
@@ -2705,11 +2705,11 @@ dependencies = [
 [[package]]
 name = "serdes_derive"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#f4f91e2959e22898d6a9ea49876d5329e70b31ad"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -2829,7 +2829,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 [[package]]
 name = "sumcheck"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#f4f91e2959e22898d6a9ea49876d5329e70b31ad"
 dependencies = [
  "arith",
  "circuit",
@@ -2857,9 +2857,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.103"
+version = "2.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4307e30089d6fd6aff212f2da3a1f9e32f3223b1f010fb09b7c95f90f3ca1e8"
+checksum = "17b6f705963418cdb9927482fa304bc562ece2fdd4f616084c50b7023b435a40"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2886,7 +2886,7 @@ checksum = "728a70f3dbaf5bab7f0c4b1ac8d7ae5ea60a4b5549c8a5914361c99147a709d2"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -2946,7 +2946,7 @@ checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -3004,7 +3004,7 @@ checksum = "6e06d43f1345a3bcd39f6a56dbb7dcab2ba47e68e8ac134855e7e2bdbaf8cab8"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -3093,7 +3093,7 @@ dependencies = [
 [[package]]
 name = "transcript"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#f4f91e2959e22898d6a9ea49876d5329e70b31ad"
 dependencies = [
  "arith",
  "gkr_engine",
@@ -3116,7 +3116,7 @@ dependencies = [
 [[package]]
 name = "tree"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#f4f91e2959e22898d6a9ea49876d5329e70b31ad"
 dependencies = [
  "arith",
  "ark-std",
@@ -3218,7 +3218,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 [[package]]
 name = "utils"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Finterface_change_for_efficiency#da316acec911af8f0b177c93d474ce555b7fc649"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=main#f4f91e2959e22898d6a9ea49876d5329e70b31ad"
 dependencies = [
  "colored",
 ]
@@ -3320,7 +3320,7 @@ dependencies = [
  "log",
  "proc-macro2",
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
  "wasm-bindgen-shared",
 ]
 
@@ -3355,7 +3355,7 @@ checksum = "8ae87ea40c9f689fc23f209965b6fb8a99ad69aeeb0231408be24920604395de"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
  "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]
@@ -3443,7 +3443,7 @@ checksum = "a47fddd13af08290e67f4acabf4b459f647552718f683a7b415d290ac744a836"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -3454,7 +3454,7 @@ checksum = "bd9211b69f8dcdfa817bfd14bf1c97c9188afa36f4750130fcdf3f400eca9fa8"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -3506,6 +3506,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e38bc4d79ed67fd075bcc251a1c39b32a1776bbe92e5bef1f0bf1f8c531853b"
 dependencies = [
  "windows-targets 0.52.6",
+]
+
+[[package]]
+name = "windows-sys"
+version = "0.60.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2f500e4d28234f72040990ec9d39e3a6b950f9f22d3dba18416c35882612bcb"
+dependencies = [
+ "windows-targets 0.53.2",
 ]
 
 [[package]]
@@ -3777,7 +3786,7 @@ checksum = "38da3c9736e16c5d3c8c597a9aaa5d1fa565d0532ae05e27c24aa62fb32c0ab6"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
  "synstructure",
 ]
 
@@ -3798,7 +3807,7 @@ checksum = "9ecf5b4cc5364572d7f4c329661bcc82724222973f2cab6f050a4e5c22f75181"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -3818,7 +3827,7 @@ checksum = "d71e5d6e06ab090c67b5e44993ec16b72dcbaabc526db883a360057678b48502"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
  "synstructure",
 ]
 
@@ -3839,7 +3848,7 @@ checksum = "ce36e65b0d2999d2aafac989fb249189a141aee1f53c612c1f37d72631959f69"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -3872,5 +3881,5 @@ checksum = "5b96237efa0c878c64bd89c436f661be4e46b2f3eff1ebb976f7ef2321d2f58f"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.103",
+ "syn 2.0.104",
 ]
