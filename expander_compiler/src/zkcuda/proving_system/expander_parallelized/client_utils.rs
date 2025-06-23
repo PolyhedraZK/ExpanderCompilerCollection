@@ -94,7 +94,7 @@ where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let setup_timer = Timer::new("setup", true);
-    println!("Starting server with binary: {}", server_binary);
+    println!("Starting server with binary: {server_binary}");
 
     let mut bytes = vec![];
     computation_graph.serialize_into(&mut bytes).unwrap();

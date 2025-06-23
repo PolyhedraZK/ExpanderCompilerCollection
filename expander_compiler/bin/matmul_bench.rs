@@ -10,7 +10,6 @@ use expander_compiler::zkcuda::{
     context::{call_kernel, Context},
     kernel::{compile_with_spec_and_shapes, kernel, IOVecSpec, KernelPrimitive},
 };
-use expander_utils::timer;
 use gkr::BN254ConfigSha2Hyrax;
 
 const M: usize = 512;
@@ -82,12 +81,12 @@ fn zkcuda_matmul<C: Config, P: ProvingSystem<C>, const N: usize>() {
         &ctx.export_device_memories(),
     );
     let elapsed = timer.elapsed();
-    println!("Parallel Count {}, Proving time: {:?}", N, elapsed);
+    println!("Parallel Count {N}, Proving time: {elapsed:?}");
 
     let timer = std::time::Instant::now();
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
     let elapsed = timer.elapsed();
-    println!("Parallel Count {}, Verification time: {:?}", N, elapsed);
+    println!("Parallel Count {N}, Verification time: {elapsed:?}");
 }
 
 fn main() {

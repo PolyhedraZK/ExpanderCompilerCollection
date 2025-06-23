@@ -1,5 +1,4 @@
 use gkr_engine::{ExpanderPCS, FieldEngine, GKREngine};
-use serde::ser;
 
 use crate::{
     frontend::{Config, SIMDField},
