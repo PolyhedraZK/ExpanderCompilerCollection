@@ -1,12 +1,13 @@
 use gkr_engine::{ExpanderPCS, FieldEngine, GKREngine};
+use serde::ser;
 
 use crate::{
     frontend::{Config, SIMDField},
     zkcuda::proving_system::{
         expander::structs::{ExpanderProverSetup, ExpanderVerifierSetup},
         expander_parallelized::client_utils::{
-            client_launch_server_and_setup, client_send_witness_and_prove, wait_async,
-            ClientHttpHelper,
+            client_launch_server_and_setup, client_parse_args, client_send_witness_and_prove,
+            wait_async, ClientHttpHelper,
         },
         CombinedProof, Expander, ProvingSystem,
     },
@@ -33,10 +34,9 @@ where
     fn setup(
         computation_graph: &crate::zkcuda::context::ComputationGraph<ECCConfig>,
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
-        client_launch_server_and_setup::<C, ECCConfig>(
-            "../target/release/expander_server_pcs_defered",
-            computation_graph,
-        )
+        let server_binary = client_parse_args()
+            .unwrap_or("../target/release/expander_server_pcs_defered".to_owned());
+        client_launch_server_and_setup::<C, ECCConfig>(&server_binary, computation_graph)
     }
 
     fn prove(

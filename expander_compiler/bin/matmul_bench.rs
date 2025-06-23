@@ -10,10 +10,9 @@ use expander_compiler::zkcuda::{
     context::{call_kernel, Context},
     kernel::{compile_with_spec_and_shapes, kernel, IOVecSpec, KernelPrimitive},
 };
+use expander_utils::timer;
 use gkr::BN254ConfigSha2Hyrax;
 
-/// N * M matrix times M *K matrix
-const N: usize = 8;
 const M: usize = 512;
 const K: usize = 512;
 
@@ -36,7 +35,7 @@ fn mul_line<C: Config>(
     }
 }
 
-fn zkcuda_matmul<C: Config, P: ProvingSystem<C>>() {
+fn zkcuda_matmul<C: Config, P: ProvingSystem<C>, const N: usize>() {
     let kernel_mul_line: KernelPrimitive<C> = compile_mul_line().unwrap();
 
     let mut ctx: Context<C> = Context::default();
@@ -75,15 +74,27 @@ fn zkcuda_matmul<C: Config, P: ProvingSystem<C>>() {
 
     let computation_graph = ctx.compile_computation_graph().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
+
+    let timer = std::time::Instant::now();
     let proof = P::prove(
         &prover_setup,
         &computation_graph,
         &ctx.export_device_memories(),
     );
+    let elapsed = timer.elapsed();
+    println!("Parallel Count {}, Proving time: {:?}", N, elapsed);
+
+    let timer = std::time::Instant::now();
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
+    let elapsed = timer.elapsed();
+    println!("Parallel Count {}, Verification time: {:?}", N, elapsed);
 }
 
 fn main() {
-    zkcuda_matmul::<BN254Config, Expander<BN254ConfigSha2Hyrax>>();
-    zkcuda_matmul::<BN254Config, ParallelizedExpander<BN254ConfigSha2Hyrax>>();
+    zkcuda_matmul::<BN254Config, Expander<BN254ConfigSha2Hyrax>, 4>();
+    zkcuda_matmul::<BN254Config, Expander<BN254ConfigSha2Hyrax>, 8>();
+    zkcuda_matmul::<BN254Config, Expander<BN254ConfigSha2Hyrax>, 16>();
+    zkcuda_matmul::<BN254Config, ParallelizedExpander<BN254ConfigSha2Hyrax>, 4>();
+    zkcuda_matmul::<BN254Config, ParallelizedExpander<BN254ConfigSha2Hyrax>, 8>();
+    zkcuda_matmul::<BN254Config, ParallelizedExpander<BN254ConfigSha2Hyrax>, 16>();
 }

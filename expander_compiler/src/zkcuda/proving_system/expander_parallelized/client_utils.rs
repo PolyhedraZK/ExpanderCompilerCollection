@@ -62,6 +62,25 @@ impl ClientHttpHelper {
     }
 }
 
+// Add a clap parser
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+pub struct ClientArgs {
+    /// Path to the server binary
+    #[arg(short, long, default_value = "")]
+    pub server_binary: String,
+}
+
+pub fn client_parse_args() -> Option<String> {
+    let args = ClientArgs::parse();
+    if args.server_binary.is_empty() {
+        None
+    } else {
+        Some(args.server_binary)
+    }
+}
+
 pub fn client_launch_server_and_setup<C, ECCConfig>(
     server_binary: &str,
     computation_graph: &ComputationGraph<ECCConfig>,
@@ -75,6 +94,7 @@ where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let setup_timer = Timer::new("setup", true);
+    println!("Starting server with binary: {}", server_binary);
 
     let mut bytes = vec![];
     computation_graph.serialize_into(&mut bytes).unwrap();
