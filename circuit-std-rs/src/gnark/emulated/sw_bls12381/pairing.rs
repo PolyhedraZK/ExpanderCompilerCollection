@@ -103,7 +103,7 @@ impl Pairing {
         let buf = self.ext12.div(native, &buf, &f);
         let f = self.ext12.frobenius_square(native, &buf);
         let f = self.ext12.mul(native, &f, &buf);
-        return Ok(f);
+        Ok(f)
     }
     pub fn assert_final_exponentiation_is_one<C: Config, B: RootAPI<C>>(
         &mut self,
