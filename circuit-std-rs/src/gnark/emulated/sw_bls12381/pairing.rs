@@ -92,7 +92,12 @@ impl Pairing {
         p: &[G1Affine],
         q: &mut [G2Affine],
     ) -> Result<GE12, Error> {
-        let f = self.miller_loop(native, p, q).unwrap();
+        let f = match self.miller_loop(native, p, q) {
+            Ok(val) => val,
+            Err(e) => {
+                return Err(Error::InternalError(e));
+            }
+        };
         let buf = self.ext12.conjugate(native, &f);
 
         let buf = self.ext12.div(native, &buf, &f);
