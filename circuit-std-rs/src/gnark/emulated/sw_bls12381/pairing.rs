@@ -120,7 +120,7 @@ impl Pairing {
         }
         self.ext12
             .assert_final_exponentiation_is_one(native, &combined_result);
-        return Ok(());
+        Ok(())
     }
 
     pub fn miller_loop_lines_with_hint<C: Config, B: RootAPI<C>>(
