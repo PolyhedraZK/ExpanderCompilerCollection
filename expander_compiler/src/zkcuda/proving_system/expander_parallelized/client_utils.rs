@@ -63,13 +63,15 @@ impl ClientHttpHelper {
 }
 
 pub fn client_parse_args() -> Option<String> {
-    let args = std::env::args();
-    for arg in args {
-        if arg.starts_with("--server-binary=") {
-            return Some(arg.trim_start_matches("--server-binary=").to_owned());
+    let args = std::env::args().collect::<Vec<_>>();
+    let mut string = None;
+    for (i, arg) in args.iter().take(args.len() - 1).enumerate() {
+        if arg == "--server-binary" || arg == "-s" {
+            string = Some(args[i + 1].clone());
+            break;
         }
     }
-    None
+    string
 }
 
 pub fn client_launch_server_and_setup<C, ECCConfig>(
