@@ -12,7 +12,7 @@ use crate::gnark::emulated::field_bls12381::e6::GE6;
 use expander_compiler::frontend::{Config, Error, RootAPI};
 use num_bigint::BigInt;
 
-const LOOP_COUNTER: [i8; 64] = [
+pub const LOOP_COUNTER: [i8; 64] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1,
 ];
