@@ -72,6 +72,8 @@ pub fn zkcuda_matmul<C: Config, P: ProvingSystem<C>, const N: usize>() {
     assert_eq!(result, expected_result);
 
     let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.solve_witness().unwrap();
+
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
 
     let timer = std::time::Instant::now();
