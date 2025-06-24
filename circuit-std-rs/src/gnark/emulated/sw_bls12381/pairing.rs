@@ -107,13 +107,14 @@ impl Pairing {
     ) -> Result<(), Error> {
         let mut combined_result = match miller_loop_results.first() {
             Some(val) => val.clone(),
-            None => return Err(Error::UserError("Input slice is empty".to_string()))
+            None => return Err(Error::UserError("Input slice is empty".to_string())),
         };
 
         for val in miller_loop_results.iter().skip(1) {
             combined_result = self.ext12.mul(native, &combined_result, val);
         }
-        self.ext12.assert_final_exponentiation_is_one(native, &combined_result);
+        self.ext12
+            .assert_final_exponentiation_is_one(native, &combined_result);
         return Ok(());
     }
 
