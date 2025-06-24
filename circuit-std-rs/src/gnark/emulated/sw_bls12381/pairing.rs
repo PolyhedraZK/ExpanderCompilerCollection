@@ -85,6 +85,38 @@ impl Pairing {
         }
         self.miller_loop_lines_with_hint(native, p, lines)
     }
+
+    pub fn multi_miller_loop<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        p: &[G1Affine],
+        q: &mut [G2Affine],
+    ) -> Result<GE12, Error> {
+        let f = self.miller_loop(native, p, q).unwrap();
+        let buf = self.ext12.conjugate(native, &f);
+
+        let buf = self.ext12.div(native, &buf, &f);
+        let f = self.ext12.frobenius_square(native, &buf);
+        let f = self.ext12.mul(native, &f, &buf);
+        return Ok(f);
+    }
+    pub fn assert_final_exponentiation_is_one<C: Config, B: RootAPI<C>>(
+        &mut self,
+        native: &mut B,
+        miller_loop_results: &[GE12],
+    ) -> Result<(), Error> {
+        let mut combined_result = match miller_loop_results.first() {
+            Some(val) => val.clone(),
+            None => return Err(Error::UserError("Input slice is empty".to_string()))
+        };
+
+        for val in miller_loop_results.iter().skip(1) {
+            combined_result = self.ext12.mul(native, &combined_result, val);
+        }
+        self.ext12.assert_final_exponentiation_is_one(native, &combined_result);
+        return Ok(());
+    }
+
     pub fn miller_loop_lines_with_hint<C: Config, B: RootAPI<C>>(
         &mut self,
         native: &mut B,
