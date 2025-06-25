@@ -1,3 +1,5 @@
+//! Module for handling built-in hints in the expander compiler.
+
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use ethnum::U256;
@@ -5,6 +7,7 @@ use rand::RngCore;
 
 use crate::{field::Field, utils::error::Error};
 
+/// This enum defines the IDs of built-in hints used in the expander compiler.
 #[repr(u64)]
 pub enum BuiltinHintIds {
     Identity = 0xccc000000000,
@@ -33,6 +36,7 @@ pub enum BuiltinHintIds {
 compile_error!("compilation is only allowed for 64-bit targets");
 
 impl BuiltinHintIds {
+    /// Creates a `BuiltinHintIds` from a `usize`.
     pub fn from_usize(id: usize) -> Option<BuiltinHintIds> {
         if id < (BuiltinHintIds::Identity as u64 as usize) {
             return None;
@@ -66,6 +70,7 @@ impl BuiltinHintIds {
     }
 }
 
+/// Stubs the implementation of a hint by hashing the hint ID and inputs.
 fn stub_impl_general<F: Field>(hint_id: usize, inputs: &Vec<F>, num_outputs: usize) -> Vec<F> {
     let mut hasher = DefaultHasher::new();
     hint_id.hash(&mut hasher);
@@ -79,6 +84,7 @@ fn stub_impl_general<F: Field>(hint_id: usize, inputs: &Vec<F>, num_outputs: usi
     outputs
 }
 
+/// Validates the number of inputs and outputs for a built-in hint.
 fn validate_builtin_hint(
     hint_id: BuiltinHintIds,
     num_inputs: usize,
@@ -154,6 +160,9 @@ fn validate_builtin_hint(
     Ok(())
 }
 
+/// Validates the number of inputs and outputs for a hint by its ID.
+/// If the hint ID corresponds to a built-in hint, it validates it using `validate_builtin_hint`.
+/// Otherwise, it checks that the custom hint has at least 1 input and 1 output
 pub fn validate_hint(hint_id: usize, num_inputs: usize, num_outputs: usize) -> Result<(), Error> {
     match BuiltinHintIds::from_usize(hint_id) {
         Some(hint_id) => validate_builtin_hint(hint_id, num_inputs, num_outputs),
@@ -173,6 +182,7 @@ pub fn validate_hint(hint_id: usize, num_inputs: usize, num_outputs: usize) -> R
     }
 }
 
+/// Implements a built-in hint by its ID.
 pub fn impl_builtin_hint<F: Field>(
     hint_id: BuiltinHintIds,
     inputs: &[F],
@@ -239,10 +249,12 @@ pub fn impl_builtin_hint<F: Field>(
     }
 }
 
+/// Applies a binary operation on the first two inputs and returns a vector with the result.
 fn binop_hint<F: Field, G: Fn(F, F) -> F>(inputs: &[F], f: G) -> Vec<F> {
     vec![f(inputs[0], inputs[1])]
 }
 
+/// Applies a binary operation on the first two inputs interpreted as U256 and returns a vector with the result.
 fn binop_hint_on_u256<F: Field, G: Fn(U256, U256) -> U256>(inputs: &[F], f: G) -> Vec<F> {
     let x_u256: U256 = inputs[0].to_u256();
     let y_u256: U256 = inputs[1].to_u256();
@@ -250,6 +262,7 @@ fn binop_hint_on_u256<F: Field, G: Fn(U256, U256) -> U256>(inputs: &[F], f: G) -
     vec![F::from_u256(z_u256)]
 }
 
+/// Converts a field element to a binary representation, returning a vector of field elements.
 pub fn to_binary<F: Field>(x: F, num_outputs: usize) -> Result<Vec<F>, Error> {
     let mut outputs = Vec::with_capacity(num_outputs);
     let mut y = x.to_u256();
@@ -265,6 +278,7 @@ pub fn to_binary<F: Field>(x: F, num_outputs: usize) -> Result<Vec<F>, Error> {
     Ok(outputs)
 }
 
+/// Stubs the implementation of a hint by its ID.
 pub fn stub_impl<F: Field>(hint_id: usize, inputs: &Vec<F>, num_outputs: usize) -> Vec<F> {
     match BuiltinHintIds::from_usize(hint_id) {
         Some(hint_id) => impl_builtin_hint(hint_id, inputs, num_outputs),
@@ -272,6 +286,7 @@ pub fn stub_impl<F: Field>(hint_id: usize, inputs: &Vec<F>, num_outputs: usize) 
     }
 }
 
+/// Generates a random built-in hint ID along with the number of inputs and outputs.
 pub fn random_builtin(mut rand: impl RngCore) -> (usize, usize, usize) {
     loop {
         let hint_id = (rand.next_u64() as usize % 100) + (BuiltinHintIds::Identity as u64 as usize);
@@ -312,10 +327,13 @@ pub fn random_builtin(mut rand: impl RngCore) -> (usize, usize, usize) {
     }
 }
 
+/// Returns the bit length of a U256 value.
 pub fn u256_bit_length(x: U256) -> usize {
     256 - x.leading_zeros() as usize
 }
 
+/// Shifts a U256 value left by a given number of bits, wrapping around if necessary.
+/// This implementation should be the same as the Circom shift left operation.
 pub fn circom_shift_l_impl<F: Field>(x: U256, k: U256) -> U256 {
     let top = F::MODULUS / 2;
     if k <= top {
@@ -336,6 +354,8 @@ pub fn circom_shift_l_impl<F: Field>(x: U256, k: U256) -> U256 {
     }
 }
 
+/// Shifts a U256 value right by a given number of bits, wrapping around if necessary.
+/// This implementation should be the same as the Circom shift right operation.
 pub fn circom_shift_r_impl<F: Field>(x: U256, k: U256) -> U256 {
     let top = F::MODULUS / 2;
     if k <= top {

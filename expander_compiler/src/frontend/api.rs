@@ -1,3 +1,5 @@
+//! This module provides the API for circuit operations in the Expander Compiler.
+
 use arith::Field;
 
 use crate::circuit::config::Config;
@@ -17,6 +19,7 @@ macro_rules! binary_op {
     };
 }
 
+/// This trait defines the basic operations available in the Expander Compiler API.
 pub trait BasicAPI<C: Config> {
     binary_op!(add);
     binary_op!(sub);
@@ -25,18 +28,27 @@ pub trait BasicAPI<C: Config> {
     binary_op!(or);
     binary_op!(and);
 
+    /// Displays a variable with an optional label.
+    /// This function is a no-op in the compilation mode.
+    /// In debug mode, it can be used to visualize the variable.
     fn display(&self, _label: &str, _x: impl ToVariableOrValue<CircuitField<C>>) {}
+    /// Divides the first variable by the second.
+    /// If `checked` is true, it checks for division by zero.
     fn div(
         &mut self,
         x: impl ToVariableOrValue<CircuitField<C>>,
         y: impl ToVariableOrValue<CircuitField<C>>,
         checked: bool,
     ) -> Variable;
+    /// Negates a variable.
     fn neg(&mut self, x: impl ToVariableOrValue<CircuitField<C>>) -> Variable;
+    /// Computes the inverse of a variable.
     fn inverse(&mut self, x: impl ToVariableOrValue<CircuitField<C>>) -> Variable {
         self.div(1, x, true)
     }
+    /// Returns 1 if the variable is zero, 0 otherwise.
     fn is_zero(&mut self, x: impl ToVariableOrValue<CircuitField<C>>) -> Variable;
+    /// Converts a variable to its binary representation.
     fn to_binary(
         &mut self,
         x: impl ToVariableOrValue<CircuitField<C>>,
@@ -58,9 +70,13 @@ pub trait BasicAPI<C: Config> {
         x: impl ToVariableOrValue<CircuitField<C>>,
         y: impl ToVariableOrValue<CircuitField<C>>,
     ) -> Variable;
+    /// Adds an assertion that the variable is zero.
     fn assert_is_zero(&mut self, x: impl ToVariableOrValue<CircuitField<C>>);
+    /// Adds an assertion that the variable is non-zero.
     fn assert_is_non_zero(&mut self, x: impl ToVariableOrValue<CircuitField<C>>);
+    /// Adds an assertion that the variable is a boolean (0 or 1).
     fn assert_is_bool(&mut self, x: impl ToVariableOrValue<CircuitField<C>>);
+    /// Adds an assertion that the variable equals to another variable.
     fn assert_is_equal(
         &mut self,
         x: impl ToVariableOrValue<CircuitField<C>>,
@@ -69,6 +85,7 @@ pub trait BasicAPI<C: Config> {
         let diff = self.sub(x, y);
         self.assert_is_zero(diff);
     }
+    /// Adds an assertion that the variable is different from another variable.
     fn assert_is_different(
         &mut self,
         x: impl ToVariableOrValue<CircuitField<C>>,
@@ -77,21 +94,29 @@ pub trait BasicAPI<C: Config> {
         let diff = self.sub(x, y);
         self.assert_is_non_zero(diff);
     }
+    /// Returns a prover time random value.
     fn get_random_value(&mut self) -> Variable;
+    /// Adds a hint to the circuit.
+    /// Hints are used to compute values that are not directly computable in the circuit.
+    /// The `hint_key` is a unique identifier for the hint, and `inputs` are the input variables to the hint.
+    /// The `num_outputs` specifies how many output variables the hint will produce.
+    /// The hint should be defined in the `HintRegistry`.
     fn new_hint(
         &mut self,
         hint_key: &str,
         inputs: &[Variable],
         num_outputs: usize,
     ) -> Vec<Variable>;
+    /// Converts a value to a variable.
     fn constant(&mut self, x: impl ToVariableOrValue<CircuitField<C>>) -> Variable;
-    // try to get the value of a compile-time constant variable
-    // this function has different behavior in normal and debug mode, in debug mode it always returns Some(value)
+    /// Try to get the value of a compile-time constant variable.
+    /// This function has different behavior in normal and debug mode, in debug mode it always returns Some(value).
     fn constant_value(
         &mut self,
         x: impl ToVariableOrValue<CircuitField<C>>,
     ) -> Option<CircuitField<C>>;
 
+    /// Converts binary representation to a variable.
     #[allow(clippy::wrong_self_convention)]
     fn from_binary(&mut self, xs: &[Variable]) -> Variable {
         if xs.is_empty() {
@@ -108,6 +133,9 @@ pub trait BasicAPI<C: Config> {
     }
 }
 
+/// UnconstrainedAPI provides some binary operations, which are not constrained by the circuit structure.
+///
+/// These operations are inspired by the circom language, and are similar to hints.
 pub trait UnconstrainedAPI<C: Config> {
     fn unconstrained_identity(&mut self, x: impl ToVariableOrValue<CircuitField<C>>) -> Variable;
     binary_op!(unconstrained_add);
@@ -131,23 +159,25 @@ pub trait UnconstrainedAPI<C: Config> {
     binary_op!(unconstrained_bit_xor);
 }
 
+/// RootAPI provides the root circuit API, which includes basic operations, unconstrained operations, and sub-circuit management.
 pub trait RootAPI<C: Config>: Sized + BasicAPI<C> + UnconstrainedAPI<C> + 'static {
+    /// Call a function with the given inputs, memorizing the circuit structure of the function.
     fn memorized_simple_call<F: Fn(&mut Self, &Vec<Variable>) -> Vec<Variable> + 'static>(
         &mut self,
         f: F,
         inputs: &[Variable],
     ) -> Vec<Variable>;
     fn hash_to_sub_circuit_id(&mut self, hash: &[u8; 32]) -> usize;
-    // This function should only be called in proc macro generated code
+    /// This function should only be called in proc macro generated code
     fn call_sub_circuit<F: FnOnce(&mut Self, &Vec<Variable>) -> Vec<Variable>>(
         &mut self,
         circuit_id: usize,
         inputs: &[Variable],
         f: F,
     ) -> Vec<Variable>;
-    // This function should only be called in proc macro generated code
+    /// This function should only be called in proc macro generated code
     fn register_sub_circuit_output_structure(&mut self, circuit_id: usize, structure: Vec<usize>);
-    // This function should only be called in proc macro generated code
+    /// This function should only be called in proc macro generated code
     fn get_sub_circuit_output_structure(&self, circuit_id: usize) -> Vec<usize>;
     fn set_outputs(&mut self, outputs: Vec<Variable>);
 }

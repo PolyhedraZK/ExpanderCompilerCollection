@@ -1,3 +1,6 @@
+//! This module contains the zkCUDA kernel types, which are used to represent
+//! compiled kernels in the circuit compiler.
+
 use crate::circuit::input_mapping::EMPTY;
 use crate::circuit::ir::common::Instruction;
 use crate::compile::{
@@ -19,6 +22,8 @@ pub use macros::kernel;
 
 use serdes::ExpSerde;
 
+/// The KernelPrimitive is a representation of a kernel that can be compiled later.
+/// It contains the circuit IR for both later compilation and calling.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, ExpSerde)]
 pub struct KernelPrimitive<C: Config> {
     // The circuit IR for output computation and later compilation
@@ -32,26 +37,34 @@ pub struct KernelPrimitive<C: Config> {
 }
 
 impl<C: Config> KernelPrimitive<C> {
+    /// Get the circuit IR for later compilation.
     pub fn ir_for_later_compilation(&self) -> &ir::hint_normalized::RootCircuit<C> {
         &self.ir_for_later_compilation
     }
+    /// Get the circuit IR for calling.
     pub fn ir_for_calling(&self) -> &ir::hint_normalized::RootCircuit<C> {
         &self.ir_for_calling
     }
+    /// Get the input offsets for the IR.
     pub fn ir_input_offsets(&self) -> &[usize] {
         &self.ir_input_offsets
     }
+    /// Get the output offsets for the IR.
     pub fn ir_output_offsets(&self) -> &[usize] {
         &self.ir_output_offsets
     }
+    /// Get the input/output specifications for the kernel.
     pub fn io_specs(&self) -> &[IOVecSpec] {
         &self.io_specs
     }
+    /// Get the shapes of the input/output variables.
     pub fn io_shapes(&self) -> &[Shape] {
         &self.io_shapes
     }
 }
 
+/// Kernel is a representation of a compiled kernel that can be executed.
+/// It contains the layered circuit and the hint solver if available.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, ExpSerde)]
 pub struct Kernel<C: Config> {
     hint_solver: Option<ir::hint_normalized::RootCircuit<C>>,
@@ -60,30 +73,49 @@ pub struct Kernel<C: Config> {
 }
 
 impl<C: Config> Kernel<C> {
+    /// Get the layered circuit for the kernel.
     pub fn layered_circuit(&self) -> &LayeredCircuit<C, NormalInputType> {
         &self.layered_circuit
     }
+    /// Get the layered circuit input specifications.
     pub fn layered_circuit_input(&self) -> &[LayeredCircuitInputVec] {
         &self.layered_circuit_input
     }
+    /// Get the hint solver circuit if available.
     pub fn hint_solver(&self) -> Option<&ir::hint_normalized::RootCircuit<C>> {
         self.hint_solver.as_ref()
     }
 }
 
+/// IOVecSpec is a specification for an input/output vector in a kernel definition.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, ExpSerde)]
 pub struct IOVecSpec {
+    /// The length of the vector.
     pub len: usize,
+    /// Whether this vector is an input.
     pub is_input: bool,
+    /// Whether this vector is an output.
+    /// At least one of `is_input` or `is_output` must be true.
     pub is_output: bool,
 }
 
+/// LayeredCircuitInputVec is a specification for an input vector in the final layered circuit.
 #[derive(Default, Debug, Clone, Hash, PartialEq, Eq, ExpSerde)]
 pub struct LayeredCircuitInputVec {
+    /// The length of the vector.
     pub len: usize,
+    /// The offset of the vector in the layered circuit input.
     pub offset: usize,
 }
 
+/// Compile a kernel with the given specifications and shapes.
+///
+/// This function takes a closure `f` that defines the kernel logic,
+/// a slice of `IOVecSpec` that describes the input/output vectors,
+/// and a slice of shapes that describe the dimensions of the input/output variables.
+/// It returns a `KernelPrimitive` that can be used for later compilation.
+///
+/// This function is called by the `kernel!` macro to compile the kernel definition.
 pub fn compile_with_spec_and_shapes<C, F>(
     f: F,
     io_specs: &[IOVecSpec],
@@ -176,6 +208,14 @@ where
     })
 }
 
+/// Compile a kernel primitive with the given input and output shapes.
+///
+/// This function takes a `KernelPrimitive` and two slices of optional shapes,
+/// one for the input shapes and one for the output shapes.
+/// It returns a `Kernel` that can be executed.
+///
+/// This function is called by the Context to compile the kernel primitive
+/// with the specified input and output shapes.
 pub fn compile_primitive<C: Config>(
     kernel: &KernelPrimitive<C>,
     pad_shapes_input: &[Option<Shape>],
@@ -267,6 +307,7 @@ pub fn compile_primitive<C: Config>(
     })
 }
 
+/// Reorder the inputs of the IR circuit and pad them to 2^n sizes.
 fn reorder_ir_inputs<C: Config>(
     r: &mut ir::hint_less::RootCircuit<C>,
     pad_shapes: &[Shape],

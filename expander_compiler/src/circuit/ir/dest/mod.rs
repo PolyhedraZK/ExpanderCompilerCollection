@@ -1,3 +1,7 @@
+//! This module defines the dest IR (based on the `common` IR) for the circuit.
+//! This is the fourth and final stage of the IR.
+//! It is used to generate layered circuits.
+
 use std::collections::{HashMap, HashSet};
 
 use crate::circuit::{config::Config, layered::Coef};
@@ -19,21 +23,23 @@ pub mod tests;
 pub mod display;
 pub mod mul_fanout_limit;
 
+/// Instruction set for the dest IR.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Instruction<C: Config> {
-    InternalVariable {
-        expr: Expression<C>,
-    },
+    /// Internal variable defined by an expression.
+    InternalVariable { expr: Expression<C> },
+    /// Call to a sub-circuit.
     SubCircuitCall {
         sub_circuit_id: usize,
         inputs: Vec<usize>,
         num_outputs: usize,
     },
-    ConstantLike {
-        value: Coef<C>,
-    },
+    /// Constant-like instruction, which can also be a public input or a random value.
+    /// This is separated from `InternalVariable` to allow for more efficient handling of constants.
+    ConstantLike { value: Coef<C> },
 }
 
+/// IR configuration for the dest IR.
 #[derive(Default, Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Irc<C: Config> {
     _a: C,
@@ -42,11 +48,14 @@ impl<C: Config> IrConfig for Irc<C> {
     type Instruction = Instruction<C>;
     type Constraint = RawConstraint;
     type Config = C;
+    /// We don't allow duplicate sub-circuit inputs in the dest IR,
+    /// as it makes the final compilation more complex.
     const ALLOW_DUPLICATE_SUB_CIRCUIT_INPUTS: bool = false;
     const ALLOW_DUPLICATE_CONSTRAINTS: bool = true;
     const ALLOW_DUPLICATE_OUTPUTS: bool = false;
 }
 
+/// IR configuration for the relaxed dest IR.
 #[derive(Default, Debug, Clone, Hash, PartialEq, Eq)]
 pub struct IrcRelaxed<C: Config> {
     _a: C,
@@ -55,6 +64,9 @@ impl<C: Config> IrConfig for IrcRelaxed<C> {
     type Instruction = Instruction<C>;
     type Constraint = RawConstraint;
     type Config = C;
+    /// In the relaxed dest IR, we allow duplicate sub-circuit inputs,
+    /// constraints, and outputs to simplify the export process.
+    /// But we will transform the circuit to non-relaxed form later.
     const ALLOW_DUPLICATE_SUB_CIRCUIT_INPUTS: bool = true;
     const ALLOW_DUPLICATE_CONSTRAINTS: bool = true;
     const ALLOW_DUPLICATE_OUTPUTS: bool = true;
@@ -308,6 +320,7 @@ impl<C: Config> CircuitRelaxed<C> {
 }
 
 impl<C: Config> RootCircuitRelaxed<C> {
+    /// Solves duplicated outputs and constraints in the relaxed circuit.
     pub fn solve_duplicates(&self) -> RootCircuit<C> {
         let mut new_circuits = HashMap::new();
         for (id, circuit) in self.circuits.iter() {
@@ -320,6 +333,8 @@ impl<C: Config> RootCircuitRelaxed<C> {
         }
     }
 
+    /// Export constraints to outputs, and set `expected_num_output_zeroes` to the expected number of zeroes in the output.
+    /// This is used in certain configurations like `GF(2)`.
     pub fn export_constraints(&self) -> RootCircuitRelaxed<C> {
         let mut exported_circuits = HashMap::new();
         let mut sub_num_add_outputs = HashMap::new();
@@ -340,6 +355,7 @@ impl<C: Config> RootCircuitRelaxed<C> {
 }
 
 impl<C: Config> RootCircuit<C> {
+    /// Validates that all circuits in the root circuit have at least one input.
     pub fn validate_circuit_has_inputs(&self) -> Result<(), Error> {
         for circuit in self.circuits.values() {
             if circuit.num_inputs == 0 {

@@ -1,3 +1,5 @@
+//! This module provides traits and implementations for joining, rebuilding, and hashing circuit variables and their structures.
+
 use std::fmt::Display;
 
 use tiny_keccak::Hasher;

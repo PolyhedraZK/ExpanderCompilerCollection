@@ -1,3 +1,5 @@
+//! This module defines the common traits and functions for the IR.
+
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
@@ -22,46 +24,82 @@ pub mod stats;
 #[cfg(test)]
 pub mod rand_gen;
 
+/// The IR configuration trait, which defines the types and constants used in the IR.
+/// Since we have multiple stages of IR, this trait allows us to define the configuration for each stage,
+/// so that we can reuse the same IR structure and implementations with different configurations.
 pub trait IrConfig: Debug + Clone + Default + Hash + PartialEq + Eq {
+    /// The configuration type for the circuit.
     type Config: Config;
+    /// The instruction type for the IR.
     type Instruction: Instruction<Self::Config>;
+    /// The constraint type for the IR.
     type Constraint: Constraint<Self::Config>;
+    /// Whether to allow duplicated sub-circuit inputs.
     const ALLOW_DUPLICATE_SUB_CIRCUIT_INPUTS: bool;
+    /// Whether to allow duplicated constraints in the circuit.
     const ALLOW_DUPLICATE_CONSTRAINTS: bool;
+    /// Whether to allow duplicated outputs in the circuit.
     const ALLOW_DUPLICATE_OUTPUTS: bool;
 }
 
+/// Instruction trait, which defines the methods for the instructions in the IR.
 pub trait Instruction<C: Config>: Debug + Clone + Hash + PartialEq + Eq {
+    /// Returns a vector of variable indices that this instruction uses as inputs.
     fn inputs(&self) -> Vec<usize>;
+    /// Returns the number of outputs this instruction produces.
     fn num_outputs(&self) -> usize;
+    /// Returns the information of the sub circuit call if this instruction is a sub circuit call.
     fn as_sub_circuit_call(&self) -> Option<(usize, &Vec<usize>, usize)>;
+    /// Creates a new instruction that represents a sub circuit call.
     fn sub_circuit_call(sub_circuit_id: usize, inputs: Vec<usize>, num_outputs: usize) -> Self;
+    /// Replaces the variable indices in the instruction according to the provided function.
     fn replace_vars<F: Fn(usize) -> usize>(&self, f: F) -> Self;
+    /// Creates a new instruction from a linear combination `kx + b`, where `x` is a variable index, `k` is a coefficient, and `b` is a constant.
     fn from_kx_plus_b(x: usize, k: CircuitField<C>, b: CircuitField<C>) -> Self;
+    /// Validates the instruction.
     fn validate(&self, num_public_inputs: usize) -> Result<(), Error>;
+    /// Evaluates the instruction with the provided values.
+    /// This function is unsafe because it does not require actual public inputs to be provided, or random values to be used.
     fn eval_unsafe(&self, values: &[CircuitField<C>]) -> EvalResult<'_, C>;
 }
 
+/// The result of evaluating an instruction in the IR.
 pub enum EvalResult<'a, C: Config> {
+    /// A single value produced by the instruction.
     Value(CircuitField<C>),
+    /// Multiple values produced by the instruction.
     Values(Vec<CircuitField<C>>),
+    /// A sub circuit call produced by the instruction.
+    /// In this case, the caller should evaluate the sub circuit with the provided inputs.
     SubCircuitCall(usize, &'a Vec<usize>),
+    /// An error occurred during evaluation.
+    /// This can be used to propagate errors from the instruction evaluation.
     Error(Error),
 }
 
+/// Trait for constraints in the IR.
 pub trait Constraint<C: Config>: Debug + Clone + Hash + PartialEq + Eq {
+    /// The type of the constraint.
     type Type: ConstraintType<C>;
+    /// Returns the variable index that this constraint refers to.
     fn var(&self) -> usize;
+    /// Returns the type of the constraint.
     fn typ(&self) -> Self::Type;
+    /// Replaces the variable index in the constraint according to the provided function.
     fn replace_var<F: Fn(usize) -> usize>(&self, f: F) -> Self;
+    /// Creates a new constraint with the given variable index and type.
     fn new(var: usize, typ: Self::Type) -> Self;
 }
 
+/// Trait for constraint types in the IR.
 pub trait ConstraintType<C: Config>: Debug + Copy + Clone + Hash + PartialEq + Eq {
+    /// Verifies the constraint against a value in the circuit.
     fn verify(&self, value: &CircuitField<C>) -> bool;
 }
 
+/// A raw constraint type that is used for testing and debugging purposes.
 pub type RawConstraint = usize;
+/// The type of the raw constraint, which is just a placeholder type.
 pub type RawConstraintType = ();
 
 impl<C: Config> Constraint<C> for RawConstraint {
@@ -84,22 +122,39 @@ impl<C: Config> ConstraintType<C> for RawConstraintType {
     }
 }
 
+/// The main circuit structure that contains the instructions, constraints, and outputs.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Circuit<Irc: IrConfig> {
+    /// The instructions in the circuit.
     pub instructions: Vec<Irc::Instruction>,
+    /// The constraints in the circuit.
     pub constraints: Vec<Irc::Constraint>,
+    /// The outputs of the circuit, which are variable indices.
     pub outputs: Vec<usize>,
+    /// The number of inputs to the circuit.
     pub num_inputs: usize,
 }
 
+/// `RootCircuit` is the top-level circuit that contains all sub-circuits and their relationships.
+/// It is used to represent the entire IR circuit.
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct RootCircuit<Irc: IrConfig> {
+    /// The number of public inputs to the root circuit.
+    /// This is shared by all sub-circuits.
     pub num_public_inputs: usize,
+    /// The expected number of output zeroes in the root circuit.
+    /// The output of the root circuit is expected to have this many zeroes at the beginning.
+    /// And the rest of the outputs are actual outputs of the circuit.
     pub expected_num_output_zeroes: usize,
+    /// The circuits in the root circuit, indexed by their IDs.
+    /// The root circuit is expected to have a circuit with ID 0, which is the main circuit.
+    /// Other circuits are sub-circuits that can be called from the main circuit.
+    /// The IDs are unique and should not be duplicated.
     pub circuits: HashMap<usize, Circuit<Irc>>,
 }
 
 impl<Irc: IrConfig> Circuit<Irc> {
+    /// Gets the number of inputs to the circuit.
     pub fn get_num_inputs_all(&self) -> usize {
         self.num_inputs
     }
@@ -166,6 +221,7 @@ impl<Irc: IrConfig> Circuit<Irc> {
         Ok(())
     }
 
+    /// Gets the number of all variables in the circuit.
     pub fn get_num_variables(&self) -> usize {
         let mut cur_var_max = self.get_num_inputs_all();
         for insn in self.instructions.iter() {
@@ -175,13 +231,18 @@ impl<Irc: IrConfig> Circuit<Irc> {
     }
 }
 
+/// The result of evaluating the root circuit.
+/// This is to prevent cargo from complaining about type complexity.
 pub type EvalOk<Irc> = (Vec<CircuitField<<Irc as IrConfig>::Config>>, bool);
 
 impl<Irc: IrConfig> RootCircuit<Irc> {
+    /// Returns the vertices of the sub-circuit calling graph.
+    /// This is used to do graph algorithms on the sub-circuit calling graph.
     pub fn sub_circuit_graph_vertices(&self) -> HashSet<usize> {
         self.circuits.keys().cloned().collect()
     }
 
+    /// Returns the edges of the sub-circuit calling graph.
     pub fn sub_circuit_graph_edges(&self) -> HashMap<usize, HashSet<usize>> {
         let mut edges: HashMap<usize, HashSet<usize>> = HashMap::new();
         for (circuit_id, circuit) in self.circuits.iter() {
@@ -194,6 +255,7 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
         edges
     }
 
+    /// Validates the circuit structure and its components.
     pub fn validate(&self) -> Result<(), Error> {
         // tests of this function are in for_layering
         // check if 0 circuit exists
@@ -269,11 +331,13 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
         Ok(())
     }
 
+    /// Returns the number of inputs to the root circuit.
     pub fn input_size(&self) -> usize {
         // tests of this function are in for_layering
         self.circuits[&0].num_inputs
     }
 
+    /// Returns the topological order of the sub-circuit calling graph.
     pub fn topo_order(&self) -> Vec<usize> {
         topo_order(
             &self.sub_circuit_graph_vertices(),
@@ -281,7 +345,7 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
         )
     }
 
-    // eval the circuit. This function should be used for testing only
+    /// Eval the circuit. This function should be used for testing only.
     pub fn eval_unsafe_with_errors(
         &self,
         inputs: Vec<CircuitField<<Irc as IrConfig>::Config>>,
@@ -295,6 +359,7 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
         Ok((res.to_vec(), cond))
     }
 
+    /// Eval the circuit. This function should be used for testing only.
     pub fn eval_unsafe(
         &self,
         inputs: Vec<CircuitField<<Irc as IrConfig>::Config>>,

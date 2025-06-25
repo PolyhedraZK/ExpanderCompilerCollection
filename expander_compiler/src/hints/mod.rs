@@ -1,3 +1,5 @@
+//! Module for handling hints in the expander compiler.
+
 pub mod builtin;
 pub mod registry;
 
@@ -7,6 +9,9 @@ use registry::HintCaller;
 
 use crate::{field::Field, utils::error::Error};
 
+/// Safely calls a hint implementation.
+/// If the hint ID corresponds to a built-in hint, it calls the built-in implementation.
+/// Otherwise, it calls the provided `HintCaller` implementation.
 pub fn safe_impl<F: Field>(
     hint_caller: &impl HintCaller<F>,
     hint_id: usize,

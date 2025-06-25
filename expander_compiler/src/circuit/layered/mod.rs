@@ -1,3 +1,5 @@
+//! The module for layered circuits.
+
 use std::{fmt, hash::Hash};
 
 use serdes::ExpSerde;
@@ -15,6 +17,7 @@ pub mod serde;
 pub mod stats;
 pub mod witness;
 
+/// The `Coef` enum represents coefficients in the circuit.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Coef<C: Config> {
     Constant(CircuitField<C>),
@@ -23,6 +26,8 @@ pub enum Coef<C: Config> {
 }
 
 impl<C: Config> Coef<C> {
+    /// Returns the value of the coefficient.
+    /// It's marked as `unsafe` because it returns fake values for random and public inputs.
     pub fn get_value_unsafe(&self) -> CircuitField<C> {
         match self {
             Coef::Constant(c) => *c,
@@ -36,6 +41,10 @@ impl<C: Config> Coef<C> {
         }
     }
 
+    /// Returns the value of the coefficient.
+    /// It's safer than `get_value_unsafe` because it requires public inputs to be provided.
+    /// But the random value is still not proven.
+    /// This function should not be used in proving.
     pub fn get_value_with_public_inputs(
         &self,
         public_inputs: &[CircuitField<C>],
@@ -52,6 +61,8 @@ impl<C: Config> Coef<C> {
         }
     }
 
+    /// Returns the value of the coefficient using SIMD operations.
+    /// This function is almost identical to `get_value_with_public_inputs`, but it operates on SIMD fields.
     pub fn get_value_with_public_inputs_simd<SF: arith::SimdField<Scalar = CircuitField<C>>>(
         &self,
         public_inputs: &[SF],
@@ -68,6 +79,7 @@ impl<C: Config> Coef<C> {
         }
     }
 
+    /// Validates the coefficient against the number of public inputs.
     pub fn validate(&self, num_public_inputs: usize) -> Result<(), Error> {
         match self {
             Coef::Constant(_) => Ok(()),
@@ -84,10 +96,13 @@ impl<C: Config> Coef<C> {
         }
     }
 
+    /// Checks if the coefficient is a constant.
     pub fn is_constant(&self) -> bool {
         matches!(self, Coef::Constant(_))
     }
 
+    /// Adds a constant to the coefficient.
+    /// Panics if called on a non-constant coefficient.
     pub fn add_constant(&self, c: CircuitField<C>) -> Self {
         match self {
             Coef::Constant(x) => Coef::Constant(*x + c),
@@ -95,6 +110,7 @@ impl<C: Config> Coef<C> {
         }
     }
 
+    /// Returns the constant value if the coefficient is a constant.
     pub fn get_constant(&self) -> Option<CircuitField<C>> {
         match self {
             Coef::Constant(x) => Some(*x),
@@ -102,6 +118,8 @@ impl<C: Config> Coef<C> {
         }
     }
 
+    /// Creates a random coefficient for testing purposes.
+    /// It doesn't return `Random` coefficients, but rather `Constant` or `PublicInput`.
     #[cfg(test)]
     pub fn random_no_random(mut rnd: impl rand::RngCore, num_public_inputs: usize) -> Self {
         use rand::Rng;
@@ -112,6 +130,7 @@ impl<C: Config> Coef<C> {
         }
     }
 
+    /// Exports the coefficient to the expander circuit format.
     pub fn export_to_expander(&self) -> (CircuitField<C>, expander_circuit::CoefType) {
         match self {
             Coef::Constant(c) => (*c, expander_circuit::CoefType::Constant),
@@ -127,18 +146,27 @@ impl<C: Config> Coef<C> {
     }
 }
 
+/// Cross layer input, which a gate can go across multiple layers.
 #[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord, ExpSerde)]
 pub struct CrossLayerInput {
-    // the actual layer of the input is (output_layer-1-layer)
+    /// Difference in layers between the input and the output.
+    /// The actual layer of the input is (output_layer-1-layer)
     pub layer: usize,
+    /// Offset of the input in the layer.
     pub offset: usize,
 }
 
+/// Normal input, which represents an normal layered circuit.
 #[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord, ExpSerde)]
 pub struct NormalInput {
+    /// Offset of the input in the layer.
     pub offset: usize,
 }
 
+/// The trait for gate inputs in the circuit.
+/// We want other components to support both cross-layer and normal inputs,
+/// so we define a trait that both `CrossLayerInput` and `NormalInput` implement.
+/// This allows us to reuse most compilation logic for both types of layered citcuits.
 pub trait Input:
     std::fmt::Debug
     + std::fmt::Display
@@ -152,9 +180,13 @@ pub trait Input:
     + Ord
     + ExpSerde
 {
+    /// The layer of the input.
     fn layer(&self) -> usize;
+    /// The offset of the input in the layer.
     fn offset(&self) -> usize;
+    /// Sets the offset of the input in the layer.
     fn set_offset(&mut self, offset: usize);
+    /// Creates a new input with the given layer and offset.
     fn new(layer: usize, offset: usize) -> Self;
 }
 
@@ -191,31 +223,43 @@ impl Input for NormalInput {
     }
 }
 
+/// `InputUsize` for cross layer circuits.
 #[derive(Debug, Default, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, ExpSerde)]
 pub struct CrossLayerInputUsize {
     v: Vec<usize>,
 }
 
+/// `InputUsize` for normal layered circuits.
 #[derive(Debug, Default, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, ExpSerde)]
 pub struct NormalInputUsize {
     v: usize,
 }
 
+/// `InputUsize` is a certain `usize`-like type that are used in circuits.
+/// More specifically, in sub circuits, we need to know the offset of the sub circuit inputs.
+/// In normal layered circuits, this is just a single `usize` value.
+/// In cross-layer circuits, this is a vector of `usize` values, where each value represents the offset of the input in the each involved layer.
 pub trait InputUsize:
     std::fmt::Debug + Default + Clone + Hash + PartialEq + Eq + PartialOrd + Ord + ExpSerde
 {
     type Iter<'a>: Iterator<Item = usize>
     where
         Self: 'a;
+    /// Returns the length of the input.
     fn len(&self) -> usize;
+    /// Returns an iterator over the input.
     fn iter(&self) -> Self::Iter<'_>;
+    /// Returns the value at the given index.
     fn get(&self, i: usize) -> usize {
         self.iter().nth(i).unwrap()
     }
+    /// Sets the value at the given index.
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
+    /// Creates a new `InputUsize` from a vector of `usize`.
     fn from_vec(v: Vec<usize>) -> Self;
+    /// Converts the `InputUsize` to a vector of `usize`.
     fn to_vec(&self) -> Vec<usize> {
         self.iter().collect()
     }
@@ -250,14 +294,24 @@ impl InputUsize for NormalInputUsize {
     }
 }
 
+/// The trait for input types in the circuit.
+/// This trait allows us to define different types of inputs, such as cross-layer and normal inputs,
+/// and to use them interchangeably in the circuit.
 pub trait InputType:
     std::fmt::Debug + Default + Clone + Hash + PartialEq + Eq + PartialOrd + Ord
 {
+    /// The input type for this input type.
     type Input: Input;
+    /// The input usize type for this input type.
     type InputUsize: InputUsize;
+    /// Whether this input type supports cross-layer relay.
+    /// We have only two types of inputs: cross-layer and normal.
+    /// If the input type is cross-layer, it supports cross-layer relay.
+    /// If the input type is normal, it does not support cross-layer relay.
     const CROSS_LAYER_RELAY: bool;
 }
 
+/// CrossLayerInputType is the input type for cross-layer circuits.
 #[derive(Debug, Default, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CrossLayerInputType;
 
@@ -267,6 +321,7 @@ impl InputType for CrossLayerInputType {
     const CROSS_LAYER_RELAY: bool = true;
 }
 
+/// NormalInputType is the input type for normal layered circuits.
 #[derive(Debug, Default, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NormalInputType;
 
@@ -276,14 +331,20 @@ impl InputType for NormalInputType {
     const CROSS_LAYER_RELAY: bool = false;
 }
 
+/// The `Gate` struct represents a gate in the circuit.
+/// `INPUT_NUM` is the number of inputs to the gate, 0 for constants, 1 for additions, and 2 for multiplications.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Gate<C: Config, I: InputType, const INPUT_NUM: usize> {
+    /// Inputs to the gate.
     pub inputs: [I::Input; INPUT_NUM],
+    /// Output of the gate.
     pub output: usize,
+    /// Coefficient of the gate.
     pub coef: Coef<C>,
 }
 
 impl<C: Config, const INPUT_NUM: usize> Gate<C, NormalInputType, INPUT_NUM> {
+    /// Exports the gate to the expander circuit format.
     pub fn export_to_expander<
         DestConfig: gkr_engine::FieldEngine<CircuitField = CircuitField<C>>,
     >(
@@ -305,6 +366,7 @@ impl<C: Config, const INPUT_NUM: usize> Gate<C, NormalInputType, INPUT_NUM> {
 }
 
 impl<C: Config, const INPUT_NUM: usize> Gate<C, CrossLayerInputType, INPUT_NUM> {
+    /// Exports the gate to the expander circuit format.
     pub fn export_to_crosslayer_simple<
         DestConfig: gkr_engine::FieldEngine<CircuitField = CircuitField<C>>,
     >(
@@ -331,10 +393,14 @@ impl<C: Config, const INPUT_NUM: usize> Gate<C, CrossLayerInputType, INPUT_NUM> 
     }
 }
 
+/// Gate type for multiplication.
 pub type GateMul<C, I> = Gate<C, I, 2>;
+/// Gate type for addition.
 pub type GateAdd<C, I> = Gate<C, I, 1>;
+/// Gate type for constants, which have no inputs.
 pub type GateConst<C, I> = Gate<C, I, 0>;
 
+/// Custom gate type, which can have any number of inputs and a specific gate type.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct GateCustom<C: Config, I: InputType> {
     pub gate_type: usize,
@@ -343,35 +409,53 @@ pub struct GateCustom<C: Config, I: InputType> {
     pub coef: Coef<C>,
 }
 
+/// Allocation represents the allocation of inputs and outputs in a segment.
 #[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq, ExpSerde)]
 pub struct Allocation<I: InputType> {
     pub input_offset: I::InputUsize,
     pub output_offset: usize,
 }
 
+/// Specification of a child segment in a circuit.
+/// It contains the ID of the child segment and a vector of allocations.
 pub type ChildSpec<I> = (usize, Vec<Allocation<I>>);
 
+/// The `Segment` struct represents a segment in the circuit.
 #[derive(Default, Debug, Hash, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub struct Segment<C: Config, I: InputType> {
+    /// The number of inputs to the segment.
     pub num_inputs: I::InputUsize,
+    /// The number of outputs from the segment.
     pub num_outputs: usize,
+    /// Child segments of this segment.
     pub child_segs: Vec<ChildSpec<I>>,
+    /// Multiplication gates in the segment.
     pub gate_muls: Vec<GateMul<C, I>>,
+    /// Addition gates in the segment.
     pub gate_adds: Vec<GateAdd<C, I>>,
+    /// Constant gates in the segment.
     pub gate_consts: Vec<GateConst<C, I>>,
+    /// Custom gates in the segment.
     pub gate_customs: Vec<GateCustom<C, I>>,
 }
 
+/// The `Circuit` struct represents a full layered circuit.
 #[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub struct Circuit<C: Config, I: InputType> {
+    /// The number of public inputs in the circuit.
     pub num_public_inputs: usize,
+    /// The number of actual outputs in the circuit.
     pub num_actual_outputs: usize,
+    /// The number of expected output zeroes in the circuit.
     pub expected_num_output_zeroes: usize,
+    /// The number of expected output ones in the circuit.
     pub segments: Vec<Segment<C, I>>,
+    /// The segments in the circuit.
     pub layer_ids: Vec<usize>,
 }
 
 impl<C: Config, I: InputType> Circuit<C, I> {
+    /// Validates the circuit.
     pub fn validate(&self) -> Result<(), Error> {
         for (i, seg) in self.segments.iter().enumerate() {
             for (j, x) in seg.num_inputs.iter().enumerate() {
@@ -595,6 +679,9 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         Ok(())
     }
 
+    /// Computes the usage masks for inputs and outputs of each segment.
+    /// If a position in the input mask is `true`, it means that the input is used in the segment.
+    /// If a position in the output mask is `true`, it means that the output is computed in the segment.
     fn compute_masks(&self) -> (Vec<Vec<Vec<bool>>>, Vec<Vec<bool>>) {
         let mut input_mask: Vec<Vec<Vec<bool>>> = Vec::with_capacity(self.segments.len());
         let mut output_mask: Vec<Vec<bool>> = Vec::with_capacity(self.segments.len());
@@ -646,10 +733,13 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         (input_mask, output_mask)
     }
 
+    /// Returns the number of inputs to the circuit.
     pub fn input_size(&self) -> usize {
         self.segments[self.layer_ids[0]].num_inputs.get(0)
     }
 
+    /// Evaluates the circuit with the given inputs.
+    /// This function is marked as `unsafe` because it does not use public inputs.
     pub fn eval_unsafe(&self, inputs: Vec<CircuitField<C>>) -> (Vec<CircuitField<C>>, bool) {
         if inputs.len() != self.input_size() {
             panic!("input length mismatch");
@@ -678,6 +768,8 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         )
     }
 
+    /// Applies the segment to the current layer and updates the next layer.
+    /// This function is marked as `unsafe` because it does not use public inputs.
     fn apply_segment_unsafe(
         &self,
         seg: &Segment<C, I>,
@@ -725,6 +817,8 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         }
     }
 
+    /// Evaluates the circuit with the given inputs and public inputs.
+    /// This function returns a tuple of the outputs and a boolean indicating whether the constraints are satisfied
     pub fn eval_with_public_inputs(
         &self,
         inputs: Vec<CircuitField<C>>,
@@ -762,6 +856,7 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         )
     }
 
+    /// Applies the segment to the current layer and updates the next layer with public inputs.
     fn apply_segment_with_public_inputs(
         &self,
         seg: &Segment<C, I>,
@@ -811,6 +906,9 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         }
     }
 
+    /// Evaluates the circuit with the given inputs using SIMD operations.
+    /// This function returns a tuple of the outputs and a vector of booleans indicating whether
+    /// the constraints are satisfied for each SIMD lane.
     pub fn eval_with_public_inputs_simd<SF: arith::SimdField<Scalar = CircuitField<C>>>(
         &self,
         inputs: Vec<SF>,
@@ -850,6 +948,7 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         )
     }
 
+    /// Applies the segment to the current layer and updates the next layer with public inputs using SIMD operations.
     fn apply_segment_with_public_inputs_simd<SF: arith::SimdField<Scalar = CircuitField<C>>>(
         &self,
         seg: &Segment<C, I>,
@@ -911,6 +1010,8 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         }
     }
 
+    /// Sorts all gates and child segments in the circuit.
+    /// This ensures that the compilation result is deterministic.
     pub fn sort_everything(&mut self) {
         for seg in self.segments.iter_mut() {
             seg.gate_muls.sort();

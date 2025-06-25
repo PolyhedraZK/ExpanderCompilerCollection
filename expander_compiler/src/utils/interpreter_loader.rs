@@ -1,3 +1,5 @@
+//! M31 circuit loader.
+
 use crate::frontend::{Config, RootAPI, Variable};
 
 pub struct M31Loader {

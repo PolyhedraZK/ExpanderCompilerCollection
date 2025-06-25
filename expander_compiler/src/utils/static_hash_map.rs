@@ -1,3 +1,5 @@
+//! Static hash map implementation for fast lookups.
+
 use rand::RngCore;
 
 pub struct StaticHashMap {
@@ -10,6 +12,7 @@ pub struct StaticHashMap {
 const MOD: u64 = 1_000_000_007;
 
 impl StaticHashMap {
+    /// Creates a new `StaticHashMap` from a slice of `usize` values.
     pub fn new(s: &[usize]) -> Self {
         if s.len() > (MOD / 1000) as usize {
             panic!("too large");
@@ -49,6 +52,7 @@ impl StaticHashMap {
         }
     }
 
+    /// Returns the index of the value `x` in the static hash map.
     pub fn get(&self, x: usize) -> usize {
         let x = (x as u64) % MOD;
         let pos = ((x * self.a + self.b) % MOD * x % MOD) & self.m;

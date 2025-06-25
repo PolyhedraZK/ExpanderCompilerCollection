@@ -1,3 +1,5 @@
+//! This module provides a utility function to get a unique identifier for a function type.
+
 use std::any::TypeId;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};

@@ -1,3 +1,8 @@
+//! Layer layout module.
+//!
+//! This module determines the layout of each layer in a layered circuit.
+//! It handles the placement of variables, sub-circuits, and constraints across layers.
+
 use std::{collections::HashMap, mem};
 
 use crate::{
@@ -7,29 +12,40 @@ use crate::{
 
 use super::compile::CompileContext;
 
+/// Context for layer layout, containing information about variables, previous circuit instructions, and placement requests.
+///
+/// This context is used to manage the layout of variables and sub-circuits in a specific layer of a circuit.
 #[derive(Default, Clone)]
 pub struct LayerLayoutContext {
-    pub vars: Pool<usize>, // global index of variables occurring in this layer
-    pub prev_circuit_insn_ids: HashMap<usize, usize>, // insn id of previous circuit
-    pub prev_circuit_num_out: HashMap<usize, usize>, // number of outputs of previous circuit, used to check if all output variables are used
+    /// global index of variables occurring in this layer
+    pub vars: Pool<usize>,
+    /// insn id of previous circuit
+    pub prev_circuit_insn_ids: HashMap<usize, usize>,
+    /// number of outputs of previous circuit, used to check if all output variables are used
+    pub prev_circuit_num_out: HashMap<usize, usize>,
     pub prev_circuit_subc_pos: HashMap<usize, usize>,
-    pub placement: HashMap<usize, usize>, // placement group of each variable
-    pub parent: Vec<usize>,               // parent placement group of some placement group
+    /// placement group of each variable
+    pub placement: HashMap<usize, usize>,
+    /// parent placement group of some placement group
+    pub parent: Vec<usize>,
     pub req: Vec<PlacementRequest>,
 
-    pub middle_sub_circuits: Vec<usize>, // sub-circuits who have middle layers in this layer (referenced by index in sub_circuit_insn_ids)
+    /// sub-circuits who have middle layers in this layer (referenced by index in sub_circuit_insn_ids)
+    pub middle_sub_circuits: Vec<usize>,
 }
 
-// we will sort placement requests by size, and then greedy
+/// PlacementRequest represents a request for a sub circuit call in a specific layer.
 #[derive(Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PlacementRequest {
     pub insn_id: usize,
     pub input_ids: Vec<usize>,
 }
 
-// finalized layout of a layer
-// dense -> placementDense[i] = variable on slot i (placementDense[i] == j means i-th slot stores varIdx[j])
-// sparse -> placementSparse[i] = variable on slot i, and there are subLayouts.
+/// Finalized layout of a layer.
+///
+/// dense -> placementDense[i] = variable on slot i (placementDense[i] == j means i-th slot stores varIdx[j])
+///
+/// sparse -> placementSparse[i] = variable on slot i, and there are subLayouts
 #[derive(Hash, Clone, PartialEq, Eq)]
 pub struct LayerLayout {
     pub circuit_id: usize,
@@ -38,6 +54,10 @@ pub struct LayerLayout {
     pub inner: LayerLayoutInner,
 }
 
+/// Inner representation of a layer layout, which can be either sparse or dense.
+///
+/// Sparse layouts use a placement map to indicate where variables are placed, along with sub-layouts for sub-circuits.
+/// Dense layouts simply use a vector of placements.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum LayerLayoutInner {
     Sparse {
@@ -71,21 +91,28 @@ impl std::hash::Hash for LayerLayoutInner {
     }
 }
 
+/// Represents a sub circuit layout within a layer layout.
 #[derive(Hash, Clone, PartialEq, Eq, Debug)]
 pub struct SubLayout {
-    pub id: usize,      // unique layout id in a compile context
-    pub offset: usize,  // offset in layout
-    pub insn_id: usize, // instruction id corresponding to this sub-layout
+    /// unique layout id in a compile context
+    pub id: usize,
+    /// offset in layout
+    pub offset: usize,
+    /// instruction id corresponding to this sub-layout
+    pub insn_id: usize,
 }
 
-// request for layer layout
+/// Request for layer layout
 #[derive(Hash, Clone, PartialEq, Eq)]
 pub struct LayerReq {
+    /// circuit id of the circuit to solve
     pub circuit_id: usize,
-    pub layer: usize, // which layer to solve?
+    /// which layer to solve?
+    pub layer: usize,
 }
 
 impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
+    /// Prepares the layer layout context for a given circuit ID.
     pub fn prepare_layer_layout_context(&mut self, circuit_id: usize) {
         let mut ic = self.circuits.remove(&circuit_id).unwrap();
 
@@ -186,6 +213,11 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
         self.circuits.insert(circuit_id, ic);
     }
 
+    /// Solves the layer layout for a given LayerReq.
+    ///
+    /// It first checks if the layout has already been computed and cached.
+    /// It then checks if the circuit is a special case (input or output layer), and if so, it uses a fixed layout.
+    /// Otherwise, it computes the layout normally by solving the layer layout recursively.
     pub fn solve_layer_layout(&mut self, req: &LayerReq) -> usize {
         if let Some(id) = self.layer_req_to_layout.get(req) {
             return *id;
@@ -367,11 +399,13 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
     }
 }
 
+/// Merges multiple layouts into a single layout, filling empty slots with additional variables.
+///
+/// Currently it's a simple greedy algorithm:
+/// sort groups by size, and then place them one by one.
+/// Since their size are always 2^n, the result is aligned.
+/// Finally we insert the remaining variables to the empty slots.
 pub fn merge_layouts(s: Vec<Vec<usize>>, additional: Vec<usize>) -> Vec<usize> {
-    // currently it's a simple greedy algorithm
-    // sort groups by size, and then place them one by one
-    // since their size are always 2^n, the result is aligned
-    // finally we insert the remaining variables to the empty slots
     let mut n = 0;
     for x in s.iter() {
         let m = x.len();
@@ -450,6 +484,7 @@ fn subs_array(l: &mut [usize], s: &[usize]) {
     }
 }
 
+/// Substitutes variables in a list based on a mapping.
 pub fn subs_map(l: &mut [usize], m: &HashMap<usize, usize>) {
     for x in l.iter_mut() {
         if *x != EMPTY {

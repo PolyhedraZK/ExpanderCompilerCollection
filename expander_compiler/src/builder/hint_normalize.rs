@@ -1,3 +1,5 @@
+//! This module transforms the source circuit IR into a hint-normalized IR, based on the basic builder.
+
 use crate::circuit::ir::common::RawConstraint;
 use crate::circuit::ir::expr;
 use crate::field::FieldArith;
@@ -26,10 +28,12 @@ type InsnOut<C> = ir::hint_normalized::Instruction<C>;
 type Builder<'a, C> = super::basic::Builder<'a, C, IrcIn<C>, IrcOut<C>>;
 
 impl<'a, C: Config> Builder<'a, C> {
+    /// Pushes a constant instruction into the circuit and returns the variable ID of its output.
     fn push_const(&mut self, c: CircuitField<C>) -> usize {
         self.push_insn(InsnOut::ConstantLike(Coef::Constant(c)))
             .unwrap()
     }
+    /// Pushes an addition instruction into the circuit and returns the variable ID of its output.
     fn push_add(&mut self, a: usize, b: usize) -> usize {
         self.push_insn(InsnOut::LinComb(LinComb {
             terms: vec![
@@ -46,6 +50,7 @@ impl<'a, C: Config> Builder<'a, C> {
         }))
         .unwrap()
     }
+    /// Pushes a subtraction instruction into the circuit and returns the variable ID of its output.
     fn push_sub(&mut self, a: usize, b: usize) -> usize {
         self.push_insn(InsnOut::LinComb(LinComb {
             terms: vec![
@@ -62,24 +67,30 @@ impl<'a, C: Config> Builder<'a, C> {
         }))
         .unwrap()
     }
+    /// Pushes a multiplication instruction into the circuit and returns the variable ID of its output.
     fn push_mul(&mut self, a: usize, b: usize) -> usize {
         self.push_insn(InsnOut::Mul(vec![a, b])).unwrap()
     }
+    /// Copy a previous variable ID as result.
     fn copy(&mut self, a: usize) -> InsnTransformResult<C, IrcOut<C>> {
         self.copys(&[a])
     }
+    /// Copies a slice of variable IDs and returns them as a vector.
     fn copys(&mut self, a: &[usize]) -> InsnTransformResult<C, IrcOut<C>> {
         InsnTransformResult::Vars(a.to_vec())
     }
+    /// Computes the boolean condition for a variable ID `a`, returning a variable which needs to be zero
     fn bool_cond(&mut self, a: usize) -> usize {
         let one = self.push_const(CircuitField::<C>::one());
         let a_minus_one = self.push_sub(a, one);
         self.push_mul(a, a_minus_one)
     }
+    /// Pushes a boolean assertion into the circuit
     fn assert_bool(&mut self, a: usize) {
         let t = self.bool_cond(a);
         self.assert((), t);
     }
+    /// Marks a variable ID as a boolean condition
     fn mark_bool(&mut self, a: usize) {
         let t = self.bool_cond(a);
         self.mark((), t);
@@ -87,6 +98,9 @@ impl<'a, C: Config> Builder<'a, C> {
 }
 
 impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Builder<'a, C> {
+    /// Transforms an input instruction into an output instruction, handling various types of instructions.
+    ///
+    /// Operations like division are transformed into more basic operations and hints.
     fn transform_in_to_out(&mut self, in_insn: &InsnIn<C>) -> InsnTransformResult<C, IrcOut<C>> {
         use ir::source::Instruction::*;
         InsnTransformResult::Insn(match in_insn {
@@ -369,6 +383,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
     }
 }
 
+/// Processes the input root circuit, transforming it into a hint-normalized output circuit.
 pub fn process<C: Config>(
     rc: &ir::common::RootCircuit<IrcIn<C>>,
 ) -> Result<ir::common::RootCircuit<IrcOut<C>>, Error> {

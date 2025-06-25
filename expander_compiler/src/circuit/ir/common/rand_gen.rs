@@ -1,7 +1,10 @@
+//! This module contains random generation utilities for the circuit IR.
+
 use rand::{Rng, RngCore, SeedableRng};
 
 use super::*;
 
+/// This trait is used to generate random instructions for the circuit IR.
 pub trait RandomInstruction {
     fn random_no_sub_circuit(
         r: impl RngCore,
@@ -11,6 +14,7 @@ pub trait RandomInstruction {
     ) -> Self;
 }
 
+/// This trait is used to generate random constraint types for the circuit IR.
 pub trait RandomConstraintType {
     fn random(r: impl RngCore) -> Self;
 }
@@ -19,6 +23,7 @@ impl RandomConstraintType for RawConstraintType {
     fn random(_r: impl RngCore) -> Self {}
 }
 
+/// This type represents a range of random values that can be generated.
 #[derive(Clone)]
 pub struct RandomRange {
     pub min: usize,
@@ -31,6 +36,7 @@ impl RandomRange {
     }
 }
 
+/// This type represents the configuration for generating random circuits.
 #[derive(Clone)]
 pub struct RandomCircuitConfig {
     pub seed: usize,
@@ -48,6 +54,7 @@ where
     Irc::Instruction: RandomInstruction,
     <Irc::Constraint as Constraint<C>>::Type: RandomConstraintType,
 {
+    /// Generates a random `RootCircuit` based on the provided configuration.
     pub fn random(config: &RandomCircuitConfig) -> Self {
         let mut rnd = rand::rngs::StdRng::seed_from_u64(config.seed as u64);
         let mut root = RootCircuit::<Irc>::default();

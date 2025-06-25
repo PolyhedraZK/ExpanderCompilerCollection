@@ -1,3 +1,6 @@
+//! This module transforms the hint-less IR into a dest IR, based on the basic builder.
+//! It's deprecated and should not be used in new code.
+
 use core::panic;
 use std::collections::HashMap;
 
@@ -17,8 +20,10 @@ type IrcIn<C> = ir::hint_less::Irc<C>;
 type IrcOut<C> = ir::hint_less::Irc<C>;
 type InsnIn<C> = ir::hint_less::Instruction<C>;
 type InsnOut<C> = ir::hint_less::Instruction<C>;
+#[deprecated]
 type Builder<'a, C> = super::basic::Builder<'a, C, IrcIn<C>, IrcOut<C>>;
 
+#[allow(deprecated)]
 impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Builder<'a, C> {
     fn transform_in_to_out(&mut self, in_insn: &InsnIn<C>) -> InsnTransformResult<C, IrcOut<C>> {
         InsnTransformResult::Insn(in_insn.clone())
@@ -65,6 +70,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
     }
 }
 
+#[allow(deprecated)]
 impl<'a, C: Config> Builder<'a, C> {
     fn export_for_layering(&mut self) -> Result<ir::dest::CircuitRelaxed<C>, Error> {
         let mut last_subc_o_mid_id = 0;
@@ -208,6 +214,7 @@ impl<'a, C: Config> Builder<'a, C> {
     }
 }
 
+#[deprecated]
 pub fn process<'a, C: Config>(
     rc: &'a ir::common::RootCircuit<IrcIn<C>>,
 ) -> Result<ir::dest::RootCircuitRelaxed<C>, Error> {
@@ -236,6 +243,7 @@ pub fn process<'a, C: Config>(
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use std::vec;
 

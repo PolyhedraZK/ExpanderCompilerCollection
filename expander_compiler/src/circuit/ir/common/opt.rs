@@ -1,3 +1,5 @@
+//! This module contains optimizations for the circuit IR.
+
 use crate::{
     circuit::input_mapping::{InputMapping, EMPTY},
     frontend::CircuitField,
@@ -26,6 +28,7 @@ enum ElementType {
 use ElementType::*;
 
 impl<Irc: IrConfig> RootCircuit<Irc> {
+    /// Returns a new `RootCircuit` with unreachable circuits and variables removed.
     pub fn remove_unreachable(&self) -> (Self, InputMapping) {
         let order = self.topo_order();
         // first, remove unused sub circuits based on constraints
@@ -398,6 +401,8 @@ impl<Irc: IrConfig> RootCircuit<Irc> {
         false
     }
 
+    /// Reassigns duplicate sub-circuit outputs to ensure that each output is unique,
+    /// if it's required in the `IrConfig` trait.
     pub fn reassign_duplicate_sub_circuit_outputs(&mut self, force: bool) {
         if !self.has_duplicate_sub_circuit_outputs() {
             return;

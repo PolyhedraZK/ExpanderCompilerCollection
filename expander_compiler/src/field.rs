@@ -1,3 +1,5 @@
+//! Fields used in the expander compiler.
+
 pub use arith::{Field as FieldArith, Fr as BN254Fr};
 use babybear::{BabyBear, BabyBearx16};
 pub use gf2::{GF2x8, GF2};
@@ -23,8 +25,8 @@ impl Field for M31 {}
 impl Field for Goldilocks {}
 impl Field for BabyBear {}
 
-// This trait exist only for making Rust happy
-// If we use arith::Field, Rust says upstream may add more impls
+/// This trait exist only for making Rust happy
+/// If we use arith::Field, Rust says upstream may add more impls
 pub trait FieldRaw: FieldArith {}
 
 impl FieldRaw for BN254Fr {}

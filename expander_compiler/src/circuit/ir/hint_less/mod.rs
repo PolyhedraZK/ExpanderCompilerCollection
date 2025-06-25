@@ -1,3 +1,6 @@
+//! This module defines the hint-less IR (based on the `common` IR) for the circuit.
+//! This is the third stage of the IR, where hints are removed.
+
 use crate::circuit::{config::Config, layered::Coef};
 use crate::field::FieldArith;
 use crate::frontend::CircuitField;
@@ -14,16 +17,22 @@ mod tests;
 
 pub mod display;
 
+/// Instruction set for the hint-less IR.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Instruction<C: Config> {
+    /// Linear combination of variables.
     LinComb(expr::LinComb<C>),
+    /// Multiplication of variables.
     Mul(Vec<usize>),
+    /// Constant-like instruction, which can also be a public input or a random value.
     ConstantLike(Coef<C>),
+    /// Call to a sub-circuit.
     SubCircuitCall {
         sub_circuit_id: usize,
         inputs: Vec<usize>,
         num_outputs: usize,
     },
+    /// Custom gate with a specific type and inputs.
     CustomGate {
         gate_type: usize,
         inputs: Vec<usize>,
