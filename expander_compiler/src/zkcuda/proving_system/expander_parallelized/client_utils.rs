@@ -62,6 +62,18 @@ impl ClientHttpHelper {
     }
 }
 
+pub fn client_parse_args() -> Option<String> {
+    let args = std::env::args().collect::<Vec<_>>();
+    let mut string = None;
+    for (i, arg) in args.iter().take(args.len() - 1).enumerate() {
+        if arg == "--server-binary" || arg == "-s" {
+            string = Some(args[i + 1].clone());
+            break;
+        }
+    }
+    string
+}
+
 pub fn client_launch_server_and_setup<C, ECCConfig>(
     server_binary: &str,
     computation_graph: &ComputationGraph<ECCConfig>,
@@ -75,6 +87,7 @@ where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let setup_timer = Timer::new("setup", true);
+    println!("Starting server with binary: {server_binary}");
 
     let mut bytes = vec![];
     computation_graph.serialize_into(&mut bytes).unwrap();

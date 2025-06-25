@@ -1,4 +1,5 @@
 use arith::Field;
+use expander_utils::timer::Timer;
 use gkr_engine::{
     ExpanderDualVarChallenge, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig,
     MPIEngine, Transcript,
@@ -36,6 +37,7 @@ where
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
+    let commit_timer = Timer::new("Commit to all input", global_mpi_config.is_root());
     let (commitments, states) = if global_mpi_config.is_root() {
         let (commitments, states) = values
             .iter()
@@ -45,7 +47,9 @@ where
     } else {
         (None, None)
     };
+    commit_timer.stop();
 
+    let prove_timer = Timer::new("Prove all kernels", global_mpi_config.is_root());
     let proofs = computation_graph
         .proof_templates()
         .iter()
@@ -56,6 +60,8 @@ where
                 .map(|&idx| values[idx].as_ref())
                 .collect::<Vec<_>>();
 
+            let single_kernel_gkr_timer =
+                Timer::new("small gkr kernel", global_mpi_config.is_root());
             let gkr_end_state = prove_kernel_gkr::<C, ECCConfig>(
                 global_mpi_config,
                 &computation_graph.kernels()[template.kernel_id()],
@@ -63,8 +69,10 @@ where
                 next_power_of_two(template.parallel_count()),
                 template.is_broadcast(),
             );
+            single_kernel_gkr_timer.stop();
 
             if global_mpi_config.is_root() {
+                let pcs_open_timer = Timer::new("pcs open", true);
                 let (mut transcript, challenge) = gkr_end_state.unwrap();
                 let challenges = if let Some(challenge_y) = challenge.challenge_y() {
                     vec![challenge.challenge_x(), challenge_y]
@@ -87,6 +95,7 @@ where
                     );
                 });
 
+                pcs_open_timer.stop();
                 Some(ExpanderProof {
                     data: vec![transcript.finalize_and_get_proof()],
                 })
@@ -95,6 +104,7 @@ where
             }
         })
         .collect::<Vec<_>>();
+    prove_timer.stop();
 
     if global_mpi_config.is_root() {
         let proofs = proofs.into_iter().map(|p| p.unwrap()).collect::<Vec<_>>();

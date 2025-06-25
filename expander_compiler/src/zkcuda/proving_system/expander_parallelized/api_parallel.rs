@@ -6,7 +6,8 @@ use crate::zkcuda::proving_system::expander::structs::{
     ExpanderProverSetup, ExpanderVerifierSetup,
 };
 use crate::zkcuda::proving_system::expander_parallelized::client_utils::{
-    client_launch_server_and_setup, client_send_witness_and_prove, wait_async, ClientHttpHelper,
+    client_launch_server_and_setup, client_parse_args, client_send_witness_and_prove, wait_async,
+    ClientHttpHelper,
 };
 use crate::zkcuda::proving_system::expander_parallelized::verify_impl::verify_kernel;
 use crate::zkcuda::proving_system::{CombinedProof, ProvingSystem};
@@ -32,10 +33,9 @@ where
     fn setup(
         computation_graph: &crate::zkcuda::context::ComputationGraph<ECCConfig>,
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
-        client_launch_server_and_setup::<C, ECCConfig>(
-            "../target/release/expander_server",
-            computation_graph,
-        )
+        let server_binary =
+            client_parse_args().unwrap_or("../target/release/expander_server".to_owned());
+        client_launch_server_and_setup::<C, ECCConfig>(&server_binary, computation_graph)
     }
 
     fn prove(
