@@ -8,10 +8,9 @@ use expander_compiler::{
             server_ctrl::{serve, ExpanderExecArgs},
             ParallelizedExpander,
         },
-        expander_pcs_defered::BN254ConfigSha2UniKZG,
     },
 };
-use gkr::BN254ConfigSha2Hyrax;
+use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
 use gkr_engine::PolynomialCommitmentType;
 
 #[tokio::main]
@@ -58,7 +57,7 @@ pub async fn main() {
             .await;
         }
         ("BN254", PolynomialCommitmentType::KZG) => {
-            serve::<BN254ConfigSha2UniKZG, BN254Config, ParallelizedExpander<_>>(
+            serve::<BN254ConfigSha2KZG, BN254Config, ParallelizedExpander<_>>(
                 expander_exec_args.port_number,
             )
             .await;
