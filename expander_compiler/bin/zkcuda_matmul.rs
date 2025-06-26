@@ -5,13 +5,12 @@ use expander_compiler::frontend::{
     BN254Config, BasicAPI, CircuitField, Config, Error, FieldArith, Variable, API,
 };
 use expander_compiler::zkcuda::proving_system::expander_pcs_defered::BN254ConfigSha2UniKZG;
-use expander_compiler::zkcuda::proving_system::{Expander, ParallelizedExpander, ProvingSystem};
+use expander_compiler::zkcuda::proving_system::{ParallelizedExpander, ProvingSystem};
 use expander_compiler::zkcuda::shape::Reshape;
 use expander_compiler::zkcuda::{
     context::{call_kernel, Context},
     kernel::{compile_with_spec_and_shapes, kernel, IOVecSpec, KernelPrimitive},
 };
-use gkr::BN254ConfigSha2Hyrax;
 
 const M: usize = 512;
 const K: usize = 512;
