@@ -3,10 +3,13 @@ use std::str::FromStr;
 use clap::Parser;
 use expander_compiler::{
     frontend::{BN254Config, BabyBearConfig, GF2Config, GoldilocksConfig, M31Config},
-    zkcuda::proving_system::{expander_parallelized::{
-        server_ctrl::{serve, ExpanderExecArgs},
-        ParallelizedExpander,
-    }, expander_pcs_defered::BN254ConfigSha2UniKZG},
+    zkcuda::proving_system::{
+        expander_parallelized::{
+            server_ctrl::{serve, ExpanderExecArgs},
+            ParallelizedExpander,
+        },
+        expander_pcs_defered::BN254ConfigSha2UniKZG,
+    },
 };
 use gkr::BN254ConfigSha2Hyrax;
 use gkr_engine::PolynomialCommitmentType;
