@@ -6,23 +6,23 @@ pub fn start_server<C: GKREngine>(binary: &str, max_parallel_count: usize, port_
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    let (overscribe, field_name, pcs_name) = parse_config::<C>(max_parallel_count);
+    let (actual_mpi_size, field_name, pcs_name) = parse_config::<C>(max_parallel_count);
 
     let cmd_str = format!(
-        "mpiexec -n {max_parallel_count} {overscribe} {binary} --field-type {field_name} --poly-commit {pcs_name} --port-number {port_number}"
+        "mpiexec -n {actual_mpi_size} {binary} --field-type {field_name} --poly-commit {pcs_name} --port-number {port_number}"
     );
     exec_command(&cmd_str, false);
 }
 
-fn parse_config<C: GKREngine>(mpi_size: usize) -> (String, String, String)
+fn parse_config<C: GKREngine>(desired_mpi_size: usize) -> (usize, String, String)
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    let oversubscription = if mpi_size > num_cpus::get_physical() {
-        println!("Warning: Not enough cores available for the requested number of processes. Using oversubscription.");
-        "--oversubscribe"
+    let num_available_cpus = num_cpus::get_physical();
+    let actual_mpi_size = if desired_mpi_size > num_available_cpus {
+        num_available_cpus
     } else {
-        ""
+        desired_mpi_size
     };
 
     let field_name = match <C::FieldConfig as FieldEngine>::FIELD_TYPE {
@@ -42,7 +42,7 @@ where
     };
 
     (
-        oversubscription.to_string(),
+        actual_mpi_size,
         field_name.to_string(),
         pcs_name.to_string(),
     )
