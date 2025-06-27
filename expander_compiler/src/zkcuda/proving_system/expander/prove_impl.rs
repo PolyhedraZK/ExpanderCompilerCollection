@@ -1,5 +1,5 @@
 use arith::Field;
-use expander_circuit::Circuit;
+use expander_circuit::{Circuit, RecursiveCircuit, Segment};
 use gkr::gkr_prove;
 use gkr_engine::{
     ExpanderDualVarChallenge, ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine,
@@ -13,7 +13,7 @@ use crate::{
     frontend::Config,
     zkcuda::{
         kernel::{Kernel, LayeredCircuitInputVec},
-        proving_system::expander::structs::ExpanderProverSetup,
+        proving_system::expander::{self, structs::ExpanderProverSetup},
     },
 };
 
@@ -29,6 +29,71 @@ where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let mut expander_circuit = kernel.layered_circuit().export_to_expander().flatten::<C>();
+    expander_circuit.pre_process_gkr::<C>();
+    let (max_num_input_var, max_num_output_var) = super::utils::max_n_vars(&expander_circuit);
+    let prover_scratch = ProverScratchPad::<C::FieldConfig>::new(
+        max_num_input_var,
+        max_num_output_var,
+        mpi_world_size,
+    );
+
+    (expander_circuit, prover_scratch)
+}
+
+pub fn repeat_expander_rc_circuit<F: FieldEngine>(
+    expander_rc_circuit: &mut RecursiveCircuit<F>,
+    num_repeats: usize,
+) {
+    assert_eq!(expander_rc_circuit.num_public_inputs, 0);
+    let log_num_repeats = num_repeats.ilog2() as usize;
+    let original_layer_ids = &expander_rc_circuit.layers;
+
+    let new_layers = original_layer_ids
+        .iter()
+        .map(|&layer_id| {
+            let segment = &expander_rc_circuit.segments[layer_id];
+            let original_input_size = 1 << segment.i_var_num;
+            let original_output_size = 1 << segment.o_var_num;
+
+            let allocations = (0..num_repeats)
+                .map(|i_alloc| expander_circuit::Allocation {
+                    i_offset: i_alloc * original_input_size,
+                    o_offset: i_alloc * original_output_size,
+                })
+                .collect::<Vec<_>>();
+
+            let new_segment = Segment::<F> {
+                i_var_num: segment.i_var_num + log_num_repeats,
+                o_var_num: segment.o_var_num + log_num_repeats,
+                child_segs: vec![(layer_id, allocations)],
+                ..Default::default()
+            };
+
+            new_segment
+        })
+        .collect::<Vec<_>>();
+
+    expander_rc_circuit.layers.extend(
+        expander_rc_circuit.segments.len()..expander_rc_circuit.segments.len() + new_layers.len(),
+    );
+    expander_rc_circuit.segments.extend(new_layers);
+    expander_rc_circuit.num_outputs *= num_repeats;
+}
+
+pub fn prepare_expander_circuit_multi_responsibility<C, ECCConfig>(
+    kernel: &Kernel<ECCConfig>,
+    mpi_world_size: usize,
+    num_responsibilities: usize,
+) -> (Circuit<C::FieldConfig>, ProverScratchPad<C::FieldConfig>)
+where
+    C: GKREngine,
+    ECCConfig: Config<FieldConfig = C::FieldConfig>,
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
+    let mut expander_rc_circuit = kernel.layered_circuit().export_to_expander();
+    repeat_expander_rc_circuit::<C::FieldConfig>(&mut expander_rc_circuit, num_responsibilities);
+    let mut expander_circuit = expander_rc_circuit.flatten::<C>();
+
     expander_circuit.pre_process_gkr::<C>();
     let (max_num_input_var, max_num_output_var) = super::utils::max_n_vars(&expander_circuit);
     let prover_scratch = ProverScratchPad::<C::FieldConfig>::new(
@@ -64,6 +129,25 @@ pub fn get_local_vals<'vals_life, F: Field>(
                 let local_val_len = vals.as_ref().len() / parallel_num;
                 &vals.as_ref()[local_val_len * parallel_index..local_val_len * (parallel_index + 1)]
             }
+        })
+        .collect::<Vec<_>>()
+}
+
+pub fn get_local_vals_multiple_responsibility<'vals_life, F: Field>(
+    global_vals: &'vals_life [impl AsRef<[F]>],
+    is_broadcast: &[bool],
+    local_mpi_rank: usize,
+    num_responsibilities: usize,
+    parallel_num: usize,
+) -> Vec<Vec<&'vals_life [F]>> {
+    (0..num_responsibilities)
+        .map(|i| {
+            get_local_vals(
+                global_vals,
+                is_broadcast,
+                local_mpi_rank * num_responsibilities + i,
+                parallel_num,
+            )
         })
         .collect::<Vec<_>>()
 }
@@ -110,6 +194,42 @@ where
     );
     challenge
 }
+
+pub fn prove_gkr_with_local_vals_multi_responsibility<C: GKREngine>(
+    expander_circuit: &mut Circuit<C::FieldConfig>,
+    prover_scratch: &mut ProverScratchPad<C::FieldConfig>,
+    local_commitment_values: &[Vec<impl AsRef<[<C::FieldConfig as FieldEngine>::SimdCircuitField]>>],
+    partition_info: &[LayeredCircuitInputVec],
+    transcript: &mut C::TranscriptConfig,
+    mpi_config: &MPIConfig,
+) -> ExpanderDualVarChallenge<C::FieldConfig>
+where
+    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+{
+    let input_vals = local_commitment_values
+        .iter()
+        .flat_map(|vals| {
+            prepare_inputs_with_local_vals(
+                1 << expander_circuit.log_input_size(),
+                partition_info,
+                vals,
+            )
+        })
+        .collect::<Vec<_>>();
+
+    expander_circuit.layers[0].input_vals = input_vals;
+    expander_circuit.fill_rnd_coefs(transcript);
+    expander_circuit.evaluate();
+    let (claimed_v, challenge) =
+        gkr_prove(expander_circuit, prover_scratch, transcript, mpi_config);
+    assert_eq!(
+        claimed_v,
+        <C::FieldConfig as FieldEngine>::ChallengeField::from(0)
+    );
+    challenge
+}
+
+
 
 /// Challenge structure:
 /// llll pppp cccc ssss

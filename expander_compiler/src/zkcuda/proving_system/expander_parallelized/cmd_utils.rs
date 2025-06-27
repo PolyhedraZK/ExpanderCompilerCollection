@@ -1,6 +1,8 @@
 use gkr_engine::{ExpanderPCS, FieldEngine, FieldType, GKREngine, PolynomialCommitmentType};
 use std::process::Command;
 
+use crate::utils::misc::prev_power_of_two;
+
 #[allow(clippy::zombie_processes)]
 pub fn start_server<C: GKREngine>(binary: &str, max_parallel_count: usize, port_number: u16)
 where
@@ -18,9 +20,10 @@ fn parse_config<C: GKREngine>(desired_mpi_size: usize) -> (usize, String, String
 where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    let num_available_cpus = num_cpus::get_physical();
-    let actual_mpi_size = if desired_mpi_size > num_available_cpus {
-        num_available_cpus
+    let num_cpus_to_use = prev_power_of_two(num_cpus::get_physical());
+
+    let actual_mpi_size = if desired_mpi_size > num_cpus_to_use {
+        num_cpus_to_use
     } else {
         desired_mpi_size
     };

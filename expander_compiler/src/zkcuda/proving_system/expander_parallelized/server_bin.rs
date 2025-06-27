@@ -3,11 +3,9 @@ use std::str::FromStr;
 use clap::Parser;
 use expander_compiler::{
     frontend::{BN254Config, BabyBearConfig, GF2Config, GoldilocksConfig, M31Config},
-    zkcuda::proving_system::{
-        expander_parallelized::{
-            server_ctrl::{serve, ExpanderExecArgs},
-            ParallelizedExpander,
-        },
+    zkcuda::proving_system::expander_parallelized::{
+        server_ctrl::{serve, ExpanderExecArgs},
+        ParallelizedExpander,
     },
 };
 use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};

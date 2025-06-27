@@ -8,6 +8,17 @@ pub fn next_power_of_two(x: usize) -> usize {
     1 << padk
 }
 
+pub fn prev_power_of_two(x: usize) -> usize {
+    if x == 0 {
+        return 0;
+    }
+    let mut padk: usize = 0;
+    while (1 << (padk + 1)) <= x {
+        padk += 1;
+    }
+    1 << padk
+}
+
 pub fn topo_order_and_is_dag(
     vertices: &HashSet<usize>,
     edges: &HashMap<usize, HashSet<usize>>,

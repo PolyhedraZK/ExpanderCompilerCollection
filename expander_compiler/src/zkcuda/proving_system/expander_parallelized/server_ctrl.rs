@@ -239,12 +239,18 @@ pub fn broadcast_request_type(global_mpi_config: &MPIConfig<'static>, request_ty
 #[allow(static_mut_refs)]
 pub fn generate_local_mpi_config(
     global_mpi_config: &MPIConfig<'static>,
-    n_parties: usize,
-) -> Option<MPIConfig<'static>> {
-    assert!(n_parties > 0, "Number of parties must be greater than 0");
+    parallel_count: usize,
+) -> Option<(MPIConfig<'static>, usize)> {
+    assert!(
+        parallel_count > 0,
+        "Number of parties must be greater than 0"
+    );
 
+    // determine which parties will be involved in the parallel computation
+    // In case parallel count is greater than the number of parties, we will use all parties
+    // Otherwise, we will use only the first `parallel_count` parties
     let rank = global_mpi_config.world_rank();
-    let color_v = if rank < n_parties { 0 } else { 1 };
+    let color_v = if rank < parallel_count { 0 } else { 1 };
     let color = mpi::topology::Color::with_value(color_v);
     unsafe {
         LOCAL_COMMUNICATOR = global_mpi_config
@@ -252,10 +258,22 @@ pub fn generate_local_mpi_config(
             .unwrap()
             .split_by_color_with_key(color, rank as i32);
     }
+
+    // determine the number of local responsibilities for each party
+    let num_local_responsibilities = if parallel_count > global_mpi_config.world_size() {
+        assert!(parallel_count % global_mpi_config.world_size() == 0);
+        parallel_count / global_mpi_config.world_size()
+    } else {
+        1
+    };
+
     if color_v == 0 {
-        Some(MPIConfig::prover_new(global_mpi_config.universe, unsafe {
-            LOCAL_COMMUNICATOR.as_ref()
-        }))
+        Some((
+            MPIConfig::prover_new(global_mpi_config.universe, unsafe {
+                LOCAL_COMMUNICATOR.as_ref()
+            }),
+            num_local_responsibilities,
+        ))
     } else {
         None
     }
