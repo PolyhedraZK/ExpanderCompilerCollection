@@ -15,8 +15,9 @@ use crate::{
             expander::{
                 commit_impl::local_commit_impl,
                 prove_impl::{
-                    get_local_vals, pcs_local_open_impl, prepare_expander_circuit,
-                    prove_gkr_with_local_vals,
+                    get_local_vals, get_local_vals_multiple_responsibility, pcs_local_open_impl,
+                    prepare_expander_circuit, prepare_expander_circuit_multi_responsibility,
+                    prove_gkr_with_local_vals, prove_gkr_with_local_vals_multi_responsibility,
                 },
                 structs::{ExpanderCommitmentState, ExpanderProof, ExpanderProverSetup},
             },
@@ -133,26 +134,32 @@ where
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    let local_mpi_config = generate_local_mpi_config(mpi_config, parallel_count);
+    let local_proving_config = generate_local_mpi_config(mpi_config, parallel_count);
 
-    local_mpi_config.as_ref()?;
+    local_proving_config.as_ref()?;
 
-    let local_mpi_config = local_mpi_config.unwrap();
+    let (local_mpi_config, n_local_responsibilities) = local_proving_config.unwrap();
+
     let local_world_size = local_mpi_config.world_size();
     let local_world_rank = local_mpi_config.world_rank();
 
-    let local_commitment_values = get_local_vals(
+    let local_commitment_values = get_local_vals_multiple_responsibility(
         commitments_values,
         is_broadcast,
         local_world_rank,
-        local_world_size,
+        n_local_responsibilities,
+        parallel_count,
     );
 
     let (mut expander_circuit, mut prover_scratch) =
-        prepare_expander_circuit::<C, ECCConfig>(kernel, local_world_size);
+        prepare_expander_circuit_multi_responsibility::<C, ECCConfig>(
+            kernel,
+            local_world_size,
+            n_local_responsibilities,
+        );
 
     let mut transcript = C::TranscriptConfig::new();
-    let challenge = prove_gkr_with_local_vals::<C>(
+    let challenge = prove_gkr_with_local_vals_multi_responsibility::<C>(
         &mut expander_circuit,
         &mut prover_scratch,
         &local_commitment_values,

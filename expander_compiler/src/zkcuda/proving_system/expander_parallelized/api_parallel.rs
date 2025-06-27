@@ -14,6 +14,7 @@ use crate::zkcuda::proving_system::{CombinedProof, ProvingSystem};
 
 use super::super::Expander;
 
+use expander_utils::timer::Timer;
 use gkr_engine::{FieldEngine, GKREngine};
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
@@ -51,6 +52,7 @@ where
         computation_graph: &ComputationGraph<ECCConfig>,
         proof: &Self::Proof,
     ) -> bool {
+        let verification_timer = Timer::new("Verify all kernels", true);
         let verified = proof
             .proofs
             .par_iter()
@@ -72,6 +74,7 @@ where
                 )
             })
             .collect::<Vec<_>>();
+        verification_timer.stop();
 
         verified.iter().all(|x| *x)
     }

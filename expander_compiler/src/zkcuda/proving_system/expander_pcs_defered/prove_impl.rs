@@ -1,4 +1,5 @@
 use arith::Field;
+use expander_utils::timer::Timer;
 use gkr_engine::{
     ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine,
     Proof as BytesProof, Transcript,
@@ -115,6 +116,7 @@ where
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
+    let commit_timer = Timer::new("Commit to all input", global_mpi_config.is_root());
     let (commitments, _states) = if global_mpi_config.is_root() {
         let (commitments, states) = values
             .iter()
@@ -124,10 +126,15 @@ where
     } else {
         (None, None)
     };
+    commit_timer.stop();
 
     let mut vals_ref = vec![];
     let mut challenges = vec![];
 
+    let prove_timer = Timer::new(
+        "Prove all kernels (NO PCS Opening)",
+        global_mpi_config.is_root(),
+    );
     let proofs = computation_graph
         .proof_templates()
         .iter()
@@ -169,12 +176,16 @@ where
             }
         })
         .collect::<Vec<_>>();
+    prove_timer.stop();
 
     if global_mpi_config.is_root() {
         let mut proofs = proofs.into_iter().map(|p| p.unwrap()).collect::<Vec<_>>();
 
+        let pcs_opening_timer = Timer::new("Batch PCS Opening for all kernels", true);
         let pcs_batch_opening =
             open_defered_pcs::<C, ECCConfig>(prover_setup, &vals_ref, &challenges);
+        pcs_opening_timer.stop();
+
         proofs.push(pcs_batch_opening);
         Some(CombinedProof {
             commitments: commitments.unwrap(),

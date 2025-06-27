@@ -1,6 +1,7 @@
 use std::io::Cursor;
 
 use arith::Field;
+use expander_utils::timer::Timer;
 use gkr::gkr_verify;
 use gkr_engine::{
     ExpanderDualVarChallenge, ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine,
@@ -155,8 +156,10 @@ where
     <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Commitment:
         AsRef<<C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Commitment>,
 {
+    let verification_timer = Timer::new("Total Verification", true);
     let pcs_batch_opening = proof.proofs.pop().unwrap();
 
+    let gkr_verification_timer = Timer::new("GKR Verification", true);
     let verified_with_pcs_claims = proof
         .proofs
         .par_iter()
@@ -193,7 +196,9 @@ where
         println!("Failed to verify GKR proofs");
         return false;
     }
+    gkr_verification_timer.stop();
 
+    let pcs_verification_timer = Timer::new("PCS Verification", true);
     let commitments_ref = verified_with_pcs_claims
         .iter()
         .flat_map(|(_, c, _)| c)
@@ -211,6 +216,8 @@ where
         &commitments_ref,
         &challenges,
     );
+    pcs_verification_timer.stop();
 
+    verification_timer.stop();
     gkr_verified && pcs_verified
 }
