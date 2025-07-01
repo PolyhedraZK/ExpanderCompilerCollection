@@ -49,46 +49,46 @@ pub struct KernelCall {
 
 #[derive(PartialEq, Eq, Clone, Debug, ExpSerde)]
 pub struct ProofTemplate {
-    kernel_id: usize,
-    commitment_indices: Vec<usize>,
-    commitment_bit_orders: Vec<BitOrder>,
-    parallel_count: usize,
-    is_broadcast: Vec<bool>,
+    pub kernel_id: usize,
+    pub commitment_indices: Vec<usize>,
+    pub commitment_bit_orders: Vec<BitOrder>,
+    pub parallel_count: usize,
+    pub is_broadcast: Vec<bool>,
 }
 
 impl ProofTemplate {
     pub fn kernel_id(&self) -> usize {
         self.kernel_id
     }
-    pub fn commitment_indices(&self) -> &[usize] {
+    pub fn commitment_indices(&self) -> &Vec<usize> {
         &self.commitment_indices
     }
-    pub fn commitment_bit_orders(&self) -> &[BitOrder] {
+    pub fn commitment_bit_orders(&self) -> &Vec<BitOrder> {
         &self.commitment_bit_orders
     }
     pub fn parallel_count(&self) -> usize {
         self.parallel_count
     }
-    pub fn is_broadcast(&self) -> &[bool] {
+    pub fn is_broadcast(&self) -> &Vec<bool> {
         &self.is_broadcast
     }
 }
 
 #[derive(Default, Clone, Debug, ExpSerde)]
 pub struct ComputationGraph<C: Config> {
-    kernels: Vec<Kernel<C>>,
-    commitments_lens: Vec<usize>,
-    proof_templates: Vec<ProofTemplate>,
+    pub kernels: Vec<Kernel<C>>,
+    pub commitments_lens: Vec<usize>,
+    pub proof_templates: Vec<ProofTemplate>,
 }
 
 impl<C: Config> ComputationGraph<C> {
-    pub fn kernels(&self) -> &[Kernel<C>] {
+    pub fn kernels(&self) -> &Vec<Kernel<C>> {
         &self.kernels
     }
-    pub fn commitments_lens(&self) -> &[usize] {
+    pub fn commitments_lens(&self) -> &Vec<usize> {
         &self.commitments_lens
     }
-    pub fn proof_templates(&self) -> &[ProofTemplate] {
+    pub fn proof_templates(&self) -> &Vec<ProofTemplate> {
         &self.proof_templates
     }
 }
