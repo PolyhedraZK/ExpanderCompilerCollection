@@ -50,6 +50,11 @@ pub enum RequestType {
 pub static mut UNIVERSE: Option<Universe> = None;
 pub static mut GLOBAL_COMMUNICATOR: Option<SimpleCommunicator> = None;
 pub static mut LOCAL_COMMUNICATOR: Option<SimpleCommunicator> = None;
+pub struct SharedMemoryWINWrapper {
+    pub win: MPI_Win,
+}
+unsafe impl Send for SharedMemoryWINWrapper {}
+unsafe impl Sync for SharedMemoryWINWrapper {}
 
 pub struct ServerState<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>
 where
@@ -62,7 +67,7 @@ where
     pub verifier_setup:
         Arc<Mutex<ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>>>,
     pub computation_graph: Arc<Mutex<ComputationGraph<ECCConfig>>>,
-    pub mpi_shared_memory_win: Arc<Mutex<Option<MPI_Win>>>,
+    pub mpi_shared_memory_win: Arc<Mutex<Option<SharedMemoryWINWrapper>>>,
     pub shutdown_tx: Arc<Mutex<Option<oneshot::Sender<()>>>>,
 }
 
@@ -159,17 +164,17 @@ where
 
             match Arc::try_unwrap(state.computation_graph) {
                 Ok(cg_mutex) => {
-                    let cg = cg_mutex.into_inner(); // moves the value out
-                    cg.discard_control_of_shared_mem();
+                    let mut mpi_win = state.mpi_shared_memory_win.lock().await.take();
+                    S::shared_memory_clean_up(
+                        &state.global_mpi_config,
+                        cg_mutex.into_inner(), // moves the value out
+                        &mut mpi_win,
+                    );
                 }
                 Err(_) => {
                     panic!("Failed to unwrap Arc, multiple references exist");
                 }
             }
-            state
-                .global_mpi_config
-                .free_shared_mem(&mut state.mpi_shared_memory_win.lock().await.unwrap());
-
             unsafe { mpi::ffi::MPI_Finalize() };
 
             state
@@ -239,17 +244,17 @@ where
             255 => {
                 match Arc::try_unwrap(state.computation_graph) {
                     Ok(cg_mutex) => {
-                        let cg = cg_mutex.into_inner(); // moves the value out
-                        cg.discard_control_of_shared_mem();
+                        let mut mpi_win = state.mpi_shared_memory_win.lock().await.take();
+                        S::shared_memory_clean_up(
+                            &state.global_mpi_config,
+                            cg_mutex.into_inner(), // moves the value out
+                            &mut mpi_win,
+                        );
                     }
                     Err(_) => {
                         panic!("Failed to unwrap Arc, multiple references exist");
                     }
                 }
-                state
-                    .global_mpi_config
-                    .free_shared_mem(&mut state.mpi_shared_memory_win.lock().await.unwrap());
-
                 unsafe { mpi::ffi::MPI_Finalize() };
                 break;
             }

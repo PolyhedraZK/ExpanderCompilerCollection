@@ -1,6 +1,9 @@
-use gkr_engine::{FieldEngine, GKREngine, MPIConfig, MPIEngine};
+use std::sync::Arc;
+
+use gkr_engine::{FieldEngine, GKREngine, MPIConfig, MPIEngine, MPISharedMemory};
 use mpi::ffi::MPI_Win;
 use serdes::ExpSerde;
+use tokio::sync::Mutex;
 
 use crate::{
     frontend::{Config, SIMDField},
@@ -11,7 +14,10 @@ use crate::{
                 setup_impl::local_setup_impl,
                 structs::{ExpanderProverSetup, ExpanderVerifierSetup},
             },
-            expander_parallelized::prove_impl::mpi_prove_impl,
+            expander_parallelized::{
+                prove_impl::mpi_prove_impl, server_ctrl::SharedMemoryWINWrapper,
+                shared_memory_utils::SharedMemory,
+            },
             CombinedProof, Expander, ParallelizedExpander,
         },
     },
@@ -29,7 +35,7 @@ where
         computation_graph: &mut ComputationGraph<ECCConfig>,
         prover_setup: &mut ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
         verifier_setup: &mut ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-        mpi_win: &mut Option<MPI_Win>,
+        mpi_win: &mut Option<SharedMemoryWINWrapper>,
     );
 
     fn prove_request_handler(
@@ -38,6 +44,17 @@ where
         computation_graph: &ComputationGraph<ECCConfig>,
         values: &[impl AsRef<[SIMDField<C>]>],
     ) -> Option<CombinedProof<ECCConfig, Expander<C>>>;
+
+    fn shared_memory_clean_up(
+        global_mpi_config: &MPIConfig<'static>,
+        computation_graph: ComputationGraph<ECCConfig>,
+        mpi_win: &mut Option<SharedMemoryWINWrapper>,
+    ) {
+        computation_graph.discard_control_of_shared_mem();
+        if let Some(win_wrapper) = mpi_win {
+            global_mpi_config.free_shared_mem(&mut win_wrapper.win);
+        }
+    }
 }
 
 impl<C, ECCConfig> ServerFns<C, ECCConfig> for ParallelizedExpander<C>
@@ -52,7 +69,7 @@ where
         computation_graph: &mut ComputationGraph<ECCConfig>,
         prover_setup: &mut ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
         verifier_setup: &mut ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-        mpi_win: &mut Option<MPI_Win>,
+        mpi_win: &mut Option<SharedMemoryWINWrapper>,
     ) where
         C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
     {
@@ -101,7 +118,7 @@ pub fn read_circuit<C, ECCConfig>(
     global_mpi_config: &MPIConfig<'static>,
     setup_file: String,
     computation_graph: &mut ComputationGraph<ECCConfig>,
-    mpi_win: &mut Option<MPI_Win>,
+    mpi_win: &mut Option<SharedMemoryWINWrapper>,
 ) where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
@@ -121,5 +138,5 @@ pub fn read_circuit<C, ECCConfig>(
     };
 
     *computation_graph = cg;
-    *mpi_win = Some(win);
+    mpi_win.replace(SharedMemoryWINWrapper { win });
 }

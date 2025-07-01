@@ -7,7 +7,10 @@ use crate::{
         context::ComputationGraph,
         proving_system::{
             expander::structs::{ExpanderProverSetup, ExpanderVerifierSetup},
-            expander_parallelized::server_fns::{broadcast_string, read_circuit, ServerFns},
+            expander_parallelized::{
+                server_ctrl::SharedMemoryWINWrapper,
+                server_fns::{broadcast_string, read_circuit, ServerFns},
+            },
             expander_pcs_defered::{
                 prove_impl::mpi_prove_with_pcs_defered, setup_impl::pcs_setup_max_length_only,
             },
@@ -28,7 +31,7 @@ where
         computation_graph: &mut ComputationGraph<ECCConfig>,
         prover_setup: &mut ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
         verifier_setup: &mut ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-        mpi_win: &mut Option<MPI_Win>,
+        mpi_win: &mut Option<SharedMemoryWINWrapper>,
     ) {
         let setup_file = if global_mpi_config.is_root() {
             let setup_file = setup_file.expect("Setup file path must be provided");
