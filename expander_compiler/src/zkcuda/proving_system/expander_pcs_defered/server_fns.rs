@@ -1,4 +1,5 @@
-use gkr_engine::{FieldEngine, MPIEngine};
+use gkr_engine::{FieldEngine, GKREngine, MPIEngine};
+use mpi::ffi::MPI_Win;
 
 use crate::{
     frontend::Config,
@@ -17,7 +18,7 @@ use crate::{
 
 impl<C, ECCConfig> ServerFns<C, ECCConfig> for ExpanderPCSDefered<C>
 where
-    C: gkr_engine::GKREngine,
+    C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
@@ -25,16 +26,9 @@ where
         global_mpi_config: &gkr_engine::MPIConfig<'static>,
         setup_file: Option<String>,
         computation_graph: &mut ComputationGraph<ECCConfig>,
-        prover_setup: &mut ExpanderProverSetup<
-            <C as gkr_engine::GKREngine>::PCSField,
-            <C as gkr_engine::GKREngine>::FieldConfig,
-            <C as gkr_engine::GKREngine>::PCSConfig,
-        >,
-        verifier_setup: &mut ExpanderVerifierSetup<
-            <C as gkr_engine::GKREngine>::PCSField,
-            <C as gkr_engine::GKREngine>::FieldConfig,
-            <C as gkr_engine::GKREngine>::PCSConfig,
-        >,
+        prover_setup: &mut ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+        verifier_setup: &mut ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+        mpi_win: &mut Option<MPI_Win>,
     ) {
         let setup_file = if global_mpi_config.is_root() {
             let setup_file = setup_file.expect("Setup file path must be provided");
@@ -44,7 +38,7 @@ where
             broadcast_string(global_mpi_config, None)
         };
 
-        read_circuit::<C, ECCConfig>(global_mpi_config, setup_file, computation_graph);
+        read_circuit::<C, ECCConfig>(global_mpi_config, setup_file, computation_graph, mpi_win);
         if global_mpi_config.is_root() {
             (*prover_setup, *verifier_setup) =
                 pcs_setup_max_length_only::<C, ECCConfig>(computation_graph);

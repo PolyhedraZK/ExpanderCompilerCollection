@@ -149,9 +149,7 @@ impl<C: Config> CircuitRelaxed<C> {
             }
             match insn {
                 Instruction::ConstantLike { value } => {
-                    new_insns.push(Instruction::ConstantLike {
-                        value: value.clone(),
-                    });
+                    new_insns.push(Instruction::ConstantLike { value: *value });
                     new_var_max += 1;
                     new_id.push(NewIdQueue::new(new_var_max));
                 }

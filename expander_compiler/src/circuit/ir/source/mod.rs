@@ -232,7 +232,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 inputs: inputs.iter().map(|i| f(*i)).collect(),
                 num_outputs: *num_outputs,
             },
-            Instruction::ConstantLike(coef) => Instruction::ConstantLike(coef.clone()),
+            Instruction::ConstantLike(coef) => Instruction::ConstantLike(*coef),
             Instruction::SubCircuitCall {
                 sub_circuit_id,
                 inputs,

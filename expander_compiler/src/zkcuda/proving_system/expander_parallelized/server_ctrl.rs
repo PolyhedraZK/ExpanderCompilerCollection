@@ -12,13 +12,14 @@ use axum::Router;
 use clap::Parser;
 use expander_utils::timer::Timer;
 use mpi::environment::Universe;
+use mpi::ffi::MPI_Win;
 use mpi::topology::SimpleCommunicator;
 use mpi::traits::Communicator;
 
 use crate::frontend::Config;
 
 use axum::{extract::State, Json};
-use gkr_engine::{FieldEngine, GKREngine, MPIConfig, MPIEngine};
+use gkr_engine::{FieldEngine, GKREngine, MPIConfig, MPIEngine, MPISharedMemory};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, SocketAddr};
@@ -61,6 +62,7 @@ where
     pub verifier_setup:
         Arc<Mutex<ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>>>,
     pub computation_graph: Arc<Mutex<ComputationGraph<ECCConfig>>>,
+    pub mpi_shared_memory_win: Arc<Mutex<Option<MPI_Win>>>,
     pub shutdown_tx: Arc<Mutex<Option<oneshot::Sender<()>>>>,
 }
 
@@ -91,6 +93,7 @@ where
             prover_setup: Arc::clone(&self.prover_setup),
             verifier_setup: Arc::clone(&self.verifier_setup),
             computation_graph: Arc::clone(&self.computation_graph),
+            mpi_shared_memory_win: Arc::clone(&self.mpi_shared_memory_win),
             shutdown_tx: Arc::clone(&self.shutdown_tx),
         }
     }
@@ -115,12 +118,14 @@ where
             let mut computation_graph = state.computation_graph.lock().await;
             let mut prover_setup_guard = state.prover_setup.lock().await;
             let mut verifier_setup_guard = state.verifier_setup.lock().await;
+            let mut mpi_shared_memory_win = state.mpi_shared_memory_win.lock().await;
             S::setup_request_handler(
                 &state.global_mpi_config,
                 Some(setup_file),
                 &mut computation_graph,
                 &mut prover_setup_guard,
                 &mut verifier_setup_guard,
+                &mut mpi_shared_memory_win,
             );
 
             SharedMemoryEngine::write_pcs_setup_to_shared_memory(&(
@@ -152,6 +157,19 @@ where
         RequestType::Exit => {
             broadcast_request_type(&state.global_mpi_config, 255);
 
+            match Arc::try_unwrap(state.computation_graph) {
+                Ok(cg_mutex) => {
+                    let cg = cg_mutex.into_inner(); // moves the value out
+                    cg.discard_control_of_shared_mem();
+                }
+                Err(_) => {
+                    panic!("Failed to unwrap Arc, multiple references exist");
+                }
+            }
+            state
+                .global_mpi_config
+                .free_shared_mem(&mut state.mpi_shared_memory_win.lock().await.unwrap());
+
             unsafe { mpi::ffi::MPI_Finalize() };
 
             state
@@ -180,6 +198,7 @@ where
         prover_setup: Arc::new(Mutex::new(ExpanderProverSetup::default())),
         verifier_setup: Arc::new(Mutex::new(ExpanderVerifierSetup::default())),
         computation_graph: Arc::new(Mutex::new(ComputationGraph::default())),
+        mpi_shared_memory_win: Arc::new(Mutex::new(None)),
         shutdown_tx: Arc::new(Mutex::new(None)),
     };
 
@@ -192,12 +211,15 @@ where
                 let mut computation_graph = state.computation_graph.lock().await;
                 let mut prover_setup_guard = state.prover_setup.lock().await;
                 let mut verifier_setup_guard = state.verifier_setup.lock().await;
+                let mut mpi_shared_memory_win = state.mpi_shared_memory_win.lock().await;
+
                 S::setup_request_handler(
                     &state.global_mpi_config,
                     None,
                     &mut computation_graph,
                     &mut prover_setup_guard,
                     &mut verifier_setup_guard,
+                    &mut mpi_shared_memory_win,
                 );
             }
             2 => {
@@ -215,7 +237,19 @@ where
                 assert!(proof.is_none());
             }
             255 => {
-                // Exit condition, if needed
+                match Arc::try_unwrap(state.computation_graph) {
+                    Ok(cg_mutex) => {
+                        let cg = cg_mutex.into_inner(); // moves the value out
+                        cg.discard_control_of_shared_mem();
+                    }
+                    Err(_) => {
+                        panic!("Failed to unwrap Arc, multiple references exist");
+                    }
+                }
+                state
+                    .global_mpi_config
+                    .free_shared_mem(&mut state.mpi_shared_memory_win.lock().await.unwrap());
+
                 unsafe { mpi::ffi::MPI_Finalize() };
                 break;
             }
@@ -282,6 +316,7 @@ where
         prover_setup: Arc::new(Mutex::new(ExpanderProverSetup::default())),
         verifier_setup: Arc::new(Mutex::new(ExpanderVerifierSetup::default())),
         computation_graph: Arc::new(Mutex::new(ComputationGraph::default())),
+        mpi_shared_memory_win: Arc::new(Mutex::new(None)),
         shutdown_tx: Arc::new(Mutex::new(None)),
     };
 
