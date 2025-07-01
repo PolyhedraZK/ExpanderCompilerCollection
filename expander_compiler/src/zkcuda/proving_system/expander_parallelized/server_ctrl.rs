@@ -311,6 +311,19 @@ where
             })
             .await
             .unwrap();
+
+        // it might need some time for the server to properly shutdown
+        loop {
+            match Arc::strong_count(&state.computation_graph) {
+                1 => {
+                    break;
+                }
+                _ => {
+                    println!("Waiting for server to shutdown...");
+                    std::thread::sleep(std::time::Duration::from_secs(1));
+                }
+            }
+        }
     } else {
         worker_main::<C, ECCConfig, S>(global_mpi_config, state.clone()).await;
     }
