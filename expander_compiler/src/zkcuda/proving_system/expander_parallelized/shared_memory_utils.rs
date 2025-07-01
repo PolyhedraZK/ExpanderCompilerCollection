@@ -1,8 +1,9 @@
 #![allow(static_mut_refs)]
 
+use crate::zkcuda::proving_system::expander_parallelized::server_ctrl::SharedMemoryWINWrapper;
 use crate::zkcuda::proving_system::{CombinedProof, Expander};
 use arith::Field;
-use gkr_engine::{ExpanderPCS, FieldEngine, GKREngine};
+use gkr_engine::{ExpanderPCS, FieldEngine, GKREngine, MPIConfig, MPIEngine, MPISharedMemory};
 use serdes::ExpSerde;
 use shared_memory::{Shmem, ShmemConf};
 
@@ -182,6 +183,24 @@ impl SharedMemoryEngine {
                 vals
             })
             .collect()
+    }
+
+    pub fn read_shared_witness_from_shared_memory<F: FieldEngine>(
+        global_mpi_config: &MPIConfig<'static>,
+    ) -> (Vec<Vec<F::SimdCircuitField>>, SharedMemoryWINWrapper) {
+        let shmem = ShmemConf::new().flink("witness").open().unwrap();
+        let ptr = shmem.as_ptr();
+        let (mut mpi_shared_mem_ptr, mpi_win) = global_mpi_config.create_shared_mem(shmem.len());
+        unsafe {
+            std::ptr::copy_nonoverlapping(ptr, mpi_shared_mem_ptr, shmem.len());
+        }
+
+        let n_components = usize::new_from_memory(&mut mpi_shared_mem_ptr);
+        let shared_witness = (0..n_components)
+            .map(|_| Vec::<F::SimdCircuitField>::new_from_memory(&mut mpi_shared_mem_ptr))
+            .collect();
+
+        (shared_witness, SharedMemoryWINWrapper { win: mpi_win })
     }
 
     pub fn write_proof_to_shared_memory<

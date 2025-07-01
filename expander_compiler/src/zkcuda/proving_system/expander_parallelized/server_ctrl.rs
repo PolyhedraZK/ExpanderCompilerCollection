@@ -63,11 +63,17 @@ where
     pub lock: Arc<Mutex<()>>, // For now we want to ensure that only one request is processed at a time
     pub global_mpi_config: MPIConfig<'static>,
     pub local_mpi_config: Option<MPIConfig<'static>>,
+
     pub prover_setup: Arc<Mutex<ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>>>,
     pub verifier_setup:
         Arc<Mutex<ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>>>,
+
     pub computation_graph: Arc<Mutex<ComputationGraph<ECCConfig>>>,
-    pub mpi_shared_memory_win: Arc<Mutex<Option<SharedMemoryWINWrapper>>>,
+    pub witness: Arc<Mutex<Vec<Vec<C::PCSField>>>>,
+
+    pub cg_shared_memory_win: Arc<Mutex<Option<SharedMemoryWINWrapper>>>, // Shared memory for computation graph
+    pub wt_shared_memory_win: Arc<Mutex<Option<SharedMemoryWINWrapper>>>, // Shared memory for witness
+
     pub shutdown_tx: Arc<Mutex<Option<oneshot::Sender<()>>>>,
 }
 
@@ -98,7 +104,9 @@ where
             prover_setup: Arc::clone(&self.prover_setup),
             verifier_setup: Arc::clone(&self.verifier_setup),
             computation_graph: Arc::clone(&self.computation_graph),
-            mpi_shared_memory_win: Arc::clone(&self.mpi_shared_memory_win),
+            witness: Arc::clone(&self.witness),
+            cg_shared_memory_win: Arc::clone(&self.cg_shared_memory_win),
+            wt_shared_memory_win: Arc::clone(&self.wt_shared_memory_win),
             shutdown_tx: Arc::clone(&self.shutdown_tx),
         }
     }
@@ -123,14 +131,14 @@ where
             let mut computation_graph = state.computation_graph.lock().await;
             let mut prover_setup_guard = state.prover_setup.lock().await;
             let mut verifier_setup_guard = state.verifier_setup.lock().await;
-            let mut mpi_shared_memory_win = state.mpi_shared_memory_win.lock().await;
+            let mut cg_shared_memory_win = state.cg_shared_memory_win.lock().await;
             S::setup_request_handler(
                 &state.global_mpi_config,
                 Some(setup_file),
                 &mut computation_graph,
                 &mut prover_setup_guard,
                 &mut verifier_setup_guard,
-                &mut mpi_shared_memory_win,
+                &mut cg_shared_memory_win,
             );
 
             SharedMemoryEngine::write_pcs_setup_to_shared_memory(&(
@@ -145,7 +153,10 @@ where
             let prove_timer = Timer::new("server prove", true);
             let _ = broadcast_request_type(&state.global_mpi_config, 2);
 
-            let witness = SharedMemoryEngine::read_witness_from_shared_memory::<C::FieldConfig>();
+            let mut witness = state.witness.lock().await;
+            let mut witness_win = state.wt_shared_memory_win.lock().await;
+            S::setup_shared_witness(&state.global_mpi_config, &mut witness, &mut witness_win);
+
             let prover_setup_guard = state.prover_setup.lock().await;
             let computation_graph = state.computation_graph.lock().await;
 
@@ -192,7 +203,7 @@ pub async fn worker_main<C, ECCConfig, S>(
                 let mut computation_graph = state.computation_graph.lock().await;
                 let mut prover_setup_guard = state.prover_setup.lock().await;
                 let mut verifier_setup_guard = state.verifier_setup.lock().await;
-                let mut mpi_shared_memory_win = state.mpi_shared_memory_win.lock().await;
+                let mut cg_shared_memory_win = state.cg_shared_memory_win.lock().await;
 
                 S::setup_request_handler(
                     &state.global_mpi_config,
@@ -200,13 +211,15 @@ pub async fn worker_main<C, ECCConfig, S>(
                     &mut computation_graph,
                     &mut prover_setup_guard,
                     &mut verifier_setup_guard,
-                    &mut mpi_shared_memory_win,
+                    &mut cg_shared_memory_win,
                 );
             }
             2 => {
                 // Prove
-                let witness =
-                    SharedMemoryEngine::read_witness_from_shared_memory::<C::FieldConfig>();
+                let mut witness = state.witness.lock().await;
+                let mut witness_win = state.wt_shared_memory_win.lock().await;
+                S::setup_shared_witness(&state.global_mpi_config, &mut witness, &mut witness_win);
+
                 let prover_setup_guard = state.prover_setup.lock().await;
                 let computation_graph = state.computation_graph.lock().await;
                 let proof = S::prove_request_handler(
@@ -283,7 +296,9 @@ where
         prover_setup: Arc::new(Mutex::new(ExpanderProverSetup::default())),
         verifier_setup: Arc::new(Mutex::new(ExpanderVerifierSetup::default())),
         computation_graph: Arc::new(Mutex::new(ComputationGraph::default())),
-        mpi_shared_memory_win: Arc::new(Mutex::new(None)),
+        witness: Arc::new(Mutex::new(Vec::new())),
+        cg_shared_memory_win: Arc::new(Mutex::new(None)),
+        wt_shared_memory_win: Arc::new(Mutex::new(None)),
         shutdown_tx: Arc::new(Mutex::new(None)),
     };
 
@@ -328,20 +343,27 @@ where
         worker_main::<C, ECCConfig, S>(global_mpi_config, state.clone()).await;
     }
 
-    match Arc::try_unwrap(state.computation_graph) {
-        Ok(cg_mutex) => {
-            let mut mpi_win = state.mpi_shared_memory_win.lock().await.take();
+    match (
+        Arc::try_unwrap(state.computation_graph),
+        Arc::try_unwrap(state.witness),
+    ) {
+        (Ok(cg_mutex), Ok(witness_mutex)) => {
+            let mut cg_mpi_win = state.cg_shared_memory_win.lock().await.take();
+            let mut wt_mpi_win = state.wt_shared_memory_win.lock().await.take();
             S::shared_memory_clean_up(
                 &state.global_mpi_config,
                 cg_mutex.into_inner(), // moves the value out
-                &mut mpi_win,
+                witness_mutex.into_inner(),
+                &mut cg_mpi_win,
+                &mut wt_mpi_win,
             );
         }
-        Err(_) => {
+        _ => {
             panic!("Failed to unwrap Arc, multiple references exist");
         }
     }
     unsafe { mpi::ffi::MPI_Finalize() };
+    println!("Server has been shut down.");
 }
 
 #[derive(Parser, Debug)]

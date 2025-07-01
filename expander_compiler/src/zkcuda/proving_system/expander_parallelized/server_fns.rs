@@ -12,6 +12,7 @@ use crate::{
             },
             expander_parallelized::{
                 prove_impl::mpi_prove_impl, server_ctrl::SharedMemoryWINWrapper,
+                shared_memory_utils::SharedMemoryEngine,
             },
             CombinedProof, Expander, ParallelizedExpander,
         },
@@ -40,13 +41,47 @@ where
         values: &[impl AsRef<[SIMDField<C>]>],
     ) -> Option<CombinedProof<ECCConfig, Expander<C>>>;
 
+    fn setup_shared_witness(
+        global_mpi_config: &MPIConfig<'static>,
+        witness_target: &mut Vec<Vec<C::PCSField>>,
+        mpi_shared_memory_win: &mut Option<SharedMemoryWINWrapper>,
+    ) {
+        // dispose of the previous shared memory if it exists
+        while let Some(w) = witness_target.pop() {
+            w.discard_control_of_shared_mem();
+        }
+        assert!(witness_target.is_empty());
+
+        if let Some(win_wrapper) = mpi_shared_memory_win {
+            global_mpi_config.free_shared_mem(&mut win_wrapper.win);
+        }
+
+        // Allocate new shared memory for the witness
+        let (witness_v, wt_shared_memory_win) =
+            SharedMemoryEngine::read_shared_witness_from_shared_memory::<C::FieldConfig>(
+                global_mpi_config,
+            );
+        *witness_target = witness_v;
+        *mpi_shared_memory_win = Some(wt_shared_memory_win);
+    }
+
     fn shared_memory_clean_up(
         global_mpi_config: &MPIConfig<'static>,
         computation_graph: ComputationGraph<ECCConfig>,
-        mpi_win: &mut Option<SharedMemoryWINWrapper>,
+        witness: Vec<Vec<C::PCSField>>,
+        cg_mpi_win: &mut Option<SharedMemoryWINWrapper>,
+        wt_mpi_win: &mut Option<SharedMemoryWINWrapper>,
     ) {
         computation_graph.discard_control_of_shared_mem();
-        if let Some(win_wrapper) = mpi_win {
+        witness.into_iter().for_each(|w| {
+            w.discard_control_of_shared_mem();
+        });
+
+        if let Some(win_wrapper) = cg_mpi_win {
+            global_mpi_config.free_shared_mem(&mut win_wrapper.win);
+        }
+
+        if let Some(win_wrapper) = wt_mpi_win {
             global_mpi_config.free_shared_mem(&mut win_wrapper.win);
         }
     }
