@@ -162,21 +162,6 @@ where
         RequestType::Exit => {
             broadcast_request_type(&state.global_mpi_config, 255);
 
-            match Arc::try_unwrap(state.computation_graph) {
-                Ok(cg_mutex) => {
-                    let mut mpi_win = state.mpi_shared_memory_win.lock().await.take();
-                    S::shared_memory_clean_up(
-                        &state.global_mpi_config,
-                        cg_mutex.into_inner(), // moves the value out
-                        &mut mpi_win,
-                    );
-                }
-                Err(_) => {
-                    panic!("Failed to unwrap Arc, multiple references exist");
-                }
-            }
-            unsafe { mpi::ffi::MPI_Finalize() };
-
             state
                 .shutdown_tx
                 .lock()
@@ -189,24 +174,15 @@ where
     axum::Json(true)
 }
 
-pub async fn worker_main<C, ECCConfig, S>(global_mpi_config: MPIConfig<'static>)
-where
+pub async fn worker_main<C, ECCConfig, S>(
+    global_mpi_config: MPIConfig<'static>,
+    state: ServerState<C, ECCConfig>,
+) where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
     S: ServerFns<C, ECCConfig>,
 {
-    let state = ServerState::<C, ECCConfig> {
-        lock: Arc::new(Mutex::new(())),
-        global_mpi_config: global_mpi_config.clone(),
-        local_mpi_config: None,
-        prover_setup: Arc::new(Mutex::new(ExpanderProverSetup::default())),
-        verifier_setup: Arc::new(Mutex::new(ExpanderVerifierSetup::default())),
-        computation_graph: Arc::new(Mutex::new(ComputationGraph::default())),
-        mpi_shared_memory_win: Arc::new(Mutex::new(None)),
-        shutdown_tx: Arc::new(Mutex::new(None)),
-    };
-
     loop {
         // waiting for work
         let request_type = broadcast_request_type(&global_mpi_config, 128);
@@ -242,20 +218,6 @@ where
                 assert!(proof.is_none());
             }
             255 => {
-                match Arc::try_unwrap(state.computation_graph) {
-                    Ok(cg_mutex) => {
-                        let mut mpi_win = state.mpi_shared_memory_win.lock().await.take();
-                        S::shared_memory_clean_up(
-                            &state.global_mpi_config,
-                            cg_mutex.into_inner(), // moves the value out
-                            &mut mpi_win,
-                        );
-                    }
-                    Err(_) => {
-                        panic!("Failed to unwrap Arc, multiple references exist");
-                    }
-                }
-                unsafe { mpi::ffi::MPI_Finalize() };
                 break;
             }
             _ => {
@@ -332,7 +294,7 @@ where
         let app = Router::new()
             .route("/", post(root_main::<C, ECCConfig, S>))
             .route("/", get(|| async { "Expander Server is running" }))
-            .with_state(state);
+            .with_state(state.clone());
 
         let ip: IpAddr = SERVER_IP.parse().expect("Invalid SERVER_IP");
         let port_val = port_number.parse::<u16>().unwrap_or_else(|e| {
@@ -350,8 +312,23 @@ where
             .await
             .unwrap();
     } else {
-        worker_main::<C, ECCConfig, S>(global_mpi_config).await;
+        worker_main::<C, ECCConfig, S>(global_mpi_config, state.clone()).await;
     }
+
+    match Arc::try_unwrap(state.computation_graph) {
+        Ok(cg_mutex) => {
+            let mut mpi_win = state.mpi_shared_memory_win.lock().await.take();
+            S::shared_memory_clean_up(
+                &state.global_mpi_config,
+                cg_mutex.into_inner(), // moves the value out
+                &mut mpi_win,
+            );
+        }
+        Err(_) => {
+            panic!("Failed to unwrap Arc, multiple references exist");
+        }
+    }
+    unsafe { mpi::ffi::MPI_Finalize() };
 }
 
 #[derive(Parser, Debug)]
