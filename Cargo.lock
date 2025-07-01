@@ -112,7 +112,7 @@ dependencies = [
 [[package]]
 name = "arith"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#76b77857ded1091aecc2f9fbf98329880b449205"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fshared_memory_alignment#c2e8a37da99b936cf56ba5cf5b323f4bea6ec0e1"
 dependencies = [
  "ark-std",
  "criterion",
@@ -330,7 +330,7 @@ dependencies = [
 [[package]]
 name = "babybear"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#76b77857ded1091aecc2f9fbf98329880b449205"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fshared_memory_alignment#c2e8a37da99b936cf56ba5cf5b323f4bea6ec0e1"
 dependencies = [
  "arith",
  "ark-std",
@@ -383,7 +383,7 @@ dependencies = [
 [[package]]
 name = "bin"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#76b77857ded1091aecc2f9fbf98329880b449205"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fshared_memory_alignment#c2e8a37da99b936cf56ba5cf5b323f4bea6ec0e1"
 dependencies = [
  "arith",
  "babybear",
@@ -589,7 +589,7 @@ dependencies = [
 [[package]]
 name = "circuit"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#76b77857ded1091aecc2f9fbf98329880b449205"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fshared_memory_alignment#c2e8a37da99b936cf56ba5cf5b323f4bea6ec0e1"
 dependencies = [
  "arith",
  "ark-std",
@@ -702,7 +702,7 @@ dependencies = [
 [[package]]
 name = "config_macros"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#76b77857ded1091aecc2f9fbf98329880b449205"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fshared_memory_alignment#c2e8a37da99b936cf56ba5cf5b323f4bea6ec0e1"
 dependencies = [
  "gkr_engine",
  "gkr_hashers",
@@ -817,7 +817,7 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 [[package]]
 name = "crosslayer_prototype"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#76b77857ded1091aecc2f9fbf98329880b449205"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fshared_memory_alignment#c2e8a37da99b936cf56ba5cf5b323f4bea6ec0e1"
 dependencies = [
  "arith",
  "env_logger",
@@ -1143,7 +1143,7 @@ dependencies = [
 [[package]]
 name = "gf2"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#76b77857ded1091aecc2f9fbf98329880b449205"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fshared_memory_alignment#c2e8a37da99b936cf56ba5cf5b323f4bea6ec0e1"
 dependencies = [
  "arith",
  "ark-std",
@@ -1160,7 +1160,7 @@ dependencies = [
 [[package]]
 name = "gf2_128"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#76b77857ded1091aecc2f9fbf98329880b449205"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fshared_memory_alignment#c2e8a37da99b936cf56ba5cf5b323f4bea6ec0e1"
 dependencies = [
  "arith",
  "ark-std",
@@ -1179,7 +1179,7 @@ checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 [[package]]
 name = "gkr"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#76b77857ded1091aecc2f9fbf98329880b449205"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fshared_memory_alignment#c2e8a37da99b936cf56ba5cf5b323f4bea6ec0e1"
 dependencies = [
  "arith",
  "ark-std",
@@ -1212,7 +1212,7 @@ dependencies = [
 [[package]]
 name = "gkr_engine"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#76b77857ded1091aecc2f9fbf98329880b449205"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fshared_memory_alignment#c2e8a37da99b936cf56ba5cf5b323f4bea6ec0e1"
 dependencies = [
  "arith",
  "babybear",
@@ -1231,7 +1231,7 @@ dependencies = [
 [[package]]
 name = "gkr_hashers"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#76b77857ded1091aecc2f9fbf98329880b449205"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fshared_memory_alignment#c2e8a37da99b936cf56ba5cf5b323f4bea6ec0e1"
 dependencies = [
  "arith",
  "halo2curves",
@@ -1249,7 +1249,7 @@ checksum = "a8d1add55171497b4705a648c6b583acafb01d58050a51727785f0b2c8e0a2b2"
 [[package]]
 name = "goldilocks"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#76b77857ded1091aecc2f9fbf98329880b449205"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fshared_memory_alignment#c2e8a37da99b936cf56ba5cf5b323f4bea6ec0e1"
 dependencies = [
  "arith",
  "ark-std",
@@ -1870,7 +1870,7 @@ dependencies = [
 [[package]]
 name = "mersenne31"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#76b77857ded1091aecc2f9fbf98329880b449205"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fshared_memory_alignment#c2e8a37da99b936cf56ba5cf5b323f4bea6ec0e1"
 dependencies = [
  "arith",
  "ark-std",
@@ -2248,7 +2248,7 @@ dependencies = [
 [[package]]
 name = "poly_commit"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#76b77857ded1091aecc2f9fbf98329880b449205"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fshared_memory_alignment#c2e8a37da99b936cf56ba5cf5b323f4bea6ec0e1"
 dependencies = [
  "arith",
  "ark-std",
@@ -2273,7 +2273,7 @@ dependencies = [
 [[package]]
 name = "polynomials"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#76b77857ded1091aecc2f9fbf98329880b449205"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fshared_memory_alignment#c2e8a37da99b936cf56ba5cf5b323f4bea6ec0e1"
 dependencies = [
  "arith",
  "ark-std",
@@ -2694,7 +2694,7 @@ dependencies = [
 [[package]]
 name = "serdes"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#76b77857ded1091aecc2f9fbf98329880b449205"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fshared_memory_alignment#c2e8a37da99b936cf56ba5cf5b323f4bea6ec0e1"
 dependencies = [
  "ethnum",
  "halo2curves",
@@ -2705,7 +2705,7 @@ dependencies = [
 [[package]]
 name = "serdes_derive"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#76b77857ded1091aecc2f9fbf98329880b449205"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fshared_memory_alignment#c2e8a37da99b936cf56ba5cf5b323f4bea6ec0e1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2829,7 +2829,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 [[package]]
 name = "sumcheck"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#76b77857ded1091aecc2f9fbf98329880b449205"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fshared_memory_alignment#c2e8a37da99b936cf56ba5cf5b323f4bea6ec0e1"
 dependencies = [
  "arith",
  "circuit",
@@ -3093,7 +3093,7 @@ dependencies = [
 [[package]]
 name = "transcript"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#76b77857ded1091aecc2f9fbf98329880b449205"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fshared_memory_alignment#c2e8a37da99b936cf56ba5cf5b323f4bea6ec0e1"
 dependencies = [
  "arith",
  "gkr_engine",
@@ -3116,7 +3116,7 @@ dependencies = [
 [[package]]
 name = "tree"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#76b77857ded1091aecc2f9fbf98329880b449205"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fshared_memory_alignment#c2e8a37da99b936cf56ba5cf5b323f4bea6ec0e1"
 dependencies = [
  "arith",
  "ark-std",
@@ -3218,7 +3218,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 [[package]]
 name = "utils"
 version = "0.1.0"
-source = "git+https://github.com/PolyhedraZK/Expander?branch=main#76b77857ded1091aecc2f9fbf98329880b449205"
+source = "git+https://github.com/PolyhedraZK/Expander?branch=zf%2Fshared_memory_alignment#c2e8a37da99b936cf56ba5cf5b323f4bea6ec0e1"
 dependencies = [
  "colored",
 ]

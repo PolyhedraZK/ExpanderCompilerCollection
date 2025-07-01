@@ -188,19 +188,31 @@ impl SharedMemoryEngine {
     pub fn read_shared_witness_from_shared_memory<F: FieldEngine>(
         global_mpi_config: &MPIConfig<'static>,
     ) -> (Vec<Vec<F::SimdCircuitField>>, SharedMemoryWINWrapper) {
-        let shmem = ShmemConf::new().flink("witness").open().unwrap();
-        let ptr = shmem.as_ptr();
-        let (mut mpi_shared_mem_ptr, mpi_win) = global_mpi_config.create_shared_mem(shmem.len());
-        unsafe {
-            std::ptr::copy_nonoverlapping(ptr, mpi_shared_mem_ptr, shmem.len());
-        }
+        let (mut mpi_shared_mem_ptr, mem_win) = if global_mpi_config.is_root() {
+            let witness = Self::read_witness_from_shared_memory::<F>();
+            let bytes_size = std::mem::size_of::<usize>()
+                + witness.iter().map(|v| v.bytes_size()).sum::<usize>();
+            let (mut mpi_shared_mem_ptr, mem_win) = global_mpi_config.create_shared_mem(bytes_size);
+            let mpi_shared_mem_ptr_init = mpi_shared_mem_ptr;
 
-        let n_components = usize::new_from_memory(&mut mpi_shared_mem_ptr);
-        let shared_witness = (0..n_components)
+            witness.len().to_memory(&mut mpi_shared_mem_ptr);
+            witness.iter().for_each(|vals| {
+                vals.to_memory(&mut mpi_shared_mem_ptr);
+            });
+
+            (mpi_shared_mem_ptr_init, mem_win)
+        } else {
+            global_mpi_config.create_shared_mem(0)
+        };
+
+        global_mpi_config.barrier();
+
+        let n_witness = usize::new_from_memory(&mut mpi_shared_mem_ptr);
+        let witness = (0..n_witness)
             .map(|_| Vec::<F::SimdCircuitField>::new_from_memory(&mut mpi_shared_mem_ptr))
-            .collect();
+            .collect::<Vec<_>>();
 
-        (shared_witness, SharedMemoryWINWrapper { win: mpi_win })
+        (witness, SharedMemoryWINWrapper { win: mem_win })
     }
 
     pub fn write_proof_to_shared_memory<
