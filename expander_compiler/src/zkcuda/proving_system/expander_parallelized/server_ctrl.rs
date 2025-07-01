@@ -19,7 +19,7 @@ use mpi::traits::Communicator;
 use crate::frontend::Config;
 
 use axum::{extract::State, Json};
-use gkr_engine::{FieldEngine, GKREngine, MPIConfig, MPIEngine, MPISharedMemory};
+use gkr_engine::{FieldEngine, GKREngine, MPIConfig, MPIEngine};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, SocketAddr};

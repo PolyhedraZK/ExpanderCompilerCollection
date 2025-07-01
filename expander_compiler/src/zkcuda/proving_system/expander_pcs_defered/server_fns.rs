@@ -1,5 +1,4 @@
 use gkr_engine::{FieldEngine, GKREngine, MPIEngine};
-use mpi::ffi::MPI_Win;
 
 use crate::{
     frontend::Config,

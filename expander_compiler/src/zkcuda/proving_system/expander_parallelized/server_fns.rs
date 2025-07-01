@@ -1,9 +1,6 @@
-use std::sync::Arc;
 
 use gkr_engine::{FieldEngine, GKREngine, MPIConfig, MPIEngine, MPISharedMemory};
-use mpi::ffi::MPI_Win;
 use serdes::ExpSerde;
-use tokio::sync::Mutex;
 
 use crate::{
     frontend::{Config, SIMDField},
@@ -16,7 +13,6 @@ use crate::{
             },
             expander_parallelized::{
                 prove_impl::mpi_prove_impl, server_ctrl::SharedMemoryWINWrapper,
-                shared_memory_utils::SharedMemory,
             },
             CombinedProof, Expander, ParallelizedExpander,
         },
