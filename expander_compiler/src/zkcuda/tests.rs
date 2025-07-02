@@ -113,7 +113,7 @@ fn context_shape_test_1_impl<P: ProvingSystem<M31Config>>() {
             32, // Part 2 output b
         ]
     );
-    assert_eq!(computation_graph.commitments_lens().clone(), dm_len);
+    assert_eq!(computation_graph.commitments_lens(), dm_len);
 
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(
