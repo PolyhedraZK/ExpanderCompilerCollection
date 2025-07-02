@@ -362,8 +362,12 @@ where
             panic!("Failed to unwrap Arc, multiple references exist");
         }
     }
+
+    if state.global_mpi_config.is_root() {
+        println!("Server has been shut down.");
+    }
+
     unsafe { mpi::ffi::MPI_Finalize() };
-    println!("Server has been shut down.");
 }
 
 #[derive(Parser, Debug)]

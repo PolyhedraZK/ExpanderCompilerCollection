@@ -60,16 +60,16 @@ impl ProofTemplate {
     pub fn kernel_id(&self) -> usize {
         self.kernel_id
     }
-    pub fn commitment_indices(&self) -> &Vec<usize> {
+    pub fn commitment_indices(&self) -> &[usize] {
         &self.commitment_indices
     }
-    pub fn commitment_bit_orders(&self) -> &Vec<BitOrder> {
+    pub fn commitment_bit_orders(&self) -> &[BitOrder] {
         &self.commitment_bit_orders
     }
     pub fn parallel_count(&self) -> usize {
         self.parallel_count
     }
-    pub fn is_broadcast(&self) -> &Vec<bool> {
+    pub fn is_broadcast(&self) -> &[bool] {
         &self.is_broadcast
     }
 }
@@ -82,13 +82,13 @@ pub struct ComputationGraph<C: Config> {
 }
 
 impl<C: Config> ComputationGraph<C> {
-    pub fn kernels(&self) -> &Vec<Kernel<C>> {
+    pub fn kernels(&self) -> &[Kernel<C>] {
         &self.kernels
     }
-    pub fn commitments_lens(&self) -> &Vec<usize> {
+    pub fn commitments_lens(&self) -> &[usize] {
         &self.commitments_lens
     }
-    pub fn proof_templates(&self) -> &Vec<ProofTemplate> {
+    pub fn proof_templates(&self) -> &[ProofTemplate] {
         &self.proof_templates
     }
 }
