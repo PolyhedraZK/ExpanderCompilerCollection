@@ -125,6 +125,7 @@ where
     let _lock = state.lock.lock().await; // Ensure only one request is processed at a time
     match request_type {
         RequestType::Setup(setup_file) => {
+            println!("Received setup request with file: {setup_file}");
             let setup_timer = Timer::new("server setup", true);
             let _ = broadcast_request_type(&state.global_mpi_config, 1);
 
@@ -149,6 +150,7 @@ where
             setup_timer.stop();
         }
         RequestType::Prove => {
+            println!("Received prove request");
             // Handle proving logic here
             let prove_timer = Timer::new("server prove", true);
             let _ = broadcast_request_type(&state.global_mpi_config, 2);
@@ -171,6 +173,7 @@ where
             prove_timer.stop();
         }
         RequestType::Exit => {
+            println!("Received exit request, shutting down server");
             broadcast_request_type(&state.global_mpi_config, 255);
 
             state
