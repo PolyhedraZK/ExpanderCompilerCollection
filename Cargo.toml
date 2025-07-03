@@ -47,22 +47,22 @@ stacker = "0.1.17"
 tiny-keccak = { version = "2.0", features = ["keccak"] }
 tokio = { version = "1", features = ["full"] }
 
-arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/shared_memory_alignment" }
-mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/shared_memory_alignment" }
-gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/shared_memory_alignment" }
-babybear = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/shared_memory_alignment" }
-crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/shared_memory_alignment" }
-expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/shared_memory_alignment", package = "circuit" }
-expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/shared_memory_alignment", package = "transcript" }
-expander_binary = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/shared_memory_alignment", package = "bin" }
-gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/shared_memory_alignment" }
-gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/shared_memory_alignment" }
-mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/shared_memory_alignment" }
-goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/shared_memory_alignment" }
-poly_commit = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/shared_memory_alignment", package = "poly_commit" }
-polynomials = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/shared_memory_alignment" }
-sumcheck = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/shared_memory_alignment" }
-serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/shared_memory_alignment", package = "serdes" }
-gkr_engine = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/shared_memory_alignment" }
-gkr_hashers = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/shared_memory_alignment" }
-expander_utils = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/shared_memory_alignment", package = "utils" }
+arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+babybear = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "circuit" }
+expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "transcript" }
+expander_binary = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "bin" }
+gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+poly_commit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "poly_commit" }
+polynomials = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+sumcheck = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "serdes" }
+gkr_engine = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+gkr_hashers = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
+expander_utils = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "utils" }
