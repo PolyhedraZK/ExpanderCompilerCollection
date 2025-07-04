@@ -292,7 +292,7 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
                         res.gate_consts.push(GateConst {
                             inputs: [],
                             output: pos,
-                            coef: value.clone(),
+                            coef: *value,
                         });
                     } else if ic.internal_variable_expr.contains_key(&x) {
                         for term in ic.internal_variable_expr[&x].iter() {

@@ -49,11 +49,11 @@ pub struct KernelCall {
 
 #[derive(PartialEq, Eq, Clone, Debug, ExpSerde)]
 pub struct ProofTemplate {
-    kernel_id: usize,
-    commitment_indices: Vec<usize>,
-    commitment_bit_orders: Vec<BitOrder>,
-    parallel_count: usize,
-    is_broadcast: Vec<bool>,
+    pub kernel_id: usize,
+    pub commitment_indices: Vec<usize>,
+    pub commitment_bit_orders: Vec<BitOrder>,
+    pub parallel_count: usize,
+    pub is_broadcast: Vec<bool>,
 }
 
 impl ProofTemplate {
@@ -76,9 +76,9 @@ impl ProofTemplate {
 
 #[derive(Default, Clone, Debug, ExpSerde)]
 pub struct ComputationGraph<C: Config> {
-    kernels: Vec<Kernel<C>>,
-    commitments_lens: Vec<usize>,
-    proof_templates: Vec<ProofTemplate>,
+    pub kernels: Vec<Kernel<C>>,
+    pub commitments_lens: Vec<usize>,
+    pub proof_templates: Vec<ProofTemplate>,
 }
 
 impl<C: Config> ComputationGraph<C> {

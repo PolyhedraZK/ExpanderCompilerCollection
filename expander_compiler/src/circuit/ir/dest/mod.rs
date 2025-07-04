@@ -106,9 +106,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 inputs: inputs.iter().map(|&i| f(i)).collect(),
                 num_outputs: *num_outputs,
             },
-            Instruction::ConstantLike { value } => Instruction::ConstantLike {
-                value: value.clone(),
-            },
+            Instruction::ConstantLike { value } => Instruction::ConstantLike { value: *value },
         }
     }
     fn from_kx_plus_b(x: usize, k: CircuitField<C>, b: CircuitField<C>) -> Self {

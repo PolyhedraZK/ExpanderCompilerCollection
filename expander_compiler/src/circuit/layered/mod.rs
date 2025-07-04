@@ -15,7 +15,7 @@ pub mod serde;
 pub mod stats;
 pub mod witness;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Coef<C: Config> {
     Constant(CircuitField<C>),
     Random,
@@ -196,9 +196,9 @@ pub struct CrossLayerInputUsize {
     v: Vec<usize>,
 }
 
-#[derive(Debug, Default, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, ExpSerde)]
+#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, ExpSerde)]
 pub struct NormalInputUsize {
-    v: usize,
+    pub v: usize,
 }
 
 pub trait InputUsize:
@@ -283,6 +283,8 @@ pub struct Gate<C: Config, I: InputType, const INPUT_NUM: usize> {
     pub coef: Coef<C>,
 }
 
+impl<C: Config, const INPUT_NUM: usize> Copy for Gate<C, NormalInputType, INPUT_NUM> {}
+
 impl<C: Config, const INPUT_NUM: usize> Gate<C, NormalInputType, INPUT_NUM> {
     pub fn export_to_expander<
         DestConfig: gkr_engine::FieldEngine<CircuitField = CircuitField<C>>,
@@ -348,6 +350,8 @@ pub struct Allocation<I: InputType> {
     pub input_offset: I::InputUsize,
     pub output_offset: usize,
 }
+
+impl Copy for Allocation<NormalInputType> {}
 
 pub type ChildSpec<I> = (usize, Vec<Allocation<I>>);
 

@@ -105,7 +105,7 @@ impl<'a, C: Config> Builder<'a, C> {
                     panic!("unexpected situation");
                 }
                 ir::hint_less::Instruction::ConstantLike(c) => {
-                    fin_insns.push(ir::dest::Instruction::ConstantLike { value: c.clone() });
+                    fin_insns.push(ir::dest::Instruction::ConstantLike { value: *c });
                 }
                 ir::hint_less::Instruction::SubCircuitCall {
                     sub_circuit_id,
