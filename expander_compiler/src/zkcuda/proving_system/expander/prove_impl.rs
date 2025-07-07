@@ -19,19 +19,17 @@ use crate::{
 
 /// ECCCircuit -> ExpanderCircuit
 /// Returns an additional prover scratch pad for later use in GKR.
-pub fn prepare_expander_circuit<C, ECCConfig>(
+pub fn prepare_expander_circuit<F, ECCConfig>(
     kernel: &Kernel<ECCConfig>,
     mpi_world_size: usize,
-) -> (Circuit<C::FieldConfig>, ProverScratchPad<C::FieldConfig>)
+) -> (Circuit<F>, ProverScratchPad<F>)
 where
-    C: GKREngine,
-    ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+    F: FieldEngine,
+    ECCConfig: Config<FieldConfig = F>,
 {
-    let mut expander_circuit = kernel.layered_circuit().export_to_expander().flatten::<C>();
-    expander_circuit.pre_process_gkr();
+    let expander_circuit = kernel.layered_circuit().export_to_expander_flatten();
     let (max_num_input_var, max_num_output_var) = super::utils::max_n_vars(&expander_circuit);
-    let prover_scratch = ProverScratchPad::<C::FieldConfig>::new(
+    let prover_scratch = ProverScratchPad::<F>::new(
         max_num_input_var,
         max_num_output_var,
         mpi_world_size,

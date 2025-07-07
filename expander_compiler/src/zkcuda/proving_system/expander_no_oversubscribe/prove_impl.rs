@@ -20,7 +20,7 @@ use crate::{
                 },
                 structs::{ExpanderCommitmentState, ExpanderProof, ExpanderProverSetup},
             },
-            expander_parallelized::server_ctrl::generate_local_mpi_config,
+            expander_parallelized::{prove_impl::prove_kernel_gkr, server_ctrl::generate_local_mpi_config},
             CombinedProof, Expander,
         },
     },
@@ -62,7 +62,7 @@ where
 
             let single_kernel_gkr_timer =
                 Timer::new("small gkr kernel", global_mpi_config.is_root());
-            let gkr_end_state = prove_kernel_gkr::<C, ECCConfig>(
+            let gkr_end_state = prove_kernel_gkr::<C::FieldConfig, C::TranscriptConfig, ECCConfig>(
                 global_mpi_config,
                 &computation_graph.kernels()[template.kernel_id()],
                 &commitment_values,
@@ -115,53 +115,6 @@ where
     } else {
         None
     }
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn prove_kernel_gkr<F, T, ECCConfig>(
-    mpi_config: &MPIConfig<'static>,
-    kernel: &Kernel<ECCConfig>,
-    commitments_values: &[&[F::SimdCircuitField]],
-    parallel_count: usize,
-    is_broadcast: &[bool],
-) -> Option<(
-    T,
-    ExpanderDualVarChallenge<F>,
-)>
-where
-    F: FieldEngine,
-    T: Transcript,
-    ECCConfig: Config<FieldConfig = F>,
-{
-    let local_mpi_config = generate_local_mpi_config(mpi_config, parallel_count);
-
-    local_mpi_config.as_ref()?;
-
-    let local_mpi_config = local_mpi_config.unwrap();
-    let local_world_size = local_mpi_config.world_size();
-    let local_world_rank = local_mpi_config.world_rank();
-
-    let local_commitment_values = get_local_vals(
-        commitments_values,
-        is_broadcast,
-        local_world_rank,
-        local_world_size,
-    );
-
-    let (mut expander_circuit, mut prover_scratch) =
-        prepare_expander_circuit::<C, ECCConfig>(kernel, local_world_size);
-
-    let mut transcript = T::new();
-    let challenge = prove_gkr_with_local_vals::<F, T>(
-        &mut expander_circuit,
-        &mut prover_scratch,
-        &local_commitment_values,
-        kernel.layered_circuit_input(),
-        &mut transcript,
-        &local_mpi_config,
-    );
-
-    Some((transcript, challenge))
 }
 
 pub fn partition_challenge_and_location_for_pcs_mpi<F: FieldEngine>(

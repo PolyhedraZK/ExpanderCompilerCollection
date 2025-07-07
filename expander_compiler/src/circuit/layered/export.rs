@@ -72,7 +72,7 @@ impl<C: Config> Circuit<C, NormalInputType> {
 
     pub fn export_to_expander_flatten(&self) -> expander_circuit::Circuit<C::FieldConfig> {
         let circuit = self.export_to_expander::<C::FieldConfig>();
-        let mut flattened = circuit.flatten::<C>();
+        let mut flattened = circuit.flatten();
         flattened.pre_process_gkr();
         flattened
     }

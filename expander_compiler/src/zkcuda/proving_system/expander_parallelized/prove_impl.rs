@@ -62,7 +62,7 @@ where
 
             let single_kernel_gkr_timer =
                 Timer::new("small gkr kernel", global_mpi_config.is_root());
-            let gkr_end_state = prove_kernel_gkr::<C, ECCConfig>(
+            let gkr_end_state = prove_kernel_gkr::<C::FieldConfig, C::TranscriptConfig, ECCConfig>(
                 global_mpi_config,
                 &computation_graph.kernels()[template.kernel_id()],
                 &commitment_values,
@@ -118,20 +118,20 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn prove_kernel_gkr<C, ECCConfig>(
+pub fn prove_kernel_gkr<F, T, ECCConfig>(
     mpi_config: &MPIConfig<'static>,
     kernel: &Kernel<ECCConfig>,
-    commitments_values: &[&[SIMDField<C>]],
+    commitments_values: &[&[F::SimdCircuitField]],
     parallel_count: usize,
     is_broadcast: &[bool],
 ) -> Option<(
-    C::TranscriptConfig,
-    ExpanderDualVarChallenge<C::FieldConfig>,
+    T,
+    ExpanderDualVarChallenge<F>,
 )>
 where
-    C: GKREngine,
-    ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+    F: FieldEngine,
+    T: Transcript,
+    ECCConfig: Config<FieldConfig = F>,
 {
     let local_mpi_config = generate_local_mpi_config(mpi_config, parallel_count);
 
@@ -149,10 +149,10 @@ where
     );
 
     let (mut expander_circuit, mut prover_scratch) =
-        prepare_expander_circuit::<C, ECCConfig>(kernel, local_world_size);
+        prepare_expander_circuit::<F, ECCConfig>(kernel, local_world_size);
 
-    let mut transcript = C::TranscriptConfig::new();
-    let challenge = prove_gkr_with_local_vals::<C>(
+    let mut transcript = T::new();
+    let challenge = prove_gkr_with_local_vals::<F, T>(
         &mut expander_circuit,
         &mut prover_scratch,
         &local_commitment_values,

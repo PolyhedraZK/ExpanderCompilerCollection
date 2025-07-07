@@ -69,7 +69,7 @@ where
         check_inputs(kernel, commitments_values, parallel_count, is_broadcast);
 
         let (mut expander_circuit, mut prover_scratch) =
-            prepare_expander_circuit::<C, ECCConfig>(kernel, 1);
+            prepare_expander_circuit::<C::FieldConfig, ECCConfig>(kernel, 1);
 
         let mut proof = ExpanderProof { data: vec![] };
 
@@ -83,7 +83,7 @@ where
                 parallel_index,
                 parallel_count,
             );
-            let challenge = prove_gkr_with_local_vals::<C>(
+            let challenge = prove_gkr_with_local_vals::<C::FieldConfig, C::TranscriptConfig>(
                 &mut expander_circuit,
                 &mut prover_scratch,
                 &local_vals,
@@ -118,8 +118,7 @@ where
         is_broadcast: &[bool],
     ) -> bool {
         let timer = Timer::new("verify", true);
-        let mut expander_circuit = kernel.layered_circuit().export_to_expander().flatten::<C>();
-        expander_circuit.pre_process_gkr();
+        let mut expander_circuit = kernel.layered_circuit().export_to_expander_flatten();
 
         for i in 0..parallel_count {
             let mut transcript = C::TranscriptConfig::new();

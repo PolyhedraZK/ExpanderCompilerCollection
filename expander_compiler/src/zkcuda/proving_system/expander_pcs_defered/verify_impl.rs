@@ -70,8 +70,7 @@ where
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    let mut expander_circuit = kernel.layered_circuit().export_to_expander().flatten::<C>();
-    expander_circuit.pre_process_gkr();
+    let mut expander_circuit = kernel.layered_circuit().export_to_expander_flatten();
 
     let mut transcript = C::TranscriptConfig::new();
     expander_circuit.fill_rnd_coefs(&mut transcript);
