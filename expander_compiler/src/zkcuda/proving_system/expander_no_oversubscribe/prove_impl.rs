@@ -1,7 +1,7 @@
 use arith::Field;
 use expander_utils::timer::Timer;
 use gkr_engine::{
-    ExpanderDualVarChallenge, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig,
+    ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig,
     MPIEngine, Transcript,
 };
 
@@ -10,19 +10,13 @@ use crate::{
     utils::misc::next_power_of_two,
     zkcuda::{
         context::ComputationGraph,
-        kernel::Kernel,
         proving_system::{
             expander::{
                 commit_impl::local_commit_impl,
-                prove_impl::{
-                    get_local_vals, pcs_local_open_impl, prepare_expander_circuit,
-                    prove_gkr_with_local_vals,
-                },
+                prove_impl::pcs_local_open_impl,
                 structs::{ExpanderCommitmentState, ExpanderProof, ExpanderProverSetup},
             },
-            expander_parallelized::{
-                prove_impl::prove_kernel_gkr, server_ctrl::generate_local_mpi_config,
-            },
+            expander_parallelized::prove_impl::prove_kernel_gkr,
             CombinedProof, Expander,
         },
     },
