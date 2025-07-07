@@ -20,7 +20,9 @@ use crate::{
                 },
                 structs::{ExpanderCommitmentState, ExpanderProof, ExpanderProverSetup},
             },
-            expander_parallelized::{prove_impl::prove_kernel_gkr, server_ctrl::generate_local_mpi_config},
+            expander_parallelized::{
+                prove_impl::prove_kernel_gkr, server_ctrl::generate_local_mpi_config,
+            },
             CombinedProof, Expander,
         },
     },

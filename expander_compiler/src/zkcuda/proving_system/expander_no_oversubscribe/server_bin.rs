@@ -4,7 +4,9 @@ use clap::Parser;
 use expander_compiler::{
     frontend::BN254Config,
     zkcuda::proving_system::{
-        expander_parallelized::server_ctrl::{serve, ExpanderExecArgs}, expander_pcs_defered::BN254ConfigSha2UniKZG, ExpanderNoOverSubscribe,
+        expander_parallelized::server_ctrl::{serve, ExpanderExecArgs},
+        expander_pcs_defered::BN254ConfigSha2UniKZG,
+        ExpanderNoOverSubscribe,
     },
 };
 use gkr::BN254ConfigSha2Hyrax;

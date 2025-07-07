@@ -124,10 +124,7 @@ pub fn prove_kernel_gkr<F, T, ECCConfig>(
     commitments_values: &[&[F::SimdCircuitField]],
     parallel_count: usize,
     is_broadcast: &[bool],
-) -> Option<(
-    T,
-    ExpanderDualVarChallenge<F>,
-)>
+) -> Option<(T, ExpanderDualVarChallenge<F>)>
 where
     F: FieldEngine,
     T: Transcript,

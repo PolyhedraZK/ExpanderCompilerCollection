@@ -6,9 +6,9 @@ use crate::{
     zkcuda::{
         context::ComputationGraph,
         proving_system::{
-            expander::{
-                structs::{ExpanderProverSetup, ExpanderVerifierSetup},
-            }, expander_parallelized::{prove_impl::mpi_prove_impl, server_fns::ServerFns}, CombinedProof, Expander, ExpanderNoOverSubscribe, ParallelizedExpander
+            expander::structs::{ExpanderProverSetup, ExpanderVerifierSetup},
+            expander_parallelized::{prove_impl::mpi_prove_impl, server_fns::ServerFns},
+            CombinedProof, Expander, ExpanderNoOverSubscribe, ParallelizedExpander,
         },
     },
 };

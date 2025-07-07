@@ -30,8 +30,8 @@ where
     fn setup(
         computation_graph: &crate::zkcuda::context::ComputationGraph<ECCConfig>,
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
-        let server_binary =
-            client_parse_args().unwrap_or("../target/release/expander_server_no_oversubscribe".to_owned());
+        let server_binary = client_parse_args()
+            .unwrap_or("../target/release/expander_server_no_oversubscribe".to_owned());
         client_launch_server_and_setup::<C, ECCConfig>(&server_binary, computation_graph, false)
     }
 

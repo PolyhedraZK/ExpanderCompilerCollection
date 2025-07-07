@@ -145,7 +145,7 @@ where
                 .map(|&idx| values[idx].as_ref())
                 .collect::<Vec<_>>();
 
-            let gkr_end_state = prove_kernel_gkr::<C, ECCConfig>(
+            let gkr_end_state = prove_kernel_gkr::<C::FieldConfig, C::TranscriptConfig, ECCConfig>(
                 global_mpi_config,
                 &computation_graph.kernels()[template.kernel_id()],
                 &commitment_values,

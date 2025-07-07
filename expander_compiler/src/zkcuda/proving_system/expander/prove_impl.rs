@@ -29,11 +29,8 @@ where
 {
     let expander_circuit = kernel.layered_circuit().export_to_expander_flatten();
     let (max_num_input_var, max_num_output_var) = super::utils::max_n_vars(&expander_circuit);
-    let prover_scratch = ProverScratchPad::<F>::new(
-        max_num_input_var,
-        max_num_output_var,
-        mpi_world_size,
-    );
+    let prover_scratch =
+        ProverScratchPad::<F>::new(max_num_input_var, max_num_output_var, mpi_world_size);
 
     (expander_circuit, prover_scratch)
 }
@@ -89,8 +86,7 @@ pub fn prove_gkr_with_local_vals<F: FieldEngine, T: Transcript>(
     partition_info: &[LayeredCircuitInputVec],
     transcript: &mut T,
     mpi_config: &MPIConfig,
-) -> ExpanderDualVarChallenge<F>
-{
+) -> ExpanderDualVarChallenge<F> {
     expander_circuit.layers[0].input_vals = prepare_inputs_with_local_vals(
         1 << expander_circuit.log_input_size(),
         partition_info,
@@ -100,10 +96,7 @@ pub fn prove_gkr_with_local_vals<F: FieldEngine, T: Transcript>(
     expander_circuit.evaluate();
     let (claimed_v, challenge) =
         gkr_prove(expander_circuit, prover_scratch, transcript, mpi_config);
-    assert_eq!(
-        claimed_v,
-        F::ChallengeField::from(0)
-    );
+    assert_eq!(claimed_v, F::ChallengeField::from(0));
     challenge
 }
 
