@@ -62,6 +62,10 @@ name = "expander_server_pcs_defered"
 path = "src/zkcuda/proving_system/expander_pcs_defered/server_bin.rs"
 
 [[bin]]
+name = "expander_server_no_oversubscribe"
+path = "src/zkcuda/proving_system/expander_no_oversubscribe/server_bin.rs"
+
+[[bin]]
 name = "zkcuda_matmul"
 path = "bin/zkcuda_matmul.rs"
 

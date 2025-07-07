@@ -84,16 +84,14 @@ pub fn prepare_inputs_with_local_vals<F: Field>(
     input_vals
 }
 
-pub fn prove_gkr_with_local_vals<C: GKREngine>(
-    expander_circuit: &mut Circuit<C::FieldConfig>,
-    prover_scratch: &mut ProverScratchPad<C::FieldConfig>,
-    local_commitment_values: &[impl AsRef<[<C::FieldConfig as FieldEngine>::SimdCircuitField]>],
+pub fn prove_gkr_with_local_vals<F: FieldEngine, T: Transcript>(
+    expander_circuit: &mut Circuit<F>,
+    prover_scratch: &mut ProverScratchPad<F>,
+    local_commitment_values: &[impl AsRef<[F::SimdCircuitField]>],
     partition_info: &[LayeredCircuitInputVec],
-    transcript: &mut C::TranscriptConfig,
+    transcript: &mut T,
     mpi_config: &MPIConfig,
-) -> ExpanderDualVarChallenge<C::FieldConfig>
-where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+) -> ExpanderDualVarChallenge<F>
 {
     expander_circuit.layers[0].input_vals = prepare_inputs_with_local_vals(
         1 << expander_circuit.log_input_size(),
@@ -106,7 +104,7 @@ where
         gkr_prove(expander_circuit, prover_scratch, transcript, mpi_config);
     assert_eq!(
         claimed_v,
-        <C::FieldConfig as FieldEngine>::ChallengeField::from(0)
+        F::ChallengeField::from(0)
     );
     challenge
 }

@@ -2,7 +2,7 @@ use std::fs;
 
 use crate::{
     frontend::{Config, SIMDField},
-    utils::misc::next_power_of_two,
+    utils::misc::{next_power_of_two, prev_power_of_two},
     zkcuda::{
         context::ComputationGraph,
         proving_system::{
@@ -77,6 +77,7 @@ pub fn client_parse_args() -> Option<String> {
 pub fn client_launch_server_and_setup<C, ECCConfig>(
     server_binary: &str,
     computation_graph: &ComputationGraph<ECCConfig>,
+    allow_oversubscribe: bool,
 ) -> (
     ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
     ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
@@ -104,10 +105,22 @@ where
         .map(|t| t.parallel_count())
         .max()
         .unwrap_or(1);
+    let max_parallel_count = next_power_of_two(max_parallel_count);
+
+    let mpi_size = if allow_oversubscribe {
+        max_parallel_count
+    } else {
+        let num_cpus = prev_power_of_two(num_cpus::get_physical());
+        if max_parallel_count > num_cpus {
+            num_cpus
+        } else {
+            max_parallel_count
+        }
+    };
 
     let port = parse_port_number();
     let server_url = format!("{SERVER_IP}:{port}");
-    start_server::<C>(server_binary, next_power_of_two(max_parallel_count), port);
+    start_server::<C>(server_binary, mpi_size, port);
 
     // Keep trying until the server is ready
     loop {

@@ -35,7 +35,7 @@ where
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
         let server_binary = client_parse_args()
             .unwrap_or("../target/release/expander_server_pcs_defered".to_owned());
-        client_launch_server_and_setup::<C, ECCConfig>(&server_binary, computation_graph)
+        client_launch_server_and_setup::<C, ECCConfig>(&server_binary, computation_graph, true)
     }
 
     fn prove(
