@@ -119,7 +119,7 @@ where
     ) -> bool {
         let timer = Timer::new("verify", true);
         let mut expander_circuit = kernel.layered_circuit().export_to_expander().flatten::<C>();
-        expander_circuit.pre_process_gkr::<C>();
+        expander_circuit.pre_process_gkr();
 
         for i in 0..parallel_count {
             let mut transcript = C::TranscriptConfig::new();

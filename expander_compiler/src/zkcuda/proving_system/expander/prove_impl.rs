@@ -29,7 +29,7 @@ where
     C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let mut expander_circuit = kernel.layered_circuit().export_to_expander().flatten::<C>();
-    expander_circuit.pre_process_gkr::<C>();
+    expander_circuit.pre_process_gkr();
     let (max_num_input_var, max_num_output_var) = super::utils::max_n_vars(&expander_circuit);
     let prover_scratch = ProverScratchPad::<C::FieldConfig>::new(
         max_num_input_var,
