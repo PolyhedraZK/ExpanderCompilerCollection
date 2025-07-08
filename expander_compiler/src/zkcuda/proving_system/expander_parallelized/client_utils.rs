@@ -19,7 +19,7 @@ use crate::{
 use super::server_ctrl::{RequestType, SERVER_IP, SERVER_PORT};
 
 use expander_utils::timer::Timer;
-use gkr_engine::{FieldEngine, GKREngine};
+use gkr_engine::GKREngine;
 use reqwest::Client;
 use serdes::ExpSerde;
 

@@ -1,8 +1,6 @@
 use arith::Fr;
-use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
 use gkr_engine::{
-    BN254Config, ExpanderPCS, FieldEngine, FieldType, GKREngine, MPIConfig, MPIEngine,
-    PolynomialCommitmentType,
+    FieldEngine, GKREngine, MPIConfig, MPIEngine,
 };
 use serdes::ExpSerde;
 
@@ -13,7 +11,7 @@ use crate::{
         proving_system::{
             expander::structs::{ExpanderProverSetup, ExpanderVerifierSetup},
             expander_no_oversubscribe::prove_impl::mpi_prove_no_oversubscribe_impl,
-            expander_parallelized::{prove_impl::mpi_prove_impl, server_fns::ServerFns},
+            expander_parallelized::server_fns::ServerFns,
             CombinedProof, Expander, ExpanderNoOverSubscribe, ParallelizedExpander,
         },
     },

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use gkr_engine::{FieldEngine, GKREngine, MPIConfig};
+use gkr_engine::{GKREngine, MPIConfig};
 
 use crate::{
     frontend::Config,

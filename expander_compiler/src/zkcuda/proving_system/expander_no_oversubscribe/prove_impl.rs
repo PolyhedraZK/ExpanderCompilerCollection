@@ -1,7 +1,7 @@
 use arith::{Field, Fr, SimdField};
 use expander_utils::timer::Timer;
 use gkr_engine::{
-    BN254ConfigXN, ExpanderDualVarChallenge, ExpanderSingleVarChallenge, FieldEngine, FieldType,
+    BN254ConfigXN, ExpanderDualVarChallenge, FieldEngine,
     GKREngine, MPIConfig, MPIEngine, Transcript,
 };
 
@@ -15,10 +15,10 @@ use crate::{
             expander::{
                 commit_impl::local_commit_impl,
                 prove_impl::{
-                    get_local_vals, pcs_local_open_impl, prepare_expander_circuit,
+                    get_local_vals, prepare_expander_circuit,
                     prepare_inputs_with_local_vals,
                 },
-                structs::{ExpanderCommitmentState, ExpanderProof, ExpanderProverSetup},
+                structs::{ExpanderProof, ExpanderProverSetup},
             },
             expander_parallelized::prove_impl::partition_single_gkr_claim_and_open_pcs_mpi,
             expander_parallelized::server_ctrl::generate_local_mpi_config,
@@ -229,7 +229,7 @@ where
             is_broadcast,
         ),
         _ => {
-            panic!("Unsupported parallel count: {}", parallel_count);
+            panic!("Unsupported parallel count: {parallel_count}");
         }
     }
 }
@@ -270,7 +270,7 @@ where
         &local_commitment_values,
         kernel.layered_circuit_input(),
         &mut transcript,
-        &mpi_config,
+        mpi_config,
     );
 
     Some((transcript, challenge))

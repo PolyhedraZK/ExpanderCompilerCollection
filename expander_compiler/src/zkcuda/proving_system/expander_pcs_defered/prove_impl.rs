@@ -1,7 +1,7 @@
 use arith::Field;
 use expander_utils::timer::Timer;
 use gkr_engine::{
-    ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine,
+    ExpanderPCS, ExpanderSingleVarChallenge, GKREngine, MPIConfig, MPIEngine,
     Proof as BytesProof, Transcript,
 };
 use polynomials::RefMultiLinearPoly;

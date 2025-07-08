@@ -1,4 +1,4 @@
-use gkr_engine::{ExpanderPCS, FieldEngine, GKREngine};
+use gkr_engine::{ExpanderPCS, GKREngine};
 
 use crate::{
     frontend::{Config, SIMDField},

@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use arith::Field;
 use gkr_engine::{ExpanderPCS, FieldEngine, Proof as BytesProof, StructuredReferenceString};
 use serdes::ExpSerde;
 

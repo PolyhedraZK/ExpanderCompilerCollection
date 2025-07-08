@@ -15,7 +15,7 @@ use crate::zkcuda::proving_system::{CombinedProof, ProvingSystem};
 use super::super::Expander;
 
 use expander_utils::timer::Timer;
-use gkr_engine::{FieldEngine, GKREngine};
+use gkr_engine::GKREngine;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 pub struct ParallelizedExpander<C: GKREngine> {

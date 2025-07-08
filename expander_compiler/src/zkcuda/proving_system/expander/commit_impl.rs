@@ -1,5 +1,5 @@
 use expander_utils::timer::Timer;
-use gkr_engine::{ExpanderPCS, FieldEngine, GKREngine, MPIConfig};
+use gkr_engine::{ExpanderPCS, GKREngine, MPIConfig};
 use polynomials::RefMultiLinearPoly;
 
 use super::structs::ExpanderProverSetup;

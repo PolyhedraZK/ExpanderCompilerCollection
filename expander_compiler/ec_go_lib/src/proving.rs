@@ -1,12 +1,10 @@
 use std::ptr;
 use std::slice;
 
-use arith::SimdField;
 use expander_binary::executor;
 use expander_compiler::frontend::ChallengeField;
 use expander_compiler::frontend::SIMDField;
 
-use gkr_engine::FieldEngine;
 use libc::{c_uchar, c_ulong, malloc};
 
 use expander_compiler::circuit::config;

@@ -13,7 +13,7 @@ use crate::{
     frontend::Config,
     zkcuda::{
         kernel::{Kernel, LayeredCircuitInputVec},
-        proving_system::expander::{self, structs::ExpanderProverSetup},
+        proving_system::expander::structs::ExpanderProverSetup,
     },
 };
 
