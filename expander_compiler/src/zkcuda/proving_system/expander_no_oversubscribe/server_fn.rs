@@ -1,4 +1,9 @@
-use gkr_engine::{FieldEngine, GKREngine, MPIConfig, MPIEngine};
+use arith::Fr;
+use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
+use gkr_engine::{
+    BN254Config, ExpanderPCS, FieldEngine, FieldType, GKREngine, MPIConfig, MPIEngine,
+    PolynomialCommitmentType,
+};
 use serdes::ExpSerde;
 
 use crate::{
@@ -7,6 +12,7 @@ use crate::{
         context::ComputationGraph,
         proving_system::{
             expander::structs::{ExpanderProverSetup, ExpanderVerifierSetup},
+            expander_no_oversubscribe::prove_impl::mpi_prove_no_oversubscribe_impl,
             expander_parallelized::{prove_impl::mpi_prove_impl, server_fns::ServerFns},
             CombinedProof, Expander, ExpanderNoOverSubscribe, ParallelizedExpander,
         },
@@ -16,6 +22,7 @@ use crate::{
 impl<C, ECCConfig> ServerFns<C, ECCConfig> for ExpanderNoOverSubscribe<C>
 where
     C: GKREngine,
+    C::FieldConfig: FieldEngine<CircuitField = Fr, ChallengeField = Fr>,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
 {
     fn setup_request_handler(
@@ -44,7 +51,7 @@ where
         C: GKREngine,
         ECCConfig: Config<FieldConfig = C::FieldConfig>,
     {
-        mpi_prove_impl(global_mpi_config, prover_setup, computation_graph, values)
+        mpi_prove_no_oversubscribe_impl(global_mpi_config, prover_setup, computation_graph, values)
     }
 }
 

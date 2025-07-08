@@ -1,4 +1,4 @@
-use arith::{Field, Fr};
+use arith::{Field, Fr, SimdField};
 use expander_utils::timer::Timer;
 use gkr_engine::{
     BN254ConfigXN, ExpanderDualVarChallenge, ExpanderSingleVarChallenge, FieldEngine, FieldType,
@@ -10,13 +10,17 @@ use crate::{
     utils::misc::next_power_of_two,
     zkcuda::{
         context::ComputationGraph,
-        kernel::Kernel,
+        kernel::{Kernel, LayeredCircuitInputVec},
         proving_system::{
             expander::{
                 commit_impl::local_commit_impl,
-                prove_impl::pcs_local_open_impl,
+                prove_impl::{
+                    get_local_vals, pcs_local_open_impl, prepare_expander_circuit,
+                    prepare_inputs_with_local_vals,
+                },
                 structs::{ExpanderCommitmentState, ExpanderProof, ExpanderProverSetup},
             },
+            expander_parallelized::prove_impl::partition_single_gkr_claim_and_open_pcs_mpi,
             expander_parallelized::server_ctrl::generate_local_mpi_config,
             CombinedProof, Expander,
         },
@@ -31,6 +35,7 @@ pub fn mpi_prove_no_oversubscribe_impl<C, ECCConfig>(
 ) -> Option<CombinedProof<ECCConfig, Expander<C>>>
 where
     C: GKREngine,
+    C::FieldConfig: FieldEngine<CircuitField = Fr, ChallengeField = Fr>,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
 {
     let commit_timer = Timer::new("Commit to all input", global_mpi_config.is_root());
@@ -136,7 +141,6 @@ where
 
     let local_mpi_config = local_mpi_config.unwrap();
     let local_world_size = local_mpi_config.world_size();
-    let local_world_rank = local_mpi_config.world_rank();
 
     let n_local_copies = parallel_count / local_world_size;
     match n_local_copies {
@@ -244,82 +248,105 @@ where
     T: Transcript,
     ECCConfig: Config<FieldConfig = FBasic>,
 {
-    let local_commitment_values = get_local_vals(
+    let world_rank = mpi_config.world_rank();
+    let world_size = mpi_config.world_size();
+    let n_copies = parallel_count / world_size;
+
+    let local_commitment_values = get_local_vals_multi_copies(
         commitments_values,
         is_broadcast,
-        local_world_rank,
-        local_world_size,
+        world_rank,
+        n_copies,
+        parallel_count,
     );
 
     let (mut expander_circuit, mut prover_scratch) =
-        prepare_expander_circuit::<F, ECCConfig>(kernel, local_world_size);
+        prepare_expander_circuit::<FMulti, ECCConfig>(kernel, world_size);
 
     let mut transcript = T::new();
-    let challenge = prove_gkr_with_local_vals::<F, T>(
+    let challenge = prove_gkr_with_local_vals_multi_copies::<FBasic, FMulti, T>(
         &mut expander_circuit,
         &mut prover_scratch,
         &local_commitment_values,
         kernel.layered_circuit_input(),
         &mut transcript,
-        &local_mpi_config,
+        &mpi_config,
     );
 
     Some((transcript, challenge))
 }
 
-pub fn partition_challenge_and_location_for_pcs_mpi<F: FieldEngine>(
-    gkr_challenge: &ExpanderSingleVarChallenge<F>,
-    total_vals_len: usize,
+pub fn get_local_vals_multi_copies<'vals_life, F: Field>(
+    global_vals: &'vals_life [impl AsRef<[F]>],
+    is_broadcast: &[bool],
+    local_world_rank: usize,
+    n_copies: usize,
     parallel_count: usize,
-    is_broadcast: bool,
-) -> (ExpanderSingleVarChallenge<F>, Vec<F::ChallengeField>) {
-    let mut challenge = gkr_challenge.clone();
-    let zero = F::ChallengeField::ZERO;
-    if is_broadcast {
-        let n_vals_vars = total_vals_len.ilog2() as usize;
-        let component_idx_vars = challenge.rz[n_vals_vars..].to_vec();
-        challenge.rz.resize(n_vals_vars, zero);
-        challenge.r_mpi.clear();
-        (challenge, component_idx_vars)
-    } else {
-        let n_vals_vars = (total_vals_len / parallel_count).ilog2() as usize;
-        let component_idx_vars = challenge.rz[n_vals_vars..].to_vec();
-        challenge.rz.resize(n_vals_vars, zero);
+) -> Vec<Vec<&'vals_life [F]>> {
+    let parallel_indices = (0..n_copies)
+        .map(|i| local_world_rank * n_copies + i)
+        .collect::<Vec<_>>();
 
-        challenge.rz.extend_from_slice(&challenge.r_mpi);
-        challenge.r_mpi.clear();
-        (challenge, component_idx_vars)
-    }
+    parallel_indices
+        .iter()
+        .map(|&parallel_index| {
+            get_local_vals(global_vals, is_broadcast, parallel_index, parallel_count)
+        })
+        .collect::<Vec<_>>()
 }
 
-#[allow(clippy::too_many_arguments)]
-fn partition_single_gkr_claim_and_open_pcs_mpi<C: GKREngine>(
-    p_keys: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
-    commitments_values: &[impl AsRef<[SIMDField<C>]>],
-    commitments_state: &[&ExpanderCommitmentState<C::FieldConfig, C::PCSConfig>],
-    gkr_challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
-    is_broadcast: &[bool],
-    transcript: &mut C::TranscriptConfig,
-) {
-    let parallel_count = 1 << gkr_challenge.r_mpi.len();
-    for ((commitment_val, _state), ib) in commitments_values
+pub fn prove_gkr_with_local_vals_multi_copies<FBasic, FMulti, T>(
+    expander_circuit: &mut expander_circuit::Circuit<FMulti>,
+    prover_scratch: &mut sumcheck::ProverScratchPad<FMulti>,
+    local_commitment_values_multi_copies: &[Vec<impl AsRef<[FBasic::SimdCircuitField]>>],
+    partition_info: &[LayeredCircuitInputVec],
+    transcript: &mut T,
+    mpi_config: &MPIConfig,
+) -> ExpanderDualVarChallenge<FBasic>
+where
+    FBasic: FieldEngine,
+    FMulti:
+        FieldEngine<CircuitField = FBasic::CircuitField, ChallengeField = FBasic::ChallengeField>,
+    T: Transcript,
+{
+    let input_vals_multi_copies = local_commitment_values_multi_copies
         .iter()
-        .zip(commitments_state)
-        .zip(is_broadcast)
-    {
-        let val_len = commitment_val.as_ref().len();
-        let (challenge_for_pcs, _) = partition_challenge_and_location_for_pcs_mpi(
-            gkr_challenge,
-            val_len,
-            parallel_count,
-            *ib,
-        );
+        .map(|local_commitment_values| {
+            prepare_inputs_with_local_vals(
+                1 << expander_circuit.log_input_size(),
+                partition_info,
+                local_commitment_values,
+            )
+        })
+        .collect::<Vec<_>>();
 
-        pcs_local_open_impl::<C>(
-            commitment_val.as_ref(),
-            &challenge_for_pcs,
-            p_keys,
-            transcript,
-        );
+    let mut input_vals =
+        vec![FMulti::SimdCircuitField::ZERO; 1 << expander_circuit.log_input_size()];
+    for (i, vals) in input_vals.iter_mut().enumerate() {
+        let vals_unpacked = input_vals_multi_copies
+            .iter()
+            .flat_map(|v| v[i].unpack())
+            .collect::<Vec<_>>();
+        *vals = FMulti::SimdCircuitField::pack(&vals_unpacked);
+    }
+    expander_circuit.layers[0].input_vals = input_vals;
+
+    expander_circuit.fill_rnd_coefs(transcript);
+    expander_circuit.evaluate();
+    let (claimed_v, challenge) =
+        gkr::gkr_prove(expander_circuit, prover_scratch, transcript, mpi_config);
+    assert_eq!(claimed_v, FBasic::ChallengeField::from(0));
+
+    let n_simd_vars_basic = FBasic::SimdCircuitField::PACK_SIZE.ilog2() as usize;
+
+    ExpanderDualVarChallenge {
+        rz_0: challenge.rz_0,
+        rz_1: challenge.rz_1,
+        r_simd: challenge.r_simd[..n_simd_vars_basic].to_vec(),
+        r_mpi: {
+            let mut v = challenge.r_simd[n_simd_vars_basic..].to_vec();
+            v.extend(&challenge.r_mpi);
+            v
+        },
     }
 }

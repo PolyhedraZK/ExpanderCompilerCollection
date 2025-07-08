@@ -13,7 +13,7 @@ use crate::{
     frontend::Config,
     zkcuda::{
         kernel::{Kernel, LayeredCircuitInputVec},
-        proving_system::expander::structs::ExpanderProverSetup,
+        proving_system::expander::{self, structs::ExpanderProverSetup},
     },
 };
 
@@ -25,9 +25,12 @@ pub fn prepare_expander_circuit<F, ECCConfig>(
 ) -> (Circuit<F>, ProverScratchPad<F>)
 where
     F: FieldEngine,
-    ECCConfig: Config<FieldConfig = F>,
+    ECCConfig: Config,
+    ECCConfig::FieldConfig: FieldEngine<CircuitField = F::CircuitField>,
 {
-    let expander_circuit = kernel.layered_circuit().export_to_expander_flatten();
+    let mut expander_circuit = kernel.layered_circuit().export_to_expander().flatten();
+    expander_circuit.pre_process_gkr();
+
     let (max_num_input_var, max_num_output_var) = super::utils::max_n_vars(&expander_circuit);
     let prover_scratch =
         ProverScratchPad::<F>::new(max_num_input_var, max_num_output_var, mpi_world_size);

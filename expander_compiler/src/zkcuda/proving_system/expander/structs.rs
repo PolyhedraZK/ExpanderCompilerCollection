@@ -23,11 +23,8 @@ impl<F: FieldEngine, PCS: ExpanderPCS<F>> Clone for ExpanderCommitment<F, PCS> {
     }
 }
 
-impl<
-        F: FieldEngine,
-        PCS: ExpanderPCS<F, F::SimdCircuitField>,
-        ECCConfig: Config<FieldConfig = F>,
-    > Commitment<ECCConfig> for ExpanderCommitment<F::SimdCircuitField, F, PCS>
+impl<F: FieldEngine, PCS: ExpanderPCS<F>, ECCConfig: Config<FieldConfig = F>> Commitment<ECCConfig>
+    for ExpanderCommitment<F, PCS>
 {
     fn vals_len(&self) -> usize {
         self.vals_len

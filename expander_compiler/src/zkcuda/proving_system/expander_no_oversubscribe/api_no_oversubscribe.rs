@@ -12,6 +12,7 @@ use crate::zkcuda::proving_system::{CombinedProof, ParallelizedExpander, Proving
 
 use super::super::Expander;
 
+use arith::Fr;
 use gkr_engine::{FieldEngine, GKREngine};
 
 pub struct ExpanderNoOverSubscribe<C: GKREngine> {

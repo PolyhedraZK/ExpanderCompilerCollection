@@ -186,7 +186,7 @@ pub fn partition_challenge_and_location_for_pcs_mpi<F: FieldEngine>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn partition_single_gkr_claim_and_open_pcs_mpi<C: GKREngine>(
+pub fn partition_single_gkr_claim_and_open_pcs_mpi<C: GKREngine>(
     p_keys: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
     commitments_values: &[impl AsRef<[SIMDField<C>]>],
     commitments_state: &[&ExpanderCommitmentState<C::FieldConfig, C::PCSConfig>],
