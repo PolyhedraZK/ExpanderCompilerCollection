@@ -19,19 +19,16 @@ impl<C, ECCConfig> ServerFns<C, ECCConfig> for ExpanderPCSDefered<C>
 where
     C: gkr_engine::GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     fn setup_request_handler(
         global_mpi_config: &gkr_engine::MPIConfig<'static>,
         setup_file: Option<String>,
         computation_graph: &mut ComputationGraph<ECCConfig>,
         prover_setup: &mut ExpanderProverSetup<
-            <C as gkr_engine::GKREngine>::PCSField,
             <C as gkr_engine::GKREngine>::FieldConfig,
             <C as gkr_engine::GKREngine>::PCSConfig,
         >,
         verifier_setup: &mut ExpanderVerifierSetup<
-            <C as gkr_engine::GKREngine>::PCSField,
             <C as gkr_engine::GKREngine>::FieldConfig,
             <C as gkr_engine::GKREngine>::PCSConfig,
         >,
@@ -54,7 +51,6 @@ where
     fn prove_request_handler(
         global_mpi_config: &gkr_engine::MPIConfig<'static>,
         prover_setup: &ExpanderProverSetup<
-            <C as gkr_engine::GKREngine>::PCSField,
             <C as gkr_engine::GKREngine>::FieldConfig,
             <C as gkr_engine::GKREngine>::PCSConfig,
         >,

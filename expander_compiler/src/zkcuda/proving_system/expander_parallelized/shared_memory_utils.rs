@@ -87,15 +87,8 @@ impl SharedMemoryEngine {
 
 /// This impl block contains functions for reading/writing specific objects to shared memory.
 impl SharedMemoryEngine {
-    pub fn write_pcs_setup_to_shared_memory<
-        PCSField: Field,
-        F: FieldEngine,
-        PCS: ExpanderPCS<F, PCSField>,
-    >(
-        pcs_setup: &(
-            ExpanderProverSetup<PCSField, F, PCS>,
-            ExpanderVerifierSetup<PCSField, F, PCS>,
-        ),
+    pub fn write_pcs_setup_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
+        pcs_setup: &(ExpanderProverSetup<F, PCS>, ExpanderVerifierSetup<F, PCS>),
     ) {
         Self::write_object_to_shared_memory(
             pcs_setup,
@@ -104,14 +97,8 @@ impl SharedMemoryEngine {
         );
     }
 
-    pub fn read_pcs_setup_from_shared_memory<
-        PCSField: Field,
-        F: FieldEngine,
-        PCS: ExpanderPCS<F, PCSField>,
-    >() -> (
-        ExpanderProverSetup<PCSField, F, PCS>,
-        ExpanderVerifierSetup<PCSField, F, PCS>,
-    ) {
+    pub fn read_pcs_setup_from_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
+    ) -> (ExpanderProverSetup<F, PCS>, ExpanderVerifierSetup<F, PCS>) {
         Self::read_object_from_shared_memory("pcs_setup", 0)
     }
 
@@ -189,9 +176,7 @@ impl SharedMemoryEngine {
         ECCConfig: Config<FieldConfig = C::FieldConfig>,
     >(
         proof: &CombinedProof<ECCConfig, Expander<C>>,
-    ) where
-        C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-    {
+    ) {
         Self::write_object_to_shared_memory(proof, unsafe { &mut SHARED_MEMORY.proof }, "proof");
     }
 
@@ -199,9 +184,7 @@ impl SharedMemoryEngine {
         C: GKREngine,
         ECCConfig: Config<FieldConfig = C::FieldConfig>,
     >() -> CombinedProof<ECCConfig, Expander<C>>
-    where
-        C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-    {
+where {
         Self::read_object_from_shared_memory("proof", 0)
     }
 }

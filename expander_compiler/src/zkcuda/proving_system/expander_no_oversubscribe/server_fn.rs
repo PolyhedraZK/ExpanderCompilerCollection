@@ -17,17 +17,14 @@ impl<C, ECCConfig> ServerFns<C, ECCConfig> for ExpanderNoOverSubscribe<C>
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     fn setup_request_handler(
         global_mpi_config: &MPIConfig<'static>,
         setup_file: Option<String>,
         computation_graph: &mut ComputationGraph<ECCConfig>,
-        prover_setup: &mut ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-        verifier_setup: &mut ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-    ) where
-        C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-    {
+        prover_setup: &mut ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
+        verifier_setup: &mut ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>,
+    ) {
         ParallelizedExpander::<C>::setup_request_handler(
             global_mpi_config,
             setup_file,
@@ -39,14 +36,13 @@ where
 
     fn prove_request_handler(
         global_mpi_config: &MPIConfig<'static>,
-        prover_setup: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+        prover_setup: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
         computation_graph: &ComputationGraph<ECCConfig>,
         values: &[impl AsRef<[SIMDField<C>]>],
     ) -> Option<CombinedProof<ECCConfig, Expander<C>>>
     where
         C: GKREngine,
         ECCConfig: Config<FieldConfig = C::FieldConfig>,
-        C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
     {
         mpi_prove_impl(global_mpi_config, prover_setup, computation_graph, values)
     }
@@ -71,7 +67,6 @@ pub fn read_circuit<C, ECCConfig>(
 ) where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let computation_graph_bytes =
         std::fs::read(setup_file).expect("Failed to read computation graph from file");

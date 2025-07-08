@@ -25,17 +25,16 @@ use crate::{
 };
 
 pub fn verify_kernel<C, ECCConfig>(
-    verifier_setup: &ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    verifier_setup: &ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>,
     kernel: &Kernel<ECCConfig>,
     proof: &ExpanderProof,
-    commitments: &[&ExpanderCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
+    commitments: &[&ExpanderCommitment<C::FieldConfig, C::PCSConfig>],
     parallel_count: usize,
     is_broadcast: &[bool],
 ) -> bool
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let timer = Timer::new("verify", true);
     let mut expander_circuit = kernel.layered_circuit().export_to_expander_flatten();
@@ -83,10 +82,10 @@ where
 pub fn verify_pcs_opening_and_aggregation_mpi_impl<C, ECCConfig>(
     mut proof_reader: impl Read,
     kernel: &Kernel<ECCConfig>,
-    v_keys: &ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    v_keys: &ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>,
     challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
     y: &<C::FieldConfig as FieldEngine>::ChallengeField,
-    commitments: &[&ExpanderCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
+    commitments: &[&ExpanderCommitment<C::FieldConfig, C::PCSConfig>],
     is_broadcast: &[bool],
     parallel_count: usize,
     transcript: &mut C::TranscriptConfig,
@@ -94,7 +93,6 @@ pub fn verify_pcs_opening_and_aggregation_mpi_impl<C, ECCConfig>(
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let mut target_y = <C::FieldConfig as FieldEngine>::ChallengeField::ZERO;
     for ((input, commitment), ib) in kernel
@@ -104,9 +102,9 @@ where
         .zip(is_broadcast)
     {
         let val_len =
-            <ExpanderCommitment<C::PCSField, C::FieldConfig, C::PCSConfig> as Commitment<
-                ECCConfig,
-            >>::vals_len(commitment);
+            <ExpanderCommitment<C::FieldConfig, C::PCSConfig> as Commitment<ECCConfig>>::vals_len(
+                commitment,
+            );
         let (challenge_for_pcs, component_idx_vars) =
             partition_challenge_and_location_for_pcs_mpi(challenge, val_len, parallel_count, *ib);
 
@@ -142,11 +140,11 @@ where
 pub fn verify_pcs_opening_and_aggregation_mpi<C, ECCConfig>(
     mut proof_reader: impl Read,
     kernel: &Kernel<ECCConfig>,
-    v_keys: &ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    v_keys: &ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>,
     challenge: &ExpanderDualVarChallenge<C::FieldConfig>,
     claim_v0: <C::FieldConfig as FieldEngine>::ChallengeField,
     claim_v1: Option<<C::FieldConfig as FieldEngine>::ChallengeField>,
-    commitments: &[&ExpanderCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
+    commitments: &[&ExpanderCommitment<C::FieldConfig, C::PCSConfig>],
     is_broadcast: &[bool],
     parallel_count: usize,
     transcript: &mut C::TranscriptConfig,
@@ -154,7 +152,6 @@ pub fn verify_pcs_opening_and_aggregation_mpi<C, ECCConfig>(
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let challenges = if let Some(challenge_y) = challenge.challenge_y() {
         vec![challenge.challenge_x(), challenge_y]

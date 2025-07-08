@@ -2,10 +2,7 @@ use gkr_engine::{ExpanderPCS, FieldEngine, FieldType, GKREngine, PolynomialCommi
 use std::process::Command;
 
 #[allow(clippy::zombie_processes)]
-pub fn start_server<C: GKREngine>(binary: &str, max_parallel_count: usize, port_number: u16)
-where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-{
+pub fn start_server<C: GKREngine>(binary: &str, max_parallel_count: usize, port_number: u16) {
     let (overscribe, field_name, pcs_name) = parse_config::<C>(max_parallel_count);
 
     let cmd_str = format!(
@@ -16,7 +13,6 @@ where
 
 fn parse_config<C: GKREngine>(mpi_size: usize) -> (String, String, String)
 where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let oversubscription = if mpi_size > num_cpus::get_physical() {
         println!("Warning: Not enough cores available for the requested number of processes. Using oversubscription.");
@@ -34,7 +30,7 @@ where
         _ => panic!("Unsupported field type"),
     };
 
-    let pcs_name = match <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::PCS_TYPE {
+    let pcs_name = match <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::PCS_TYPE {
         PolynomialCommitmentType::Raw => "Raw",
         PolynomialCommitmentType::Hyrax => "Hyrax",
         PolynomialCommitmentType::KZG => "KZG",

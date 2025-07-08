@@ -79,13 +79,12 @@ pub fn client_launch_server_and_setup<C, ECCConfig>(
     computation_graph: &ComputationGraph<ECCConfig>,
     allow_oversubscribe: bool,
 ) -> (
-    ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-    ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
+    ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>,
 )
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let setup_timer = Timer::new("setup", true);
     println!("Starting server with binary: {server_binary}");
@@ -143,7 +142,6 @@ pub fn client_send_witness_and_prove<C, ECCConfig>(
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let timer = Timer::new("prove", true);
 

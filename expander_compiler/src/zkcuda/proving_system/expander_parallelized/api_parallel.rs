@@ -24,11 +24,9 @@ pub struct ParallelizedExpander<C: GKREngine> {
 
 impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSystem<ECCConfig>
     for ParallelizedExpander<C>
-where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    type ProverSetup = ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
-    type VerifierSetup = ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
+    type ProverSetup = ExpanderProverSetup<C::FieldConfig, C::PCSConfig>;
+    type VerifierSetup = ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>;
     type Proof = CombinedProof<ECCConfig, Expander<C>>;
 
     fn setup(

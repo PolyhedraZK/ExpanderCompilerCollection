@@ -35,13 +35,12 @@ impl<C, ECCConfig> KernelWiseProvingSystem<ECCConfig> for Expander<C>
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    type ProverSetup = ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
-    type VerifierSetup = ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
+    type ProverSetup = ExpanderProverSetup<C::FieldConfig, C::PCSConfig>;
+    type VerifierSetup = ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>;
     type Proof = ExpanderProof;
-    type Commitment = ExpanderCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>;
-    type CommitmentState = ExpanderCommitmentState<C::PCSField, C::FieldConfig, C::PCSConfig>;
+    type Commitment = ExpanderCommitment<C::FieldConfig, C::PCSConfig>;
+    type CommitmentState = ExpanderCommitmentState<C::FieldConfig, C::PCSConfig>;
 
     fn setup(
         computation_graph: &crate::zkcuda::context::ComputationGraph<ECCConfig>,
@@ -172,8 +171,6 @@ where
 // In this case, generate the implementation with a procedural macro seems to be the best solution.
 impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSystem<ECCConfig>
     for Expander<C>
-where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     type ProverSetup = <Self as KernelWiseProvingSystem<ECCConfig>>::ProverSetup;
     type VerifierSetup = <Self as KernelWiseProvingSystem<ECCConfig>>::VerifierSetup;

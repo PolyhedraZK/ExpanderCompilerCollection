@@ -20,13 +20,13 @@ impl<C, ECCConfig> ProvingSystem<ECCConfig> for ExpanderPCSDefered<C>
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-    <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Commitment:
-        AsRef<<C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Commitment>,
-{
-    type ProverSetup = ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
 
-    type VerifierSetup = ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
+    <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::Commitment:
+        AsRef<<C::PCSConfig as ExpanderPCS<C::FieldConfig>>::Commitment>,
+{
+    type ProverSetup = ExpanderProverSetup<C::FieldConfig, C::PCSConfig>;
+
+    type VerifierSetup = ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>;
 
     type Proof = CombinedProof<ECCConfig, Expander<C>>;
 

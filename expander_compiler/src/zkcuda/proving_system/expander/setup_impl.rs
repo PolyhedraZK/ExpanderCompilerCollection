@@ -16,13 +16,12 @@ use crate::{
 pub fn local_setup_impl<C, ECCConfig>(
     computation_graph: &ComputationGraph<ECCConfig>,
 ) -> (
-    ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-    ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
+    ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>,
 )
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let mut p_keys = HashMap::new();
     let mut v_keys = HashMap::new();

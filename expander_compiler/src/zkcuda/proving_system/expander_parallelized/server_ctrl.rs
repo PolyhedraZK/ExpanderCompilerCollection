@@ -50,38 +50,28 @@ pub static mut UNIVERSE: Option<Universe> = None;
 pub static mut GLOBAL_COMMUNICATOR: Option<SimpleCommunicator> = None;
 pub static mut LOCAL_COMMUNICATOR: Option<SimpleCommunicator> = None;
 
-pub struct ServerState<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>
-where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-{
+pub struct ServerState<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> {
     pub lock: Arc<Mutex<()>>, // For now we want to ensure that only one request is processed at a time
     pub global_mpi_config: MPIConfig<'static>,
     pub local_mpi_config: Option<MPIConfig<'static>>,
-    pub prover_setup: Arc<Mutex<ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>>>,
-    pub verifier_setup:
-        Arc<Mutex<ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>>>,
+    pub prover_setup: Arc<Mutex<ExpanderProverSetup<C::FieldConfig, C::PCSConfig>>>,
+    pub verifier_setup: Arc<Mutex<ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>>>,
     pub computation_graph: Arc<Mutex<ComputationGraph<ECCConfig>>>,
     pub shutdown_tx: Arc<Mutex<Option<oneshot::Sender<()>>>>,
 }
 
 unsafe impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> Send
     for ServerState<C, ECCConfig>
-where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
 }
 
 unsafe impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> Sync
     for ServerState<C, ECCConfig>
-where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
 }
 
 impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> Clone
     for ServerState<C, ECCConfig>
-where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     fn clone(&self) -> Self {
         ServerState {
@@ -103,7 +93,7 @@ pub async fn root_main<C, ECCConfig, S>(
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+
     S: ServerFns<C, ECCConfig>,
 {
     let _lock = state.lock.lock().await; // Ensure only one request is processed at a time
@@ -170,7 +160,7 @@ pub async fn worker_main<C, ECCConfig, S>(global_mpi_config: MPIConfig<'static>)
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+
     S: ServerFns<C, ECCConfig>,
 {
     let state = ServerState::<C, ECCConfig> {
@@ -266,7 +256,7 @@ pub async fn serve<C, ECCConfig, S>(port_number: String)
 where
     C: GKREngine + 'static,
     ECCConfig: Config<FieldConfig = C::FieldConfig> + 'static,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+
     S: ServerFns<C, ECCConfig> + 'static,
 {
     let global_mpi_config = unsafe {

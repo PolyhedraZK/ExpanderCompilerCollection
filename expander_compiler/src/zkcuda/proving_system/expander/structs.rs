@@ -9,14 +9,12 @@ use crate::{frontend::Config, zkcuda::proving_system::Commitment};
 /// A wrapper for the PCS Commitment that includes the length of the values committed to.
 #[allow(clippy::type_complexity)]
 #[derive(ExpSerde)]
-pub struct ExpanderCommitment<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> {
+pub struct ExpanderCommitment<F: FieldEngine, PCS: ExpanderPCS<F>> {
     pub vals_len: usize,
     pub commitment: PCS::Commitment,
 }
 
-impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
-    for ExpanderCommitment<PCSField, F, PCS>
-{
+impl<F: FieldEngine, PCS: ExpanderPCS<F>> Clone for ExpanderCommitment<F, PCS> {
     fn clone(&self) -> Self {
         Self {
             vals_len: self.vals_len,
@@ -40,13 +38,11 @@ impl<
 /// For Raw, KZG, and Hyrax, this is not needed, so the scratchpad can be empty.
 #[allow(clippy::type_complexity)]
 #[derive(ExpSerde)]
-pub struct ExpanderCommitmentState<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> {
+pub struct ExpanderCommitmentState<F: FieldEngine, PCS: ExpanderPCS<F>> {
     pub scratch: PCS::ScratchPad,
 }
 
-impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
-    for ExpanderCommitmentState<PCSField, F, PCS>
-{
+impl<F: FieldEngine, PCS: ExpanderPCS<F>> Clone for ExpanderCommitmentState<F, PCS> {
     fn clone(&self) -> Self {
         Self {
             scratch: self.scratch.clone(),
@@ -58,13 +54,11 @@ impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
 /// The keys are indexed by the length of values committed to, allowing for different setups based on the length of the values.
 #[allow(clippy::type_complexity)]
 #[derive(ExpSerde)]
-pub struct ExpanderProverSetup<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> {
+pub struct ExpanderProverSetup<F: FieldEngine, PCS: ExpanderPCS<F>> {
     pub p_keys: HashMap<usize, <PCS::SRS as StructuredReferenceString>::PKey>,
 }
 
-impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Default
-    for ExpanderProverSetup<PCSField, F, PCS>
-{
+impl<F: FieldEngine, PCS: ExpanderPCS<F>> Default for ExpanderProverSetup<F, PCS> {
     fn default() -> Self {
         Self {
             p_keys: HashMap::new(),
@@ -72,9 +66,7 @@ impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Default
     }
 }
 
-impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
-    for ExpanderProverSetup<PCSField, F, PCS>
-{
+impl<F: FieldEngine, PCS: ExpanderPCS<F>> Clone for ExpanderProverSetup<F, PCS> {
     fn clone(&self) -> Self {
         Self {
             p_keys: self.p_keys.clone(),
@@ -86,14 +78,12 @@ impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
 /// The keys are indexed by the length of values committed to, allowing for different setups based on the length of the values.
 #[allow(clippy::type_complexity)]
 #[derive(ExpSerde)]
-pub struct ExpanderVerifierSetup<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> {
+pub struct ExpanderVerifierSetup<F: FieldEngine, PCS: ExpanderPCS<F>> {
     pub v_keys: HashMap<usize, <PCS::SRS as StructuredReferenceString>::VKey>,
 }
 
 // implement default
-impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Default
-    for ExpanderVerifierSetup<PCSField, F, PCS>
-{
+impl<F: FieldEngine, PCS: ExpanderPCS<F>> Default for ExpanderVerifierSetup<F, PCS> {
     fn default() -> Self {
         Self {
             v_keys: HashMap::new(),
@@ -101,9 +91,7 @@ impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Default
     }
 }
 
-impl<PCSField: Field, F: FieldEngine, PCS: ExpanderPCS<F, PCSField>> Clone
-    for ExpanderVerifierSetup<PCSField, F, PCS>
-{
+impl<F: FieldEngine, PCS: ExpanderPCS<F>> Clone for ExpanderVerifierSetup<F, PCS> {
     fn clone(&self) -> Self {
         Self {
             v_keys: self.v_keys.clone(),

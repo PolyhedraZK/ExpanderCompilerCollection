@@ -158,18 +158,14 @@ pub fn partition_challenge_and_location_for_pcs_no_mpi<F: FieldEngine>(
 pub fn pcs_local_open_impl<C: GKREngine>(
     vals: &[<C::FieldConfig as FieldEngine>::SimdCircuitField],
     challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
-    p_keys: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    p_keys: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
     transcript: &mut C::TranscriptConfig,
-) where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-{
+) {
     assert_eq!(challenge.r_mpi.len(), 0);
 
     let val_len = vals.len();
-    let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
-        val_len.ilog2() as usize,
-        1,
-    );
+    let params =
+        <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(val_len.ilog2() as usize, 1);
     let p_key = p_keys.p_keys.get(&val_len).unwrap();
 
     let poly = RefMultiLinearPoly::from_ref(vals);
@@ -180,14 +176,14 @@ pub fn pcs_local_open_impl<C: GKREngine>(
     transcript.append_field_element(&v);
 
     transcript.lock_proof();
-    let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::open(
+    let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::open(
         &params,
         &MPIConfig::prover_new(None, None),
         p_key,
         &poly,
         challenge,
         transcript,
-        &<C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::init_scratch_pad(
+        &<C::PCSConfig as ExpanderPCS<C::FieldConfig>>::init_scratch_pad(
             &params,
             &MPIConfig::prover_new(None, None),
         ),
@@ -206,14 +202,12 @@ pub fn pcs_local_open_impl<C: GKREngine>(
 pub fn partition_gkr_claims_and_open_pcs_no_mpi_impl<C: GKREngine>(
     gkr_claim: &ExpanderSingleVarChallenge<C::FieldConfig>,
     global_vals: &[impl AsRef<[<C::FieldConfig as FieldEngine>::SimdCircuitField]>],
-    p_keys: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    p_keys: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
     is_broadcast: &[bool],
     parallel_index: usize,
     parallel_num: usize,
     transcript: &mut C::TranscriptConfig,
-) where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-{
+) {
     for (commitment_val, ib) in global_vals.iter().zip(is_broadcast) {
         let val_len = commitment_val.as_ref().len();
         let (challenge_for_pcs, _) = partition_challenge_and_location_for_pcs_no_mpi::<
@@ -237,14 +231,12 @@ pub fn partition_gkr_claims_and_open_pcs_no_mpi_impl<C: GKREngine>(
 pub fn partition_gkr_claims_and_open_pcs_no_mpi<C: GKREngine>(
     gkr_claim: &ExpanderDualVarChallenge<C::FieldConfig>,
     global_vals: &[impl AsRef<[<C::FieldConfig as FieldEngine>::SimdCircuitField]>],
-    p_keys: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    p_keys: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
     is_broadcast: &[bool],
     parallel_index: usize,
     parallel_num: usize,
     transcript: &mut C::TranscriptConfig,
-) where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-{
+) {
     let challenges = if let Some(challenge_y) = gkr_claim.challenge_y() {
         vec![gkr_claim.challenge_x(), challenge_y]
     } else {

@@ -28,14 +28,13 @@ use crate::{
 
 pub fn mpi_prove_impl<C, ECCConfig>(
     global_mpi_config: &MPIConfig<'static>,
-    prover_setup: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    prover_setup: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
     computation_graph: &ComputationGraph<ECCConfig>,
     values: &[impl AsRef<[SIMDField<C>]>],
 ) -> Option<CombinedProof<ECCConfig, Expander<C>>>
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let commit_timer = Timer::new("Commit to all input", global_mpi_config.is_root());
     let (commitments, states) = if global_mpi_config.is_root() {
@@ -188,15 +187,13 @@ pub fn partition_challenge_and_location_for_pcs_mpi<F: FieldEngine>(
 
 #[allow(clippy::too_many_arguments)]
 fn partition_single_gkr_claim_and_open_pcs_mpi<C: GKREngine>(
-    p_keys: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    p_keys: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
     commitments_values: &[impl AsRef<[SIMDField<C>]>],
-    commitments_state: &[&ExpanderCommitmentState<C::PCSField, C::FieldConfig, C::PCSConfig>],
+    commitments_state: &[&ExpanderCommitmentState<C::FieldConfig, C::PCSConfig>],
     gkr_challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
     is_broadcast: &[bool],
     transcript: &mut C::TranscriptConfig,
-) where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-{
+) {
     let parallel_count = 1 << gkr_challenge.r_mpi.len();
     for ((commitment_val, _state), ib) in commitments_values
         .iter()

@@ -28,16 +28,15 @@ use crate::{
 };
 
 pub fn pad_vals_and_commit<C, ECCConfig>(
-    prover_setup: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    prover_setup: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
     vals: &[SIMDField<C>],
 ) -> (
-    ExpanderCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>,
-    ExpanderCommitmentState<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    ExpanderCommitment<C::FieldConfig, C::PCSConfig>,
+    ExpanderCommitmentState<C::FieldConfig, C::PCSConfig>,
 )
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     assert_eq!(prover_setup.p_keys.len(), 1);
     let len_to_commit = prover_setup.p_keys.keys().next().cloned().unwrap();
@@ -56,14 +55,13 @@ where
 }
 
 pub fn open_defered_pcs<C, ECCConfig>(
-    prover_setup: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    prover_setup: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
     vals: &[&[SIMDField<C>]],
     challenges: &[ExpanderSingleVarChallenge<C::FieldConfig>],
 ) -> ExpanderProof
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     // TODO: Efficiency
     let polys: Vec<_> = vals
@@ -74,26 +72,23 @@ where
     // TODO: Soundness
     let mut transcript = C::TranscriptConfig::new();
     let max_length = prover_setup.p_keys.keys().max().cloned().unwrap_or(0);
-    let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
-        max_length.ilog2() as usize,
-        1,
-    );
-    let scratch_pad = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::init_scratch_pad(
+    let params =
+        <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(max_length.ilog2() as usize, 1);
+    let scratch_pad = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::init_scratch_pad(
         &params,
         &MPIConfig::prover_new(None, None),
     );
 
     transcript.lock_proof();
-    let (vals, opening) =
-        <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::multi_points_batch_open(
-            &params,
-            &MPIConfig::prover_new(None, None),
-            prover_setup.p_keys.get(&max_length).unwrap(),
-            &polys,
-            challenges,
-            &scratch_pad,
-            &mut transcript,
-        );
+    let (vals, opening) = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::multi_points_batch_open(
+        &params,
+        &MPIConfig::prover_new(None, None),
+        prover_setup.p_keys.get(&max_length).unwrap(),
+        &polys,
+        challenges,
+        &scratch_pad,
+        &mut transcript,
+    );
     transcript.unlock_proof();
 
     let mut bytes = vec![];
@@ -107,14 +102,13 @@ where
 
 pub fn mpi_prove_with_pcs_defered<C, ECCConfig>(
     global_mpi_config: &MPIConfig<'static>,
-    prover_setup: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    prover_setup: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
     computation_graph: &ComputationGraph<ECCConfig>,
     values: &[impl AsRef<[SIMDField<C>]>],
 ) -> Option<CombinedProof<ECCConfig, Expander<C>>>
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let commit_timer = Timer::new("Commit to all input", global_mpi_config.is_root());
     let (commitments, _states) = if global_mpi_config.is_root() {
@@ -206,7 +200,6 @@ pub fn extract_pcs_claims<'a, C: GKREngine>(
     Vec<ExpanderSingleVarChallenge<C::FieldConfig>>,
 )
 where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let mut commitment_values_rt = vec![];
     let mut challenges = vec![];

@@ -1,8 +1,8 @@
-use arith::Field;
+use arith::{Field, Fr};
 use expander_utils::timer::Timer;
 use gkr_engine::{
-    ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig,
-    MPIEngine, Transcript,
+    BN254ConfigXN, ExpanderDualVarChallenge, ExpanderSingleVarChallenge, FieldEngine, FieldType,
+    GKREngine, MPIConfig, MPIEngine, Transcript,
 };
 
 use crate::{
@@ -10,28 +10,28 @@ use crate::{
     utils::misc::next_power_of_two,
     zkcuda::{
         context::ComputationGraph,
+        kernel::Kernel,
         proving_system::{
             expander::{
                 commit_impl::local_commit_impl,
                 prove_impl::pcs_local_open_impl,
                 structs::{ExpanderCommitmentState, ExpanderProof, ExpanderProverSetup},
             },
-            expander_parallelized::prove_impl::prove_kernel_gkr,
+            expander_parallelized::server_ctrl::generate_local_mpi_config,
             CombinedProof, Expander,
         },
     },
 };
 
-pub fn mpi_prove_impl<C, ECCConfig>(
+pub fn mpi_prove_no_oversubscribe_impl<C, ECCConfig>(
     global_mpi_config: &MPIConfig<'static>,
-    prover_setup: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    prover_setup: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
     computation_graph: &ComputationGraph<ECCConfig>,
     values: &[impl AsRef<[SIMDField<C>]>],
 ) -> Option<CombinedProof<ECCConfig, Expander<C>>>
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let commit_timer = Timer::new("Commit to all input", global_mpi_config.is_root());
     let (commitments, states) = if global_mpi_config.is_root() {
@@ -58,7 +58,11 @@ where
 
             let single_kernel_gkr_timer =
                 Timer::new("small gkr kernel", global_mpi_config.is_root());
-            let gkr_end_state = prove_kernel_gkr::<C::FieldConfig, C::TranscriptConfig, ECCConfig>(
+            let gkr_end_state = prove_kernel_gkr_no_oversubscribe::<
+                C::FieldConfig,
+                C::TranscriptConfig,
+                ECCConfig,
+            >(
                 global_mpi_config,
                 &computation_graph.kernels()[template.kernel_id()],
                 &commitment_values,
@@ -113,6 +117,156 @@ where
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+pub fn prove_kernel_gkr_no_oversubscribe<F, T, ECCConfig>(
+    mpi_config: &MPIConfig<'static>,
+    kernel: &Kernel<ECCConfig>,
+    commitments_values: &[&[F::SimdCircuitField]],
+    parallel_count: usize,
+    is_broadcast: &[bool],
+) -> Option<(T, ExpanderDualVarChallenge<F>)>
+where
+    F: FieldEngine<CircuitField = Fr, ChallengeField = Fr>,
+    T: Transcript,
+    ECCConfig: Config<FieldConfig = F>,
+{
+    let local_mpi_config = generate_local_mpi_config(mpi_config, parallel_count);
+
+    local_mpi_config.as_ref()?;
+
+    let local_mpi_config = local_mpi_config.unwrap();
+    let local_world_size = local_mpi_config.world_size();
+    let local_world_rank = local_mpi_config.world_rank();
+
+    let n_local_copies = parallel_count / local_world_size;
+    match n_local_copies {
+        1 => prove_kernel_gkr_internal::<F, F, T, ECCConfig>(
+            mpi_config,
+            kernel,
+            commitments_values,
+            parallel_count,
+            is_broadcast,
+        ),
+        2 => prove_kernel_gkr_internal::<F, BN254ConfigXN<2>, T, ECCConfig>(
+            mpi_config,
+            kernel,
+            commitments_values,
+            parallel_count,
+            is_broadcast,
+        ),
+        4 => prove_kernel_gkr_internal::<F, BN254ConfigXN<4>, T, ECCConfig>(
+            mpi_config,
+            kernel,
+            commitments_values,
+            parallel_count,
+            is_broadcast,
+        ),
+        8 => prove_kernel_gkr_internal::<F, BN254ConfigXN<8>, T, ECCConfig>(
+            mpi_config,
+            kernel,
+            commitments_values,
+            parallel_count,
+            is_broadcast,
+        ),
+        16 => prove_kernel_gkr_internal::<F, BN254ConfigXN<16>, T, ECCConfig>(
+            mpi_config,
+            kernel,
+            commitments_values,
+            parallel_count,
+            is_broadcast,
+        ),
+        32 => prove_kernel_gkr_internal::<F, BN254ConfigXN<32>, T, ECCConfig>(
+            mpi_config,
+            kernel,
+            commitments_values,
+            parallel_count,
+            is_broadcast,
+        ),
+        64 => prove_kernel_gkr_internal::<F, BN254ConfigXN<64>, T, ECCConfig>(
+            mpi_config,
+            kernel,
+            commitments_values,
+            parallel_count,
+            is_broadcast,
+        ),
+        128 => prove_kernel_gkr_internal::<F, BN254ConfigXN<128>, T, ECCConfig>(
+            mpi_config,
+            kernel,
+            commitments_values,
+            parallel_count,
+            is_broadcast,
+        ),
+        256 => prove_kernel_gkr_internal::<F, BN254ConfigXN<256>, T, ECCConfig>(
+            mpi_config,
+            kernel,
+            commitments_values,
+            parallel_count,
+            is_broadcast,
+        ),
+        512 => prove_kernel_gkr_internal::<F, BN254ConfigXN<512>, T, ECCConfig>(
+            mpi_config,
+            kernel,
+            commitments_values,
+            parallel_count,
+            is_broadcast,
+        ),
+        1024 => prove_kernel_gkr_internal::<F, BN254ConfigXN<1024>, T, ECCConfig>(
+            mpi_config,
+            kernel,
+            commitments_values,
+            parallel_count,
+            is_broadcast,
+        ),
+        2048 => prove_kernel_gkr_internal::<F, BN254ConfigXN<2048>, T, ECCConfig>(
+            mpi_config,
+            kernel,
+            commitments_values,
+            parallel_count,
+            is_broadcast,
+        ),
+        _ => {
+            panic!("Unsupported parallel count: {}", parallel_count);
+        }
+    }
+}
+
+pub fn prove_kernel_gkr_internal<FBasic, FMulti, T, ECCConfig>(
+    mpi_config: &MPIConfig<'static>,
+    kernel: &Kernel<ECCConfig>,
+    commitments_values: &[&[FBasic::SimdCircuitField]],
+    parallel_count: usize,
+    is_broadcast: &[bool],
+) -> Option<(T, ExpanderDualVarChallenge<FBasic>)>
+where
+    FBasic: FieldEngine,
+    FMulti:
+        FieldEngine<CircuitField = FBasic::CircuitField, ChallengeField = FBasic::ChallengeField>,
+    T: Transcript,
+    ECCConfig: Config<FieldConfig = FBasic>,
+{
+    let local_commitment_values = get_local_vals(
+        commitments_values,
+        is_broadcast,
+        local_world_rank,
+        local_world_size,
+    );
+
+    let (mut expander_circuit, mut prover_scratch) =
+        prepare_expander_circuit::<F, ECCConfig>(kernel, local_world_size);
+
+    let mut transcript = T::new();
+    let challenge = prove_gkr_with_local_vals::<F, T>(
+        &mut expander_circuit,
+        &mut prover_scratch,
+        &local_commitment_values,
+        kernel.layered_circuit_input(),
+        &mut transcript,
+        &local_mpi_config,
+    );
+
+    Some((transcript, challenge))
+}
+
 pub fn partition_challenge_and_location_for_pcs_mpi<F: FieldEngine>(
     gkr_challenge: &ExpanderSingleVarChallenge<F>,
     total_vals_len: usize,
@@ -140,15 +294,13 @@ pub fn partition_challenge_and_location_for_pcs_mpi<F: FieldEngine>(
 
 #[allow(clippy::too_many_arguments)]
 fn partition_single_gkr_claim_and_open_pcs_mpi<C: GKREngine>(
-    p_keys: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    p_keys: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
     commitments_values: &[impl AsRef<[SIMDField<C>]>],
-    commitments_state: &[&ExpanderCommitmentState<C::PCSField, C::FieldConfig, C::PCSConfig>],
+    commitments_state: &[&ExpanderCommitmentState<C::FieldConfig, C::PCSConfig>],
     gkr_challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
     is_broadcast: &[bool],
     transcript: &mut C::TranscriptConfig,
-) where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-{
+) {
     let parallel_count = 1 << gkr_challenge.r_mpi.len();
     for ((commitment_val, _state), ib) in commitments_values
         .iter()

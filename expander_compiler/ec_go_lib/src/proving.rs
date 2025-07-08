@@ -20,11 +20,7 @@ use super::{match_config_id, ByteArray, Config};
 fn prove_circuit_file_inner<C: config::Config>(
     circuit_filename: &str,
     witness: &[u8],
-) -> Result<Vec<u8>, String>
-where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-    C::PCSField: SimdField<Scalar = <C::FieldConfig as FieldEngine>::CircuitField>,
-{
+) -> Result<Vec<u8>, String> {
     // (None, None) means single core execution
     let mpi_config = MPIConfig::prover_new(None, None);
 
