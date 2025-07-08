@@ -1,8 +1,8 @@
 use arith::{Field, Fr, SimdField};
 use expander_utils::timer::Timer;
 use gkr_engine::{
-    BN254ConfigXN, ExpanderDualVarChallenge, FieldEngine,
-    GKREngine, MPIConfig, MPIEngine, Transcript,
+    BN254ConfigXN, ExpanderDualVarChallenge, FieldEngine, GKREngine, MPIConfig, MPIEngine,
+    Transcript,
 };
 
 use crate::{
@@ -15,8 +15,7 @@ use crate::{
             expander::{
                 commit_impl::local_commit_impl,
                 prove_impl::{
-                    get_local_vals, prepare_expander_circuit,
-                    prepare_inputs_with_local_vals,
+                    get_local_vals, prepare_expander_circuit, prepare_inputs_with_local_vals,
                 },
                 structs::{ExpanderProof, ExpanderProverSetup},
             },

@@ -2,7 +2,6 @@ use arith::Field;
 use arith::SimdField;
 use expander_binary::executor;
 use expander_compiler::frontend::*;
-use gkr_engine::FieldEngine;
 use gkr_engine::MPIConfig;
 use rand::SeedableRng;
 

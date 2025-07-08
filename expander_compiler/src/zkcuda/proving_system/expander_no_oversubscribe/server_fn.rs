@@ -1,7 +1,5 @@
 use arith::Fr;
-use gkr_engine::{
-    FieldEngine, GKREngine, MPIConfig, MPIEngine,
-};
+use gkr_engine::{FieldEngine, GKREngine, MPIConfig, MPIEngine};
 use serdes::ExpSerde;
 
 use crate::{
