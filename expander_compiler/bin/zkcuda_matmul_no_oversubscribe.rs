@@ -1,9 +1,6 @@
 #![allow(unused)]
 mod zkcuda_matmul;
-use expander_compiler::{
-    frontend::BN254Config,
-    zkcuda::proving_system::ExpanderNoOverSubscribe,
-};
+use expander_compiler::{frontend::BN254Config, zkcuda::proving_system::ExpanderNoOverSubscribe};
 use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
 use zkcuda_matmul::zkcuda_matmul;
 
