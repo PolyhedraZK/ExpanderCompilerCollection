@@ -1,4 +1,4 @@
-use gkr_engine::{GKREngine, MPIConfig, MPIEngine};
+use gkr_engine::{FieldEngine, GKREngine, MPIConfig, MPIEngine, MPISharedMemory};
 use serdes::ExpSerde;
 
 use crate::{
@@ -10,7 +10,10 @@ use crate::{
                 setup_impl::local_setup_impl,
                 structs::{ExpanderProverSetup, ExpanderVerifierSetup},
             },
-            expander_parallelized::prove_impl::mpi_prove_impl,
+            expander_parallelized::{
+                prove_impl::mpi_prove_impl, server_ctrl::SharedMemoryWINWrapper,
+                shared_memory_utils::SharedMemoryEngine,
+            },
             CombinedProof, Expander, ParallelizedExpander,
         },
     },
@@ -27,6 +30,7 @@ where
         computation_graph: &mut ComputationGraph<ECCConfig>,
         prover_setup: &mut ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
         verifier_setup: &mut ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>,
+        mpi_win: &mut Option<SharedMemoryWINWrapper>,
     );
 
     fn prove_request_handler(
@@ -35,6 +39,51 @@ where
         computation_graph: &ComputationGraph<ECCConfig>,
         values: &[impl AsRef<[SIMDField<C>]>],
     ) -> Option<CombinedProof<ECCConfig, Expander<C>>>;
+
+    fn setup_shared_witness(
+        global_mpi_config: &MPIConfig<'static>,
+        witness_target: &mut Vec<Vec<C::PCSField>>,
+        mpi_shared_memory_win: &mut Option<SharedMemoryWINWrapper>,
+    ) {
+        // dispose of the previous shared memory if it exists
+        while let Some(w) = witness_target.pop() {
+            w.discard_control_of_shared_mem();
+        }
+        assert!(witness_target.is_empty());
+
+        if let Some(win_wrapper) = mpi_shared_memory_win {
+            global_mpi_config.free_shared_mem(&mut win_wrapper.win);
+        }
+
+        // Allocate new shared memory for the witness
+        let (witness_v, wt_shared_memory_win) =
+            SharedMemoryEngine::read_shared_witness_from_shared_memory::<C::FieldConfig>(
+                global_mpi_config,
+            );
+        *witness_target = witness_v;
+        *mpi_shared_memory_win = Some(wt_shared_memory_win);
+    }
+
+    fn shared_memory_clean_up(
+        global_mpi_config: &MPIConfig<'static>,
+        computation_graph: ComputationGraph<ECCConfig>,
+        witness: Vec<Vec<C::PCSField>>,
+        cg_mpi_win: &mut Option<SharedMemoryWINWrapper>,
+        wt_mpi_win: &mut Option<SharedMemoryWINWrapper>,
+    ) {
+        computation_graph.discard_control_of_shared_mem();
+        witness.into_iter().for_each(|w| {
+            w.discard_control_of_shared_mem();
+        });
+
+        if let Some(win_wrapper) = cg_mpi_win {
+            global_mpi_config.free_shared_mem(&mut win_wrapper.win);
+        }
+
+        if let Some(win_wrapper) = wt_mpi_win {
+            global_mpi_config.free_shared_mem(&mut win_wrapper.win);
+        }
+    }
 }
 
 impl<C, ECCConfig> ServerFns<C, ECCConfig> for ParallelizedExpander<C>
@@ -48,7 +97,10 @@ where
         computation_graph: &mut ComputationGraph<ECCConfig>,
         prover_setup: &mut ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
         verifier_setup: &mut ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>,
-    ) {
+        mpi_win: &mut Option<SharedMemoryWINWrapper>,
+    ) where
+        C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+    {
         let setup_file = if global_mpi_config.is_root() {
             let setup_file = setup_file.expect("Setup file path must be provided");
             broadcast_string(global_mpi_config, Some(setup_file))
@@ -57,7 +109,7 @@ where
             broadcast_string(global_mpi_config, None)
         };
 
-        read_circuit::<C, ECCConfig>(global_mpi_config, setup_file, computation_graph);
+        read_circuit::<C, ECCConfig>(global_mpi_config, setup_file, computation_graph, mpi_win);
         if global_mpi_config.is_root() {
             (*prover_setup, *verifier_setup) = local_setup_impl::<C, ECCConfig>(computation_graph);
         }
@@ -90,17 +142,27 @@ pub fn broadcast_string(global_mpi_config: &MPIConfig<'static>, string: Option<S
 }
 
 pub fn read_circuit<C, ECCConfig>(
-    _global_mpi_config: &MPIConfig<'static>,
+    global_mpi_config: &MPIConfig<'static>,
     setup_file: String,
     computation_graph: &mut ComputationGraph<ECCConfig>,
+    mpi_win: &mut Option<SharedMemoryWINWrapper>,
 ) where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
 {
     let computation_graph_bytes =
         std::fs::read(setup_file).expect("Failed to read computation graph from file");
-    *computation_graph = ComputationGraph::<ECCConfig>::deserialize_from(std::io::Cursor::new(
-        computation_graph_bytes,
-    ))
-    .expect("Failed to deserialize computation graph");
+
+    let (cg, win) = if global_mpi_config.is_root() {
+        let cg = ComputationGraph::<ECCConfig>::deserialize_from(std::io::Cursor::new(
+            computation_graph_bytes,
+        ))
+        .expect("Failed to deserialize computation graph from file");
+        global_mpi_config.consume_obj_and_create_shared(Some(cg))
+    } else {
+        global_mpi_config.consume_obj_and_create_shared(None)
+    };
+
+    *computation_graph = cg;
+    mpi_win.replace(SharedMemoryWINWrapper { win });
 }

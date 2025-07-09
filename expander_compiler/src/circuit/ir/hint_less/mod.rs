@@ -90,7 +90,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
         match self {
             Instruction::LinComb(lc) => Instruction::LinComb(lc.replace_vars(f)),
             Instruction::Mul(inputs) => Instruction::Mul(inputs.iter().map(|i| f(*i)).collect()),
-            Instruction::ConstantLike(coef) => Instruction::ConstantLike(coef.clone()),
+            Instruction::ConstantLike(coef) => Instruction::ConstantLike(*coef),
             Instruction::SubCircuitCall {
                 sub_circuit_id,
                 inputs,

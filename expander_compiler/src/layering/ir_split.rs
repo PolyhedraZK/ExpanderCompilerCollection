@@ -110,9 +110,7 @@ impl<'a, C: Config> SplitContext<'a, C> {
         for insn in circuit.instructions.iter() {
             match insn {
                 Instruction::ConstantLike { value } => {
-                    new_insns.push(Instruction::ConstantLike {
-                        value: value.clone(),
-                    });
+                    new_insns.push(Instruction::ConstantLike { value: *value });
                     var_max += 1;
                     var_new_id.push(var_max);
                     new_var_layers.push(1);
@@ -370,9 +368,7 @@ impl<'a, C: Config> SplitContext<'a, C> {
                         cur_var_max += 1;
                         if start_layer == 0 {
                             local_var_max += 1;
-                            new_insns.push(Instruction::ConstantLike {
-                                value: value.clone(),
-                            });
+                            new_insns.push(Instruction::ConstantLike { value: *value });
                             var_local_id[cur_var_max] = local_var_max;
                         }
                     }

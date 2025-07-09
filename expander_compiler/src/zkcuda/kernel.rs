@@ -54,9 +54,9 @@ impl<C: Config> KernelPrimitive<C> {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, ExpSerde)]
 pub struct Kernel<C: Config> {
-    hint_solver: Option<ir::hint_normalized::RootCircuit<C>>,
-    layered_circuit: LayeredCircuit<C, NormalInputType>,
-    layered_circuit_input: Vec<LayeredCircuitInputVec>,
+    pub hint_solver: Option<ir::hint_normalized::RootCircuit<C>>,
+    pub layered_circuit: LayeredCircuit<C, NormalInputType>,
+    pub layered_circuit_input: Vec<LayeredCircuitInputVec>,
 }
 
 impl<C: Config> Kernel<C> {
@@ -78,7 +78,7 @@ pub struct IOVecSpec {
     pub is_output: bool,
 }
 
-#[derive(Default, Debug, Clone, Hash, PartialEq, Eq, ExpSerde)]
+#[derive(Default, Debug, Copy, Clone, Hash, PartialEq, Eq, ExpSerde)]
 pub struct LayeredCircuitInputVec {
     pub len: usize,
     pub offset: usize,

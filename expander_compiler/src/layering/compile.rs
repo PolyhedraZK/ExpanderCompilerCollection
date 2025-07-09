@@ -284,8 +284,7 @@ impl<'a, C: Config, I: InputType> CompileContext<'a, C, I> {
                 Instruction::ConstantLike { value } => {
                     ic.min_layer[cur_var_idx] = 1;
                     q0.push(cur_var_idx);
-                    ic.constant_like_variables
-                        .insert(cur_var_idx, value.clone());
+                    ic.constant_like_variables.insert(cur_var_idx, *value);
                     cur_var_idx += 1;
                 }
             }

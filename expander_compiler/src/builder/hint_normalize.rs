@@ -195,7 +195,7 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                 inputs: inputs.clone(),
                 num_outputs: *num_outputs,
             },
-            ConstantLike(coef) => ir::hint_normalized::Instruction::ConstantLike(coef.clone()),
+            ConstantLike(coef) => ir::hint_normalized::Instruction::ConstantLike(*coef),
             SubCircuitCall {
                 sub_circuit_id,
                 inputs,

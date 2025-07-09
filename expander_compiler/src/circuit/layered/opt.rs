@@ -115,7 +115,7 @@ impl<C: Config, I: InputType, const INPUT_NUM: usize> GateOpt<C, I> for Gate<C, 
             && other.coef.is_constant()
     }
     fn get_coef(&self) -> Coef<C> {
-        self.coef.clone()
+        self.coef
     }
     fn add_offset(&self, in_offset: &I::InputUsize, out_offset: usize) -> Self {
         let mut inputs = self.inputs;
@@ -123,7 +123,7 @@ impl<C: Config, I: InputType, const INPUT_NUM: usize> GateOpt<C, I> for Gate<C, 
             input.set_offset(input.offset() + in_offset.get(input.layer()));
         }
         let output = self.output + out_offset;
-        let coef = self.coef.clone();
+        let coef = self.coef;
         Gate {
             inputs,
             output,
@@ -144,7 +144,7 @@ impl<C: Config, I: InputType> GateOpt<C, I> for GateCustom<C, I> {
             && other.coef.is_constant()
     }
     fn get_coef(&self) -> Coef<C> {
-        self.coef.clone()
+        self.coef
     }
     fn add_offset(&self, in_offset: &I::InputUsize, out_offset: usize) -> Self {
         let mut inputs = self.inputs.clone();
@@ -152,7 +152,7 @@ impl<C: Config, I: InputType> GateOpt<C, I> for GateCustom<C, I> {
             input.set_offset(input.offset() + in_offset.get(input.layer()));
         }
         let output = self.output + out_offset;
-        let coef = self.coef.clone();
+        let coef = self.coef;
         GateCustom {
             gate_type: self.gate_type,
             inputs,
