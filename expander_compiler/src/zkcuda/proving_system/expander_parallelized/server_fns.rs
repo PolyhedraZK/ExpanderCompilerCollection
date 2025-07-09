@@ -42,7 +42,7 @@ where
 
     fn setup_shared_witness(
         global_mpi_config: &MPIConfig<'static>,
-        witness_target: &mut Vec<Vec<C::PCSField>>,
+        witness_target: &mut Vec<Vec<SIMDField<C>>>,
         mpi_shared_memory_win: &mut Option<SharedMemoryWINWrapper>,
     ) {
         // dispose of the previous shared memory if it exists
@@ -67,7 +67,7 @@ where
     fn shared_memory_clean_up(
         global_mpi_config: &MPIConfig<'static>,
         computation_graph: ComputationGraph<ECCConfig>,
-        witness: Vec<Vec<C::PCSField>>,
+        witness: Vec<Vec<SIMDField<C>>>,
         cg_mpi_win: &mut Option<SharedMemoryWINWrapper>,
         wt_mpi_win: &mut Option<SharedMemoryWINWrapper>,
     ) {
@@ -98,8 +98,7 @@ where
         prover_setup: &mut ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
         verifier_setup: &mut ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>,
         mpi_win: &mut Option<SharedMemoryWINWrapper>,
-    ) where
-        C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+    )
     {
         let setup_file = if global_mpi_config.is_root() {
             let setup_file = setup_file.expect("Setup file path must be provided");

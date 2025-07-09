@@ -9,7 +9,7 @@ use crate::{
         proving_system::{
             expander::structs::{ExpanderProverSetup, ExpanderVerifierSetup},
             expander_no_oversubscribe::prove_impl::mpi_prove_no_oversubscribe_impl,
-            expander_parallelized::server_fns::ServerFns,
+            expander_parallelized::{server_ctrl::SharedMemoryWINWrapper, server_fns::ServerFns},
             CombinedProof, Expander, ExpanderNoOverSubscribe, ParallelizedExpander,
         },
     },
@@ -27,6 +27,7 @@ where
         computation_graph: &mut ComputationGraph<ECCConfig>,
         prover_setup: &mut ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
         verifier_setup: &mut ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>,
+        mpi_win: &mut Option<SharedMemoryWINWrapper>,
     ) {
         ParallelizedExpander::<C>::setup_request_handler(
             global_mpi_config,
@@ -34,6 +35,7 @@ where
             computation_graph,
             prover_setup,
             verifier_setup,
+            mpi_win,
         );
     }
 

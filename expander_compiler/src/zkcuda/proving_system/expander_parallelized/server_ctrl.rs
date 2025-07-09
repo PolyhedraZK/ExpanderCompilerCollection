@@ -16,7 +16,7 @@ use mpi::ffi::MPI_Win;
 use mpi::topology::SimpleCommunicator;
 use mpi::traits::Communicator;
 
-use crate::frontend::Config;
+use crate::frontend::{Config, SIMDField};
 
 use axum::{extract::State, Json};
 use gkr_engine::{GKREngine, MPIConfig, MPIEngine};
@@ -62,11 +62,10 @@ pub struct ServerState<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldCon
     pub local_mpi_config: Option<MPIConfig<'static>>,
 
     pub prover_setup: Arc<Mutex<ExpanderProverSetup<C::FieldConfig, C::PCSConfig>>>,
-    pub verifier_setup:
-        Arc<Mutex<ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>>>,
+    pub verifier_setup: Arc<Mutex<ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>>>,
 
     pub computation_graph: Arc<Mutex<ComputationGraph<ECCConfig>>>,
-    pub witness: Arc<Mutex<Vec<Vec<C::PCSField>>>>,
+    pub witness: Arc<Mutex<Vec<Vec<SIMDField<C>>>>>,
 
     pub cg_shared_memory_win: Arc<Mutex<Option<SharedMemoryWINWrapper>>>, // Shared memory for computation graph
     pub wt_shared_memory_win: Arc<Mutex<Option<SharedMemoryWINWrapper>>>, // Shared memory for witness
