@@ -1,4 +1,4 @@
-use gkr_engine::{FieldEngine, GKREngine, MPIEngine};
+use gkr_engine::{GKREngine, MPIEngine};
 
 use crate::{
     frontend::Config,

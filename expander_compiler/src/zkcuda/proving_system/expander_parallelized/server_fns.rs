@@ -1,4 +1,4 @@
-use gkr_engine::{FieldEngine, GKREngine, MPIConfig, MPIEngine, MPISharedMemory};
+use gkr_engine::{GKREngine, MPIConfig, MPIEngine, MPISharedMemory};
 use serdes::ExpSerde;
 
 use crate::{
@@ -98,8 +98,7 @@ where
         prover_setup: &mut ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
         verifier_setup: &mut ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>,
         mpi_win: &mut Option<SharedMemoryWINWrapper>,
-    )
-    {
+    ) {
         let setup_file = if global_mpi_config.is_root() {
             let setup_file = setup_file.expect("Setup file path must be provided");
             broadcast_string(global_mpi_config, Some(setup_file))
