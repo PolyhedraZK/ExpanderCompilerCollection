@@ -72,3 +72,7 @@ path = "bin/zkcuda_matmul.rs"
 [[bin]]
 name = "zkcuda_matmul_pcs_defered"
 path = "bin/zkcuda_matmul_pcs_defered.rs"
+
+[[bin]]
+name = "zkcuda_matmul_no_oversubscribe"
+path = "bin/zkcuda_matmul_no_oversubscribe.rs"
