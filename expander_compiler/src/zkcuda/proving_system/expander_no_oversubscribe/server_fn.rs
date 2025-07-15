@@ -13,7 +13,7 @@ use crate::{
                 server_fns::{broadcast_string, read_circuit, ServerFns},
             },
             expander_pcs_defered::setup_impl::pcs_setup_max_length_only,
-            CombinedProof, Expander, ExpanderNoOverSubscribe, ParallelizedExpander,
+            CombinedProof, Expander, ExpanderNoOverSubscribe,
         },
     },
 };

@@ -13,16 +13,12 @@ use crate::{
         kernel::{Kernel, LayeredCircuitInputVec},
         proving_system::{
             expander::{
-                commit_impl::local_commit_impl,
                 prove_impl::{
                     get_local_vals, prepare_expander_circuit, prepare_inputs_with_local_vals,
                 },
                 structs::{ExpanderProof, ExpanderProverSetup},
             },
-            expander_parallelized::{
-                prove_impl::partition_single_gkr_claim_and_open_pcs_mpi,
-                server_ctrl::generate_local_mpi_config,
-            },
+            expander_parallelized::server_ctrl::generate_local_mpi_config,
             expander_pcs_defered::prove_impl::{
                 extract_pcs_claims, open_defered_pcs, pad_vals_and_commit,
             },
@@ -43,7 +39,7 @@ where
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
 {
     let commit_timer = Timer::new("Commit to all input", global_mpi_config.is_root());
-    let (commitments, states) = if global_mpi_config.is_root() {
+    let (commitments, _states) = if global_mpi_config.is_root() {
         let (commitments, states) = values
             .iter()
             .map(|value| pad_vals_and_commit::<C, ECCConfig>(prover_setup, value.as_ref()))

@@ -9,7 +9,7 @@ use crate::zkcuda::proving_system::expander_parallelized::client_utils::{
     ClientHttpHelper,
 };
 use crate::zkcuda::proving_system::{
-    CombinedProof, ExpanderPCSDefered, ParallelizedExpander, ProvingSystem,
+    CombinedProof, ExpanderPCSDefered, ProvingSystem,
 };
 
 use super::super::Expander;
