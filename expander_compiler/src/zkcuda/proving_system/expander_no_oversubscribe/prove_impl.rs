@@ -19,8 +19,13 @@ use crate::{
                 },
                 structs::{ExpanderProof, ExpanderProverSetup},
             },
-            expander_parallelized::prove_impl::partition_single_gkr_claim_and_open_pcs_mpi,
-            expander_parallelized::server_ctrl::generate_local_mpi_config,
+            expander_parallelized::{
+                prove_impl::partition_single_gkr_claim_and_open_pcs_mpi,
+                server_ctrl::generate_local_mpi_config,
+            },
+            expander_pcs_defered::prove_impl::{
+                extract_pcs_claims, open_defered_pcs, pad_vals_and_commit,
+            },
             CombinedProof, Expander,
         },
     },
@@ -41,13 +46,16 @@ where
     let (commitments, states) = if global_mpi_config.is_root() {
         let (commitments, states) = values
             .iter()
-            .map(|value| local_commit_impl::<C, ECCConfig>(prover_setup, value.as_ref()))
+            .map(|value| pad_vals_and_commit::<C, ECCConfig>(prover_setup, value.as_ref()))
             .unzip::<_, _, Vec<_>, Vec<_>>();
         (Some(commitments), Some(states))
     } else {
         (None, None)
     };
     commit_timer.stop();
+
+    let mut vals_ref = vec![];
+    let mut challenges = vec![];
 
     let prove_timer = Timer::new("Prove all kernels", global_mpi_config.is_root());
     let proofs = computation_graph
@@ -76,30 +84,20 @@ where
             single_kernel_gkr_timer.stop();
 
             if global_mpi_config.is_root() {
-                let pcs_open_timer = Timer::new("pcs open", true);
                 let (mut transcript, challenge) = gkr_end_state.unwrap();
-                let challenges = if let Some(challenge_y) = challenge.challenge_y() {
-                    vec![challenge.challenge_x(), challenge_y]
-                } else {
-                    vec![challenge.challenge_x()]
-                };
+                assert!(challenge.challenge_y().is_none());
+                let challenge = challenge.challenge_x();
 
-                challenges.iter().for_each(|c| {
-                    partition_single_gkr_claim_and_open_pcs_mpi::<C>(
-                        prover_setup,
-                        &commitment_values,
-                        &template
-                            .commitment_indices()
-                            .iter()
-                            .map(|&idx| &states.as_ref().unwrap()[idx])
-                            .collect::<Vec<_>>(),
-                        c,
-                        template.is_broadcast(),
-                        &mut transcript,
-                    );
-                });
+                let (local_vals_ref, local_challenges) = extract_pcs_claims::<C>(
+                    &commitment_values,
+                    &challenge,
+                    template.is_broadcast(),
+                    next_power_of_two(template.parallel_count()),
+                );
 
-                pcs_open_timer.stop();
+                vals_ref.extend(local_vals_ref);
+                challenges.extend(local_challenges);
+
                 Some(ExpanderProof {
                     data: vec![transcript.finalize_and_get_proof()],
                 })
@@ -111,7 +109,14 @@ where
     prove_timer.stop();
 
     if global_mpi_config.is_root() {
-        let proofs = proofs.into_iter().map(|p| p.unwrap()).collect::<Vec<_>>();
+        let mut proofs = proofs.into_iter().map(|p| p.unwrap()).collect::<Vec<_>>();
+
+        let pcs_opening_timer = Timer::new("Batch PCS Opening for all kernels", true);
+        let pcs_batch_opening =
+            open_defered_pcs::<C, ECCConfig>(prover_setup, &vals_ref, &challenges);
+        pcs_opening_timer.stop();
+
+        proofs.push(pcs_batch_opening);
         Some(CombinedProof {
             commitments: commitments.unwrap(),
             proofs,

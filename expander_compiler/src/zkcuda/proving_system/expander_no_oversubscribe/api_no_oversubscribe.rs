@@ -8,11 +8,13 @@ use crate::zkcuda::proving_system::expander_parallelized::client_utils::{
     client_launch_server_and_setup, client_parse_args, client_send_witness_and_prove, wait_async,
     ClientHttpHelper,
 };
-use crate::zkcuda::proving_system::{CombinedProof, ParallelizedExpander, ProvingSystem};
+use crate::zkcuda::proving_system::{
+    CombinedProof, ExpanderPCSDefered, ParallelizedExpander, ProvingSystem,
+};
 
 use super::super::Expander;
 
-use gkr_engine::GKREngine;
+use gkr_engine::{ExpanderPCS, GKREngine};
 
 pub struct ExpanderNoOverSubscribe<C: GKREngine> {
     _config: std::marker::PhantomData<C>,
@@ -20,6 +22,9 @@ pub struct ExpanderNoOverSubscribe<C: GKREngine> {
 
 impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSystem<ECCConfig>
     for ExpanderNoOverSubscribe<C>
+where
+    <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::Commitment:
+        AsRef<<C::PCSConfig as ExpanderPCS<C::FieldConfig>>::Commitment>,
 {
     type ProverSetup = ExpanderProverSetup<C::FieldConfig, C::PCSConfig>;
     type VerifierSetup = ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>;
@@ -46,8 +51,7 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
         computation_graph: &ComputationGraph<ECCConfig>,
         proof: &Self::Proof,
     ) -> bool {
-        // The proof should be the same as the one returned by ParallelizedExpander::prove
-        ParallelizedExpander::verify(verifier_setup, computation_graph, proof)
+        ExpanderPCSDefered::<C>::verify(verifier_setup, computation_graph, proof)
     }
 
     fn post_process() {
