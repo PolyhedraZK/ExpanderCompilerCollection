@@ -35,6 +35,7 @@ pub struct Builder<C: Config> {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Variable {
     id: usize,
+    len: usize,
 }
 
 impl Variable {
@@ -43,14 +44,14 @@ impl Variable {
     }
 }
 
-pub fn new_variable(id: usize) -> Variable {
-    Variable { id }
+pub fn new_variable(id: usize, len: usize) -> Variable {
+    Variable { id, len }
 }
 
 // impl Variable for From<usize> trait
 impl From<usize> for Variable {
     fn from(id: usize) -> Self {
-        Variable { id }
+        Variable { id, len: 1 }
     }
 }
 

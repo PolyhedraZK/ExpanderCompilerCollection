@@ -40,7 +40,7 @@ impl<C: Config> Circuit<C> {
             let lc = if let Instruction::LinComb(lc) = &self.instructions[i] {
                 let mut flag = false;
                 for x in lc.terms.iter() {
-                    if insn_ref_count[var_insn_id[x.var]] == 1 {
+                    if is_add[var_insn_id[x.var]] && insn_ref_count[var_insn_id[x.var]] == 1 {
                         flag = true;
                         break;
                     }
