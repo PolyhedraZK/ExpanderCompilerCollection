@@ -8,9 +8,7 @@ use crate::zkcuda::proving_system::expander_parallelized::client_utils::{
     client_launch_server_and_setup, client_parse_args, client_send_witness_and_prove, wait_async,
     ClientHttpHelper,
 };
-use crate::zkcuda::proving_system::{
-    CombinedProof, ExpanderPCSDefered, ProvingSystem,
-};
+use crate::zkcuda::proving_system::{CombinedProof, ExpanderPCSDefered, ProvingSystem};
 
 use super::super::Expander;
 
