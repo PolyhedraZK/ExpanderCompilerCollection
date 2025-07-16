@@ -381,4 +381,8 @@ pub struct ExpanderExecArgs {
     /// The port number for the server to listen on.
     #[arg(short, long, default_value = "Port")]
     pub port_number: String,
+
+    /// The port number for the server to listen on.
+    #[arg(short, long, default_value = "false")]
+    pub batch_pcs: bool,
 }

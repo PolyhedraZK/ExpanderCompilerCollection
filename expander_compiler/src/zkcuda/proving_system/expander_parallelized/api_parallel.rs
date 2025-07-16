@@ -34,7 +34,12 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
         let server_binary =
             client_parse_args().unwrap_or("../target/release/expander_server".to_owned());
-        client_launch_server_and_setup::<C, ECCConfig>(&server_binary, computation_graph, true)
+        client_launch_server_and_setup::<C, ECCConfig>(
+            &server_binary,
+            computation_graph,
+            true,
+            false,
+        )
     }
 
     fn prove(

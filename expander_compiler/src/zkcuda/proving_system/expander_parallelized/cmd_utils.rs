@@ -2,11 +2,16 @@ use gkr_engine::{ExpanderPCS, FieldEngine, FieldType, GKREngine, PolynomialCommi
 use std::process::Command;
 
 #[allow(clippy::zombie_processes)]
-pub fn start_server<C: GKREngine>(binary: &str, max_parallel_count: usize, port_number: u16) {
+pub fn start_server<C: GKREngine>(
+    binary: &str,
+    max_parallel_count: usize,
+    port_number: u16,
+    batch_pcs: bool,
+) {
     let (overscribe, field_name, pcs_name) = parse_config::<C>(max_parallel_count);
 
     let cmd_str = format!(
-        "mpiexec -n {max_parallel_count} {overscribe} {binary} --field-type {field_name} --poly-commit {pcs_name} --port-number {port_number}"
+        "mpiexec -n {max_parallel_count} {overscribe} {binary} --field-type {field_name} --poly-commit {pcs_name} --port-number {port_number} --batch-pcs {batch_pcs}"
     );
     exec_command(&cmd_str, false);
 }

@@ -4,12 +4,17 @@ use clap::Parser;
 use expander_compiler::{
     frontend::BN254Config,
     zkcuda::proving_system::{
+        expander::{
+            self,
+            config::{
+                ZKCudaBN254Hyrax, ZKCudaBN254HyraxBatchPCS, ZKCudaBN254KZG, ZKCudaBN254KZGBatchPCS,
+            },
+        },
         expander_parallelized::server_ctrl::{serve, ExpanderExecArgs},
         expander_pcs_defered::BN254ConfigSha2UniKZG,
         ExpanderNoOverSubscribe,
     },
 };
-use gkr::BN254ConfigSha2Hyrax;
 use gkr_engine::PolynomialCommitmentType;
 
 #[tokio::main]
@@ -24,16 +29,30 @@ pub async fn main() {
 
     match (expander_exec_args.field_type.as_str(), pcs_type) {
         ("BN254", PolynomialCommitmentType::Hyrax) => {
-            serve::<BN254ConfigSha2Hyrax, BN254Config, ExpanderNoOverSubscribe<_>>(
-                expander_exec_args.port_number,
-            )
-            .await;
+            if expander_exec_args.batch_pcs {
+                serve::<_, _, ExpanderNoOverSubscribe<ZKCudaBN254HyraxBatchPCS>>(
+                    expander_exec_args.port_number,
+                )
+                .await;
+            } else {
+                serve::<_, _, ExpanderNoOverSubscribe<ZKCudaBN254Hyrax>>(
+                    expander_exec_args.port_number,
+                )
+                .await;
+            }
         }
         ("BN254", PolynomialCommitmentType::KZG) => {
-            serve::<BN254ConfigSha2UniKZG, BN254Config, ExpanderNoOverSubscribe<_>>(
-                expander_exec_args.port_number,
-            )
-            .await;
+            if expander_exec_args.batch_pcs {
+                serve::<_, _, ExpanderNoOverSubscribe<ZKCudaBN254KZGBatchPCS>>(
+                    expander_exec_args.port_number,
+                )
+                .await;
+            } else {
+                serve::<_, _, ExpanderNoOverSubscribe<ZKCudaBN254KZG>>(
+                    expander_exec_args.port_number,
+                )
+                .await;
+            }
         }
         (field_type, pcs_type) => {
             panic!("Combination of {field_type:?} and {pcs_type:?} not supported for no oversubscribe expander proving system.");

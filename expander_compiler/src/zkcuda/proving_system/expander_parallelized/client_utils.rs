@@ -78,6 +78,7 @@ pub fn client_launch_server_and_setup<C, ECCConfig>(
     server_binary: &str,
     computation_graph: &ComputationGraph<ECCConfig>,
     allow_oversubscribe: bool,
+    batch_pcs: bool,
 ) -> (
     ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
     ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>,
@@ -119,7 +120,7 @@ where
 
     let port = parse_port_number();
     let server_url = format!("{SERVER_IP}:{port}");
-    start_server::<C>(server_binary, mpi_size, port);
+    start_server::<C>(server_binary, mpi_size, port, batch_pcs);
 
     // Keep trying until the server is ready
     loop {

@@ -1,4 +1,7 @@
 use expander_compiler::frontend::*;
+use expander_compiler::zkcuda::proving_system::expander::config::{
+    ZKCudaBN254Hyrax, ZKCudaBN254HyraxBatchPCS, ZKCudaBN254KZG, ZKCudaBN254KZGBatchPCS,
+};
 use expander_compiler::zkcuda::proving_system::expander_pcs_defered::BN254ConfigSha2UniKZG;
 use expander_compiler::zkcuda::proving_system::{
     Expander, ExpanderNoOverSubscribe, ParallelizedExpander, ProvingSystem,
@@ -90,8 +93,10 @@ fn zkcuda_test_multi_core() {
     zkcuda_test::<BN254Config, ParallelizedExpander<BN254ConfigSha2Hyrax>>();
     zkcuda_test::<BN254Config, ParallelizedExpander<BN254ConfigSha2UniKZG>>();
 
-    zkcuda_test::<BN254Config, ExpanderNoOverSubscribe<BN254ConfigSha2Hyrax>>();
-    zkcuda_test::<BN254Config, ExpanderNoOverSubscribe<BN254ConfigSha2UniKZG>>();
+    zkcuda_test::<_, ExpanderNoOverSubscribe<ZKCudaBN254Hyrax>>();
+    zkcuda_test::<_, ExpanderNoOverSubscribe<ZKCudaBN254HyraxBatchPCS>>();
+    zkcuda_test::<_, ExpanderNoOverSubscribe<ZKCudaBN254KZG>>();
+    zkcuda_test::<_, ExpanderNoOverSubscribe<ZKCudaBN254KZGBatchPCS>>();
 }
 
 fn zkcuda_test_simd_prepare_ctx() -> Context<M31Config> {
