@@ -62,6 +62,8 @@ impl SharedMemoryEngine {
             .serialize_into(&mut buffer)
             .expect("Failed to serialize object");
 
+        println!("Object size: {}", buffer.len());
+
         unsafe {
             Self::allocate_shared_memory_if_necessary(shared_memory_ref, name, buffer.len());
             let object_ptr = shared_memory_ref.as_mut().unwrap().as_ptr();
@@ -91,6 +93,7 @@ impl SharedMemoryEngine {
     pub fn write_pcs_setup_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
         pcs_setup: &(ExpanderProverSetup<F, PCS>, ExpanderVerifierSetup<F, PCS>),
     ) {
+        println!("Writing PCS setup to shared memory...");
         Self::write_object_to_shared_memory(
             pcs_setup,
             unsafe { &mut SHARED_MEMORY.pcs_setup },
@@ -112,6 +115,7 @@ impl SharedMemoryEngine {
                 .map(|v| std::mem::size_of::<usize>() + std::mem::size_of_val(v.as_ref()))
                 .sum::<usize>();
 
+        println!("Writing witness to shared memory, total size: {total_size}");
         unsafe {
             Self::allocate_shared_memory_if_necessary(
                 &mut SHARED_MEMORY.witness,
@@ -208,6 +212,7 @@ impl SharedMemoryEngine {
     >(
         proof: &CombinedProof<ECCConfig, Expander<C>>,
     ) {
+        println!("Writing proof to shared memory...");
         Self::write_object_to_shared_memory(proof, unsafe { &mut SHARED_MEMORY.proof }, "proof");
     }
 

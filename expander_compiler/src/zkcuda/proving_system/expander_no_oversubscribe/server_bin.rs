@@ -2,12 +2,12 @@ use std::str::FromStr;
 
 use clap::Parser;
 use expander_compiler::zkcuda::proving_system::{
-        expander::config::{
-                ZKCudaBN254Hyrax, ZKCudaBN254HyraxBatchPCS, ZKCudaBN254KZG, ZKCudaBN254KZGBatchPCS,
-            },
-        expander_parallelized::server_ctrl::{serve, ExpanderExecArgs},
-        ExpanderNoOverSubscribe,
-    };
+    expander::config::{
+        ZKCudaBN254Hyrax, ZKCudaBN254HyraxBatchPCS, ZKCudaBN254KZG, ZKCudaBN254KZGBatchPCS,
+    },
+    expander_parallelized::server_ctrl::{serve, ExpanderExecArgs},
+    ExpanderNoOverSubscribe,
+};
 use gkr_engine::PolynomialCommitmentType;
 
 #[tokio::main]

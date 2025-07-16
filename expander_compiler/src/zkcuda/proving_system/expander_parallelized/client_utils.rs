@@ -92,6 +92,8 @@ where
 
     let mut bytes = vec![];
     computation_graph.serialize_into(&mut bytes).unwrap();
+    println!("Serialized computation graph, size: {}", bytes.len());
+
     // append current timestamp to the file name to avoid conflicts
     let setup_filename = format!(
         "/tmp/computation_graph_{}.bin",
