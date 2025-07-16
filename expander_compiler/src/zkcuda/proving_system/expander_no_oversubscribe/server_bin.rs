@@ -1,20 +1,13 @@
 use std::str::FromStr;
 
 use clap::Parser;
-use expander_compiler::{
-    frontend::BN254Config,
-    zkcuda::proving_system::{
-        expander::{
-            self,
-            config::{
+use expander_compiler::zkcuda::proving_system::{
+        expander::config::{
                 ZKCudaBN254Hyrax, ZKCudaBN254HyraxBatchPCS, ZKCudaBN254KZG, ZKCudaBN254KZGBatchPCS,
             },
-        },
         expander_parallelized::server_ctrl::{serve, ExpanderExecArgs},
-        expander_pcs_defered::BN254ConfigSha2UniKZG,
         ExpanderNoOverSubscribe,
-    },
-};
+    };
 use gkr_engine::PolynomialCommitmentType;
 
 #[tokio::main]
