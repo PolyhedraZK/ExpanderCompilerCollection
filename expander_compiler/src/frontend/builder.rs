@@ -12,10 +12,7 @@ use crate::{
             source::{self, Constraint as SourceConstraint, Instruction as SourceInstruction},
         },
         layered::Coef,
-    },
-    field::{Field, FieldArith},
-    hints::{self, registry::hint_key_to_id},
-    utils::function_id::get_function_id,
+    }, field::{Field, FieldArith}, frontend::api::CommonAPI, hints::{self, registry::hint_key_to_id}, utils::function_id::get_function_id
 };
 
 use super::{
@@ -25,7 +22,7 @@ use super::{
 
 #[derive(Clone)]
 pub struct Builder<C: Config> {
-    instructions: Vec<SourceInstruction<C>>,
+    instructions: Vec<(SourceInstruction<C>, Vec<(usize, usize)>)>,
     constraints: Vec<SourceConstraint>,
     var_const_id: Vec<usize>,
     const_values: Vec<CircuitField<C>>,
@@ -36,11 +33,12 @@ pub struct Builder<C: Config> {
 pub struct Variable {
     id: usize,
     len: usize,
+    pos: usize,
 }
 
 impl Variable {
-    pub fn id(&self) -> usize {
-        self.id
+    pub fn id(&self) -> (usize, usize) {
+        (self.id, self.pos)
     }
 }
 
@@ -51,7 +49,7 @@ pub fn new_variable(id: usize, len: usize) -> Variable {
 // impl Variable for From<usize> trait
 impl From<usize> for Variable {
     fn from(id: usize) -> Self {
-        Variable { id, len: 1 }
+        Variable { id, len: 1, pos: 0 }
     }
 }
 
@@ -146,20 +144,43 @@ impl<C: Config> Builder<C> {
         }
     }
 
+    #[inline(always)]
+    fn new_vars(&mut self, n: usize) -> Vec<Variable> {
+        let head = self.var_const_id.len();
+        self.var_const_id.resize(self.var_const_id.len() + n, 0);
+        (0..n).map(|i| Variable {
+            id: head,
+            len: n,
+            pos: i,
+        }).collect()
+    }
+
+    #[inline(always)]
+    fn set_const_into(&mut self, value: impl ToVariableOrValue<CircuitField<C>>, var: &Variable) {
+        
+        self.convert_to_variable(value)
+    }
+}
+
+impl<C: Config> CommonAPI for Builder<C> {
+    #[inline(always)]
     fn new_var(&mut self) -> Variable {
         self.var_const_id.push(0);
         Variable {
             id: self.var_const_id.len() - 1,
+            len: 1,
+            pos: 0,
         }
     }
 }
 
 impl<C: Config> BasicAPI<C> for Builder<C> {
-    fn add(
+    fn add_into(
         &mut self,
         x: impl ToVariableOrValue<CircuitField<C>>,
         y: impl ToVariableOrValue<CircuitField<C>>,
-    ) -> Variable {
+        res: &Variable,
+    ) {
         let xc = self.constant_value(x.clone());
         let yc = self.constant_value(y.clone());
         if let Some(xv) = xc {
@@ -169,7 +190,7 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         }
         let x = self.convert_to_variable(x);
         let y = self.convert_to_variable(y);
-        self.instructions.push(SourceInstruction::LinComb(LinComb {
+        self.instructions.push((SourceInstruction::LinComb(LinComb {
             terms: vec![
                 LinCombTerm {
                     var: x.id,
@@ -181,8 +202,7 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
                 },
             ],
             constant: CircuitField::<C>::zero(),
-        }));
-        self.new_var()
+        }), vec![res.id()]));
     }
 
     fn sub(
