@@ -33,6 +33,7 @@ pub trait IrConfig: Debug + Clone + Default + Hash + PartialEq + Eq {
 
 pub trait Instruction<C: Config>: Debug + Clone + Hash + PartialEq + Eq {
     fn inputs(&self) -> Vec<usize>;
+    fn outputs(&self) -> Vec<usize>;
     fn num_outputs(&self) -> usize;
     fn as_sub_circuit_call(&self) -> Option<(usize, &Vec<usize>, usize)>;
     fn sub_circuit_call(sub_circuit_id: usize, inputs: Vec<usize>, num_outputs: usize) -> Self;

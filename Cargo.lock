@@ -995,6 +995,7 @@ dependencies = [
  "mpi",
  "num_cpus",
  "once_cell",
+ "paste",
  "poly_commit",
  "polynomials",
  "rand",

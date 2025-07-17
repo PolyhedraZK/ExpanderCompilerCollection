@@ -1,3 +1,4 @@
+use paste::paste;
 use arith::Field;
 
 use crate::circuit::config::Config;
@@ -9,15 +10,33 @@ use super::{
 
 macro_rules! binary_op {
     ($name:ident) => {
-        fn $name(
-            &mut self,
-            x: impl ToVariableOrValue<CircuitField<C>>,
-            y: impl ToVariableOrValue<CircuitField<C>>,
-        ) -> Variable;
+        paste! {
+            fn [<$name _into>](
+                &mut self,
+                x: impl ToVariableOrValue<CircuitField<C>>,
+                y: impl ToVariableOrValue<CircuitField<C>>,
+                res: &Variable,
+            );
+
+            fn $name(
+                &mut self,
+                x: impl ToVariableOrValue<CircuitField<C>>,
+                y: impl ToVariableOrValue<CircuitField<C>>,
+            ) -> Variable {
+                let res = self.new_var();
+                self.[<$name _into>](x, y, &res);
+                res
+            }
+
+        }
     };
 }
 
-pub trait BasicAPI<C: Config> {
+pub trait CommonAPI {
+    fn new_var(&mut self) -> Variable;
+}
+
+pub trait BasicAPI<C: Config>: CommonAPI {
     binary_op!(add);
     binary_op!(sub);
     binary_op!(mul);
@@ -108,7 +127,7 @@ pub trait BasicAPI<C: Config> {
     }
 }
 
-pub trait UnconstrainedAPI<C: Config> {
+pub trait UnconstrainedAPI<C: Config>: CommonAPI {
     fn unconstrained_identity(&mut self, x: impl ToVariableOrValue<CircuitField<C>>) -> Variable;
     binary_op!(unconstrained_add);
     binary_op!(unconstrained_mul);
