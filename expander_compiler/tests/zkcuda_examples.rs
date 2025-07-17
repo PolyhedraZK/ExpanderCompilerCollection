@@ -27,14 +27,9 @@ fn zkcuda_test<C: Config, P: ProvingSystem<C>>() {
     println!("{:?}", kernel_add_16.io_shapes());
 
     let mut ctx: Context<C> = Context::default();
-    let mut a: Vec<Vec<CircuitField<C>>> = vec![];
-    for i in 0..16 {
-        a.push(vec![]);
-        for j in 0..2 {
-            a[i].push(CircuitField::<C>::from((i * 2 + j + 1) as u32));
-        }
-    }
-    let a = ctx.copy_to_device(&a);
+    let a_shape = vec![16, 2];
+    let (a , a_id) = ctx.new_device_memory(a_shape);
+    // let a = ctx.copy_to_device(&a);
     let mut b: DeviceMemoryHandle = None;
     call_kernel!(ctx, kernel_add_2, 16, a, mut b).unwrap();
     let b = b.reshape(&[1, 16]);
@@ -45,6 +40,16 @@ fn zkcuda_test<C: Config, P: ProvingSystem<C>>() {
     assert_eq!(result, CircuitField::<C>::from(32 * 33 / 2));
 
     let computation_graph = ctx.compile_computation_graph().unwrap();
+
+    let mut a_values: Vec<Vec<CircuitField<C>>> = vec![];
+    for i in 0..16 {
+        a_values.push(vec![]);
+        for j in 0..2 {
+            a_values[i].push(CircuitField::<C>::from((i * 2 + j + 1) as u32));
+        }
+    }
+    ctx.copy_to_device(&a_values, a_id);
+
     ctx.solve_witness().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(
@@ -244,8 +249,7 @@ fn zkcuda_to_binary() {
     let kernel: KernelPrimitive<M31Config> = compile_convert_to_binary().unwrap();
     let mut ctx: Context<M31Config, _> = Context::new(hint_registry);
 
-    let a = M31::from(0x55);
-    let a = ctx.copy_to_device(&a);
+    let (a, a_id) = ctx.new_device_memory(vec![]);
     let a = a.reshape(&[1]);
     let mut b: DeviceMemoryHandle = None;
     call_kernel!(ctx, kernel, 1, a, mut b).unwrap();
@@ -267,6 +271,8 @@ fn zkcuda_to_binary() {
 
     type P = Expander<M31Config>;
     let computation_graph = ctx.compile_computation_graph().unwrap();
+    let a_value = M31::from(0x55);
+    ctx.copy_to_device(&a_value, a_id);
     ctx.solve_witness().unwrap();
     println!("{:?}", computation_graph);
     println!("{:?}", ctx.export_device_memories());
@@ -289,12 +295,16 @@ fn zkcuda_assertion() {
     let kernel_tmp: KernelPrimitive<M31Config> = compile_assertion().unwrap();
 
     let mut ctx: Context<M31Config> = Context::default();
-    let a = ctx.copy_to_device(&M31::from(10u32)).reshape(&[1]);
-    let b = ctx.copy_to_device(&M31::from(10u32)).reshape(&[1]);
+    let (a, a_id) = ctx.new_device_memory(vec![]);
+    let (b, b_id) = ctx.new_device_memory(vec![]);
+    let a = a.reshape(&[1]);
+    let b = b.reshape(&[1]);
     call_kernel!(ctx, kernel_tmp, 1, a, b).unwrap();
 
     type P = Expander<M31Config>;
     let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.copy_to_device(&M31::from(10u32), a_id);
+    ctx.copy_to_device(&M31::from(10u32), b_id);
     ctx.solve_witness().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(
@@ -311,12 +321,16 @@ fn zkcuda_assertion_fail() {
     let kernel_tmp: KernelPrimitive<M31Config> = compile_assertion().unwrap();
 
     let mut ctx: Context<M31Config> = Context::default();
-    let a = ctx.copy_to_device(&M31::from(10u32)).reshape(&[1]);
-    let b = ctx.copy_to_device(&M31::from(9u32)).reshape(&[1]);
+    let (a, a_id) = ctx.new_device_memory(vec![]);
+    let (b, b_id) = ctx.new_device_memory(vec![]);
+    let a = a.reshape(&[1]);
+    let b = b.reshape(&[1]);
     call_kernel!(ctx, kernel_tmp, 1, a, b).unwrap();
 
     type P = Expander<M31Config>;
     let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.copy_to_device(&M31::from(10u32), a_id);
+    ctx.copy_to_device(&M31::from(9u32), b_id);
     ctx.solve_witness().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(

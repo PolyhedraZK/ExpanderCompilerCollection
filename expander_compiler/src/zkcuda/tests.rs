@@ -68,14 +68,16 @@ fn context_shape_test_1_impl<P: ProvingSystem<M31Config>>() {
 
     // Part 1
     // Since we only use the shape [15, 1], the representation of the vector is "xxxxxxxxxxxxxxx.".
-    let mut a = ctx.copy_to_device(&vec![one; 15]);
+    let a_value_1 = vec![one; 15];
+    let (mut a, a_id_1) = ctx.new_device_memory(vec![15]);
     call_kernel!(ctx, identity_1, 15, mut a).unwrap();
     assert_eq!(ctx.copy_to_host::<Vec<F>>(a), vec![one; 15]);
 
     // Part 2
     // Since we use [15, 1] and [3, 5], the context will find a representation that is compatible with both.
     // The representation of the vector is "xxxxx...xxxxx...xxxxx...........".
-    let mut a = ctx.copy_to_device(&vec![one; 15]);
+    let a_value_2 = vec![one; 15];
+    let (mut a, a_id_2) = ctx.new_device_memory(vec![15]);
     let mut b = a.reshape(&[5, 3]);
     call_kernel!(ctx, identity_1, 15, mut a).unwrap();
     call_kernel!(ctx, identity_3, 5, mut b).unwrap();
@@ -84,6 +86,8 @@ fn context_shape_test_1_impl<P: ProvingSystem<M31Config>>() {
     assert_eq!(ctx.copy_to_host::<Vec<F>>(b), vec![one; 15]);
 
     let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.copy_to_device(&a_value_1, a_id_1);
+    ctx.copy_to_device(&a_value_2, a_id_2);
     ctx.solve_witness().unwrap();
 
     // Debugging output and assertions
@@ -143,12 +147,11 @@ fn context_shape_test_1() {
 fn context_shape_test_2() {
     type C = M31Config;
     type F = CircuitField<C>;
-    let one = F::one();
     let identity_3 = compile_identity_3::<C>().unwrap();
     let identity_5 = compile_identity_5::<C>().unwrap();
 
     let mut ctx: Context<C> = Context::default();
-    let a = ctx.copy_to_device(&vec![one; 15]);
+    let (a, _) = ctx.new_device_memory(vec![15]);
     let mut b = a.reshape(&[5, 3]);
     let mut a = a.reshape(&[3, 5]);
     call_kernel!(ctx, identity_5, 3, mut a).unwrap();
@@ -164,7 +167,7 @@ fn context_shape_test_2_success() {
     let identity_5 = compile_identity_5::<C>().unwrap();
 
     let mut ctx: Context<C> = Context::default();
-    let a = ctx.copy_to_device(&vec![one; 15]);
+    let (a, _) = ctx.new_device_memory(vec![15]);
     let b = a.reshape(&[5, 3]);
     let mut a = a.reshape(&[3, 5]);
     call_kernel!(ctx, identity_5, 3, mut a).unwrap();

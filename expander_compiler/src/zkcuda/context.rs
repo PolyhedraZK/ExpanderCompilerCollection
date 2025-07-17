@@ -26,13 +26,13 @@ use super::{
 pub use macros::call_kernel;
 
 struct DeviceMemory<C: Config> {
-    values: Vec<SIMDField<C>>,
+    pub values: Vec<SIMDField<C>>,
     required_shape_products: Vec<usize>,
 }
 
 #[derive(Clone, Debug, ExpSerde)]
 pub struct DeviceMemoryHandleRaw {
-    id: usize,
+    pub id: usize,
     shape_history: ShapeHistory,
 }
 
@@ -217,13 +217,29 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         }
     }
 
+    pub fn new_device_memory(&mut self, shape: Shape) -> (DeviceMemoryHandle, usize) {
+        let t = shape_vec_len(&shape);
+        let required_shape_products = if t == 1 { vec![1] } else { vec![1, t] };
+        self.device_memories.push(DeviceMemory {
+            values: vec![],
+            required_shape_products,
+        });
+        (Some(DeviceMemoryHandleRaw {
+            id: self.device_memories.len() - 1,
+            shape_history: ShapeHistory::new(shape),
+        }), self.device_memories.len() - 1)
+    }
+
     pub fn copy_to_device<T: VecShaped<CircuitField<C>>>(
         &mut self,
         host_memory: &T,
-    ) -> DeviceMemoryHandle {
+        device_memory_id: usize,
+    ) {
+        assert!(device_memory_id < self.device_memories.len(), "The device memory dosen't exist.");
         let (flat, shape) = flatten_shaped(host_memory);
+        assert_eq!(shape_vec_len(&shape), shape_vec_len(&self.device_memories[device_memory_id].required_shape_products), "The len of values doesn't match.");
         let simd_flat = pack_vec::<C>(&flat);
-        make_device_mem(&mut self.device_memories, simd_flat, shape)
+        self.device_memories[device_memory_id].values = simd_flat;
     }
 
     pub fn copy_to_device_and_pack_simd<T: VecShaped<CircuitField<C>>>(
