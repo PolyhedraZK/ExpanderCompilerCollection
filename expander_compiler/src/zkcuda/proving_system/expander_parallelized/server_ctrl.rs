@@ -379,10 +379,10 @@ pub struct ExpanderExecArgs {
     pub poly_commit: String,
 
     /// The port number for the server to listen on.
-    #[arg(short, long, default_value = "Port")]
+    #[arg(short, long, default_value = "3000")]
     pub port_number: String,
 
-    /// The port number for the server to listen on.
-    #[arg(short, long, default_value = "false")]
+    /// Whether to batch PCS opening in proving.
+    #[arg(short, long, default_value_t = false)]
     pub batch_pcs: bool,
 }
