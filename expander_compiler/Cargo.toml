@@ -67,15 +67,15 @@ path = "src/zkcuda/proving_system/expander_no_oversubscribe/server_bin.rs"
 
 [[bin]]
 name = "zkcuda_matmul"
-path = "bin/zkcuda_servers/zkcuda_matmul.rs"
+path = "bin/zkcuda_bench/zkcuda_matmul.rs"
 
 [[bin]]
 name = "zkcuda_matmul_pcs_defered"
-path = "bin/zkcuda_servers/zkcuda_matmul_pcs_defered.rs"
+path = "bin/zkcuda_bench/zkcuda_matmul_pcs_defered.rs"
 
 [[bin]]
 name = "zkcuda_matmul_no_oversubscribe"
-path = "bin/zkcuda_servers/zkcuda_matmul_no_oversubscribe.rs"
+path = "bin/zkcuda_bench/zkcuda_matmul_no_oversubscribe.rs"
 
 [[bin]]
 name = "zkcuda_setup"

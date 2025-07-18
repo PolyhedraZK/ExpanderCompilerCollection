@@ -119,7 +119,7 @@ fn context_shape_test_1_impl<P: ProvingSystem<M31Config>>() {
     let proof = P::prove(
         &prover_setup,
         &computation_graph,
-        &ctx.export_device_memories(),
+        ctx.export_device_memories(),
     );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
     P::post_process();

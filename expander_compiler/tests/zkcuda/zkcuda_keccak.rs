@@ -353,7 +353,7 @@ fn zkcuda_keccak_1_helper<P: ProvingSystem<M31Config>>() {
     let proof = P::prove(
         &prover_setup,
         &computation_graph,
-        &ctx.export_device_memories(),
+        ctx.export_device_memories(),
     );
     println!("proof generation ok");
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
@@ -416,7 +416,7 @@ fn zkcuda_keccak_2_helper<P: ProvingSystem<M31Config>>() {
     let proof = P::prove(
         &prover_setup,
         &computation_graph,
-        &ctx.export_device_memories(),
+        ctx.export_device_memories(),
     );
     println!("proof generation ok");
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));

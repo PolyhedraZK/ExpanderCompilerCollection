@@ -185,7 +185,7 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
     fn prove(
         prover_setup: &Self::ProverSetup,
         computation_graph: &ComputationGraph<ECCConfig>,
-        device_memories: &[Vec<SIMDField<ECCConfig>>],
+        device_memories: Vec<Vec<SIMDField<ECCConfig>>>,
     ) -> Self::Proof {
         let (commitments, states) = device_memories
             .iter()

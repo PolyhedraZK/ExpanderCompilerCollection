@@ -45,7 +45,7 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
     fn prove(
         _prover_setup: &Self::ProverSetup,
         _computation_graph: &crate::zkcuda::context::ComputationGraph<ECCConfig>,
-        device_memories: &[Vec<SIMDField<ECCConfig>>],
+        device_memories: Vec<Vec<SIMDField<ECCConfig>>>,
     ) -> Self::Proof {
         client_send_witness_and_prove(device_memories)
     }

@@ -106,13 +106,11 @@ impl SharedMemoryEngine {
         Self::read_object_from_shared_memory("pcs_setup", 0)
     }
 
-    pub fn write_witness_to_shared_memory<F: FieldEngine>(
-        values: &[impl AsRef<[F::SimdCircuitField]>],
-    ) {
+    pub fn write_witness_to_shared_memory<F: FieldEngine>(values: Vec<Vec<F::SimdCircuitField>>) {
         let total_size = std::mem::size_of::<usize>()
             + values
                 .iter()
-                .map(|v| std::mem::size_of::<usize>() + std::mem::size_of_val(v.as_ref()))
+                .map(|v| std::mem::size_of::<usize>() + std::mem::size_of_val(v))
                 .sum::<usize>();
 
         println!("Writing witness to shared memory, total size: {total_size}");
@@ -132,13 +130,13 @@ impl SharedMemoryEngine {
             ptr = ptr.add(std::mem::size_of::<usize>());
 
             for vals in values {
-                let vals_len = vals.as_ref().len();
+                let vals_len = vals.len();
                 let len_ptr = &vals_len as *const usize as *const u8;
                 std::ptr::copy_nonoverlapping(len_ptr, ptr, std::mem::size_of::<usize>());
                 ptr = ptr.add(std::mem::size_of::<usize>());
 
-                let vals_size = std::mem::size_of_val(vals.as_ref());
-                std::ptr::copy_nonoverlapping(vals.as_ref().as_ptr() as *const u8, ptr, vals_size);
+                let vals_size = std::mem::size_of_val(&vals);
+                std::ptr::copy_nonoverlapping(vals.as_ptr() as *const u8, ptr, vals_size);
                 ptr = ptr.add(vals_size);
             }
         }

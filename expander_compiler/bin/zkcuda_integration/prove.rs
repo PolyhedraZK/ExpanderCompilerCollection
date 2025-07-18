@@ -32,7 +32,7 @@ fn main() {
     let proof = ExpanderNoOverSubscribe::<ZKCudaBN254Hyrax>::prove(
         &dummy_prover_setup,
         &dummy_computation_graph,
-        &extended_witness.unwrap(),
+        extended_witness.unwrap(),
     );
 
     let mut bytes = vec![];

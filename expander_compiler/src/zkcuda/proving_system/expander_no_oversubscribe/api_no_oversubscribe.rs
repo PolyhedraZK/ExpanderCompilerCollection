@@ -45,7 +45,7 @@ where
     fn prove(
         _prover_setup: &Self::ProverSetup,
         _computation_graph: &ComputationGraph<ZC::ECCConfig>,
-        device_memories: &[Vec<SIMDField<ZC::ECCConfig>>],
+        device_memories: Vec<Vec<SIMDField<ZC::ECCConfig>>>,
     ) -> Self::Proof {
         client_send_witness_and_prove(device_memories)
     }

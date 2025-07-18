@@ -56,7 +56,7 @@ fn zkcuda_test<C: Config, P: ProvingSystem<C>>() {
     let proof = P::prove(
         &prover_setup,
         &computation_graph,
-        &ctx.export_device_memories(),
+        ctx.export_device_memories(),
     );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
     P::post_process();
@@ -149,7 +149,7 @@ fn zkcuda_test_simd() {
     let proof = P::prove(
         &prover_setup,
         &computation_graph,
-        &ctx.export_device_memories(),
+        ctx.export_device_memories(),
     );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 
@@ -177,7 +177,7 @@ fn zkcuda_test_simd() {
     let proof3 = P::prove(
         &prover_setup3,
         &computation_graph,
-        &ctx3.export_device_memories(),
+        ctx3.export_device_memories(),
     );
     assert!(P::verify(&verifier_setup2, &computation_graph, &proof3));
 }
@@ -222,7 +222,7 @@ fn zkcuda_test_simd_autopack() {
     let proof = P::prove(
         &prover_setup,
         &computation_graph,
-        &ctx.export_device_memories(),
+        ctx.export_device_memories(),
     );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 }
@@ -285,7 +285,7 @@ fn zkcuda_to_binary() {
     let proof = P::prove(
         &prover_setup,
         &computation_graph,
-        &ctx.export_device_memories(),
+        ctx.export_device_memories(),
     );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 }
@@ -311,7 +311,7 @@ fn zkcuda_assertion() {
     let proof = P::prove(
         &prover_setup,
         &computation_graph,
-        &ctx.export_device_memories(),
+        ctx.export_device_memories(),
     );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 }
@@ -333,7 +333,7 @@ fn zkcuda_assertion_fail() {
     let proof = P::prove(
         &prover_setup,
         &computation_graph,
-        &ctx.export_device_memories(),
+        ctx.export_device_memories(),
     );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 }

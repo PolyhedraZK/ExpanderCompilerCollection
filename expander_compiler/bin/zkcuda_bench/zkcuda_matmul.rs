@@ -81,7 +81,7 @@ pub fn zkcuda_matmul<C: Config, P: ProvingSystem<C>, const N: usize>() {
     let proof = P::prove(
         &prover_setup,
         &computation_graph,
-        &ctx.export_device_memories(),
+        ctx.export_device_memories(),
     );
     let elapsed = timer.elapsed();
     println!("Parallel Count {N}, Proving time: {elapsed:?}");

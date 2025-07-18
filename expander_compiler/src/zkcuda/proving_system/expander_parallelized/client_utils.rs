@@ -140,7 +140,7 @@ where
 }
 
 pub fn client_send_witness_and_prove<C, ECCConfig>(
-    device_memories: &[Vec<SIMDField<ECCConfig>>],
+    device_memories: Vec<Vec<SIMDField<ECCConfig>>>,
 ) -> CombinedProof<ECCConfig, Expander<C>>
 where
     C: GKREngine,
@@ -148,9 +148,7 @@ where
 {
     let timer = Timer::new("prove", true);
 
-    SharedMemoryEngine::write_witness_to_shared_memory::<C::FieldConfig>(
-        &device_memories.iter().map(|m| &m[..]).collect::<Vec<_>>(),
-    );
+    SharedMemoryEngine::write_witness_to_shared_memory::<C::FieldConfig>(device_memories);
     wait_async(ClientHttpHelper::request_prove());
 
     let proof = SharedMemoryEngine::read_proof_from_shared_memory();
