@@ -11,6 +11,7 @@ use expander_compiler::{
 };
 use serdes::ExpSerde;
 
+#[allow(clippy::needless_range_loop)]
 fn main() {
     let mut input = vec![vec![]; 16];
     for i in 0..16 {

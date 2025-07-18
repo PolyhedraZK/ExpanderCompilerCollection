@@ -1,16 +1,14 @@
-use expander_compiler::frontend::*;
-use expander_compiler::zkcuda::proving_system::expander::config::{
-    ZKCudaBN254Hyrax, ZKCudaBN254HyraxBatchPCS, ZKCudaBN254KZG, ZKCudaBN254KZGBatchPCS,
-};
-use expander_compiler::zkcuda::proving_system::expander_pcs_defered::BN254ConfigSha2UniKZG;
-use expander_compiler::zkcuda::proving_system::{
-    Expander, ExpanderNoOverSubscribe, ParallelizedExpander, ProvingSystem,
+#![allow(clippy::ptr_arg)]
+#![allow(clippy::needless_range_loop)]
+
+use expander_compiler::frontend::{
+    BasicAPI, CircuitField, Config, Error, SIMDField, Variable, API,
 };
 use expander_compiler::zkcuda::shape::Reshape;
-use expander_compiler::zkcuda::{context::*, kernel::*};
-
-use gkr::BN254ConfigSha2Hyrax;
-use serdes::ExpSerde;
+use expander_compiler::zkcuda::{
+    context::{call_kernel, ComputationGraph, Context, DeviceMemoryHandle},
+    kernel::{compile_with_spec_and_shapes, kernel, IOVecSpec, KernelPrimitive},
+};
 
 #[kernel]
 fn add_2_macro<C: Config>(api: &mut API<C>, a: &[InputVariable; 2], b: &mut OutputVariable) {
@@ -26,6 +24,7 @@ fn add_16_macro<C: Config>(api: &mut API<C>, a: &[InputVariable; 16], b: &mut Ou
     *b = sum;
 }
 
+#[allow(clippy::type_complexity)]
 pub fn gen_computation_graph_and_witness<C: Config>(
     input: Option<Vec<Vec<CircuitField<C>>>>,
 ) -> (ComputationGraph<C>, Option<Vec<Vec<SIMDField<C>>>>) {
@@ -47,7 +46,7 @@ pub fn gen_computation_graph_and_witness<C: Config>(
         tmp
     };
 
-    let expected_result = a.iter().flat_map(|v| v).sum::<CircuitField<C>>();
+    let expected_result = a.iter().flatten().sum::<CircuitField<C>>();
 
     let a = ctx.copy_to_device(&a);
     let mut b: DeviceMemoryHandle = None;
@@ -61,7 +60,7 @@ pub fn gen_computation_graph_and_witness<C: Config>(
 
     let computation_graph = ctx.compile_computation_graph().unwrap();
 
-    let extended_witness = if let Some(_) = input {
+    let extended_witness = if input.is_some() {
         ctx.solve_witness().unwrap();
         Some(ctx.export_device_memories())
     } else {
