@@ -79,16 +79,16 @@ path = "bin/zkcuda_servers/zkcuda_matmul_no_oversubscribe.rs"
 
 [[bin]]
 name = "zkcuda_setup"
-path = "bin/integration/setup.rs"
+path = "bin/zkcuda_integration/setup.rs"
 
 [[bin]]
 name = "zkcuda_prove"
-path = "bin/integration/prove.rs"
+path = "bin/zkcuda_integration/prove.rs"
 
 [[bin]]
 name = "zkcuda_verify"
-path = "bin/integration/verify.rs"
+path = "bin/zkcuda_integration/verify.rs"
 
 [[bin]]
 name = "zkcuda_cleanup"
-path = "bin/integration/cleanup.rs"
+path = "bin/zkcuda_integration/cleanup.rs"

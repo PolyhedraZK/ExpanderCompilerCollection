@@ -13,6 +13,7 @@ use serdes::ExpSerde;
 
 #[allow(clippy::needless_range_loop)]
 fn main() {
+    // Replace this with your actual input data.
     let mut input = vec![vec![]; 16];
     for i in 0..16 {
         for j in 0..2 {
