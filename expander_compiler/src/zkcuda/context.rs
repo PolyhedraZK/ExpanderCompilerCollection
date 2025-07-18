@@ -383,72 +383,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
 
         let kernel_id = self.kernel_primitives.add(kernel);
 
-        let mut outputs_tmp = vec![Vec::new(); kernel.io_specs().len()];
-        let mut ir_inputs_all = vec![Vec::new(); kernel.io_specs().len()];
-        let mut chunk_sizes: Vec<Option<usize>> = vec![None; kernel.io_specs().len()];
-        for (((input, &ib), ir_inputs), chunk_size) in ios
-            .iter()
-            .zip(is_broadcast.iter())
-            .zip(ir_inputs_all.iter_mut())
-            .zip(chunk_sizes.iter_mut())
-        {
-            if input.is_none() {
-                continue;
-            }
-            let handle = ensure_handle(input.clone());
-            let values = handle
-                .shape_history
-                .permute_vec(&self.device_memories[handle.id].values);
-            if !ib {
-                *chunk_size = Some(values.len() / num_parallel);
-            }
-            *ir_inputs = values;
-        }
-        let mut ir_inputs_per_parallel = Vec::new();
-        for parallel_i in 0..num_parallel {
-            let mut ir_inputs = vec![SIMDField::<C>::zero(); kernel.ir_for_calling().input_size()];
-            for (i, ((input, input_start), input_end)) in ios
-                .iter()
-                .zip(kernel.ir_input_offsets().iter())
-                .zip(kernel.ir_input_offsets().iter().skip(1))
-                .enumerate()
-            {
-                if input.is_none() {
-                    continue;
-                }
-                self.ir_copy_from_device_memory(
-                    &ir_inputs_all[i],
-                    &mut ir_inputs[*input_start..*input_end],
-                    is_broadcast[i],
-                    parallel_i,
-                    chunk_sizes[i],
-                );
-            }
-            ir_inputs_per_parallel.push(ir_inputs);
-        }
-        let ir_outputs_per_parallel: Vec<Result<Vec<SIMDField<C>>, Error>> = ir_inputs_per_parallel
-            .into_par_iter()
-            .map(|ir_inputs| {
-                kernel
-                    .ir_for_calling()
-                    .eval_safe_simd(ir_inputs, &[], &self.hint_caller)
-            })
-            .collect();
-        for ir_outputs in ir_outputs_per_parallel {
-            let ir_outputs = ir_outputs?;
-            for (((spec, output_start), output_end), out) in kernel
-                .io_specs()
-                .iter()
-                .zip(kernel.ir_output_offsets().iter())
-                .zip(kernel.ir_output_offsets().iter().skip(1))
-                .zip(outputs_tmp.iter_mut())
-            {
-                if !spec.is_output {
-                    continue;
-                }
-                out.extend_from_slice(&ir_outputs[*output_start..*output_end]);
-            }
-        }
+        let mut outputs_tmp: Vec<Vec<SIMDField::<C>>> = vec![Vec::new(); kernel.io_specs().len()];
         let input_handles = ios.to_vec();
         let mut output_handles = vec![None; kernel.io_specs().len()];
 
@@ -463,12 +398,13 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 *output = None;
                 continue;
             }
-            let handle = make_device_mem(
-                &mut self.device_memories,
-                ov,
-                shape_prepend(shape, num_parallel),
-            );
-            let id = handle.as_ref().unwrap().id;
+            // let handle = make_device_mem(
+                // &mut self.device_memories,
+                // ov,
+                // shape_prepend(shape, num_parallel),
+            // );
+            // let id = handle.as_ref().unwrap().id;
+            let (handle, id) = self.new_device_memory(shape_prepend(shape, num_parallel));
             self.device_memories[id].required_shape_products = merge_shape_products(
                 &handle
                     .as_ref()
@@ -748,6 +684,92 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             }
         }
         self.state = ContextState::WitnessDone;
+        
+        for kernel_call in self.kernel_calls.iter() {
+            let kernel =  self.kernel_primitives.get(kernel_call.kernel_id);
+            let num_parallel = kernel_call.num_parallel;
+            let is_broadcast = &kernel_call.is_broadcast;
+            
+            let mut ir_inputs_all = vec![Vec::new(); kernel.io_specs().len()];
+            let mut chunk_sizes: Vec<Option<usize>> = vec![None; kernel.io_specs().len()];
+            for (((input, &ib), ir_inputs), chunk_size) in kernel_call.input_handles
+                .iter()
+                .zip(is_broadcast.iter())
+                .zip(ir_inputs_all.iter_mut())
+                .zip(chunk_sizes.iter_mut())
+            {
+                if input.is_none() {
+                    continue;
+                }
+                let handle = ensure_handle(input.clone());
+                let values = handle
+                    .shape_history
+                    .permute_vec(&self.device_memories[handle.id].values);
+                if !ib {
+                    *chunk_size = Some(values.len() / num_parallel);
+                }
+                *ir_inputs = values;
+            }
+            let mut ir_inputs_per_parallel = Vec::new();
+            for parallel_i in 0..num_parallel {
+                let mut ir_inputs = vec![SIMDField::<C>::zero(); kernel.ir_for_calling().input_size()];
+                for (i, ((input, input_start), input_end)) in kernel_call.input_handles
+                    .iter()
+                    .zip(kernel.ir_input_offsets().iter())
+                    .zip(kernel.ir_input_offsets().iter().skip(1))
+                    .enumerate()
+                {
+                    if input.is_none() {
+                        continue;
+                    }
+                    self.ir_copy_from_device_memory(
+                        &ir_inputs_all[i],
+                        &mut ir_inputs[*input_start..*input_end],
+                        is_broadcast[i],
+                        parallel_i,
+                        chunk_sizes[i],
+                    );
+                }
+                ir_inputs_per_parallel.push(ir_inputs);
+            }
+            let ir_outputs_per_parallel: Vec<Result<Vec<SIMDField<C>>, Error>> = ir_inputs_per_parallel
+                .into_par_iter()
+                .map(|ir_inputs| {
+                    kernel
+                        .ir_for_calling()
+                        .eval_safe_simd(ir_inputs, &[], &self.hint_caller)
+                })
+                .collect();
+
+            let mut outputs_tmp: Vec<Vec<SIMDField::<C>>> = vec![Vec::new(); kernel.io_specs().len()];
+            for ir_outputs in ir_outputs_per_parallel {
+                let ir_outputs = ir_outputs?;
+                for (((spec, output_start), output_end), out) in kernel
+                    .io_specs()
+                    .iter()
+                    .zip(kernel.ir_output_offsets().iter())
+                    .zip(kernel.ir_output_offsets().iter().skip(1))
+                    .zip(outputs_tmp.iter_mut())
+                {
+                    if !spec.is_output {
+                        continue;
+                    }
+                    out.extend_from_slice(&ir_outputs[*output_start..*output_end]);
+                }
+            }
+
+            for ((output, spec), ov) in kernel_call.output_handles
+                .iter()
+                .zip(kernel.io_specs().iter())
+                .zip(outputs_tmp.into_iter())
+            {
+                if !spec.is_output {
+                    continue;
+                }
+                let output_id = output.as_ref().unwrap().id;
+                self.device_memories[output_id].values = ov;
+            }
+        }
 
         for (kernel_call, proof_template) in
             self.kernel_calls.iter().zip(self.proof_templates.iter())
