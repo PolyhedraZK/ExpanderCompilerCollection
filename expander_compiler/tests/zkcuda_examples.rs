@@ -116,12 +116,16 @@ fn zkcuda_test_simd_prepare_ctx() -> Context<M31Config> {
             a[i].push(mersenne31::M31x16::pack(&tmp));
         }
     }
-    let a = ctx.copy_simd_to_device(&a);
+    let a_value = a;
+    let (a, a_id) = ctx.new_device_memory(vec![16, 2]);
     let mut b = None;
     call_kernel!(ctx, kernel_add_2, 16, a, mut b).unwrap();
     let b = b.reshape(&[1, 16]);
     let mut c = None;
     call_kernel!(ctx, kernel_add_16, 1, b, mut c).unwrap();
+    ctx.copy_simd_to_device(&a_value, a_id);
+    ctx.solve_result().unwrap();
+
     let c = c.reshape(&[]);
     let result: mersenne31::M31x16 = ctx.copy_simd_to_host(c);
     let result = result.unpack();
@@ -197,21 +201,26 @@ fn zkcuda_test_simd_autopack() {
             }
         }
     }
-    let a = ctx.copy_to_device_and_pack_simd(&a);
+    let a_value = a;
+    let (a, a_id) = ctx.new_device_memory(vec![16, 2]);
     let mut b = None;
     call_kernel!(ctx, kernel_add_2, 16, a, mut b).unwrap();
     let b = b.reshape(&[1, 16]);
     let mut c = None;
     call_kernel!(ctx, kernel_add_16, 1, b, mut c).unwrap();
     let c = c.reshape(&[]);
+
+    type P = Expander<M31Config>;
+    let computation_graph = ctx.compile_computation_graph().unwrap();
+
+    ctx.copy_to_device_and_pack_simd(&a_value, a_id);
+    ctx.solve_witness().unwrap();
+
     let result: Vec<M31> = ctx.copy_to_host_and_unpack_simd(c);
     for k in 0..16 {
         assert_eq!(result[k], M31::from((32 * 33 / 2 + 32 * k) as u32));
     }
 
-    type P = Expander<M31Config>;
-    let computation_graph = ctx.compile_computation_graph().unwrap();
-    ctx.solve_witness().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(
         &prover_setup,
@@ -253,36 +262,38 @@ fn zkcuda_to_binary() {
     let a = a.reshape(&[1]);
     let mut b: DeviceMemoryHandle = None;
     call_kernel!(ctx, kernel, 1, a, mut b).unwrap();
-    let b = b.reshape(&[8]);
-    // let result: Vec<M31> = ctx.copy_to_host(b);
-    // assert_eq!(
-    //     result,
-    //     vec![
-    //         M31::from(1),
-    //         M31::from(0),
-    //         M31::from(1),
-    //         M31::from(0),
-    //         M31::from(1),
-    //         M31::from(0),
-    //         M31::from(1),
-    //         M31::from(0)
-    //     ]
-    // );
 
     type P = Expander<M31Config>;
     let computation_graph = ctx.compile_computation_graph().unwrap();
     let a_value = M31::from(0x55);
     ctx.copy_to_device(&a_value, a_id);
-    // ctx.solve_witness().unwrap();
+    ctx.solve_witness().unwrap();
     println!("{:?}", computation_graph);
-    // println!("{:?}", ctx.export_device_memories());
-    // let (prover_setup, verifier_setup) = P::setup(&computation_graph);
-    // let proof = P::prove(
-    //     &prover_setup,
-    //     &computation_graph,
-    //     &ctx.export_device_memories(),
-    // );
-    // assert!(P::verify(&verifier_setup, &computation_graph, &proof));
+
+    let b = b.reshape(&[8]);
+    let result: Vec<M31> = ctx.copy_to_host(b);
+    assert_eq!(
+        result,
+        vec![
+            M31::from(1),
+            M31::from(0),
+            M31::from(1),
+            M31::from(0),
+            M31::from(1),
+            M31::from(0),
+            M31::from(1),
+            M31::from(0)
+        ]
+    );
+
+    println!("{:?}", ctx.export_device_memories());
+    let (prover_setup, verifier_setup) = P::setup(&computation_graph);
+    let proof = P::prove(
+        &prover_setup,
+        &computation_graph,
+        &ctx.export_device_memories(),
+    );
+    assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 }
 
 #[kernel]

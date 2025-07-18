@@ -237,7 +237,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
     ) {
         assert!(device_memory_id < self.device_memories.len(), "The device memory dosen't exist.");
         let (flat, shape) = flatten_shaped(host_memory);
-        assert_eq!(shape_vec_len(&shape), shape_vec_len(&self.device_memories[device_memory_id].required_shape_products), "The len of values doesn't match.");
+        // assert_eq!(shape_vec_len(&shape), shape_vec_len(&self.device_memories[device_memory_id].required_shape_products), "The len of values doesn't match.");
         let simd_flat = pack_vec::<C>(&flat);
         self.device_memories[device_memory_id].values = simd_flat;
     }
@@ -245,17 +245,22 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
     pub fn copy_to_device_and_pack_simd<T: VecShaped<CircuitField<C>>>(
         &mut self,
         host_memory: &T,
-    ) -> DeviceMemoryHandle {
+        device_memory_id: usize,
+    ) {
+        assert!(device_memory_id < self.device_memories.len(), "The device memory dosen't exist.");
         let (flat, shape) = flatten_shaped_pack_simd(host_memory);
-        make_device_mem(&mut self.device_memories, flat, shape)
+        self.device_memories[device_memory_id].values = flat;
     }
 
     pub fn copy_simd_to_device<T: VecShaped<SIMDField<C>>>(
         &mut self,
         host_memory: &T,
-    ) -> DeviceMemoryHandle {
+        device_memory_id: usize,
+    ) {
+        assert!(device_memory_id < self.device_memories.len(), "The device memory dosen't exist.");
         let (flat, shape) = flatten_shaped(host_memory);
-        make_device_mem(&mut self.device_memories, flat, shape)
+        // assert_eq!(shape_vec_len(&shape), shape_vec_len(&self.device_memories[device_memory_id].required_shape_products), "The len of values doesn't match.");
+        self.device_memories[device_memory_id].values = flat;
     }
 
     pub fn copy_to_host<T: VecShaped<CircuitField<C>> + Default>(
@@ -383,7 +388,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
 
         let kernel_id = self.kernel_primitives.add(kernel);
 
-        let mut outputs_tmp: Vec<Vec<SIMDField::<C>>> = vec![Vec::new(); kernel.io_specs().len()];
+        let outputs_tmp: Vec<Vec<SIMDField::<C>>> = vec![Vec::new(); kernel.io_specs().len()];
         let input_handles = ios.to_vec();
         let mut output_handles = vec![None; kernel.io_specs().len()];
 
@@ -672,19 +677,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         Ok(())
     }
 
-    // actually, this function computes hints
-    pub fn solve_witness(&mut self) -> Result<(), Error> {
-        match self.state {
-            ContextState::ComputationGraphNotDone => {
-                panic!("Please compile computation graph first.");
-            }
-            ContextState::ComputationGraphDone => {}
-            ContextState::WitnessDone => {
-                panic!("Witness already solved.");
-            }
-        }
-        self.state = ContextState::WitnessDone;
-        
+    pub fn solve_result(&mut self) -> Result<(), Error> {
         for kernel_call in self.kernel_calls.iter() {
             let kernel =  self.kernel_primitives.get(kernel_call.kernel_id);
             let num_parallel = kernel_call.num_parallel;
@@ -770,6 +763,24 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 self.device_memories[output_id].values = ov;
             }
         }
+
+        Ok(())
+    }
+
+    // actually, this function computes hints
+    pub fn solve_witness(&mut self) -> Result<(), Error> {
+        match self.state {
+            ContextState::ComputationGraphNotDone => {
+                panic!("Please compile computation graph first.");
+            }
+            ContextState::ComputationGraphDone => {}
+            ContextState::WitnessDone => {
+                panic!("Witness already solved.");
+            }
+        }
+        self.state = ContextState::WitnessDone;
+        
+        self.solve_result();
 
         for (kernel_call, proof_template) in
             self.kernel_calls.iter().zip(self.proof_templates.iter())
