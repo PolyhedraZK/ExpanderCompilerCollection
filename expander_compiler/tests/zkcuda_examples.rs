@@ -36,8 +36,6 @@ fn zkcuda_test<C: Config, P: ProvingSystem<C>>() {
     let mut c: DeviceMemoryHandle = None;
     call_kernel!(ctx, kernel_add_16, 1, b, mut c).unwrap();
     let c = c.reshape(&[]);
-    let result: CircuitField<C> = ctx.copy_to_host(c);
-    assert_eq!(result, CircuitField::<C>::from(32 * 33 / 2));
 
     let computation_graph = ctx.compile_computation_graph().unwrap();
 
@@ -51,6 +49,10 @@ fn zkcuda_test<C: Config, P: ProvingSystem<C>>() {
     ctx.copy_to_device(&a_values, a_id);
 
     ctx.solve_witness().unwrap();
+
+    let result: CircuitField<C> = ctx.copy_to_host(c);
+    assert_eq!(result, CircuitField::<C>::from(32 * 33 / 2));
+
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(
         &prover_setup,
