@@ -48,6 +48,7 @@ sha2 = "0.10.8"
 [features]
 default = []
 profile = ["expander_utils/profile"]
+zkcuda_profile = []
 
 [[bin]]
 name = "trivial_circuit"

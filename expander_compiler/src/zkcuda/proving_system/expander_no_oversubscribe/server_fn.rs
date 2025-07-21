@@ -1,5 +1,5 @@
 use arith::Fr;
-use gkr_engine::{FieldEngine, GKREngine, MPIConfig};
+use gkr_engine::{FieldEngine, GKREngine, MPIConfig, MPIEngine};
 
 use crate::{
     frontend::SIMDField,
@@ -10,7 +10,9 @@ use crate::{
                 config::{GetFieldConfig, GetPCS, ZKCudaConfig},
                 structs::{ExpanderProverSetup, ExpanderVerifierSetup},
             },
-            expander_no_oversubscribe::prove_impl::mpi_prove_no_oversubscribe_impl,
+            expander_no_oversubscribe::{
+                profiler::NBytesProfiler, prove_impl::mpi_prove_no_oversubscribe_impl,
+            },
             expander_parallelized::{server_ctrl::SharedMemoryWINWrapper, server_fns::ServerFns},
             CombinedProof, Expander, ExpanderNoOverSubscribe, ExpanderPCSDefered,
             ParallelizedExpander,
@@ -56,12 +58,12 @@ where
         computation_graph: &ComputationGraph<ZC::ECCConfig>,
         values: &[impl AsRef<[SIMDField<ZC::ECCConfig>]>],
     ) -> Option<CombinedProof<ZC::ECCConfig, Expander<ZC::GKRConfig>>> {
-        #[cfg(feature = "profile")]
+        let mut n_bytes_profiler = NBytesProfiler::new();
+
+        #[cfg(feature = "zkcuda_profile")]
         {
-            use crate::zkcuda::proving_system::expander_no_oversubscribe::profiler::NBytesProfiler;
             use arith::SimdField;
 
-            let mut n_bytes_profiler = NBytesProfiler::new();
             values.iter().for_each(|vals| {
                 vals.as_ref().iter().for_each(|fr| {
                     let fr_unpacked = fr.unpack();
@@ -72,11 +74,18 @@ where
             n_bytes_profiler.print_stats();
         }
 
-        mpi_prove_no_oversubscribe_impl::<ZC>(
+        let proof = mpi_prove_no_oversubscribe_impl::<ZC>(
             global_mpi_config,
             prover_setup,
             computation_graph,
             values,
-        )
+            &mut n_bytes_profiler,
+        );
+
+        if global_mpi_config.is_root() {
+            n_bytes_profiler.print_stats();
+        }
+
+        proof
     }
 }

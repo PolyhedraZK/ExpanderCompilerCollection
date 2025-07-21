@@ -1,4 +1,4 @@
-#[cfg(feature = "profile")]
+#[cfg(feature = "zkcuda_profile")]
 mod profiler_enabled {
     use std::collections::HashMap;
 
@@ -36,7 +36,7 @@ mod profiler_enabled {
     }
 }
 
-#[cfg(not(feature = "profile"))]
+#[cfg(not(feature = "zkcuda_profile"))]
 mod profiler_disabled {
     use arith::Fr;
 
@@ -56,12 +56,12 @@ mod profiler_disabled {
     }
 }
 
-#[cfg(not(feature = "profile"))]
+#[cfg(not(feature = "zkcuda_profile"))]
 pub use profiler_disabled::NBytesProfiler;
-#[cfg(feature = "profile")]
+#[cfg(feature = "zkcuda_profile")]
 pub use profiler_enabled::NBytesProfiler;
 
-#[cfg(feature = "profile")]
+#[cfg(feature = "zkcuda_profile")]
 mod test {
     #![allow(unused_imports)]
     use super::NBytesProfiler;

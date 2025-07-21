@@ -20,6 +20,7 @@ use crate::{
                 },
                 structs::{ExpanderProof, ExpanderProverSetup},
             },
+            expander_no_oversubscribe::profiler::NBytesProfiler,
             expander_parallelized::{
                 prove_impl::partition_single_gkr_claim_and_open_pcs_mpi,
                 server_ctrl::generate_local_mpi_config,
@@ -37,6 +38,7 @@ pub fn mpi_prove_no_oversubscribe_impl<ZC: ZKCudaConfig>(
     prover_setup: &ExpanderProverSetup<GetFieldConfig<ZC>, GetPCS<ZC>>,
     computation_graph: &ComputationGraph<ZC::ECCConfig>,
     values: &[impl AsRef<[SIMDField<ZC::ECCConfig>]>],
+    n_bytes_profiler: &mut NBytesProfiler,
 ) -> Option<CombinedProof<ZC::ECCConfig, Expander<ZC::GKRConfig>>>
 where
     <ZC::GKRConfig as GKREngine>::FieldConfig: FieldEngine<CircuitField = Fr, ChallengeField = Fr>,
@@ -88,6 +90,7 @@ where
                     &commitment_values,
                     next_power_of_two(template.parallel_count()),
                     template.is_broadcast(),
+                    n_bytes_profiler,
                 );
                 single_kernel_gkr_timer.stop();
 
@@ -197,6 +200,7 @@ pub fn prove_kernel_gkr_no_oversubscribe<F, T, ECCConfig>(
     commitments_values: &[&[F::SimdCircuitField]],
     parallel_count: usize,
     is_broadcast: &[bool],
+    n_bytes_profiler: &mut NBytesProfiler,
 ) -> Option<(T, ExpanderDualVarChallenge<F>)>
 where
     F: FieldEngine<CircuitField = Fr, ChallengeField = Fr>,
@@ -218,6 +222,7 @@ where
             commitments_values,
             parallel_count,
             is_broadcast,
+            n_bytes_profiler,
         ),
         2 => prove_kernel_gkr_internal::<F, BN254ConfigXN<2>, T, ECCConfig>(
             &local_mpi_config,
@@ -225,6 +230,7 @@ where
             commitments_values,
             parallel_count,
             is_broadcast,
+            n_bytes_profiler,
         ),
         4 => prove_kernel_gkr_internal::<F, BN254ConfigXN<4>, T, ECCConfig>(
             &local_mpi_config,
@@ -232,6 +238,7 @@ where
             commitments_values,
             parallel_count,
             is_broadcast,
+            n_bytes_profiler,
         ),
         8 => prove_kernel_gkr_internal::<F, BN254ConfigXN<8>, T, ECCConfig>(
             &local_mpi_config,
@@ -239,6 +246,7 @@ where
             commitments_values,
             parallel_count,
             is_broadcast,
+            n_bytes_profiler,
         ),
         16 => prove_kernel_gkr_internal::<F, BN254ConfigXN<16>, T, ECCConfig>(
             &local_mpi_config,
@@ -246,6 +254,7 @@ where
             commitments_values,
             parallel_count,
             is_broadcast,
+            n_bytes_profiler,
         ),
         32 => prove_kernel_gkr_internal::<F, BN254ConfigXN<32>, T, ECCConfig>(
             &local_mpi_config,
@@ -253,6 +262,7 @@ where
             commitments_values,
             parallel_count,
             is_broadcast,
+            n_bytes_profiler,
         ),
         64 => prove_kernel_gkr_internal::<F, BN254ConfigXN<64>, T, ECCConfig>(
             &local_mpi_config,
@@ -260,6 +270,7 @@ where
             commitments_values,
             parallel_count,
             is_broadcast,
+            n_bytes_profiler,
         ),
         128 => prove_kernel_gkr_internal::<F, BN254ConfigXN<128>, T, ECCConfig>(
             &local_mpi_config,
@@ -267,6 +278,7 @@ where
             commitments_values,
             parallel_count,
             is_broadcast,
+            n_bytes_profiler,
         ),
         256 => prove_kernel_gkr_internal::<F, BN254ConfigXN<256>, T, ECCConfig>(
             &local_mpi_config,
@@ -274,6 +286,7 @@ where
             commitments_values,
             parallel_count,
             is_broadcast,
+            n_bytes_profiler,
         ),
         512 => prove_kernel_gkr_internal::<F, BN254ConfigXN<512>, T, ECCConfig>(
             &local_mpi_config,
@@ -281,6 +294,7 @@ where
             commitments_values,
             parallel_count,
             is_broadcast,
+            n_bytes_profiler,
         ),
         1024 => prove_kernel_gkr_internal::<F, BN254ConfigXN<1024>, T, ECCConfig>(
             &local_mpi_config,
@@ -288,6 +302,7 @@ where
             commitments_values,
             parallel_count,
             is_broadcast,
+            n_bytes_profiler,
         ),
         2048 => prove_kernel_gkr_internal::<F, BN254ConfigXN<2048>, T, ECCConfig>(
             &local_mpi_config,
@@ -295,6 +310,7 @@ where
             commitments_values,
             parallel_count,
             is_broadcast,
+            n_bytes_profiler,
         ),
         _ => {
             panic!("Unsupported parallel count: {parallel_count}");
@@ -308,6 +324,7 @@ pub fn prove_kernel_gkr_internal<FBasic, FMulti, T, ECCConfig>(
     commitments_values: &[&[FBasic::SimdCircuitField]],
     parallel_count: usize,
     is_broadcast: &[bool],
+    n_bytes_profiler: &mut NBytesProfiler,
 ) -> Option<(T, ExpanderDualVarChallenge<FBasic>)>
 where
     FBasic: FieldEngine<CircuitField = Fr, ChallengeField = Fr>,
@@ -339,6 +356,7 @@ where
         kernel.layered_circuit_input(),
         &mut transcript,
         mpi_config,
+        n_bytes_profiler,
     );
 
     Some((transcript, challenge))
@@ -370,6 +388,7 @@ pub fn prove_gkr_with_local_vals_multi_copies<FBasic, FMulti, T>(
     partition_info: &[LayeredCircuitInputVec],
     transcript: &mut T,
     mpi_config: &MPIConfig,
+    _n_bytes_profiler: &mut NBytesProfiler,
 ) -> ExpanderDualVarChallenge<FBasic>
 where
     FBasic: FieldEngine<CircuitField = Fr, ChallengeField = Fr>,
@@ -402,6 +421,18 @@ where
 
     expander_circuit.fill_rnd_coefs(transcript);
     expander_circuit.evaluate();
+
+    #[cfg(feature = "zkcuda_profile")]
+    {
+        expander_circuit.layers.iter().for_each(|layer| {
+            layer.input_vals.iter().for_each(|val| {
+                val.unpack().iter().for_each(|fr| {
+                    _n_bytes_profiler.add_fr(*fr);
+                })
+            });
+        });
+    }
+
     let (claimed_v, challenge) =
         gkr::gkr_prove(expander_circuit, prover_scratch, transcript, mpi_config);
     assert_eq!(claimed_v, FBasic::ChallengeField::from(0u32));
