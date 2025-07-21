@@ -56,6 +56,21 @@ where
         computation_graph: &ComputationGraph<ZC::ECCConfig>,
         values: &[impl AsRef<[SIMDField<ZC::ECCConfig>]>],
     ) -> Option<CombinedProof<ZC::ECCConfig, Expander<ZC::GKRConfig>>> {
+        #[cfg(feature = "profile")]
+        {
+            use arith::SimdField;
+            use expander_no_oversubscribe::prove_impl::NBytesProfiler;
+
+            let n_bytes_profiler = NBytesProfiler::new();
+            values.iter().for_each(|vals| {
+                vals.as_ref().iter().for_each(|fr| {
+                    let fr_unpacked = fr.unpack();
+                    assert!(fr_unpacked.len() == 1);
+                    n_bytes_profiler.add_fr(fr_unpacked[0]);
+                });
+            });
+        }
+
         mpi_prove_no_oversubscribe_impl::<ZC>(
             global_mpi_config,
             prover_setup,

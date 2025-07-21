@@ -310,7 +310,7 @@ pub fn prove_kernel_gkr_internal<FBasic, FMulti, T, ECCConfig>(
     is_broadcast: &[bool],
 ) -> Option<(T, ExpanderDualVarChallenge<FBasic>)>
 where
-    FBasic: FieldEngine,
+    FBasic: FieldEngine<CircuitField = Fr, ChallengeField = Fr>,
     FMulti:
         FieldEngine<CircuitField = FBasic::CircuitField, ChallengeField = FBasic::ChallengeField>,
     T: Transcript,
@@ -372,7 +372,7 @@ pub fn prove_gkr_with_local_vals_multi_copies<FBasic, FMulti, T>(
     mpi_config: &MPIConfig,
 ) -> ExpanderDualVarChallenge<FBasic>
 where
-    FBasic: FieldEngine,
+    FBasic: FieldEngine<CircuitField = Fr, ChallengeField = Fr>,
     FMulti:
         FieldEngine<CircuitField = FBasic::CircuitField, ChallengeField = FBasic::ChallengeField>,
     T: Transcript,
@@ -390,6 +390,7 @@ where
 
     let mut input_vals =
         vec![FMulti::SimdCircuitField::ZERO; 1 << expander_circuit.log_input_size()];
+
     for (i, vals) in input_vals.iter_mut().enumerate() {
         let vals_unpacked = input_vals_multi_copies
             .iter()
@@ -403,7 +404,7 @@ where
     expander_circuit.evaluate();
     let (claimed_v, challenge) =
         gkr::gkr_prove(expander_circuit, prover_scratch, transcript, mpi_config);
-    assert_eq!(claimed_v, FBasic::ChallengeField::from(0));
+    assert_eq!(claimed_v, FBasic::ChallengeField::from(0u32));
 
     let n_simd_vars_basic = FBasic::SimdCircuitField::PACK_SIZE.ilog2() as usize;
 
