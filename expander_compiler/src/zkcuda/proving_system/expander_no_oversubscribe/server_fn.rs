@@ -63,6 +63,7 @@ where
         #[cfg(feature = "zkcuda_profile")]
         {
             use arith::SimdField;
+            use gkr_engine::MPIEngine;
 
             values.iter().for_each(|vals| {
                 vals.as_ref().iter().for_each(|fr| {
@@ -87,6 +88,8 @@ where
 
         #[cfg(feature = "zkcuda_profile")]
         {
+            use gkr_engine::MPIEngine;
+
             if global_mpi_config.is_root() {
                 println!("NBytesProfiler stats after proving:");
                 n_bytes_profiler.print_stats();
