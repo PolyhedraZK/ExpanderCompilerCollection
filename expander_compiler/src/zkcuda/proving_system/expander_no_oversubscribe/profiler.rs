@@ -63,6 +63,10 @@ pub use profiler_enabled::NBytesProfiler;
 
 #[cfg(feature = "profile")]
 mod test {
+    #![allow(unused_imports)]
+    use super::NBytesProfiler;
+    use arith::Fr;
+
     #[test]
     fn test_n_bytes_profiler() {
         let mut profiler = NBytesProfiler::new();

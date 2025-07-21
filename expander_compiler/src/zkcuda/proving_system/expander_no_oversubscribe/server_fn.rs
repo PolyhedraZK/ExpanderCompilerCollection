@@ -58,8 +58,8 @@ where
     ) -> Option<CombinedProof<ZC::ECCConfig, Expander<ZC::GKRConfig>>> {
         #[cfg(feature = "profile")]
         {
-            use arith::SimdField;
             use crate::zkcuda::proving_system::expander_no_oversubscribe::profiler::NBytesProfiler;
+            use arith::SimdField;
 
             let mut n_bytes_profiler = NBytesProfiler::new();
             values.iter().for_each(|vals| {
