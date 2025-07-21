@@ -59,9 +59,9 @@ where
         #[cfg(feature = "profile")]
         {
             use arith::SimdField;
-            use expander_no_oversubscribe::prove_impl::NBytesProfiler;
+            use crate::zkcuda::proving_system::expander_no_oversubscribe::profiler::NBytesProfiler;
 
-            let n_bytes_profiler = NBytesProfiler::new();
+            let mut n_bytes_profiler = NBytesProfiler::new();
             values.iter().for_each(|vals| {
                 vals.as_ref().iter().for_each(|fr| {
                     let fr_unpacked = fr.unpack();

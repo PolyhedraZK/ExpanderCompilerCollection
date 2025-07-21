@@ -30,7 +30,7 @@ mod profiler_enabled {
 
         pub fn print_stats(&self) {
             for (bytes, count) in &self.bytes_stats {
-                println!("{} bytes: {}", bytes, count);
+                println!("{bytes} bytes: {count}");
             }
         }
     }
@@ -63,10 +63,6 @@ pub use profiler_enabled::NBytesProfiler;
 
 #[cfg(feature = "profile")]
 mod test {
-    use arith::Fr;
-
-    use super::profiler_enabled::NBytesProfiler;
-
     #[test]
     fn test_n_bytes_profiler() {
         let mut profiler = NBytesProfiler::new();
