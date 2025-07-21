@@ -1,5 +1,5 @@
 use arith::Fr;
-use gkr_engine::{FieldEngine, GKREngine, MPIConfig, MPIEngine};
+use gkr_engine::{FieldEngine, GKREngine, MPIConfig};
 
 use crate::{
     frontend::SIMDField,
