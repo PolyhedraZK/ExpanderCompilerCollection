@@ -69,6 +69,7 @@ where
                     n_bytes_profiler.add_fr(fr_unpacked[0]);
                 });
             });
+            n_bytes_profiler.print_stats();
         }
 
         mpi_prove_no_oversubscribe_impl::<ZC>(
