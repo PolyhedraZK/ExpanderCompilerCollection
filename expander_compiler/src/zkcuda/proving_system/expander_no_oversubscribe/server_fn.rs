@@ -71,7 +71,10 @@ where
                     n_bytes_profiler.add_fr(fr_unpacked[0]);
                 });
             });
-            n_bytes_profiler.print_stats();
+            if global_mpi_config.is_root() {
+                println!("NBytesProfiler stats before proving:");
+                n_bytes_profiler.print_stats();
+            }
         }
 
         let proof = mpi_prove_no_oversubscribe_impl::<ZC>(
@@ -82,8 +85,12 @@ where
             &mut n_bytes_profiler,
         );
 
-        if global_mpi_config.is_root() {
-            n_bytes_profiler.print_stats();
+        #[cfg(feature = "zkcuda_profile")]
+        {
+            if global_mpi_config.is_root() {
+                println!("NBytesProfiler stats after proving:");
+                n_bytes_profiler.print_stats();
+            }
         }
 
         proof
