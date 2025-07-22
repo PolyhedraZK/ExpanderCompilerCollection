@@ -58,8 +58,8 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
         let verification_timer = Timer::new("Verify all kernels", true);
         let verified = proof
             .proofs
-            .par_iter()
-            .zip(computation_graph.proof_templates().par_iter())
+            .iter()
+            .zip(computation_graph.proof_templates().iter())
             .map(|(local_proof, template)| {
                 let local_commitments = template
                     .commitment_indices()

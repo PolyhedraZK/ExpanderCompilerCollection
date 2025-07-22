@@ -155,8 +155,8 @@ where
     let gkr_verification_timer = Timer::new("GKR Verification", true);
     let verified_with_pcs_claims = proof
         .proofs
-        .par_iter()
-        .zip(computation_graph.proof_templates().par_iter())
+        .iter()
+        .zip(computation_graph.proof_templates().iter())
         .map(|(local_proof, template)| {
             let local_commitments = template
                 .commitment_indices()
