@@ -2,7 +2,6 @@ use expander_utils::timer::Timer;
 use gkr_engine::{ExpanderPCS, GKREngine, MPIConfig, StructuredReferenceString};
 use polynomials::RefMultiLinearPoly;
 
-use super::structs::ExpanderProverSetup;
 use crate::{
     frontend::{Config, SIMDField},
     zkcuda::proving_system::expander::structs::{ExpanderCommitment, ExpanderCommitmentState},

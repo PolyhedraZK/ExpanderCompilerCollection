@@ -1,4 +1,3 @@
-use arith::Field;
 use expander_utils::timer::Timer;
 use gkr_engine::{
     ExpanderPCS, ExpanderSingleVarChallenge, GKREngine, MPIConfig, MPIEngine, Proof as BytesProof,
@@ -45,7 +44,7 @@ where
     assert!(len_to_commit >= actual_len);
 
     let (mut commitment, state) =
-        local_commit_impl::<C, ECCConfig>(prover_setup.p_keys.get(&len_to_commit).unwrap(), &vals);
+        local_commit_impl::<C, ECCConfig>(prover_setup.p_keys.get(&len_to_commit).unwrap(), vals);
 
     commitment.vals_len = actual_len; // Store the actual length in the commitment
     (commitment, state)

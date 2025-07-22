@@ -16,7 +16,6 @@ use super::super::Expander;
 
 use expander_utils::timer::Timer;
 use gkr_engine::GKREngine;
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 
 pub struct ParallelizedExpander<C: GKREngine> {
     _config: std::marker::PhantomData<C>,

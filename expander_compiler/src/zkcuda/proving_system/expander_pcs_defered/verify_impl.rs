@@ -7,7 +7,6 @@ use gkr_engine::{
     ExpanderDualVarChallenge, ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine,
     Proof as BytesProof, Transcript,
 };
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use serdes::ExpSerde;
 
 use crate::{
