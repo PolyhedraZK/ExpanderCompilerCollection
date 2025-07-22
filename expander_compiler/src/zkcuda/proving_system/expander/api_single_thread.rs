@@ -1,4 +1,4 @@
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use std::io::Cursor;
 
 use crate::circuit::config::Config;
