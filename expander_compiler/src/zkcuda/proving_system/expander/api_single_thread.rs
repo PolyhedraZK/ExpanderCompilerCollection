@@ -52,7 +52,7 @@ where
         prover_setup: &Self::ProverSetup,
         vals: &[SIMDField<C>],
     ) -> (Self::Commitment, Self::CommitmentState) {
-        local_commit_impl::<C, ECCConfig>(prover_setup, vals)
+        local_commit_impl::<C, ECCConfig>(prover_setup.p_keys.get(&vals.len()).unwrap(), vals)
     }
 
     fn prove_kernel(

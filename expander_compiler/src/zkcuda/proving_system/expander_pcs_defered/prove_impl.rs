@@ -27,7 +27,7 @@ use crate::{
     },
 };
 
-pub fn pad_vals_and_commit<C, ECCConfig>(
+pub fn max_len_setup_commit_impl<C, ECCConfig>(
     prover_setup: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
     vals: &[SIMDField<C>],
 ) -> (
@@ -44,11 +44,8 @@ where
     let actual_len = vals.len();
     assert!(len_to_commit >= actual_len);
 
-    // padding to max length and commit, this may be very inefficient
-    // TODO: optimize this
-    let mut vals = vals.to_vec();
-    vals.resize(len_to_commit, SIMDField::<C>::ZERO);
-    let (mut commitment, state) = local_commit_impl::<C, ECCConfig>(prover_setup, &vals);
+    let (mut commitment, state) =
+        local_commit_impl::<C, ECCConfig>(prover_setup.p_keys.get(&len_to_commit).unwrap(), &vals);
 
     commitment.vals_len = actual_len; // Store the actual length in the commitment
     (commitment, state)
@@ -114,7 +111,7 @@ where
     let (commitments, _states) = if global_mpi_config.is_root() {
         let (commitments, states) = values
             .iter()
-            .map(|value| pad_vals_and_commit::<C, ECCConfig>(prover_setup, value.as_ref()))
+            .map(|value| max_len_setup_commit_impl::<C, ECCConfig>(prover_setup, value.as_ref()))
             .unzip::<_, _, Vec<_>, Vec<_>>();
         (Some(commitments), Some(states))
     } else {

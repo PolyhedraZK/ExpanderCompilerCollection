@@ -26,7 +26,7 @@ use crate::{
                 server_ctrl::generate_local_mpi_config,
             },
             expander_pcs_defered::prove_impl::{
-                extract_pcs_claims, open_defered_pcs, pad_vals_and_commit,
+                extract_pcs_claims, max_len_setup_commit_impl, open_defered_pcs,
             },
             CombinedProof, Expander,
         },
@@ -48,13 +48,14 @@ where
         let (commitments, states) = values
             .iter()
             .map(|value| match ZC::BATCH_PCS {
-                true => pad_vals_and_commit::<ZC::GKRConfig, ZC::ECCConfig>(
+                true => max_len_setup_commit_impl::<ZC::GKRConfig, ZC::ECCConfig>(
                     prover_setup,
                     value.as_ref(),
                 ),
-                false => {
-                    local_commit_impl::<ZC::GKRConfig, ZC::ECCConfig>(prover_setup, value.as_ref())
-                }
+                false => local_commit_impl::<ZC::GKRConfig, ZC::ECCConfig>(
+                    prover_setup.p_keys.get(&value.as_ref().len()).unwrap(),
+                    value.as_ref(),
+                ),
             })
             .unzip::<_, _, Vec<_>, Vec<_>>();
         (Some(commitments), Some(states))

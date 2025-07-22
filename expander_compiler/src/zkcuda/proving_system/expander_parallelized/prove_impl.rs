@@ -40,7 +40,12 @@ where
     let (commitments, states) = if global_mpi_config.is_root() {
         let (commitments, states) = values
             .iter()
-            .map(|value| local_commit_impl::<C, ECCConfig>(prover_setup, value.as_ref()))
+            .map(|value| {
+                local_commit_impl::<C, ECCConfig>(
+                    prover_setup.p_keys.get(&value.as_ref().len()).unwrap(),
+                    value.as_ref(),
+                )
+            })
             .unzip::<_, _, Vec<_>, Vec<_>>();
         (Some(commitments), Some(states))
     } else {
