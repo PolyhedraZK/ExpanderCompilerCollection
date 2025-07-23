@@ -235,7 +235,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         host_memory: &T,
         device_memory_id: usize,
     ) {
-        assert!(device_memory_id < self.device_memories.len(), "The device memory dosen't exist.");
+        assert!(device_memory_id < self.device_memories.len(), "The device memory doesn't exist.");
         let (flat, shape) = flatten_shaped(host_memory);
         // assert_eq!(shape_vec_len(&shape), shape_vec_len(&self.device_memories[device_memory_id].required_shape_products), "The len of values doesn't match.");
         let simd_flat = pack_vec::<C>(&flat);
@@ -403,12 +403,6 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 *output = None;
                 continue;
             }
-            // let handle = make_device_mem(
-                // &mut self.device_memories,
-                // ov,
-                // shape_prepend(shape, num_parallel),
-            // );
-            // let id = handle.as_ref().unwrap().id;
             let (handle, id) = self.new_device_memory(shape_prepend(shape, num_parallel));
             self.device_memories[id].required_shape_products = merge_shape_products(
                 &handle
@@ -679,7 +673,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
 
     pub fn solve_result(&mut self) -> Result<(), Error> {
         for kernel_call in self.kernel_calls.iter() {
-            let kernel =  self.kernel_primitives.get(kernel_call.kernel_id);
+            let kernel = self.kernel_primitives.get(kernel_call.kernel_id);
             let num_parallel = kernel_call.num_parallel;
             let is_broadcast = &kernel_call.is_broadcast;
             

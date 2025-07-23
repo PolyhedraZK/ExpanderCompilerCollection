@@ -28,7 +28,7 @@ fn zkcuda_test<C: Config, P: ProvingSystem<C>>() {
 
     let mut ctx: Context<C> = Context::default();
     let a_shape = vec![16, 2];
-    let (a , a_id) = ctx.new_device_memory(a_shape);
+    let (a, a_id) = ctx.new_device_memory(a_shape);
     // let a = ctx.copy_to_device(&a);
     let mut b: DeviceMemoryHandle = None;
     call_kernel!(ctx, kernel_add_2, 16, a, mut b).unwrap();
