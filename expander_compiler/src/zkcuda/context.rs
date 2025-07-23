@@ -247,7 +247,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         host_memory: &T,
         device_memory_id: usize,
     ) {
-        assert!(device_memory_id < self.device_memories.len(), "The device memory dosen't exist.");
+        assert!(device_memory_id < self.device_memories.len(), "The device memory doesn't exist.");
         let (flat, shape) = flatten_shaped_pack_simd(host_memory);
         self.device_memories[device_memory_id].values = flat;
     }
@@ -257,7 +257,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         host_memory: &T,
         device_memory_id: usize,
     ) {
-        assert!(device_memory_id < self.device_memories.len(), "The device memory dosen't exist.");
+        assert!(device_memory_id < self.device_memories.len(), "The device memory doesn't exist.");
         let (flat, shape) = flatten_shaped(host_memory);
         // assert_eq!(shape_vec_len(&shape), shape_vec_len(&self.device_memories[device_memory_id].required_shape_products), "The len of values doesn't match.");
         self.device_memories[device_memory_id].values = flat;
