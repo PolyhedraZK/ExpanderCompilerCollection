@@ -114,6 +114,12 @@ impl Entry {
         let mut cur_ts_prod = 1;
         let mut cur_ts_idx = 0;
         for &x in products.iter().skip(1) {
+            while ts[cur_ts_idx] == 1 && cur_ts_idx < ts.len() {
+                cur_ts_idx += 1;
+            }
+            if cur_ts_idx >= ts.len() {
+                break;
+            }
             segments_in_ts[self.axes.as_ref().unwrap()[cur_ts_idx]].push(x / cur_ts_prod);
             if x == cur_ts_prod * ts[cur_ts_idx] {
                 cur_ts_prod = x;
