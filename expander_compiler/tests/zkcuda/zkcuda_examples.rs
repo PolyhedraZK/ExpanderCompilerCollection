@@ -1,9 +1,15 @@
 use expander_compiler::frontend::*;
-use expander_compiler::zkcuda::proving_system::{Expander, ParallelizedExpander, ProvingSystem};
+use expander_compiler::zkcuda::proving_system::expander::config::{
+    ZKCudaBN254KZG, ZKCudaBN254KZGBatchPCS,
+};
+use expander_compiler::zkcuda::proving_system::expander_pcs_defered::BN254ConfigSha2UniKZG;
+use expander_compiler::zkcuda::proving_system::{
+    Expander, ExpanderNoOverSubscribe, ParallelizedExpander, ProvingSystem,
+};
 use expander_compiler::zkcuda::shape::Reshape;
 use expander_compiler::zkcuda::{context::*, kernel::*};
 
-use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
+use gkr::BN254ConfigSha2Hyrax;
 use serdes::ExpSerde;
 
 #[kernel]
@@ -50,7 +56,7 @@ fn zkcuda_test<C: Config, P: ProvingSystem<C>>() {
     let proof = P::prove(
         &prover_setup,
         &computation_graph,
-        &ctx.export_device_memories(),
+        ctx.export_device_memories(),
     );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
     P::post_process();
@@ -74,7 +80,7 @@ fn zkcuda_test_single_core() {
     zkcuda_test::<BabyBearConfig, Expander<BabyBearConfig>>();
     zkcuda_test::<BN254Config, Expander<BN254Config>>();
     zkcuda_test::<BN254Config, Expander<BN254ConfigSha2Hyrax>>();
-    zkcuda_test::<BN254Config, Expander<BN254ConfigSha2KZG>>();
+    zkcuda_test::<BN254Config, Expander<BN254ConfigSha2UniKZG>>();
 }
 
 #[test]
@@ -85,7 +91,12 @@ fn zkcuda_test_multi_core() {
     zkcuda_test::<BabyBearConfig, ParallelizedExpander<BabyBearConfig>>();
     zkcuda_test::<BN254Config, ParallelizedExpander<BN254Config>>();
     zkcuda_test::<BN254Config, ParallelizedExpander<BN254ConfigSha2Hyrax>>();
-    zkcuda_test::<BN254Config, ParallelizedExpander<BN254ConfigSha2KZG>>();
+    zkcuda_test::<BN254Config, ParallelizedExpander<BN254ConfigSha2UniKZG>>();
+
+    // zkcuda_test::<_, ExpanderNoOverSubscribe<ZKCudaBN254Hyrax>>();
+    // zkcuda_test::<_, ExpanderNoOverSubscribe<ZKCudaBN254HyraxBatchPCS>>();
+    zkcuda_test::<_, ExpanderNoOverSubscribe<ZKCudaBN254KZG>>();
+    zkcuda_test::<_, ExpanderNoOverSubscribe<ZKCudaBN254KZGBatchPCS>>();
 }
 
 fn zkcuda_test_simd_prepare_ctx() -> Context<M31Config> {
@@ -138,7 +149,7 @@ fn zkcuda_test_simd() {
     let proof = P::prove(
         &prover_setup,
         &computation_graph,
-        &ctx.export_device_memories(),
+        ctx.export_device_memories(),
     );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 
@@ -166,7 +177,7 @@ fn zkcuda_test_simd() {
     let proof3 = P::prove(
         &prover_setup3,
         &computation_graph,
-        &ctx3.export_device_memories(),
+        ctx3.export_device_memories(),
     );
     assert!(P::verify(&verifier_setup2, &computation_graph, &proof3));
 }
@@ -211,7 +222,7 @@ fn zkcuda_test_simd_autopack() {
     let proof = P::prove(
         &prover_setup,
         &computation_graph,
-        &ctx.export_device_memories(),
+        ctx.export_device_memories(),
     );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 }
@@ -274,7 +285,7 @@ fn zkcuda_to_binary() {
     let proof = P::prove(
         &prover_setup,
         &computation_graph,
-        &ctx.export_device_memories(),
+        ctx.export_device_memories(),
     );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 }
@@ -300,7 +311,7 @@ fn zkcuda_assertion() {
     let proof = P::prove(
         &prover_setup,
         &computation_graph,
-        &ctx.export_device_memories(),
+        ctx.export_device_memories(),
     );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 }
@@ -322,7 +333,7 @@ fn zkcuda_assertion_fail() {
     let proof = P::prove(
         &prover_setup,
         &computation_graph,
-        &ctx.export_device_memories(),
+        ctx.export_device_memories(),
     );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 }

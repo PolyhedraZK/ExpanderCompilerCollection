@@ -2,7 +2,7 @@ use std::fs;
 
 use crate::{
     frontend::{Config, SIMDField},
-    utils::misc::next_power_of_two,
+    utils::misc::{next_power_of_two, prev_power_of_two},
     zkcuda::{
         context::ComputationGraph,
         proving_system::{
@@ -19,7 +19,7 @@ use crate::{
 use super::server_ctrl::{RequestType, SERVER_IP, SERVER_PORT};
 
 use expander_utils::timer::Timer;
-use gkr_engine::{FieldEngine, GKREngine};
+use gkr_engine::GKREngine;
 use reqwest::Client;
 use serdes::ExpSerde;
 
@@ -77,20 +77,23 @@ pub fn client_parse_args() -> Option<String> {
 pub fn client_launch_server_and_setup<C, ECCConfig>(
     server_binary: &str,
     computation_graph: &ComputationGraph<ECCConfig>,
+    allow_oversubscribe: bool,
+    batch_pcs: bool,
 ) -> (
-    ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-    ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
+    ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>,
 )
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let setup_timer = Timer::new("setup", true);
     println!("Starting server with binary: {server_binary}");
 
     let mut bytes = vec![];
     computation_graph.serialize_into(&mut bytes).unwrap();
+    println!("Serialized computation graph, size: {}", bytes.len());
+
     // append current timestamp to the file name to avoid conflicts
     let setup_filename = format!(
         "/tmp/computation_graph_{}.bin",
@@ -104,10 +107,22 @@ where
         .map(|t| t.parallel_count())
         .max()
         .unwrap_or(1);
+    let max_parallel_count = next_power_of_two(max_parallel_count);
+
+    let mpi_size = if allow_oversubscribe {
+        max_parallel_count
+    } else {
+        let num_cpus = prev_power_of_two(num_cpus::get_physical());
+        if max_parallel_count > num_cpus {
+            num_cpus
+        } else {
+            max_parallel_count
+        }
+    };
 
     let port = parse_port_number();
     let server_url = format!("{SERVER_IP}:{port}");
-    start_server::<C>(server_binary, next_power_of_two(max_parallel_count), port);
+    start_server::<C>(server_binary, mpi_size, port, batch_pcs);
 
     // Keep trying until the server is ready
     loop {
@@ -125,18 +140,15 @@ where
 }
 
 pub fn client_send_witness_and_prove<C, ECCConfig>(
-    device_memories: &[Vec<SIMDField<ECCConfig>>],
+    device_memories: Vec<Vec<SIMDField<ECCConfig>>>,
 ) -> CombinedProof<ECCConfig, Expander<C>>
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let timer = Timer::new("prove", true);
 
-    SharedMemoryEngine::write_witness_to_shared_memory::<C::FieldConfig>(
-        &device_memories.iter().map(|m| &m[..]).collect::<Vec<_>>(),
-    );
+    SharedMemoryEngine::write_witness_to_shared_memory::<C::FieldConfig>(device_memories);
     wait_async(ClientHttpHelper::request_prove());
 
     let proof = SharedMemoryEngine::read_proof_from_shared_memory();

@@ -70,7 +70,7 @@ pub trait ProvingSystem<C: Config> {
     fn prove(
         prover_setup: &Self::ProverSetup,
         computation_graph: &ComputationGraph<C>,
-        device_memories: &[Vec<SIMDField<C>>],
+        device_memories: Vec<Vec<SIMDField<C>>>,
     ) -> Self::Proof;
 
     fn verify(

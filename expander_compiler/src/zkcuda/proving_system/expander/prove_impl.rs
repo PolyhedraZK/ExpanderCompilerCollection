@@ -19,23 +19,21 @@ use crate::{
 
 /// ECCCircuit -> ExpanderCircuit
 /// Returns an additional prover scratch pad for later use in GKR.
-pub fn prepare_expander_circuit<C, ECCConfig>(
+pub fn prepare_expander_circuit<F, ECCConfig>(
     kernel: &Kernel<ECCConfig>,
     mpi_world_size: usize,
-) -> (Circuit<C::FieldConfig>, ProverScratchPad<C::FieldConfig>)
+) -> (Circuit<F>, ProverScratchPad<F>)
 where
-    C: GKREngine,
-    ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+    F: FieldEngine,
+    ECCConfig: Config,
+    ECCConfig::FieldConfig: FieldEngine<CircuitField = F::CircuitField>,
 {
-    let mut expander_circuit = kernel.layered_circuit().export_to_expander().flatten::<C>();
-    expander_circuit.pre_process_gkr::<C>();
+    let mut expander_circuit = kernel.layered_circuit().export_to_expander().flatten();
+    expander_circuit.pre_process_gkr();
+
     let (max_num_input_var, max_num_output_var) = super::utils::max_n_vars(&expander_circuit);
-    let prover_scratch = ProverScratchPad::<C::FieldConfig>::new(
-        max_num_input_var,
-        max_num_output_var,
-        mpi_world_size,
-    );
+    let prover_scratch =
+        ProverScratchPad::<F>::new(max_num_input_var, max_num_output_var, mpi_world_size);
 
     (expander_circuit, prover_scratch)
 }
@@ -84,17 +82,14 @@ pub fn prepare_inputs_with_local_vals<F: Field>(
     input_vals
 }
 
-pub fn prove_gkr_with_local_vals<C: GKREngine>(
-    expander_circuit: &mut Circuit<C::FieldConfig>,
-    prover_scratch: &mut ProverScratchPad<C::FieldConfig>,
-    local_commitment_values: &[impl AsRef<[<C::FieldConfig as FieldEngine>::SimdCircuitField]>],
+pub fn prove_gkr_with_local_vals<F: FieldEngine, T: Transcript>(
+    expander_circuit: &mut Circuit<F>,
+    prover_scratch: &mut ProverScratchPad<F>,
+    local_commitment_values: &[impl AsRef<[F::SimdCircuitField]>],
     partition_info: &[LayeredCircuitInputVec],
-    transcript: &mut C::TranscriptConfig,
+    transcript: &mut T,
     mpi_config: &MPIConfig,
-) -> ExpanderDualVarChallenge<C::FieldConfig>
-where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-{
+) -> ExpanderDualVarChallenge<F> {
     expander_circuit.layers[0].input_vals = prepare_inputs_with_local_vals(
         1 << expander_circuit.log_input_size(),
         partition_info,
@@ -104,10 +99,7 @@ where
     expander_circuit.evaluate();
     let (claimed_v, challenge) =
         gkr_prove(expander_circuit, prover_scratch, transcript, mpi_config);
-    assert_eq!(
-        claimed_v,
-        <C::FieldConfig as FieldEngine>::ChallengeField::from(0)
-    );
+    assert_eq!(claimed_v, F::ChallengeField::from(0));
     challenge
 }
 
@@ -169,18 +161,14 @@ pub fn partition_challenge_and_location_for_pcs_no_mpi<F: FieldEngine>(
 pub fn pcs_local_open_impl<C: GKREngine>(
     vals: &[<C::FieldConfig as FieldEngine>::SimdCircuitField],
     challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
-    p_keys: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    p_keys: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
     transcript: &mut C::TranscriptConfig,
-) where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-{
+) {
     assert_eq!(challenge.r_mpi.len(), 0);
 
     let val_len = vals.len();
-    let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(
-        val_len.ilog2() as usize,
-        1,
-    );
+    let params =
+        <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(val_len.ilog2() as usize, 1);
     let p_key = p_keys.p_keys.get(&val_len).unwrap();
 
     let poly = RefMultiLinearPoly::from_ref(vals);
@@ -191,14 +179,14 @@ pub fn pcs_local_open_impl<C: GKREngine>(
     transcript.append_field_element(&v);
 
     transcript.lock_proof();
-    let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::open(
+    let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::open(
         &params,
         &MPIConfig::prover_new(None, None),
         p_key,
         &poly,
         challenge,
         transcript,
-        &<C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::init_scratch_pad(
+        &<C::PCSConfig as ExpanderPCS<C::FieldConfig>>::init_scratch_pad(
             &params,
             &MPIConfig::prover_new(None, None),
         ),
@@ -217,14 +205,12 @@ pub fn pcs_local_open_impl<C: GKREngine>(
 pub fn partition_gkr_claims_and_open_pcs_no_mpi_impl<C: GKREngine>(
     gkr_claim: &ExpanderSingleVarChallenge<C::FieldConfig>,
     global_vals: &[impl AsRef<[<C::FieldConfig as FieldEngine>::SimdCircuitField]>],
-    p_keys: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    p_keys: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
     is_broadcast: &[bool],
     parallel_index: usize,
     parallel_num: usize,
     transcript: &mut C::TranscriptConfig,
-) where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-{
+) {
     for (commitment_val, ib) in global_vals.iter().zip(is_broadcast) {
         let val_len = commitment_val.as_ref().len();
         let (challenge_for_pcs, _) = partition_challenge_and_location_for_pcs_no_mpi::<
@@ -248,14 +234,12 @@ pub fn partition_gkr_claims_and_open_pcs_no_mpi_impl<C: GKREngine>(
 pub fn partition_gkr_claims_and_open_pcs_no_mpi<C: GKREngine>(
     gkr_claim: &ExpanderDualVarChallenge<C::FieldConfig>,
     global_vals: &[impl AsRef<[<C::FieldConfig as FieldEngine>::SimdCircuitField]>],
-    p_keys: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    p_keys: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
     is_broadcast: &[bool],
     parallel_index: usize,
     parallel_num: usize,
     transcript: &mut C::TranscriptConfig,
-) where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-{
+) {
     let challenges = if let Some(challenge_y) = gkr_claim.challenge_y() {
         vec![gkr_claim.challenge_x(), challenge_y]
     } else {

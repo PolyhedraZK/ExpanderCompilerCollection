@@ -3,12 +3,15 @@ use std::str::FromStr;
 use clap::Parser;
 use expander_compiler::{
     frontend::{BN254Config, BabyBearConfig, GF2Config, GoldilocksConfig, M31Config},
-    zkcuda::proving_system::expander_parallelized::{
-        server_ctrl::{serve, ExpanderExecArgs},
-        ParallelizedExpander,
+    zkcuda::proving_system::{
+        expander_parallelized::{
+            server_ctrl::{serve, ExpanderExecArgs},
+            ParallelizedExpander,
+        },
+        expander_pcs_defered::BN254ConfigSha2UniKZG,
     },
 };
-use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2KZG};
+use gkr::BN254ConfigSha2Hyrax;
 use gkr_engine::PolynomialCommitmentType;
 
 #[tokio::main]
@@ -55,7 +58,7 @@ pub async fn main() {
             .await;
         }
         ("BN254", PolynomialCommitmentType::KZG) => {
-            serve::<BN254ConfigSha2KZG, BN254Config, ParallelizedExpander<_>>(
+            serve::<BN254ConfigSha2UniKZG, BN254Config, ParallelizedExpander<_>>(
                 expander_exec_args.port_number,
             )
             .await;

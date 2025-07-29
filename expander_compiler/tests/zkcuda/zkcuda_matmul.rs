@@ -93,7 +93,7 @@ fn zkcuda_matmul_sum() {
     let proof = P::prove(
         &prover_setup,
         &computation_graph,
-        &ctx.export_device_memories(),
+        ctx.export_device_memories(),
     );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
 }

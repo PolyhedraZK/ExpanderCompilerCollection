@@ -18,3 +18,6 @@ pub use expander_parallelized::api_parallel::*;
 
 pub mod expander_pcs_defered;
 pub use expander_pcs_defered::api_pcs_defered::*;
+
+pub mod expander_no_oversubscribe;
+pub use expander_no_oversubscribe::api_no_oversubscribe::*;

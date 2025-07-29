@@ -62,6 +62,8 @@ impl SharedMemoryEngine {
             .serialize_into(&mut buffer)
             .expect("Failed to serialize object");
 
+        println!("Object size: {}", buffer.len());
+
         unsafe {
             Self::allocate_shared_memory_if_necessary(shared_memory_ref, name, buffer.len());
             let object_ptr = shared_memory_ref.as_mut().unwrap().as_ptr();
@@ -88,16 +90,10 @@ impl SharedMemoryEngine {
 
 /// This impl block contains functions for reading/writing specific objects to shared memory.
 impl SharedMemoryEngine {
-    pub fn write_pcs_setup_to_shared_memory<
-        PCSField: Field,
-        F: FieldEngine,
-        PCS: ExpanderPCS<F, PCSField>,
-    >(
-        pcs_setup: &(
-            ExpanderProverSetup<PCSField, F, PCS>,
-            ExpanderVerifierSetup<PCSField, F, PCS>,
-        ),
+    pub fn write_pcs_setup_to_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
+        pcs_setup: &(ExpanderProverSetup<F, PCS>, ExpanderVerifierSetup<F, PCS>),
     ) {
+        println!("Writing PCS setup to shared memory...");
         Self::write_object_to_shared_memory(
             pcs_setup,
             unsafe { &mut SHARED_MEMORY.pcs_setup },
@@ -105,26 +101,19 @@ impl SharedMemoryEngine {
         );
     }
 
-    pub fn read_pcs_setup_from_shared_memory<
-        PCSField: Field,
-        F: FieldEngine,
-        PCS: ExpanderPCS<F, PCSField>,
-    >() -> (
-        ExpanderProverSetup<PCSField, F, PCS>,
-        ExpanderVerifierSetup<PCSField, F, PCS>,
-    ) {
+    pub fn read_pcs_setup_from_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
+    ) -> (ExpanderProverSetup<F, PCS>, ExpanderVerifierSetup<F, PCS>) {
         Self::read_object_from_shared_memory("pcs_setup", 0)
     }
 
-    pub fn write_witness_to_shared_memory<F: FieldEngine>(
-        values: &[impl AsRef<[F::SimdCircuitField]>],
-    ) {
+    pub fn write_witness_to_shared_memory<F: FieldEngine>(values: Vec<Vec<F::SimdCircuitField>>) {
         let total_size = std::mem::size_of::<usize>()
             + values
                 .iter()
-                .map(|v| std::mem::size_of::<usize>() + std::mem::size_of_val(v.as_ref()))
+                .map(|v| std::mem::size_of::<usize>() + std::mem::size_of_val(v.as_slice()))
                 .sum::<usize>();
 
+        println!("Writing witness to shared memory, total size: {total_size}");
         unsafe {
             Self::allocate_shared_memory_if_necessary(
                 &mut SHARED_MEMORY.witness,
@@ -141,13 +130,13 @@ impl SharedMemoryEngine {
             ptr = ptr.add(std::mem::size_of::<usize>());
 
             for vals in values {
-                let vals_len = vals.as_ref().len();
+                let vals_len = vals.len();
                 let len_ptr = &vals_len as *const usize as *const u8;
                 std::ptr::copy_nonoverlapping(len_ptr, ptr, std::mem::size_of::<usize>());
                 ptr = ptr.add(std::mem::size_of::<usize>());
 
-                let vals_size = std::mem::size_of_val(vals.as_ref());
-                std::ptr::copy_nonoverlapping(vals.as_ref().as_ptr() as *const u8, ptr, vals_size);
+                let vals_size = std::mem::size_of_val(vals.as_slice());
+                std::ptr::copy_nonoverlapping(vals.as_ptr() as *const u8, ptr, vals_size);
                 ptr = ptr.add(vals_size);
             }
         }
@@ -220,9 +209,8 @@ impl SharedMemoryEngine {
         ECCConfig: Config<FieldConfig = C::FieldConfig>,
     >(
         proof: &CombinedProof<ECCConfig, Expander<C>>,
-    ) where
-        C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-    {
+    ) {
+        println!("Writing proof to shared memory...");
         Self::write_object_to_shared_memory(proof, unsafe { &mut SHARED_MEMORY.proof }, "proof");
     }
 
@@ -230,9 +218,7 @@ impl SharedMemoryEngine {
         C: GKREngine,
         ECCConfig: Config<FieldConfig = C::FieldConfig>,
     >() -> CombinedProof<ECCConfig, Expander<C>>
-    where
-        C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-    {
+where {
         Self::read_object_from_shared_memory("proof", 0)
     }
 }

@@ -1,4 +1,4 @@
-use gkr_engine::{FieldEngine, GKREngine, MPIConfig, MPIEngine, MPISharedMemory};
+use gkr_engine::{GKREngine, MPIConfig, MPIEngine, MPISharedMemory};
 use serdes::ExpSerde;
 
 use crate::{
@@ -23,27 +23,26 @@ pub trait ServerFns<C, ECCConfig>
 where
     C: gkr_engine::GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     fn setup_request_handler(
         global_mpi_config: &MPIConfig<'static>,
         setup_file: Option<String>,
         computation_graph: &mut ComputationGraph<ECCConfig>,
-        prover_setup: &mut ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-        verifier_setup: &mut ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+        prover_setup: &mut ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
+        verifier_setup: &mut ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>,
         mpi_win: &mut Option<SharedMemoryWINWrapper>,
     );
 
     fn prove_request_handler(
         global_mpi_config: &MPIConfig<'static>,
-        prover_setup: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+        prover_setup: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
         computation_graph: &ComputationGraph<ECCConfig>,
         values: &[impl AsRef<[SIMDField<C>]>],
     ) -> Option<CombinedProof<ECCConfig, Expander<C>>>;
 
     fn setup_shared_witness(
         global_mpi_config: &MPIConfig<'static>,
-        witness_target: &mut Vec<Vec<C::PCSField>>,
+        witness_target: &mut Vec<Vec<SIMDField<C>>>,
         mpi_shared_memory_win: &mut Option<SharedMemoryWINWrapper>,
     ) {
         // dispose of the previous shared memory if it exists
@@ -68,7 +67,7 @@ where
     fn shared_memory_clean_up(
         global_mpi_config: &MPIConfig<'static>,
         computation_graph: ComputationGraph<ECCConfig>,
-        witness: Vec<Vec<C::PCSField>>,
+        witness: Vec<Vec<SIMDField<C>>>,
         cg_mpi_win: &mut Option<SharedMemoryWINWrapper>,
         wt_mpi_win: &mut Option<SharedMemoryWINWrapper>,
     ) {
@@ -91,18 +90,15 @@ impl<C, ECCConfig> ServerFns<C, ECCConfig> for ParallelizedExpander<C>
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     fn setup_request_handler(
         global_mpi_config: &MPIConfig<'static>,
         setup_file: Option<String>,
         computation_graph: &mut ComputationGraph<ECCConfig>,
-        prover_setup: &mut ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-        verifier_setup: &mut ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+        prover_setup: &mut ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
+        verifier_setup: &mut ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>,
         mpi_win: &mut Option<SharedMemoryWINWrapper>,
-    ) where
-        C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-    {
+    ) {
         let setup_file = if global_mpi_config.is_root() {
             let setup_file = setup_file.expect("Setup file path must be provided");
             broadcast_string(global_mpi_config, Some(setup_file))
@@ -119,14 +115,13 @@ where
 
     fn prove_request_handler(
         global_mpi_config: &MPIConfig<'static>,
-        prover_setup: &ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+        prover_setup: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
         computation_graph: &ComputationGraph<ECCConfig>,
         values: &[impl AsRef<[SIMDField<C>]>],
     ) -> Option<CombinedProof<ECCConfig, Expander<C>>>
     where
         C: GKREngine,
         ECCConfig: Config<FieldConfig = C::FieldConfig>,
-        C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
     {
         mpi_prove_impl(global_mpi_config, prover_setup, computation_graph, values)
     }
@@ -152,7 +147,6 @@ pub fn read_circuit<C, ECCConfig>(
 ) where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let computation_graph_bytes =
         std::fs::read(setup_file).expect("Failed to read computation graph from file");

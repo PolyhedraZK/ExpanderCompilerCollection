@@ -1,5 +1,16 @@
 use std::collections::{HashMap, HashSet};
 
+pub fn prev_power_of_two(x: usize) -> usize {
+    if x == 0 {
+        return 0;
+    }
+    let mut padk: usize = 0;
+    while (1 << padk) <= x {
+        padk += 1;
+    }
+    1 << (padk - 1)
+}
+
 pub fn next_power_of_two(x: usize) -> usize {
     let mut padk: usize = 0;
     while (1 << padk) < x {
