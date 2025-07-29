@@ -1,6 +1,6 @@
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::proving_system::expander::config::{
-    ZKCudaBN254Hyrax, ZKCudaBN254HyraxBatchPCS, ZKCudaBN254KZG, ZKCudaBN254KZGBatchPCS,
+    ZKCudaBN254KZG, ZKCudaBN254KZGBatchPCS,
 };
 use expander_compiler::zkcuda::proving_system::expander_pcs_defered::BN254ConfigSha2UniKZG;
 use expander_compiler::zkcuda::proving_system::{
