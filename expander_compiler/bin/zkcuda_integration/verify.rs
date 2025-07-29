@@ -22,11 +22,10 @@ fn main() {
     let proof_bytes = std::fs::read("/tmp/proof.bin").unwrap();
     let proof = <ExpanderNoOverSubscribe<ZKCudaBN254KZG> as ProvingSystem<BN254Config>>::Proof::deserialize_from(Cursor::new(proof_bytes)).unwrap();
 
-    let verified =
-        <ExpanderNoOverSubscribe<ZKCudaBN254KZG> as ProvingSystem<BN254Config>>::verify(
-            &verifier_setup,
-            &computation_graph,
-            &proof,
-        );
+    let verified = <ExpanderNoOverSubscribe<ZKCudaBN254KZG> as ProvingSystem<BN254Config>>::verify(
+        &verifier_setup,
+        &computation_graph,
+        &proof,
+    );
     assert!(verified, "Proof verification failed");
 }
