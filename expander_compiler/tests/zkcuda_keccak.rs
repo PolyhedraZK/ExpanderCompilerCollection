@@ -337,7 +337,8 @@ fn zkcuda_keccak_1_helper<P: ProvingSystem<M31Config>>() {
     }
 
     println!("prepare data ok");
-    let p = ctx.copy_to_device(&p);
+    let p_value = p;
+    let (p, p_id) = ctx.new_device_memory(vec![N_PARALLEL, 64 * 8]);
     println!("copy to device ok");
     let mut out = None;
     call_kernel!(ctx, kernel, N_PARALLEL, p, mut out).unwrap();
@@ -348,6 +349,7 @@ fn zkcuda_keccak_1_helper<P: ProvingSystem<M31Config>>() {
     assert_eq!(out[0][0], expected_res[0][0]);
 
     let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.copy_to_device(&p_value, p_id);
     ctx.solve_witness().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(
@@ -400,7 +402,8 @@ fn zkcuda_keccak_2_helper<P: ProvingSystem<M31Config>>() {
     }
 
     println!("prepare data ok");
-    let p = ctx.copy_to_device(&vec![p]);
+    let p_value = p;
+    let (p, p_id) = ctx.new_device_memory(vec![N_PARALLEL, 64 * 8]);
     println!("copy to device ok");
     let mut out = None;
     call_kernel!(ctx, kernel, 1, p, mut out).unwrap();
@@ -411,6 +414,7 @@ fn zkcuda_keccak_2_helper<P: ProvingSystem<M31Config>>() {
     assert_eq!(out[0][0][0], expected_res[0][0]);
 
     let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.copy_to_device(&p_value, p_id);
     ctx.solve_witness().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(

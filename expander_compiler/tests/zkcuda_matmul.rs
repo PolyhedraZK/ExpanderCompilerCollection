@@ -61,8 +61,8 @@ fn zkcuda_matmul_sum() {
         }
     }
 
-    let a = ctx.copy_to_device(&mat_a);
-    let b = ctx.copy_to_device(&mat_b);
+    let (a, a_id) = ctx.new_device_memory(vec![64, 32]);
+    let (b, b_id) = ctx.new_device_memory(vec![32, 64]);
     let mut c = None;
     call_kernel!(ctx, kernel_mul_line, 64, a, b, mut c).unwrap();
 
@@ -88,6 +88,8 @@ fn zkcuda_matmul_sum() {
 
     type P = Expander<M31Config>;
     let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.copy_to_device(&mat_a, a_id);
+    ctx.copy_to_device(&mat_b, b_id);
     ctx.solve_witness().unwrap();
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
     let proof = P::prove(

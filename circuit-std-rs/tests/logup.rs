@@ -153,13 +153,14 @@ fn rangeproof_zkcuda_test() {
     let kernel: KernelPrimitive<M31Config> = compile_rangeproof_test_kernel().unwrap();
     let mut ctx: Context<M31Config, _> = Context::new(hint_registry);
 
-    let a = M31::from(1 << 9);
-    let a = ctx.copy_to_device(&a);
+    let a_value = M31::from(1 << 9);
+    let (a, a_id) = ctx.new_device_memory(vec![]);
     let a = a.reshape(&[1]);
     call_kernel!(ctx, kernel, 1, a).unwrap();
 
     type P = Expander<M31Config>;
     let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.copy_to_device(&a_value, a_id);
     ctx.solve_witness().unwrap();
     let (prover_setup, verifier_setup) = <P as ProvingSystem<M31Config>>::setup(&computation_graph);
     let proof = P::prove(
@@ -180,13 +181,14 @@ fn rangeproof_zkcuda_test_fail() {
     let kernel: KernelPrimitive<M31Config> = compile_rangeproof_test_kernel().unwrap();
     let mut ctx: Context<M31Config, _> = Context::new(hint_registry);
 
-    let a = M31::from(1 << 11);
-    let a = ctx.copy_to_device(&a);
+    let a_value = M31::from(1 << 11);
+    let (a, a_id) = ctx.new_device_memory(vec![]);
     let a = a.reshape(&[1]);
     call_kernel!(ctx, kernel, 1, a).unwrap();
 
     type P = Expander<M31Config>;
     let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.copy_to_device(&a_value, a_id);
     ctx.solve_witness().unwrap();
     let (prover_setup, verifier_setup) = <P as ProvingSystem<M31Config>>::setup(&computation_graph);
     let proof = P::prove(

@@ -62,8 +62,8 @@ pub fn zkcuda_matmul<C: Config, P: ProvingSystem<C>, const N: usize>() {
         }
     }
 
-    let a = ctx.copy_to_device(&mat_a);
-    let b = ctx.copy_to_device(&mat_b);
+    let (a, a_id) = ctx.new_device_memory(vec![N, M]);
+    let (b, b_id) = ctx.new_device_memory(vec![M, K]);
     let mut c = None;
     call_kernel!(ctx, kernel_mul_line, N, a, b, mut c).unwrap();
 
@@ -72,6 +72,8 @@ pub fn zkcuda_matmul<C: Config, P: ProvingSystem<C>, const N: usize>() {
     assert_eq!(result, expected_result);
 
     let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.copy_to_device(&mat_a, a_id);
+    ctx.copy_to_device(&mat_b, b_id);
     ctx.solve_witness().unwrap();
 
     let (prover_setup, verifier_setup) = P::setup(&computation_graph);
