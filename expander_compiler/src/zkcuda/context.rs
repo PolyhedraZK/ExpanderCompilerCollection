@@ -486,7 +486,6 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         loop {
             let get_pad_shape = |x: &DeviceMemoryHandle| {
                 x.as_ref().map(|handle| {
-println!("get handle {:?}", handle.id);
                     handle
                         .shape_history
                         .get_transposed_shape_and_bit_order(&dm_shapes[handle.id])
