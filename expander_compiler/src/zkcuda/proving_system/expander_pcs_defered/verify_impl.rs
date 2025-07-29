@@ -1,12 +1,12 @@
 use std::io::Cursor;
 
 use arith::Field;
+use expander_utils::timer::Timer;
 use gkr::gkr_verify;
 use gkr_engine::{
     ExpanderDualVarChallenge, ExpanderPCS, ExpanderSingleVarChallenge, FieldEngine, GKREngine,
     Proof as BytesProof, Transcript,
 };
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serdes::ExpSerde;
 
 use crate::{
@@ -24,27 +24,26 @@ use crate::{
 };
 
 fn verifier_extract_pcs_claims<'a, C, ECCConfig>(
-    commitments: &[&'a ExpanderCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
+    commitments: &[&'a ExpanderCommitment<C::FieldConfig, C::PCSConfig>],
     gkr_challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
     is_broadcast: &[bool],
     parallel_count: usize,
 ) -> (
-    Vec<&'a ExpanderCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>>,
+    Vec<&'a ExpanderCommitment<C::FieldConfig, C::PCSConfig>>,
     Vec<ExpanderSingleVarChallenge<C::FieldConfig>>,
 )
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let mut commitments_rt = vec![];
     let mut challenges = vec![];
 
     for (&commitment, ib) in commitments.iter().zip(is_broadcast) {
         let val_len =
-            <ExpanderCommitment<C::PCSField, C::FieldConfig, C::PCSConfig> as Commitment<
-                ECCConfig,
-            >>::vals_len(commitment);
+            <ExpanderCommitment<C::FieldConfig, C::PCSConfig> as Commitment<ECCConfig>>::vals_len(
+                commitment,
+            );
         let (challenge_for_pcs, _) = partition_challenge_and_location_for_pcs_mpi(
             gkr_challenge,
             val_len,
@@ -67,10 +66,8 @@ pub fn verify_gkr<C, ECCConfig>(
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    let mut expander_circuit = kernel.layered_circuit().export_to_expander().flatten::<C>();
-    expander_circuit.pre_process_gkr::<C>();
+    let mut expander_circuit = kernel.layered_circuit().export_to_expander_flatten();
 
     let mut transcript = C::TranscriptConfig::new();
     expander_circuit.fill_rnd_coefs(&mut transcript);
@@ -95,21 +92,20 @@ where
 
 pub fn verify_defered_pcs_opening<C, ECCConfig>(
     proof: &BytesProof,
-    verifier_setup: &ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-    commitments: &[&ExpanderCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>],
+    verifier_setup: &ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>,
+    commitments: &[&ExpanderCommitment<C::FieldConfig, C::PCSConfig>],
     challenges: &[ExpanderSingleVarChallenge<C::FieldConfig>],
 ) -> bool
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-    <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Commitment:
-        AsRef<<C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Commitment>,
+
+    <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::Commitment:
+        AsRef<<C::PCSConfig as ExpanderPCS<C::FieldConfig>>::Commitment>,
 {
     let mut transcript = C::TranscriptConfig::new();
     let max_num_vars = verifier_setup.v_keys.keys().max().cloned().unwrap_or(0);
-    let params =
-        <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::gen_params(max_num_vars, 1);
+    let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(max_num_vars, 1);
 
     let mut defered_proof_bytes = proof.bytes.clone();
     let mut cursor = Cursor::new(&mut defered_proof_bytes);
@@ -122,45 +118,44 @@ where
         Vec::<<C::FieldConfig as FieldEngine>::ChallengeField>::deserialize_from(&mut cursor)
             .unwrap();
     let opening =
-        <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::BatchOpening::deserialize_from(
-            &mut cursor,
-        )
-        .unwrap();
+        <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::BatchOpening::deserialize_from(&mut cursor)
+            .unwrap();
 
     transcript.lock_proof();
-    let pcs_verified =
-        <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::multi_points_batch_verify(
-            &params,
-            verifier_setup.v_keys.get(&max_num_vars).unwrap(),
-            &commitments,
-            challenges,
-            &vals,
-            &opening,
-            &mut transcript,
-        );
+    let pcs_verified = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::multi_points_batch_verify(
+        &params,
+        verifier_setup.v_keys.get(&max_num_vars).unwrap(),
+        &commitments,
+        challenges,
+        &vals,
+        &opening,
+        &mut transcript,
+    );
     transcript.unlock_proof();
 
     pcs_verified
 }
 
 pub fn verify<C, ECCConfig>(
-    verifier_setup: &ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+    verifier_setup: &ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>,
     computation_graph: &ComputationGraph<ECCConfig>,
     mut proof: CombinedProof<ECCConfig, Expander<C>>,
 ) -> bool
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-    <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Commitment:
-        AsRef<<C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Commitment>,
+
+    <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::Commitment:
+        AsRef<<C::PCSConfig as ExpanderPCS<C::FieldConfig>>::Commitment>,
 {
+    let verification_timer = Timer::new("Total Verification", true);
     let pcs_batch_opening = proof.proofs.pop().unwrap();
 
+    let gkr_verification_timer = Timer::new("GKR Verification", true);
     let verified_with_pcs_claims = proof
         .proofs
-        .par_iter()
-        .zip(computation_graph.proof_templates().par_iter())
+        .iter()
+        .zip(computation_graph.proof_templates().iter())
         .map(|(local_proof, template)| {
             let local_commitments = template
                 .commitment_indices()
@@ -193,7 +188,9 @@ where
         println!("Failed to verify GKR proofs");
         return false;
     }
+    gkr_verification_timer.stop();
 
+    let pcs_verification_timer = Timer::new("PCS Verification", true);
     let commitments_ref = verified_with_pcs_claims
         .iter()
         .flat_map(|(_, c, _)| c)
@@ -211,6 +208,8 @@ where
         &commitments_ref,
         &challenges,
     );
+    pcs_verification_timer.stop();
 
+    verification_timer.stop();
     gkr_verified && pcs_verified
 }

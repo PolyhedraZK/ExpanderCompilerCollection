@@ -3,12 +3,7 @@ use gkr_engine::{ExpanderPCS, FieldEngine, MPIConfig, StructuredReferenceString,
 use poly_commit::expander_pcs_init_testing_only;
 
 #[allow(clippy::type_complexity)]
-pub fn pcs_testing_setup_fixed_seed<
-    'a,
-    F: FieldEngine,
-    T: Transcript,
-    PCS: ExpanderPCS<F, F::SimdCircuitField>,
->(
+pub fn pcs_testing_setup_fixed_seed<'a, F: FieldEngine, T: Transcript, PCS: ExpanderPCS<F>>(
     vals_len: usize,
     mpi_config: &MPIConfig<'a>,
 ) -> (
@@ -17,10 +12,7 @@ pub fn pcs_testing_setup_fixed_seed<
     <PCS::SRS as StructuredReferenceString>::VKey,
     PCS::ScratchPad,
 ) {
-    expander_pcs_init_testing_only::<F, F::SimdCircuitField, PCS>(
-        vals_len.ilog2() as usize,
-        mpi_config,
-    )
+    expander_pcs_init_testing_only::<F, PCS>(vals_len.ilog2() as usize, mpi_config)
 }
 
 pub fn max_n_vars<C: FieldEngine>(circuit: &ExpanderCircuit<C>) -> (usize, usize) {

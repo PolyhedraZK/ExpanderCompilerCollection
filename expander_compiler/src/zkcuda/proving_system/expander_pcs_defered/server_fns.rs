@@ -1,4 +1,4 @@
-use gkr_engine::{FieldEngine, GKREngine, MPIEngine};
+use gkr_engine::{GKREngine, MPIEngine};
 
 use crate::{
     frontend::Config,
@@ -22,14 +22,13 @@ impl<C, ECCConfig> ServerFns<C, ECCConfig> for ExpanderPCSDefered<C>
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     fn setup_request_handler(
         global_mpi_config: &gkr_engine::MPIConfig<'static>,
         setup_file: Option<String>,
         computation_graph: &mut ComputationGraph<ECCConfig>,
-        prover_setup: &mut ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
-        verifier_setup: &mut ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>,
+        prover_setup: &mut ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
+        verifier_setup: &mut ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>,
         mpi_win: &mut Option<SharedMemoryWINWrapper>,
     ) {
         let setup_file = if global_mpi_config.is_root() {
@@ -50,7 +49,6 @@ where
     fn prove_request_handler(
         global_mpi_config: &gkr_engine::MPIConfig<'static>,
         prover_setup: &ExpanderProverSetup<
-            <C as gkr_engine::GKREngine>::PCSField,
             <C as gkr_engine::GKREngine>::FieldConfig,
             <C as gkr_engine::GKREngine>::PCSConfig,
         >,

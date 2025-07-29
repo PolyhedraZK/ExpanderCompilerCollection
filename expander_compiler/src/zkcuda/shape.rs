@@ -84,21 +84,19 @@ impl Entry {
             return shape.to_vec();
         }
         let mut segments = vec![];
-        let mut cur_prod = 1;
-        let mut target = 1;
-        let mut self_shape_iter = self.shape.iter();
-        for &x in shape.iter() {
-            if cur_prod == target {
-                cur_prod = x.0;
-                target = *self_shape_iter.next().unwrap();
-                segments.push(vec![x]);
-            } else {
-                cur_prod *= x.0;
-                segments.last_mut().unwrap().push(x);
+        let mut shape_iter = shape.iter();
+        for &x in self.shape.iter() {
+            let mut cur_prod = 1;
+            segments.push(vec![]);
+            while let Some(y) = shape_iter.next() {
+                cur_prod *= y.0;
+                segments.last_mut().unwrap().push(*y);
+                if cur_prod == x {
+                    break;
+                }
             }
+            assert_eq!(cur_prod, x);
         }
-        assert_eq!(cur_prod, target);
-        assert_eq!(self_shape_iter.next(), None);
         let mut res = Vec::with_capacity(shape.len());
         for i in self.axes.as_ref().unwrap() {
             res.extend(segments[*i].iter());
@@ -114,6 +112,12 @@ impl Entry {
         let mut cur_ts_prod = 1;
         let mut cur_ts_idx = 0;
         for &x in products.iter().skip(1) {
+            while ts[cur_ts_idx] == 1 && cur_ts_idx < ts.len() {
+                cur_ts_idx += 1;
+            }
+            if cur_ts_idx >= ts.len() {
+                break;
+            }
             segments_in_ts[self.axes.as_ref().unwrap()[cur_ts_idx]].push(x / cur_ts_prod);
             if x == cur_ts_prod * ts[cur_ts_idx] {
                 cur_ts_prod = x;
@@ -161,9 +165,13 @@ pub fn prefix_products(shape: &[usize]) -> Vec<usize> {
 }
 
 pub fn prefix_products_to_shape(products: &[usize]) -> Vec<usize> {
-    let mut shape = Vec::with_capacity(products.len() - 1);
+    // let mut shape = Vec::with_capacity(products.len() - 1);
+    // for i in 1..products.len() {
+    //     shape.push(products[i] / products[i - 1]);
+    // }
+    let mut shape = products.to_vec();
     for i in 1..products.len() {
-        shape.push(products[i] / products[i - 1]);
+        shape[i] /= products[i - 1];
     }
     shape
 }
@@ -268,9 +276,9 @@ impl ShapeHistory {
             cur = if e.axes.as_ref().is_none() {
                 cur
             } else if cur.is_none() {
-                Some(e.transpose_shape(&initial_shape()))
+                Some(e.minimize(false).transpose_shape(&initial_shape()))
             } else {
-                Some(e.transpose_shape(&cur.unwrap()))
+                Some(e.minimize(false).transpose_shape(&cur.unwrap()))
             };
         }
         let new_shape_and_id = match cur {

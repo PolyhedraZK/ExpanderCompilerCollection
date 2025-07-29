@@ -2,21 +2,23 @@ use gkr_engine::{ExpanderPCS, FieldEngine, FieldType, GKREngine, PolynomialCommi
 use std::process::Command;
 
 #[allow(clippy::zombie_processes)]
-pub fn start_server<C: GKREngine>(binary: &str, max_parallel_count: usize, port_number: u16)
-where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-{
+pub fn start_server<C: GKREngine>(
+    binary: &str,
+    max_parallel_count: usize,
+    port_number: u16,
+    batch_pcs: bool,
+) {
     let (overscribe, field_name, pcs_name) = parse_config::<C>(max_parallel_count);
 
+    let batch_pcs_option = if batch_pcs { "--batch-pcs" } else { "" };
     let cmd_str = format!(
-        "mpiexec -n {max_parallel_count} {overscribe} {binary} --field-type {field_name} --poly-commit {pcs_name} --port-number {port_number}"
+        "mpiexec -n {max_parallel_count} {overscribe} {binary} --field-type {field_name} --poly-commit {pcs_name} --port-number {port_number} {batch_pcs_option}"
     );
     exec_command(&cmd_str, false);
 }
 
 fn parse_config<C: GKREngine>(mpi_size: usize) -> (String, String, String)
 where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     let oversubscription = if mpi_size > num_cpus::get_physical() {
         println!("Warning: Not enough cores available for the requested number of processes. Using oversubscription.");
@@ -34,7 +36,7 @@ where
         _ => panic!("Unsupported field type"),
     };
 
-    let pcs_name = match <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::PCS_TYPE {
+    let pcs_name = match <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::PCS_TYPE {
         PolynomialCommitmentType::Raw => "Raw",
         PolynomialCommitmentType::Hyrax => "Hyrax",
         PolynomialCommitmentType::KZG => "KZG",
@@ -50,6 +52,7 @@ where
 
 #[allow(clippy::zombie_processes)]
 fn exec_command(cmd: &str, wait_for_completion: bool) {
+    println!("Executing command: {cmd}");
     let mut parts = cmd.split_whitespace();
     let command = parts.next().unwrap();
     let args: Vec<&str> = parts.collect();

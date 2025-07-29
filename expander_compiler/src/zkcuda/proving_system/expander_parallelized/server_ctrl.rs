@@ -16,10 +16,10 @@ use mpi::ffi::MPI_Win;
 use mpi::topology::SimpleCommunicator;
 use mpi::traits::Communicator;
 
-use crate::frontend::Config;
+use crate::frontend::{Config, SIMDField};
 
 use axum::{extract::State, Json};
-use gkr_engine::{FieldEngine, GKREngine, MPIConfig, MPIEngine};
+use gkr_engine::{GKREngine, MPIConfig, MPIEngine};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, SocketAddr};
@@ -56,20 +56,16 @@ pub struct SharedMemoryWINWrapper {
 unsafe impl Send for SharedMemoryWINWrapper {}
 unsafe impl Sync for SharedMemoryWINWrapper {}
 
-pub struct ServerState<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>
-where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-{
+pub struct ServerState<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> {
     pub lock: Arc<Mutex<()>>, // For now we want to ensure that only one request is processed at a time
     pub global_mpi_config: MPIConfig<'static>,
     pub local_mpi_config: Option<MPIConfig<'static>>,
 
-    pub prover_setup: Arc<Mutex<ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>>>,
-    pub verifier_setup:
-        Arc<Mutex<ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>>>,
+    pub prover_setup: Arc<Mutex<ExpanderProverSetup<C::FieldConfig, C::PCSConfig>>>,
+    pub verifier_setup: Arc<Mutex<ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>>>,
 
     pub computation_graph: Arc<Mutex<ComputationGraph<ECCConfig>>>,
-    pub witness: Arc<Mutex<Vec<Vec<C::PCSField>>>>,
+    pub witness: Arc<Mutex<Vec<Vec<SIMDField<C>>>>>,
 
     pub cg_shared_memory_win: Arc<Mutex<Option<SharedMemoryWINWrapper>>>, // Shared memory for computation graph
     pub wt_shared_memory_win: Arc<Mutex<Option<SharedMemoryWINWrapper>>>, // Shared memory for witness
@@ -79,22 +75,16 @@ where
 
 unsafe impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> Send
     for ServerState<C, ECCConfig>
-where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
 }
 
 unsafe impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> Sync
     for ServerState<C, ECCConfig>
-where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
 }
 
 impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> Clone
     for ServerState<C, ECCConfig>
-where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     fn clone(&self) -> Self {
         ServerState {
@@ -119,7 +109,7 @@ pub async fn root_main<C, ECCConfig, S>(
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+
     S: ServerFns<C, ECCConfig>,
 {
     let _lock = state.lock.lock().await; // Ensure only one request is processed at a time
@@ -194,7 +184,7 @@ pub async fn worker_main<C, ECCConfig, S>(
 ) where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+
     S: ServerFns<C, ECCConfig>,
 {
     loop {
@@ -283,7 +273,7 @@ pub async fn serve<C, ECCConfig, S>(port_number: String)
 where
     C: GKREngine + 'static,
     ECCConfig: Config<FieldConfig = C::FieldConfig> + 'static,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
+
     S: ServerFns<C, ECCConfig> + 'static,
 {
     let global_mpi_config = unsafe {
@@ -389,6 +379,10 @@ pub struct ExpanderExecArgs {
     pub poly_commit: String,
 
     /// The port number for the server to listen on.
-    #[arg(short, long, default_value = "Port")]
+    #[arg(short, long, default_value = "3000")]
     pub port_number: String,
+
+    /// Whether to batch PCS opening in proving.
+    #[arg(short, long, default_value_t = false)]
+    pub batch_pcs: bool,
 }

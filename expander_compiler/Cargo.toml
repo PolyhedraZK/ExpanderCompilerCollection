@@ -44,10 +44,12 @@ once_cell = "1.21.3"
 [dev-dependencies]
 rayon = "1.9"
 sha2 = "0.10.8"
+stacker = "0.1.15"
 
 [features]
 default = []
 profile = ["expander_utils/profile"]
+zkcuda_profile = []
 
 [[bin]]
 name = "trivial_circuit"
@@ -62,9 +64,33 @@ name = "expander_server_pcs_defered"
 path = "src/zkcuda/proving_system/expander_pcs_defered/server_bin.rs"
 
 [[bin]]
+name = "expander_server_no_oversubscribe"
+path = "src/zkcuda/proving_system/expander_no_oversubscribe/server_bin.rs"
+
+[[bin]]
 name = "zkcuda_matmul"
-path = "bin/zkcuda_matmul.rs"
+path = "bin/zkcuda_bench/zkcuda_matmul.rs"
 
 [[bin]]
 name = "zkcuda_matmul_pcs_defered"
-path = "bin/zkcuda_matmul_pcs_defered.rs"
+path = "bin/zkcuda_bench/zkcuda_matmul_pcs_defered.rs"
+
+[[bin]]
+name = "zkcuda_matmul_no_oversubscribe"
+path = "bin/zkcuda_bench/zkcuda_matmul_no_oversubscribe.rs"
+
+[[bin]]
+name = "zkcuda_setup"
+path = "bin/zkcuda_integration/setup.rs"
+
+[[bin]]
+name = "zkcuda_prove"
+path = "bin/zkcuda_integration/prove.rs"
+
+[[bin]]
+name = "zkcuda_verify"
+path = "bin/zkcuda_integration/verify.rs"
+
+[[bin]]
+name = "zkcuda_cleanup"
+path = "bin/zkcuda_integration/cleanup.rs"

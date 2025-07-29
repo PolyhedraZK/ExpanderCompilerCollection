@@ -1,4 +1,4 @@
-use gkr_engine::{ExpanderPCS, FieldEngine, GKREngine};
+use gkr_engine::{ExpanderPCS, GKREngine};
 
 use crate::{
     frontend::{Config, SIMDField},
@@ -20,13 +20,13 @@ impl<C, ECCConfig> ProvingSystem<ECCConfig> for ExpanderPCSDefered<C>
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
-    <C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Commitment:
-        AsRef<<C::PCSConfig as ExpanderPCS<C::FieldConfig, C::PCSField>>::Commitment>,
-{
-    type ProverSetup = ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
 
-    type VerifierSetup = ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
+    <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::Commitment:
+        AsRef<<C::PCSConfig as ExpanderPCS<C::FieldConfig>>::Commitment>,
+{
+    type ProverSetup = ExpanderProverSetup<C::FieldConfig, C::PCSConfig>;
+
+    type VerifierSetup = ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>;
 
     type Proof = CombinedProof<ECCConfig, Expander<C>>;
 
@@ -35,13 +35,18 @@ where
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
         let server_binary = client_parse_args()
             .unwrap_or("../target/release/expander_server_pcs_defered".to_owned());
-        client_launch_server_and_setup::<C, ECCConfig>(&server_binary, computation_graph)
+        client_launch_server_and_setup::<C, ECCConfig>(
+            &server_binary,
+            computation_graph,
+            true,
+            true,
+        )
     }
 
     fn prove(
         _prover_setup: &Self::ProverSetup,
         _computation_graph: &crate::zkcuda::context::ComputationGraph<ECCConfig>,
-        device_memories: &[Vec<SIMDField<ECCConfig>>],
+        device_memories: Vec<Vec<SIMDField<ECCConfig>>>,
     ) -> Self::Proof {
         client_send_witness_and_prove(device_memories)
     }

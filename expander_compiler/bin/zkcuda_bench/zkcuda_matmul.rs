@@ -4,13 +4,14 @@
 use expander_compiler::frontend::{
     BN254Config, BasicAPI, CircuitField, Config, Error, FieldArith, Variable, API,
 };
-use expander_compiler::zkcuda::proving_system::{Expander, ParallelizedExpander, ProvingSystem};
+use expander_compiler::zkcuda::proving_system::expander_pcs_defered::BN254ConfigSha2UniKZG;
+// use expander_compiler::zkcuda::proving_system::expander_pcs_defered::BN254ConfigSha2UniKZG;
+use expander_compiler::zkcuda::proving_system::{ParallelizedExpander, ProvingSystem};
 use expander_compiler::zkcuda::shape::Reshape;
 use expander_compiler::zkcuda::{
     context::{call_kernel, Context},
     kernel::{compile_with_spec_and_shapes, kernel, IOVecSpec, KernelPrimitive},
 };
-use gkr::BN254ConfigSha2Hyrax;
 
 const M: usize = 512;
 const K: usize = 512;
@@ -80,7 +81,7 @@ pub fn zkcuda_matmul<C: Config, P: ProvingSystem<C>, const N: usize>() {
     let proof = P::prove(
         &prover_setup,
         &computation_graph,
-        &ctx.export_device_memories(),
+        ctx.export_device_memories(),
     );
     let elapsed = timer.elapsed();
     println!("Parallel Count {N}, Proving time: {elapsed:?}");
@@ -93,10 +94,10 @@ pub fn zkcuda_matmul<C: Config, P: ProvingSystem<C>, const N: usize>() {
 }
 
 fn main() {
-    zkcuda_matmul::<BN254Config, Expander<BN254ConfigSha2Hyrax>, 4>();
-    zkcuda_matmul::<BN254Config, Expander<BN254ConfigSha2Hyrax>, 8>();
-    zkcuda_matmul::<BN254Config, Expander<BN254ConfigSha2Hyrax>, 16>();
-    zkcuda_matmul::<BN254Config, ParallelizedExpander<BN254ConfigSha2Hyrax>, 4>();
-    zkcuda_matmul::<BN254Config, ParallelizedExpander<BN254ConfigSha2Hyrax>, 8>();
-    zkcuda_matmul::<BN254Config, ParallelizedExpander<BN254ConfigSha2Hyrax>, 16>();
+    // zkcuda_matmul::<BN254Config, Expander<BN254ConfigSha2Hyrax>, 4>();
+    // zkcuda_matmul::<BN254Config, Expander<BN254ConfigSha2Hyrax>, 8>();
+    // zkcuda_matmul::<BN254Config, Expander<BN254ConfigSha2Hyrax>, 16>();
+    zkcuda_matmul::<BN254Config, ParallelizedExpander<BN254ConfigSha2UniKZG>, 4>();
+    zkcuda_matmul::<BN254Config, ParallelizedExpander<BN254ConfigSha2UniKZG>, 8>();
+    zkcuda_matmul::<BN254Config, ParallelizedExpander<BN254ConfigSha2UniKZG>, 16>();
 }

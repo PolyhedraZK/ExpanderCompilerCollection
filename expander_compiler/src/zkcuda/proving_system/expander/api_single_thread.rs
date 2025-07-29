@@ -1,4 +1,3 @@
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::io::Cursor;
 
 use crate::circuit::config::Config;
@@ -35,13 +34,12 @@ impl<C, ECCConfig> KernelWiseProvingSystem<ECCConfig> for Expander<C>
 where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    type ProverSetup = ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
-    type VerifierSetup = ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
+    type ProverSetup = ExpanderProverSetup<C::FieldConfig, C::PCSConfig>;
+    type VerifierSetup = ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>;
     type Proof = ExpanderProof;
-    type Commitment = ExpanderCommitment<C::PCSField, C::FieldConfig, C::PCSConfig>;
-    type CommitmentState = ExpanderCommitmentState<C::PCSField, C::FieldConfig, C::PCSConfig>;
+    type Commitment = ExpanderCommitment<C::FieldConfig, C::PCSConfig>;
+    type CommitmentState = ExpanderCommitmentState<C::FieldConfig, C::PCSConfig>;
 
     fn setup(
         computation_graph: &crate::zkcuda::context::ComputationGraph<ECCConfig>,
@@ -53,7 +51,7 @@ where
         prover_setup: &Self::ProverSetup,
         vals: &[SIMDField<C>],
     ) -> (Self::Commitment, Self::CommitmentState) {
-        local_commit_impl::<C, ECCConfig>(prover_setup, vals)
+        local_commit_impl::<C, ECCConfig>(prover_setup.p_keys.get(&vals.len()).unwrap(), vals)
     }
 
     fn prove_kernel(
@@ -69,7 +67,7 @@ where
         check_inputs(kernel, commitments_values, parallel_count, is_broadcast);
 
         let (mut expander_circuit, mut prover_scratch) =
-            prepare_expander_circuit::<C, ECCConfig>(kernel, 1);
+            prepare_expander_circuit::<C::FieldConfig, ECCConfig>(kernel, 1);
 
         let mut proof = ExpanderProof { data: vec![] };
 
@@ -83,7 +81,7 @@ where
                 parallel_index,
                 parallel_count,
             );
-            let challenge = prove_gkr_with_local_vals::<C>(
+            let challenge = prove_gkr_with_local_vals::<C::FieldConfig, C::TranscriptConfig>(
                 &mut expander_circuit,
                 &mut prover_scratch,
                 &local_vals,
@@ -118,8 +116,7 @@ where
         is_broadcast: &[bool],
     ) -> bool {
         let timer = Timer::new("verify", true);
-        let mut expander_circuit = kernel.layered_circuit().export_to_expander().flatten::<C>();
-        expander_circuit.pre_process_gkr::<C>();
+        let mut expander_circuit = kernel.layered_circuit().export_to_expander_flatten();
 
         for i in 0..parallel_count {
             let mut transcript = C::TranscriptConfig::new();
@@ -173,8 +170,6 @@ where
 // In this case, generate the implementation with a procedural macro seems to be the best solution.
 impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSystem<ECCConfig>
     for Expander<C>
-where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
     type ProverSetup = <Self as KernelWiseProvingSystem<ECCConfig>>::ProverSetup;
     type VerifierSetup = <Self as KernelWiseProvingSystem<ECCConfig>>::VerifierSetup;
@@ -189,7 +184,7 @@ where
     fn prove(
         prover_setup: &Self::ProverSetup,
         computation_graph: &ComputationGraph<ECCConfig>,
-        device_memories: &[Vec<SIMDField<ECCConfig>>],
+        device_memories: Vec<Vec<SIMDField<ECCConfig>>>,
     ) -> Self::Proof {
         let (commitments, states) = device_memories
             .iter()
@@ -238,8 +233,8 @@ where
     ) -> bool {
         let verified = proof
             .proofs
-            .par_iter()
-            .zip(computation_graph.proof_templates().par_iter())
+            .iter()
+            .zip(computation_graph.proof_templates().iter())
             .map(|(local_proof, template)| {
                 let local_commitments = template
                     .commitment_indices()

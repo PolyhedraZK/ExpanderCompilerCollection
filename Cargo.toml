@@ -47,22 +47,22 @@ stacker = "0.1.17"
 tiny-keccak = { version = "2.0", features = ["keccak"] }
 tokio = { version = "1", features = ["full"] }
 
-arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-babybear = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "circuit" }
-expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "transcript" }
-expander_binary = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "bin" }
-gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-poly_commit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "poly_commit" }
-polynomials = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-sumcheck = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "serdes" }
-gkr_engine = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-gkr_hashers = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-expander_utils = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "utils" }
+arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/optimize_pcs_claim_merging" }
+mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/optimize_pcs_claim_merging" }
+gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/optimize_pcs_claim_merging" }
+babybear = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/optimize_pcs_claim_merging" }
+crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/optimize_pcs_claim_merging" }
+expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/optimize_pcs_claim_merging", package = "circuit" }
+expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/optimize_pcs_claim_merging", package = "transcript" }
+expander_binary = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/optimize_pcs_claim_merging", package = "bin" }
+gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/optimize_pcs_claim_merging" }
+gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/optimize_pcs_claim_merging" }
+mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/optimize_pcs_claim_merging" }
+goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/optimize_pcs_claim_merging" }
+poly_commit = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/optimize_pcs_claim_merging", package = "poly_commit" }
+polynomials = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/optimize_pcs_claim_merging" }
+sumcheck = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/optimize_pcs_claim_merging" }
+serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/optimize_pcs_claim_merging", package = "serdes" }
+gkr_engine = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/optimize_pcs_claim_merging" }
+gkr_hashers = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/optimize_pcs_claim_merging" }
+expander_utils = { git = "https://github.com/PolyhedraZK/Expander", branch = "zf/optimize_pcs_claim_merging", package = "utils" }

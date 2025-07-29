@@ -14,8 +14,8 @@ use crate::zkcuda::proving_system::{CombinedProof, ProvingSystem};
 
 use super::super::Expander;
 
-use gkr_engine::{FieldEngine, GKREngine};
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use expander_utils::timer::Timer;
+use gkr_engine::GKREngine;
 
 pub struct ParallelizedExpander<C: GKREngine> {
     _config: std::marker::PhantomData<C>,
@@ -23,11 +23,9 @@ pub struct ParallelizedExpander<C: GKREngine> {
 
 impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSystem<ECCConfig>
     for ParallelizedExpander<C>
-where
-    C::FieldConfig: FieldEngine<SimdCircuitField = C::PCSField>,
 {
-    type ProverSetup = ExpanderProverSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
-    type VerifierSetup = ExpanderVerifierSetup<C::PCSField, C::FieldConfig, C::PCSConfig>;
+    type ProverSetup = ExpanderProverSetup<C::FieldConfig, C::PCSConfig>;
+    type VerifierSetup = ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>;
     type Proof = CombinedProof<ECCConfig, Expander<C>>;
 
     fn setup(
@@ -35,13 +33,18 @@ where
     ) -> (Self::ProverSetup, Self::VerifierSetup) {
         let server_binary =
             client_parse_args().unwrap_or("../target/release/expander_server".to_owned());
-        client_launch_server_and_setup::<C, ECCConfig>(&server_binary, computation_graph)
+        client_launch_server_and_setup::<C, ECCConfig>(
+            &server_binary,
+            computation_graph,
+            true,
+            false,
+        )
     }
 
     fn prove(
         _prover_setup: &Self::ProverSetup,
         _computation_graph: &crate::zkcuda::context::ComputationGraph<ECCConfig>,
-        device_memories: &[Vec<SIMDField<ECCConfig>>],
+        device_memories: Vec<Vec<SIMDField<ECCConfig>>>,
     ) -> Self::Proof {
         client_send_witness_and_prove(device_memories)
     }
@@ -51,10 +54,11 @@ where
         computation_graph: &ComputationGraph<ECCConfig>,
         proof: &Self::Proof,
     ) -> bool {
+        let verification_timer = Timer::new("Verify all kernels", true);
         let verified = proof
             .proofs
-            .par_iter()
-            .zip(computation_graph.proof_templates().par_iter())
+            .iter()
+            .zip(computation_graph.proof_templates().iter())
             .map(|(local_proof, template)| {
                 let local_commitments = template
                     .commitment_indices()
@@ -72,6 +76,7 @@ where
                 )
             })
             .collect::<Vec<_>>();
+        verification_timer.stop();
 
         verified.iter().all(|x| *x)
     }
