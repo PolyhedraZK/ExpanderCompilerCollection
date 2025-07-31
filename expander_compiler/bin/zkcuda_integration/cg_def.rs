@@ -4,6 +4,7 @@
 use expander_compiler::frontend::{
     BasicAPI, CircuitField, Config, Error, SIMDField, Variable, API,
 };
+use expander_compiler::zkcuda::context::ComputationGraphDefine;
 use expander_compiler::zkcuda::shape::Reshape;
 use expander_compiler::zkcuda::{
     context::{call_kernel, ComputationGraph, Context, DeviceMemoryHandle},
@@ -68,4 +69,27 @@ pub fn gen_computation_graph_and_witness<C: Config>(
     };
 
     (computation_graph, extended_witness)
+}
+
+pub struct MyCGDef;
+
+impl<C: Config> ComputationGraphDefine<C> for MyCGDef {
+    type InputType = Vec<Vec<CircuitField<C>>>;
+
+    // In practice, we may want to read this from a file
+    fn get_input() -> Self::InputType {
+        let mut input = vec![vec![]; 16];
+        for i in 0..16 {
+            for j in 0..2 {
+                input[i].push(CircuitField::<C>::from((i * 2 + j + 1) as u32));
+            }
+        }
+        input
+    }
+
+    fn gen_computation_graph_and_witness(
+        input: Option<Self::InputType>,
+    ) -> (ComputationGraph<C>, Option<Vec<Vec<SIMDField<C>>>>) {
+        gen_computation_graph_and_witness(input)
+    }
 }
