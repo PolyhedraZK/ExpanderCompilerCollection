@@ -93,6 +93,17 @@ impl<C: Config> ComputationGraph<C> {
     }
 }
 
+pub trait ComputationGraphDefine<C: Config> {
+    type InputType;
+
+    fn get_input() -> Self::InputType;
+
+    #[allow(clippy::type_complexity)]
+    fn gen_computation_graph_and_witness(
+        input: Option<Self::InputType>,
+    ) -> (ComputationGraph<C>, Option<Vec<Vec<SIMDField<C>>>>);
+}
+
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum ContextState {
     ComputationGraphNotDone,
