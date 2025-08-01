@@ -32,7 +32,7 @@ halo2curves = { git = "https://github.com/PolyhedraZK/halo2curves", default-feat
     "bits",
 ] }
 hex = "0.4"
-mpi = "0.8.0"
+mpi = { git = "https://github.com/rsmpi/rsmpi", rev = "61796831954b679cbe267c1b704ddbcb7fef3715" }
 num-bigint = "0.4.6"
 num_cpus = "1.16.0"
 num-traits = "0.2.19"
@@ -47,22 +47,22 @@ stacker = "0.1.17"
 tiny-keccak = { version = "2.0", features = ["keccak"] }
 tokio = { version = "1", features = ["full"] }
 
-arith = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-mpi_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-gkr_field_config = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-babybear = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-crosslayer_prototype = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-expander_circuit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "circuit" }
-expander_transcript = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "transcript" }
-expander_binary = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "bin" }
-gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-poly_commit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "poly_commit" }
-polynomials = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-sumcheck = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "serdes" }
-gkr_engine = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-gkr_hashers = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-expander_utils = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "utils" }
+arith = { git = "https://github.com/alxkzmn/Expander", branch = "main" }
+mpi_config = { git = "https://github.com/alxkzmn/Expander", branch = "main" }
+gkr_field_config = { git = "https://github.com/alxkzmn/Expander", branch = "main" }
+babybear = { git = "https://github.com/alxkzmn/Expander", branch = "main" }
+crosslayer_prototype = { git = "https://github.com/alxkzmn/Expander", branch = "main" }
+expander_circuit = { git = "https://github.com/alxkzmn/Expander", branch = "main", package = "circuit" }
+expander_transcript = { git = "https://github.com/alxkzmn/Expander", branch = "main", package = "transcript" }
+expander_binary = { git = "https://github.com/alxkzmn/Expander", branch = "main", package = "bin" }
+gkr = { git = "https://github.com/alxkzmn/Expander", branch = "main" }
+gf2 = { git = "https://github.com/alxkzmn/Expander", branch = "main" }
+mersenne31 = { git = "https://github.com/alxkzmn/Expander", branch = "main" }
+goldilocks = { git = "https://github.com/alxkzmn/Expander", branch = "main" }
+poly_commit = { git = "https://github.com/alxkzmn/Expander", branch = "main", package = "poly_commit" }
+polynomials = { git = "https://github.com/alxkzmn/Expander", branch = "main" }
+sumcheck = { git = "https://github.com/alxkzmn/Expander", branch = "main" }
+serdes = { git = "https://github.com/alxkzmn/Expander", branch = "main", package = "serdes" }
+gkr_engine = { git = "https://github.com/alxkzmn/Expander", branch = "main" }
+gkr_hashers = { git = "https://github.com/alxkzmn/Expander", branch = "main" }
+expander_utils = { git = "https://github.com/alxkzmn/Expander", branch = "main", package = "utils" }
