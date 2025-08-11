@@ -260,9 +260,10 @@ impl<'a, C: Config> InsnTransformAndExecute<'a, C, IrcIn<C>, IrcOut<C>> for Buil
                     }
                 }
             }
-            CustomGate { gate_type, inputs } => ir::hint_normalized::Instruction::CustomGate {
+            CustomGate { gate_type, inputs , num_outputs} => ir::hint_normalized::Instruction::CustomGate {
                 gate_type: *gate_type,
                 inputs: inputs.clone(),
+                num_outputs: *num_outputs,
             },
             ToBinary { x, num_bits } => {
                 let bits = self.push_insn_multi_out(InsnOut::Hint {

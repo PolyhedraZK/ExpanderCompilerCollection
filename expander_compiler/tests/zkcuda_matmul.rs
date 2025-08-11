@@ -49,8 +49,8 @@ fn zkcuda_matmul_sum() {
     registry.register("mul_sum", mul_sum);
     registry.register_custom_gate(12348, "mul_sum");
 
-    let kernel_mul_line: Kernel<M31Config> = compile_mul_line().unwrap();
-    let kernel_sum_8_elements: Kernel<M31Config> = compile_sum_8_elements().unwrap();
+    let kernel_mul_line: KernelPrimitive<M31Config> = compile_mul_line().unwrap();
+    let kernel_sum_8_elements: KernelPrimitive<M31Config> = compile_sum_8_elements().unwrap();
 
     let mut ctx: Context<M31Config, _> = Context::new(registry);
 

@@ -42,6 +42,7 @@ pub enum Instruction<C: Config> {
     CustomGate {
         gate_type: usize,
         inputs: Vec<usize>,
+        num_outputs: usize,
     },
 }
 
@@ -210,6 +211,7 @@ impl<C: Config> Instruction<C> {
         public_inputs: &[CircuitField<C>],
         hint_caller: &impl HintCaller<CircuitField<C>>,
     ) -> EvalResult<C> {
+println!("instruction eval safe");
         if let Instruction::ConstantLike(coef) = self {
             return match coef {
                 Coef::Constant(c) => EvalResult::Value(*c),
@@ -232,6 +234,7 @@ impl<C: Config> Instruction<C> {
             };
         }
         if let Instruction::CustomGate { .. } = self {
+println!("There's a custom gate");
             return EvalResult::Error(Error::UserError(
                 "CustomGate currently unsupported".to_string(),
             ));
@@ -499,9 +502,11 @@ impl<C: Config> RootCircuit<C> {
         public_inputs: &[CircuitField<C>],
         hint_caller: &impl HintCaller<CircuitField<C>>,
     ) -> Result<Vec<CircuitField<C>>, Error> {
+println!("root circuit eval sub safe");
         let mut values = vec![CircuitField::<C>::zero(); 1];
         values.extend(inputs);
         for insn in circuit.instructions.iter() {
+println!("there's insn");
             match insn.eval_safe(&values, public_inputs, hint_caller) {
                 EvalResult::Value(v) => {
                     values.push(v);
@@ -525,8 +530,10 @@ impl<C: Config> RootCircuit<C> {
         }
         let mut res = Vec::new();
         for &o in circuit.outputs.iter() {
+println!("circuit output {:?}", o);
             res.push(values[o]);
         }
+println!("circuit done");
         Ok(res)
     }
 

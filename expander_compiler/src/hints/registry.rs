@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, num};
 
 use tiny_keccak::Hasher;
 
@@ -10,7 +10,7 @@ type HintFn<F> = fn(&[F], &mut [F]) -> Result<(), Error>;
 
 #[derive(Default, Clone)]
 pub struct HintRegistry<F: Field> {
-    hints: HashMap<usize, Box<HintFn<F>>>,
+    hints: HashMap<usize, HintFn<F>>,
     custom_gate_type_to_hint_id: HashMap<usize, usize>,
 }
 
@@ -31,20 +31,26 @@ impl<F: Field> HintRegistry<F> {
     pub fn new() -> Self {
         Self::default()
     }
-    pub fn register(&mut self, key: &str, hint: fn(&[F], &mut [F]) -> Result<(), Error>) {
+
+    pub fn register(&mut self, key: &str, hint: HintFn<F>) {
         let id = hint_key_to_id(key);
         if self.hints.contains_key(&id) {
             panic!("Hint with id {id} already exists");
         }
         self.hints.insert(id, hint);
     }
+
     pub fn register_custom_gate(&mut self, gate_type: usize, key: &str) {
-        // TODO: check
         let id = hint_key_to_id(key);
+        if !self.hints.contains_key(&id) {
+            panic!("custom gate {gate_type} haven't registered hint");
+        }
         self.custom_gate_type_to_hint_id.insert(gate_type, id);
     }
-    pub fn call(&mut self, id: usize, args: &[F], num_outputs: usize) -> Result<Vec<F>, Error> {
-        if let Some(hint) = self.hints.get_mut(&id) {
+
+    pub fn call_hint(&self, id: usize, args: &[F], num_outputs: usize) -> Result<Vec<F>, Error> {
+println!("call hint {id} out lens {num_outputs}");
+        if let Some(hint) = self.hints.get(&id) {
             let mut outputs = vec![F::zero(); num_outputs];
             hint(args, &mut outputs).map(|_| outputs)
         } else {
@@ -63,18 +69,24 @@ impl EmptyHintCaller {
 }
 pub struct StubHintCaller;
 
-pub trait HintCaller<F: Field>: 'static {
-    fn call(&mut self, id: usize, args: &[F], num_outputs: usize) -> Result<Vec<F>, Error>;
-    fn custom_gate_type_to_hint_id(&self, gate_type: usize) -> Result<usize, Error> {
+pub trait HintCaller<F: Field>: 'static + Sync {
+    fn call(&self, id: usize, args: &[F], num_outputs: usize) -> Result<Vec<F>, Error>;
+    fn custom_gate_type_to_hint_id(&self, _gate_type: usize) -> Result<usize, Error> {
         Err(Error::UserError(format!(
-            "custom gate type {gate_type} not found"
+            "custom gate not implemented for this HintCaller"
         )))
+    }
+    fn call_custom_gate(&self, gate_type: usize, args: &[F], num_outputs: usize) -> Result<Vec<F>, Error> {
+        match self.custom_gate_type_to_hint_id(gate_type) {
+            Ok(cgid) => self.call(cgid, args, num_outputs),
+            Err(e) => Err(e),
+        }
     }
 }
 
 impl<F: Field + 'static> HintCaller<F> for HintRegistry<F> {
     fn call(&self, id: usize, args: &[F], num_outputs: usize) -> Result<Vec<F>, Error> {
-        self.call(id, args, num_outputs)
+        self.call_hint(id, args, num_outputs)
     }
     fn custom_gate_type_to_hint_id(&self, gate_type: usize) -> Result<usize, Error> {
         self.custom_gate_type_to_hint_id
@@ -86,7 +98,8 @@ impl<F: Field + 'static> HintCaller<F> for HintRegistry<F> {
 
 impl<F: Field> HintCaller<F> for EmptyHintCaller {
     fn call(&self, id: usize, _: &[F], _: usize) -> Result<Vec<F>, Error> {
-        Err(Error::UserError(format!("hint with id {id} not found")))
+        Err(Error::UserError("This is a EmptyHintCaller. It can't call any hint.".to_string()))
+        // Err(Error::UserError(format!("hint with id {id} not found")))
     }
 }
 

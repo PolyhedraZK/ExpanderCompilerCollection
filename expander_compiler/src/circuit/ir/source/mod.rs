@@ -59,6 +59,7 @@ pub enum Instruction<C: Config> {
     CustomGate {
         gate_type: usize,
         inputs: Vec<usize>,
+        num_outputs: usize,
     },
     ToBinary {
         x: usize,
@@ -256,9 +257,10 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 if_true: f(*if_true),
                 if_false: f(*if_false),
             },
-            Instruction::CustomGate { gate_type, inputs } => Instruction::CustomGate {
+            Instruction::CustomGate { gate_type, inputs , num_outputs} => Instruction::CustomGate {
                 gate_type: *gate_type,
                 inputs: inputs.iter().map(|i| f(*i)).collect(),
+                num_outputs: *num_outputs,
             },
             Instruction::ToBinary { x, num_bits } => Instruction::ToBinary {
                 x: f(*x),
@@ -397,7 +399,8 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
             } else {
                 values[*if_true]
             }),
-            Instruction::CustomGate { gate_type, inputs } => {
+            Instruction::CustomGate { gate_type, inputs , num_outputs} => {
+                // TODO: impl custom gate 
                 let outputs =
                     hints::stub_impl(*gate_type, &inputs.iter().map(|i| values[*i]).collect(), 1);
                 EvalResult::Values(outputs)

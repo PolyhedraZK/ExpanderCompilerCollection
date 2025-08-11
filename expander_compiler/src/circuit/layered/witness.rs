@@ -6,6 +6,7 @@ use serdes::{ExpSerde, SerdeResult};
 
 use super::{Circuit, InputType};
 use crate::circuit::config::{CircuitField, Config, SIMDField};
+use crate::frontend::{EmptyHintCaller, HintCaller};
 
 #[derive(Clone, Debug)]
 pub enum WitnessValues<C: Config> {
@@ -199,16 +200,18 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         &self,
         witness: &Witness<C>,
         need_output: bool,
+        customgate_caller: &impl HintCaller<CircuitField<C>>,
     ) -> (Vec<bool>, Vec<Vec<CircuitField<C>>>) {
         if witness.num_witnesses == 0 {
             panic!("expected at least 1 witness")
         }
         let mut outputs = Vec::new();
         let mut constraints = Vec::new();
+println!("use simd ? {}", use_simd::<C>(witness.num_witnesses));
         if use_simd::<C>(witness.num_witnesses) {
             for (inputs, public_inputs) in witness.iter_simd() {
                 let (out, constraint_result) =
-                    self.eval_with_public_inputs_simd(inputs, &public_inputs);
+                    self.eval_with_public_inputs_simd(inputs, &public_inputs, customgate_caller);
                 if need_output {
                     let n = outputs.len();
                     for _ in 0..SIMDField::<C>::PACK_SIZE {
@@ -226,7 +229,7 @@ impl<C: Config, I: InputType> Circuit<C, I> {
             constraints.truncate(witness.num_witnesses);
         } else {
             for (inputs, public_inputs) in witness.iter_scalar() {
-                let (out, constraint_result) = self.eval_with_public_inputs(inputs, &public_inputs);
+                let (out, constraint_result) = self.eval_with_public_inputs(inputs, &public_inputs, customgate_caller);
                 outputs.push(out);
                 constraints.push(constraint_result);
             }
@@ -234,13 +237,35 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         (constraints, outputs)
     }
 
-    pub fn run(&self, witness: &Witness<C>) -> Vec<bool> {
-        let (constraints, _) = self.run_inner(witness, false);
+    pub fn run(
+        &self,
+        witness: &Witness<C>,
+    ) -> Vec<bool> {
+        let (constraints, _) = self.run_inner(witness, false, &EmptyHintCaller);
         constraints
     }
 
-    pub fn run_with_output(&self, witness: &Witness<C>) -> (Vec<bool>, Vec<Vec<CircuitField<C>>>) {
-        self.run_inner(witness, true)
+    pub fn run_with_output(
+        &self,
+        witness: &Witness<C>,
+        customgate_caller: &impl HintCaller<CircuitField<C>>,
+    ) -> (Vec<bool>, Vec<Vec<CircuitField<C>>>) {
+        self.run_inner(witness, true, customgate_caller)
+    }
+
+    pub fn run_with_options(
+        &self,
+        witness: &Witness<C>,
+        need_output: bool,
+        customgate_caller: &impl HintCaller<CircuitField<C>>,
+    ) -> (Vec<bool>, Option<Vec<Vec<CircuitField<C>>>>) {
+        let rst = self.run_inner(witness, need_output, customgate_caller);
+        if need_output {
+            (rst.0, Some(rst.1))
+        }
+        else {
+            (rst.0, None)
+        }
     }
 }
 

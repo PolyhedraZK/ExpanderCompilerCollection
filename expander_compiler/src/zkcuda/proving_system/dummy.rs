@@ -2,6 +2,7 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIter
 use serdes::ExpSerde;
 
 use crate::circuit::config::{Config, SIMDField};
+use crate::frontend::EmptyHintCaller;
 use crate::utils::misc::next_power_of_two;
 use crate::zkcuda::context::ComputationGraph;
 use crate::zkcuda::proving_system::{CombinedProof, KernelWiseProvingSystem, ProvingSystem};
@@ -88,7 +89,7 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
             );
             let (_, cond) = kernel
                 .layered_circuit()
-                .eval_with_public_inputs_simd(lc_input, &[]);
+                .eval_with_public_inputs_simd(lc_input, &[], &EmptyHintCaller);
             for x in cond.iter() {
                 if !*x {
                     panic!("constraints not satisfied");
@@ -118,7 +119,7 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
             );
             let (_, cond) = kernel
                 .layered_circuit()
-                .eval_with_public_inputs_simd(lc_input, &[]);
+                .eval_with_public_inputs_simd(lc_input, &[], &EmptyHintCaller);
             if cond != proof.cond[i] {
                 return false;
             }

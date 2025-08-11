@@ -84,7 +84,7 @@ pub trait BasicAPI<C: Config> {
         inputs: &[Variable],
         num_outputs: usize,
     ) -> Vec<Variable>;
-    fn custom_gate(&mut self, gate_type: usize, inputs: &[Variable]) -> Variable;
+    fn custom_gate(&mut self, gate_type: usize, inputs: &[Variable], num_outputs: usize) -> Variable;
     fn constant(&mut self, x: impl ToVariableOrValue<CircuitField<C>>) -> Variable;
     // try to get the value of a compile-time constant variable
     // this function has different behavior in normal and debug mode, in debug mode it always returns Some(value)

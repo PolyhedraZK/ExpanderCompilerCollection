@@ -2,7 +2,7 @@ use std::{fmt, hash::Hash};
 
 use serdes::ExpSerde;
 
-use crate::{field::FieldArith, hints, utils::error::Error};
+use crate::{field::FieldArith, frontend::HintCaller, hints, utils::error::Error};
 
 use super::config::{CircuitField, Config};
 
@@ -733,10 +733,12 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         &self,
         inputs: Vec<CircuitField<C>>,
         public_inputs: &[CircuitField<C>],
+        customgate_caller: &impl HintCaller<CircuitField<C>>,
     ) -> (Vec<CircuitField<C>>, bool) {
         if inputs.len() != self.input_size() {
             panic!("input length mismatch");
         }
+println!("inputs {:?}", inputs);
         let mut cur = vec![inputs];
         for id in self.layer_ids.iter() {
             let mut next = vec![CircuitField::<C>::zero(); self.segments[*id].num_outputs];
@@ -749,6 +751,7 @@ impl<C: Config, I: InputType> Circuit<C, I> {
                 &inputs,
                 &mut next,
                 public_inputs,
+                customgate_caller,
             );
             cur.push(next);
         }
@@ -772,6 +775,7 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         cur: &[&[CircuitField<C>]],
         nxt: &mut [CircuitField<C>],
         public_inputs: &[CircuitField<C>],
+        customgate_caller: &impl HintCaller<CircuitField<C>>,
     ) {
         for m in seg.gate_muls.iter() {
             nxt[m.output] += cur[m.inputs[0].layer()][m.inputs[0].offset()]
@@ -790,9 +794,14 @@ impl<C: Config, I: InputType> Circuit<C, I> {
             for input in cu.inputs.iter() {
                 inputs.push(cur[input.layer()][input.offset()]);
             }
-            let outputs = hints::stub_impl(cu.gate_type, &inputs, 1);
-            for (i, output) in outputs.iter().enumerate() {
-                nxt[cu.output + i] += *output * cu.coef.get_value_with_public_inputs(public_inputs);
+            // let outputs = hints::stub_impl(cu.gate_type, &inputs, 1);
+            // TODO: custom outputs num setable
+            // let outputs = customgate_caller.call_custom_gate(cu.gate_type, &inputs, cu.output);
+            let outputs = customgate_caller.call_custom_gate(cu.gate_type, &inputs, 1);
+            if let Ok(outputs) = outputs {
+                for (i, output) in outputs.iter().enumerate() {
+                    nxt[cu.output + i] += *output * cu.coef.get_value_with_public_inputs(public_inputs);
+                }
             }
         }
         for (sub_id, allocs) in seg.child_segs.iter() {
@@ -810,6 +819,7 @@ impl<C: Config, I: InputType> Circuit<C, I> {
                     &inputs,
                     &mut nxt[a.output_offset..a.output_offset + subc.num_outputs],
                     public_inputs,
+                    customgate_caller,
                 );
             }
         }
@@ -819,6 +829,7 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         &self,
         inputs: Vec<SF>,
         public_inputs: &[SF],
+        customgate_caller: &impl HintCaller<CircuitField<C>>,
     ) -> (Vec<SF>, Vec<bool>) {
         if inputs.len() != self.input_size() {
             panic!("input length mismatch");
@@ -835,6 +846,7 @@ impl<C: Config, I: InputType> Circuit<C, I> {
                 &inputs,
                 &mut next,
                 public_inputs,
+                customgate_caller,
             );
             cur.push(next);
         }
@@ -860,6 +872,7 @@ impl<C: Config, I: InputType> Circuit<C, I> {
         cur: &[&[SF]],
         nxt: &mut [SF],
         public_inputs: &[SF],
+        customgate_caller: &impl HintCaller<CircuitField<C>>,
     ) {
         for m in seg.gate_muls.iter() {
             nxt[m.output] += cur[m.inputs[0].layer()][m.inputs[0].offset()]
@@ -884,10 +897,14 @@ impl<C: Config, I: InputType> Circuit<C, I> {
             let mut outputs = Vec::with_capacity(SF::PACK_SIZE);
             for x in inputs.iter() {
                 // TODO: better handle custom gates
+                /*
                 if cu.gate_type == 12348 {
-                    outputs.push(vec![tmp_mul(&x)]);
+                    outputs.push(vec![inner_product(&x)]);
                 } else {
                     outputs.push(hints::stub_impl(cu.gate_type, x, 1));
+                } */
+                if let Ok(out) = customgate_caller.call_custom_gate(cu.gate_type, x, cu.output) {
+                    outputs.push(out);
                 }
             }
             for i in 0..outputs[0].len() {
@@ -915,6 +932,7 @@ impl<C: Config, I: InputType> Circuit<C, I> {
                     &inputs,
                     &mut nxt[a.output_offset..a.output_offset + subc.num_outputs],
                     public_inputs,
+                    customgate_caller,
                 );
             }
         }
@@ -1004,7 +1022,7 @@ impl<C: Config, I: InputType> fmt::Display for Circuit<C, I> {
     }
 }
 
-fn tmp_mul<F: crate::field::Field>(a: &[F]) -> F {
+fn inner_product<F: crate::field::Field>(a: &[F]) -> F {
     let mut sum = F::ZERO;
     let n = a.len() / 2;
     for i in 0..n {

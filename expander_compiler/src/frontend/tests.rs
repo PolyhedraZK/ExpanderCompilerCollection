@@ -1,4 +1,4 @@
-use crate::frontend::M31Config as C;
+use crate::frontend::{EmptyHintCaller, M31Config as C};
 use crate::{
     compile::CompileOptions,
     field::{FieldArith, M31},

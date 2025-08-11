@@ -77,10 +77,11 @@ impl<C: Config> ExpSerde for Instruction<C> {
                 if_true.serialize_into(&mut writer)?;
                 if_false.serialize_into(&mut writer)?;
             }
-            Instruction::CustomGate { gate_type, inputs } => {
+            Instruction::CustomGate { gate_type, inputs , num_outputs} => {
                 12u8.serialize_into(&mut writer)?;
                 gate_type.serialize_into(&mut writer)?;
                 inputs.serialize_into(&mut writer)?;
+                num_outputs.serialize_into(&mut writer)?;
             }
             Instruction::ToBinary { x, num_bits } => {
                 13u8.serialize_into(&mut writer)?;
@@ -169,6 +170,7 @@ impl<C: Config> ExpSerde for Instruction<C> {
             12 => Instruction::CustomGate {
                 gate_type: usize::deserialize_from(&mut reader)?,
                 inputs: Vec::<usize>::deserialize_from(&mut reader)?,
+                num_outputs: usize::deserialize_from(&mut reader)?,
             },
             13 => Instruction::ToBinary {
                 x: usize::deserialize_from(&mut reader)?,

@@ -445,11 +445,12 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         (0..num_outputs).map(|_| self.new_var()).collect()
     }
 
-    fn custom_gate(&mut self, gate_type: usize, inputs: &[Variable]) -> Variable {
+    fn custom_gate(&mut self, gate_type: usize, inputs: &[Variable], num_outputs: usize) -> Variable {
         ensure_variables_valid(inputs);
         self.instructions.push(SourceInstruction::CustomGate {
             gate_type,
             inputs: inputs.iter().map(|v| v.id).collect(),
+            num_outputs,
         });
         self.new_var()
     }
@@ -689,8 +690,8 @@ impl<C: Config> BasicAPI<C> for RootBuilder<C> {
         self.last_builder().new_hint(hint_key, inputs, num_outputs)
     }
 
-    fn custom_gate(&mut self, gate_type: usize, inputs: &[Variable]) -> Variable {
-        self.last_builder().custom_gate(gate_type, inputs)
+    fn custom_gate(&mut self, gate_type: usize, inputs: &[Variable], num_outputs: usize) -> Variable {
+        self.last_builder().custom_gate(gate_type, inputs, num_outputs)
     }
 
     fn constant(&mut self, x: impl ToVariableOrValue<CircuitField<C>>) -> Variable {

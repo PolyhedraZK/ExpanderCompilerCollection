@@ -67,6 +67,7 @@ impl<C: Config> RandomInstruction for Instruction<C> {
                     inputs: (0..num_inputs)
                         .map(|_| rnd.next_u64() as usize % num_vars + 1)
                         .collect(),
+                    num_outputs,
                 }
             }
         } else if prob1 < 0.74 {
