@@ -1,35 +1,30 @@
-mod circuit_def;
-use circuit_def::gen_computation_graph_and_witness;
-use expander_compiler::{
-    frontend::{BN254Config, CircuitField},
-    zkcuda::{
-        context::ComputationGraph,
-        proving_system::{
-            expander::config::ZKCudaBN254KZG, ExpanderNoOverSubscribe, ProvingSystem,
-        },
+mod cg_def;
+use expander_compiler::zkcuda::{
+    context::{ComputationGraph, ComputationGraphDefine},
+    proving_system::{
+        expander::config::{GetFieldConfig, GetPCS, ZKCudaBN254KZG, ZKCudaConfig},
+        ExpanderNoOverSubscribe, ProvingSystem,
     },
 };
+use gkr_engine::ExpanderPCS;
 use serdes::ExpSerde;
 
-#[allow(clippy::needless_range_loop)]
-fn main() {
-    // Replace this with your actual input data.
-    let mut input = vec![vec![]; 16];
-    for i in 0..16 {
-        for j in 0..2 {
-            input[i].push(CircuitField::<BN254Config>::from((i * 2 + j + 1) as u32));
-        }
-    }
+use cg_def::MyCGDef;
 
-    let (_, extended_witness) = gen_computation_graph_and_witness::<BN254Config>(Some(input));
+fn main_impl<ZC: ZKCudaConfig, CG: ComputationGraphDefine<ZC::ECCConfig>>()
+where
+    <GetPCS<ZC> as ExpanderPCS<GetFieldConfig<ZC>>>::Commitment:
+        AsRef<<GetPCS<ZC> as ExpanderPCS<GetFieldConfig<ZC>>>::Commitment>,
+{
+    let input = CG::get_input();
+    let (_computation_graph, extended_witness) = CG::gen_computation_graph_and_witness(Some(input));
 
     // Note: we've saved the computation graph and setup in the server. In order to generate a proof, we only need to submit the witness.
-    let dummy_prover_setup = <ExpanderNoOverSubscribe<ZKCudaBN254KZG> as ProvingSystem<
-        BN254Config,
-    >>::ProverSetup::default();
-    let dummy_computation_graph = ComputationGraph::<BN254Config>::default();
+    let dummy_prover_setup =
+        <ExpanderNoOverSubscribe<ZC> as ProvingSystem<ZC::ECCConfig>>::ProverSetup::default();
+    let dummy_computation_graph = ComputationGraph::<ZC::ECCConfig>::default();
 
-    let proof = ExpanderNoOverSubscribe::<ZKCudaBN254KZG>::prove(
+    let proof = ExpanderNoOverSubscribe::<ZC>::prove(
         &dummy_prover_setup,
         &dummy_computation_graph,
         extended_witness.unwrap(),
@@ -38,4 +33,9 @@ fn main() {
     let mut bytes = vec![];
     proof.serialize_into(&mut bytes).unwrap();
     std::fs::write("/tmp/proof.bin", &bytes).unwrap();
+}
+
+#[allow(clippy::needless_range_loop)]
+fn main() {
+    main_impl::<ZKCudaBN254KZG, MyCGDef>();
 }
