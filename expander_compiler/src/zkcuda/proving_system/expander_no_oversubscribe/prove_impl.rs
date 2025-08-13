@@ -63,7 +63,10 @@ where
         (None, None)
     };
     commit_timer.stop();
-
+    println!("enter Here!$$$$:{:}", values.len());
+    for item in values {
+        println!("{}", item.as_ref().len());
+    }
     let mut vals_ref = vec![];
     let mut challenges = vec![];
 
@@ -78,7 +81,9 @@ where
                     .iter()
                     .map(|&idx| values[idx].as_ref())
                     .collect::<Vec<_>>();
-
+                for commitment_value in &commitment_values {
+                    println!("commitment_value: {}", commitment_value.len());
+                }
                 let single_kernel_gkr_timer =
                     Timer::new("small gkr kernel", global_mpi_config.is_root());
                 let gkr_end_state = prove_kernel_gkr_no_oversubscribe::<
@@ -200,7 +205,7 @@ pub fn prove_kernel_gkr_no_oversubscribe<F, T, ECCConfig>(
     kernel: &Kernel<ECCConfig>,
     commitments_values: &[&[F::SimdCircuitField]],
     parallel_count: usize,
-    is_broadcast: &[bool],
+    is_broadcast: &[usize],
     n_bytes_profiler: &mut NBytesProfiler,
 ) -> Option<(T, ExpanderDualVarChallenge<F>)>
 where
@@ -324,7 +329,7 @@ pub fn prove_kernel_gkr_internal<FBasic, FMulti, T, ECCConfig>(
     kernel: &Kernel<ECCConfig>,
     commitments_values: &[&[FBasic::SimdCircuitField]],
     parallel_count: usize,
-    is_broadcast: &[bool],
+    is_broadcast: &[usize],
     n_bytes_profiler: &mut NBytesProfiler,
 ) -> Option<(T, ExpanderDualVarChallenge<FBasic>)>
 where
@@ -338,6 +343,9 @@ where
     let world_size = mpi_config.world_size();
     let n_copies = parallel_count / world_size;
 
+    for &commitment_value in commitments_values {
+        println!("commitment_value: {}", commitment_value.len());
+    }
     let local_commitment_values = get_local_vals_multi_copies(
         commitments_values,
         is_broadcast,
@@ -345,6 +353,9 @@ where
         n_copies,
         parallel_count,
     );
+    for commitment_value in local_commitment_values[0].clone() {
+        println!("local_commitment_values: {}", commitment_value.len());
+    }
 
     let (mut expander_circuit, mut prover_scratch) =
         prepare_expander_circuit::<FMulti, ECCConfig>(kernel, world_size);
@@ -365,7 +376,7 @@ where
 
 pub fn get_local_vals_multi_copies<'vals_life, F: Field>(
     global_vals: &'vals_life [impl AsRef<[F]>],
-    is_broadcast: &[bool],
+    is_broadcast: &[usize],
     local_world_rank: usize,
     n_copies: usize,
     parallel_count: usize,

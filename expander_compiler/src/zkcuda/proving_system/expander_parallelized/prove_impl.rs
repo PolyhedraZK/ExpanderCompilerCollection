@@ -127,7 +127,7 @@ pub fn prove_kernel_gkr<F, T, ECCConfig>(
     kernel: &Kernel<ECCConfig>,
     commitments_values: &[&[F::SimdCircuitField]],
     parallel_count: usize,
-    is_broadcast: &[bool],
+    is_broadcast: &[usize],
 ) -> Option<(T, ExpanderDualVarChallenge<F>)>
 where
     F: FieldEngine,
@@ -169,22 +169,25 @@ pub fn partition_challenge_and_location_for_pcs_mpi<F: FieldEngine>(
     gkr_challenge: &ExpanderSingleVarChallenge<F>,
     total_vals_len: usize,
     parallel_count: usize,
-    is_broadcast: bool,
+    broadcast_num: usize,
 ) -> (ExpanderSingleVarChallenge<F>, Vec<F::ChallengeField>) {
     let mut challenge = gkr_challenge.clone();
     let zero = F::ChallengeField::ZERO;
-    if is_broadcast {
+    if broadcast_num == parallel_count {
         let n_vals_vars = total_vals_len.ilog2() as usize;
         let component_idx_vars = challenge.rz[n_vals_vars..].to_vec();
         challenge.rz.resize(n_vals_vars, zero);
+        println!("broadcast challenge.rz.len() = {}", challenge.rz.len());
         challenge.r_mpi.clear();
         (challenge, component_idx_vars)
     } else {
-        let n_vals_vars = (total_vals_len / parallel_count).ilog2() as usize;
+        let n_vals_vars = (total_vals_len / (parallel_count / broadcast_num)).ilog2() as usize;
         let component_idx_vars = challenge.rz[n_vals_vars..].to_vec();
         challenge.rz.resize(n_vals_vars, zero);
-
-        challenge.rz.extend_from_slice(&challenge.r_mpi);
+        //TODO: what is challenge.r_mpi, why need it when broadcast is false?
+        println!("challenge.rz.len() = {}", challenge.rz.len());
+        challenge.rz.extend_from_slice(&challenge.r_mpi[..(parallel_count / broadcast_num).ilog2() as usize]);
+        println!("after challenge.rz.len() = {}", challenge.rz.len());
         challenge.r_mpi.clear();
         (challenge, component_idx_vars)
     }
@@ -196,7 +199,7 @@ pub fn partition_single_gkr_claim_and_open_pcs_mpi<C: GKREngine>(
     commitments_values: &[impl AsRef<[SIMDField<C>]>],
     commitments_state: &[&ExpanderCommitmentState<C::FieldConfig, C::PCSConfig>],
     gkr_challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
-    is_broadcast: &[bool],
+    is_broadcast: &[usize],
     transcript: &mut C::TranscriptConfig,
 ) {
     let parallel_count = 1 << gkr_challenge.r_mpi.len();

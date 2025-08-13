@@ -61,7 +61,7 @@ where
         _commitments_state: &[&Self::CommitmentState],
         commitments_values: &[&[SIMDField<C>]],
         parallel_count: usize,
-        is_broadcast: &[bool],
+        is_broadcast: &[usize],
     ) -> Self::Proof {
         let timer = Timer::new("prove", true);
         check_inputs(kernel, commitments_values, parallel_count, is_broadcast);
@@ -113,7 +113,7 @@ where
         proof: &Self::Proof,
         commitments: &[&Self::Commitment],
         parallel_count: usize,
-        is_broadcast: &[bool],
+        is_broadcast: &[usize],
     ) -> bool {
         let timer = Timer::new("verify", true);
         let mut expander_circuit = kernel.layered_circuit().export_to_expander_flatten();

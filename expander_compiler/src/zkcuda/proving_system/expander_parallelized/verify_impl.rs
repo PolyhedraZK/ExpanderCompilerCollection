@@ -30,7 +30,7 @@ pub fn verify_kernel<C, ECCConfig>(
     proof: &ExpanderProof,
     commitments: &[&ExpanderCommitment<C::FieldConfig, C::PCSConfig>],
     parallel_count: usize,
-    is_broadcast: &[bool],
+    is_broadcast: &[usize],
 ) -> bool
 where
     C: GKREngine,
@@ -86,7 +86,7 @@ pub fn verify_pcs_opening_and_aggregation_mpi_impl<C, ECCConfig>(
     challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
     y: &<C::FieldConfig as FieldEngine>::ChallengeField,
     commitments: &[&ExpanderCommitment<C::FieldConfig, C::PCSConfig>],
-    is_broadcast: &[bool],
+    is_broadcast: &[usize],
     parallel_count: usize,
     transcript: &mut C::TranscriptConfig,
 ) -> bool
@@ -145,7 +145,7 @@ pub fn verify_pcs_opening_and_aggregation_mpi<C, ECCConfig>(
     claim_v0: <C::FieldConfig as FieldEngine>::ChallengeField,
     claim_v1: Option<<C::FieldConfig as FieldEngine>::ChallengeField>,
     commitments: &[&ExpanderCommitment<C::FieldConfig, C::PCSConfig>],
-    is_broadcast: &[bool],
+    is_broadcast: &[usize],
     parallel_count: usize,
     transcript: &mut C::TranscriptConfig,
 ) -> bool

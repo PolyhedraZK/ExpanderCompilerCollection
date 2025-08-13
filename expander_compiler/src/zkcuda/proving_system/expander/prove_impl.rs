@@ -48,7 +48,7 @@ where
 /// This function returns the local values for each parallel instance based on the global values and the broadcast information.
 pub fn get_local_vals<'vals_life, F: Field>(
     global_vals: &'vals_life [impl AsRef<[F]>],
-    is_broadcast: &[bool],
+    is_broadcast: &[usize],
     parallel_index: usize,
     parallel_num: usize,
 ) -> Vec<&'vals_life [F]> {
@@ -56,12 +56,9 @@ pub fn get_local_vals<'vals_life, F: Field>(
         .iter()
         .zip(is_broadcast.iter())
         .map(|(vals, is_broadcast)| {
-            if *is_broadcast {
-                vals.as_ref()
-            } else {
-                let local_val_len = vals.as_ref().len() / parallel_num;
-                &vals.as_ref()[local_val_len * parallel_index..local_val_len * (parallel_index + 1)]
-            }
+            let local_val_len = vals.as_ref().len() / (parallel_num / is_broadcast);
+            let start_index = local_val_len * parallel_index % vals.as_ref().len();
+            &vals.as_ref()[start_index..local_val_len + start_index]
         })
         .collect::<Vec<_>>()
 }
@@ -75,10 +72,13 @@ pub fn prepare_inputs_with_local_vals<F: Field>(
 ) -> Vec<F> {
     let mut input_vals = vec![F::ZERO; input_len];
     for (partition, val) in partition_info.iter().zip(local_commitment_values.iter()) {
+        // println!("partiion.len: {}, val.len: {}", partition.len, val.as_ref().len());
+        // panic!("partiion.len: {}, val.len: {}", partition.len, val.as_ref().len());
         assert!(partition.len == val.as_ref().len());
         input_vals[partition.offset..partition.offset + partition.len]
             .copy_from_slice(val.as_ref());
     }
+    // panic!("1");
     input_vals
 }
 
@@ -133,22 +133,23 @@ pub fn partition_challenge_and_location_for_pcs_no_mpi<F: FieldEngine>(
     total_vals_len: usize,
     parallel_index: usize,
     parallel_count: usize,
-    is_broadcast: bool,
+    is_broadcast: usize,
 ) -> (ExpanderSingleVarChallenge<F>, Vec<F::ChallengeField>) {
     assert_eq!(gkr_challenge.r_mpi.len(), 0);
     let mut challenge = gkr_challenge.clone();
     let zero = F::ChallengeField::ZERO;
-    if is_broadcast {
+    if is_broadcast == parallel_count {
         let n_vals_vars = total_vals_len.ilog2() as usize;
         let component_idx_vars = challenge.rz[n_vals_vars..].to_vec();
         challenge.rz.resize(n_vals_vars, zero);
         (challenge, component_idx_vars)
     } else {
-        let n_vals_vars = (total_vals_len / parallel_count).ilog2() as usize;
+        let real_parallel_count = parallel_count / is_broadcast;
+        let n_vals_vars = (total_vals_len / real_parallel_count).ilog2() as usize;
         let component_idx_vars = challenge.rz[n_vals_vars..].to_vec();
         challenge.rz.resize(n_vals_vars, zero);
 
-        let n_index_vars = parallel_count.ilog2() as usize;
+        let n_index_vars = real_parallel_count.ilog2() as usize;
         let index_vars = (0..n_index_vars)
             .map(|i| F::ChallengeField::from(((parallel_index >> i) & 1) as u32))
             .collect::<Vec<_>>();
@@ -206,7 +207,7 @@ pub fn partition_gkr_claims_and_open_pcs_no_mpi_impl<C: GKREngine>(
     gkr_claim: &ExpanderSingleVarChallenge<C::FieldConfig>,
     global_vals: &[impl AsRef<[<C::FieldConfig as FieldEngine>::SimdCircuitField]>],
     p_keys: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
-    is_broadcast: &[bool],
+    is_broadcast: &[usize],
     parallel_index: usize,
     parallel_num: usize,
     transcript: &mut C::TranscriptConfig,
@@ -235,7 +236,7 @@ pub fn partition_gkr_claims_and_open_pcs_no_mpi<C: GKREngine>(
     gkr_claim: &ExpanderDualVarChallenge<C::FieldConfig>,
     global_vals: &[impl AsRef<[<C::FieldConfig as FieldEngine>::SimdCircuitField]>],
     p_keys: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
-    is_broadcast: &[bool],
+    is_broadcast: &[usize],
     parallel_index: usize,
     parallel_num: usize,
     transcript: &mut C::TranscriptConfig,

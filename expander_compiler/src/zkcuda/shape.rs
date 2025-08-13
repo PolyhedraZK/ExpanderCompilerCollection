@@ -209,6 +209,8 @@ pub fn keep_shape_since(shape: &[usize], x: usize) -> Vec<usize> {
         p *= y;
         if p == x {
             return shape[i + 1..].to_vec();
+        } else if (x/p).is_power_of_two() {
+            return shape[i + 1..].to_vec();
         }
     }
     unreachable!()
@@ -242,8 +244,8 @@ impl ShapeHistory {
     // Suppose we need to ensure that the current shape is legal
     // This function returns a list of dimension lengths where the initial vector must be split
     // split_first_dim: first dimension of current shape will be split
-    pub fn get_initial_split_list(&self, split_first_dim: bool) -> Vec<usize> {
-        let last_entry = self.entries.last().unwrap().minimize(split_first_dim);
+    pub fn get_initial_split_list(&self, split_first_dim: usize) -> Vec<usize> {
+        let last_entry = self.entries.last().unwrap().minimize(split_first_dim==1);
         let mut split_list = prefix_products(&last_entry.shape);
         for e in self.entries.iter().rev().skip(1) {
             let e = e.minimize(false);
@@ -480,23 +482,23 @@ mod tests {
     fn test_get_initial_split_list() {
         let sh = ShapeHistory::new(vec![16, 9]);
         let sh = sh.reshape(&[9, 16]);
-        assert_eq!(sh.get_initial_split_list(false), vec![1, 144]);
-        assert_eq!(sh.get_initial_split_list(true), vec![1, 9, 144]);
+        assert_eq!(sh.get_initial_split_list(9), vec![1, 144]);
+        assert_eq!(sh.get_initial_split_list(1), vec![1, 9, 144]);
         let sh = sh.reshape(&[3, 16, 3]);
-        assert_eq!(sh.get_initial_split_list(true), vec![1, 3, 144]);
+        assert_eq!(sh.get_initial_split_list(1), vec![1, 3, 144]);
         let sh = sh.reshape(&[2, 2, 2, 2, 3, 3]);
         let sh = sh.transpose(&[1, 0, 2, 3, 4, 5]);
-        assert_eq!(sh.get_initial_split_list(false), vec![1, 2, 4, 144]);
-        assert_eq!(sh.get_initial_split_list(true), vec![1, 2, 4, 144]);
+        assert_eq!(sh.get_initial_split_list(2), vec![1, 2, 4, 144]);
+        assert_eq!(sh.get_initial_split_list(1), vec![1, 2, 4, 144]);
         let sh = sh.reshape(&[16, 9]);
-        assert_eq!(sh.get_initial_split_list(false), vec![1, 2, 4, 144]);
-        assert_eq!(sh.get_initial_split_list(true), vec![1, 2, 4, 16, 144]);
+        assert_eq!(sh.get_initial_split_list(2), vec![1, 2, 4, 144]);
+        assert_eq!(sh.get_initial_split_list(1), vec![1, 2, 4, 16, 144]);
         let sh = sh.transpose(&[1, 0]);
-        assert_eq!(sh.get_initial_split_list(false), vec![1, 2, 4, 16, 144]);
-        assert_eq!(sh.get_initial_split_list(true), vec![1, 2, 4, 16, 144]);
+        assert_eq!(sh.get_initial_split_list(2), vec![1, 2, 4, 16, 144]);
+        assert_eq!(sh.get_initial_split_list(1), vec![1, 2, 4, 16, 144]);
         let sh = sh.reshape(&[3, 3, 16]);
-        assert_eq!(sh.get_initial_split_list(false), vec![1, 2, 4, 16, 144]);
-        assert_eq!(sh.get_initial_split_list(true), vec![1, 2, 4, 16, 48, 144]);
+        assert_eq!(sh.get_initial_split_list(2), vec![1, 2, 4, 16, 144]);
+        assert_eq!(sh.get_initial_split_list(1), vec![1, 2, 4, 16, 48, 144]);
     }
 
     #[test]
@@ -504,9 +506,9 @@ mod tests {
         let sh = ShapeHistory::new(vec![16, 9]);
         let sh = sh.transpose(&[1, 0]);
         let sh = sh.reshape(&[16, 9]);
-        sh.get_initial_split_list(false);
+        sh.get_initial_split_list(2);
         assert!(std::panic::catch_unwind(|| {
-            sh.get_initial_split_list(true);
+            sh.get_initial_split_list(1);
         })
         .is_err());
     }

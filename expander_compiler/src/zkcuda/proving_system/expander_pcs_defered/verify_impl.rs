@@ -26,7 +26,7 @@ use crate::{
 fn verifier_extract_pcs_claims<'a, C, ECCConfig>(
     commitments: &[&'a ExpanderCommitment<C::FieldConfig, C::PCSConfig>],
     gkr_challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
-    is_broadcast: &[bool],
+    is_broadcast: &[usize],
     parallel_count: usize,
 ) -> (
     Vec<&'a ExpanderCommitment<C::FieldConfig, C::PCSConfig>>,
