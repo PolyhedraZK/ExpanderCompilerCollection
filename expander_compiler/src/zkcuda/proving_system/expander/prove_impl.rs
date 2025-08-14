@@ -72,8 +72,6 @@ pub fn prepare_inputs_with_local_vals<F: Field>(
 ) -> Vec<F> {
     let mut input_vals = vec![F::ZERO; input_len];
     for (partition, val) in partition_info.iter().zip(local_commitment_values.iter()) {
-        // println!("partiion.len: {}, val.len: {}", partition.len, val.as_ref().len());
-        // panic!("partiion.len: {}, val.len: {}", partition.len, val.as_ref().len());
         assert!(partition.len == val.as_ref().len());
         input_vals[partition.offset..partition.offset + partition.len]
             .copy_from_slice(val.as_ref());

@@ -209,9 +209,7 @@ pub fn keep_shape_since(shape: &[usize], x: usize) -> Vec<usize> {
         p *= y;
         if p == x {
             return shape[i + 1..].to_vec();
-        } else if (x/p).is_power_of_two() {
-            return shape[i + 1..].to_vec();
-        }
+        } 
     }
     unreachable!()
 }

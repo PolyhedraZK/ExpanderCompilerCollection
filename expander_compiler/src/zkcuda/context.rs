@@ -159,7 +159,6 @@ fn check_shape_compat(
     io_shape: &Shape,
     parallel_count: usize,
 ) -> Option<usize> {
-    println!("kernel_shape: {:?}, io_shape: {:?}, parallel_count: {}", kernel_shape, io_shape, parallel_count);
     if kernel_shape.len() == io_shape.len() {
         if *kernel_shape == *io_shape {
             Some(parallel_count)
@@ -373,7 +372,6 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 }
             }
         }
-        println!("is_broadcast: {:?}", is_broadcast);
         for (io_spec, ib) in kernel.io_specs().iter().zip(is_broadcast.iter()) {
             if io_spec.is_output && *ib!=1 {
                 panic!("Output is broadcasted, but it shouldn't be");
@@ -402,7 +400,6 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             *chunk_size = Some(kernel_shape.iter().product());
             *ir_inputs = values;
         }
-        println!("chunk_sizes: {:?}", chunk_sizes);
         let mut ir_inputs_per_parallel = Vec::new();
         for parallel_i in 0..num_parallel {
             let mut ir_inputs = vec![SIMDField::<C>::zero(); kernel.ir_for_calling().input_size()];
@@ -580,7 +577,6 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         self.state = ContextState::ComputationGraphDone;
 
         let dm_shapes = self.propagate_and_get_shapes();
-
         let (mut cg_kernels, cg_proof_templates, cg_commitments_lens) = if let Some(cg) = cg {
             for (i, kernel) in cg.kernels.iter().enumerate() {
                 assert_eq!(self.kernels.add(kernel), i);
@@ -628,9 +624,9 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                     psi.push(s.as_ref().map(|t| {
                         if ib == kernel_call.num_parallel {
                             t.0.clone()
-                        } else {
-                            keep_shape_since(&t.0, kernel_call.num_parallel)
-                        }
+                        } else{
+                            keep_shape_since(&t.0, kernel_call.num_parallel/ib)
+                        } 
                     }));
                 }
                 let mut pso = Vec::new();

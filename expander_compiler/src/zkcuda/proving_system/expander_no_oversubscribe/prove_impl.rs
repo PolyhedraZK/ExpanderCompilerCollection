@@ -63,10 +63,6 @@ where
         (None, None)
     };
     commit_timer.stop();
-    println!("enter Here!$$$$:{:}", values.len());
-    for item in values {
-        println!("{}", item.as_ref().len());
-    }
     let mut vals_ref = vec![];
     let mut challenges = vec![];
 
@@ -81,9 +77,6 @@ where
                     .iter()
                     .map(|&idx| values[idx].as_ref())
                     .collect::<Vec<_>>();
-                for commitment_value in &commitment_values {
-                    println!("commitment_value: {}", commitment_value.len());
-                }
                 let single_kernel_gkr_timer =
                     Timer::new("small gkr kernel", global_mpi_config.is_root());
                 let gkr_end_state = prove_kernel_gkr_no_oversubscribe::<
@@ -318,6 +311,46 @@ where
             is_broadcast,
             n_bytes_profiler,
         ),
+        4096 => prove_kernel_gkr_internal::<F, BN254ConfigXN<4096>, T, ECCConfig>(
+            &local_mpi_config,
+            kernel,
+            commitments_values,
+            parallel_count,
+            is_broadcast,
+            n_bytes_profiler,
+        ),
+        8192 => prove_kernel_gkr_internal::<F, BN254ConfigXN<8192>, T, ECCConfig>(
+            &local_mpi_config,
+            kernel,
+            commitments_values,
+            parallel_count,
+            is_broadcast,
+            n_bytes_profiler,
+        ),
+        16384 => prove_kernel_gkr_internal::<F, BN254ConfigXN<16384>, T, ECCConfig>(
+            &local_mpi_config,
+            kernel,
+            commitments_values,
+            parallel_count,
+            is_broadcast,
+            n_bytes_profiler,
+        ),
+        32768 => prove_kernel_gkr_internal::<F, BN254ConfigXN<32768>, T, ECCConfig>(
+            &local_mpi_config,
+            kernel,
+            commitments_values,
+            parallel_count,
+            is_broadcast,
+            n_bytes_profiler,
+        ),
+        65536 => prove_kernel_gkr_internal::<F, BN254ConfigXN<65536>, T, ECCConfig>(
+            &local_mpi_config,
+            kernel,
+            commitments_values,
+            parallel_count,
+            is_broadcast,
+            n_bytes_profiler,
+        ),
         _ => {
             panic!("Unsupported parallel count: {parallel_count}");
         }
@@ -343,9 +376,6 @@ where
     let world_size = mpi_config.world_size();
     let n_copies = parallel_count / world_size;
 
-    for &commitment_value in commitments_values {
-        println!("commitment_value: {}", commitment_value.len());
-    }
     let local_commitment_values = get_local_vals_multi_copies(
         commitments_values,
         is_broadcast,
@@ -353,9 +383,6 @@ where
         n_copies,
         parallel_count,
     );
-    for commitment_value in local_commitment_values[0].clone() {
-        println!("local_commitment_values: {}", commitment_value.len());
-    }
 
     let (mut expander_circuit, mut prover_scratch) =
         prepare_expander_circuit::<FMulti, ECCConfig>(kernel, world_size);

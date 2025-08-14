@@ -177,7 +177,6 @@ pub fn partition_challenge_and_location_for_pcs_mpi<F: FieldEngine>(
         let n_vals_vars = total_vals_len.ilog2() as usize;
         let component_idx_vars = challenge.rz[n_vals_vars..].to_vec();
         challenge.rz.resize(n_vals_vars, zero);
-        println!("broadcast challenge.rz.len() = {}", challenge.rz.len());
         challenge.r_mpi.clear();
         (challenge, component_idx_vars)
     } else {
@@ -185,9 +184,7 @@ pub fn partition_challenge_and_location_for_pcs_mpi<F: FieldEngine>(
         let component_idx_vars = challenge.rz[n_vals_vars..].to_vec();
         challenge.rz.resize(n_vals_vars, zero);
         //TODO: what is challenge.r_mpi, why need it when broadcast is false?
-        println!("challenge.rz.len() = {}", challenge.rz.len());
         challenge.rz.extend_from_slice(&challenge.r_mpi[..(parallel_count / broadcast_num).ilog2() as usize]);
-        println!("after challenge.rz.len() = {}", challenge.rz.len());
         challenge.r_mpi.clear();
         (challenge, component_idx_vars)
     }
