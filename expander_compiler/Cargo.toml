@@ -44,6 +44,7 @@ once_cell = "1.21.3"
 [dev-dependencies]
 rayon = "1.9"
 sha2 = "0.10.8"
+stacker = "0.1.15"
 
 [features]
 default = []

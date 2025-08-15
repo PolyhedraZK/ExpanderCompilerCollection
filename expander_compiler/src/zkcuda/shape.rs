@@ -214,6 +214,7 @@ pub fn keep_shape_since(shape: &[usize], x: usize) -> Vec<usize> {
     unreachable!()
 }
 
+// generate new subscripts active in padded shape
 pub fn shape_padded_mapping(shape: &[usize]) -> InputMapping {
     let mut cur = vec![0];
     let mut step = 1;
