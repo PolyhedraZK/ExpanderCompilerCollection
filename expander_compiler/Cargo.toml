@@ -48,6 +48,7 @@ sha2 = "0.10.8"
 [features]
 default = []
 profile = ["expander_utils/profile"]
+cuda-msm = ["poly_commit/cuda-msm"]
 zkcuda_profile = []
 
 [[bin]]
