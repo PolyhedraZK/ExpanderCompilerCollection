@@ -169,7 +169,7 @@ fn check_shape_compat(
         if io_shape.iter().skip(1).eq(kernel_shape.iter()) {
             if io_shape[0] == parallel_count {
                 Some(1)
-            } else if (parallel_count / io_shape[0]).is_power_of_two() {
+            } else if parallel_count % io_shape[0] == 0 {
                 Some(parallel_count / io_shape[0])
             } else {
                 None
@@ -890,6 +890,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             .map(|dm| {
                 let shape = prefix_products_to_shape(&dm.required_shape_products);
                 let im = shape_padded_mapping(&shape);
+                let tmp = im.map_inputs(&dm.values);
                 im.map_inputs(&dm.values)
             })
             .collect()

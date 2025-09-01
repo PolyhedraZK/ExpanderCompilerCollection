@@ -180,7 +180,7 @@ pub fn partition_challenge_and_location_for_pcs_mpi<F: FieldEngine>(
         challenge.r_mpi.clear();
         (challenge, component_idx_vars)
     } else {
-        let n_vals_vars = (total_vals_len / (parallel_count / broadcast_num)).ilog2() as usize;
+        let n_vals_vars = (total_vals_len / (parallel_count / broadcast_num.next_power_of_two())).ilog2() as usize;
         let component_idx_vars = challenge.rz[n_vals_vars..].to_vec();
         challenge.rz.resize(n_vals_vars, zero);
         //TODO: what is challenge.r_mpi, why need it when broadcast is false?

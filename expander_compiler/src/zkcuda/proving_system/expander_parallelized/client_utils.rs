@@ -147,7 +147,6 @@ where
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
 {
     let timer = Timer::new("prove", true);
-
     SharedMemoryEngine::write_witness_to_shared_memory::<C::FieldConfig>(device_memories);
     wait_async(ClientHttpHelper::request_prove());
 

@@ -65,7 +65,6 @@ where
     commit_timer.stop();
     let mut vals_ref = vec![];
     let mut challenges = vec![];
-
     let prove_timer = Timer::new("Prove all kernels", global_mpi_config.is_root());
     let proofs =
         computation_graph
@@ -375,7 +374,6 @@ where
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
     let n_copies = parallel_count / world_size;
-
     let local_commitment_values = get_local_vals_multi_copies(
         commitments_values,
         is_broadcast,
@@ -434,7 +432,7 @@ where
     FMulti:
         FieldEngine<CircuitField = FBasic::CircuitField, ChallengeField = FBasic::ChallengeField>,
     T: Transcript,
-{
+{   
     let input_vals_multi_copies = local_commitment_values_multi_copies
         .iter()
         .map(|local_commitment_values| {
