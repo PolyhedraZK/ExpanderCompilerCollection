@@ -10,8 +10,7 @@ use expander_compiler::zkcuda::proving_system::{
 };
 use gkr_engine::PolynomialCommitmentType;
 
-#[tokio::main]
-pub async fn main() {
+async fn async_main() {
     let expander_exec_args = ExpanderExecArgs::parse();
     assert_eq!(
         expander_exec_args.fiat_shamir_hash, "SHA256",
@@ -51,4 +50,18 @@ pub async fn main() {
             panic!("Combination of {field_type:?} and {pcs_type:?} not supported for no oversubscribe expander proving system.");
         }
     }
+}
+
+pub fn main() {
+    let stack_size_mb = std::env::var("THREAD_STACK_SIZE_MB")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .unwrap_or(64);
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .thread_stack_size(stack_size_mb * 1024 * 1024) // stack size in MB
+        .enable_all()
+        .build()
+        .unwrap();
+
+    rt.block_on(async_main());
 }
