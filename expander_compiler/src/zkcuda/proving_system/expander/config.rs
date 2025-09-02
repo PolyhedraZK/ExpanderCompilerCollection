@@ -1,8 +1,8 @@
-use gkr::{BN254ConfigSha2Hyrax, BN254ConfigSha2Raw, M31x16ConfigSha2RawVanilla};
+use gkr::{BN254ConfigSha2Hyrax, M31x16ConfigSha2RawVanilla};
 use gkr_engine::GKREngine;
 
 use crate::{
-    frontend::{BN254Config, Config, M31Config},
+    frontend::{BN254Config, BabyBearConfig, Config, GF2Config, GoldilocksConfig, M31Config},
     zkcuda::proving_system::expander_pcs_defered::BN254ConfigSha2UniKZG,
 };
 
@@ -43,9 +43,9 @@ pub type ZKCudaBN254Hyrax<'a> = ZKCudaConfigImpl<BN254Config, BN254ConfigSha2Hyr
 pub type ZKCudaBN254KZG<'a> = ZKCudaConfigImpl<BN254Config, BN254ConfigSha2UniKZG<'a>, false>;
 
 pub type ZKCudaM31<'a> = ZKCudaConfigImpl<M31Config, M31x16ConfigSha2RawVanilla<'a>, false>;
-pub type ZKCudaGF2<'a> = ZKCudaConfigImpl<BN254Config, BN254ConfigSha2Raw<'a>, false>;
-pub type ZKCudaGoldilocks<'a> = ZKCudaConfigImpl<BN254Config, BN254ConfigSha2Raw<'a>, false>;
-pub type ZKCudaBabyBear<'a> = ZKCudaConfigImpl<BN254Config, BN254ConfigSha2Raw<'a>, false>;
+pub type ZKCudaGF2<'a> = ZKCudaConfigImpl<GF2Config, GF2Config, false>;
+pub type ZKCudaGoldilocks<'a> = ZKCudaConfigImpl<GoldilocksConfig, GoldilocksConfig, false>;
+pub type ZKCudaBabyBear<'a> = ZKCudaConfigImpl<BabyBearConfig, BabyBearConfig, false>;
 
 // Batch PCS types
 pub type ZKCudaBN254HyraxBatchPCS<'a> =
@@ -53,7 +53,7 @@ pub type ZKCudaBN254HyraxBatchPCS<'a> =
 pub type ZKCudaBN254KZGBatchPCS<'a> =
     ZKCudaConfigImpl<BN254Config, BN254ConfigSha2UniKZG<'a>, true>;
 
-pub type ZKCudaM31BatchPCS<'a> = ZKCudaConfigImpl<M31Config, M31x16ConfigSha2RawVanilla<'a>, true>;
-pub type ZKCudaGF2BatchPCS<'a> = ZKCudaConfigImpl<BN254Config, BN254ConfigSha2Raw<'a>, true>;
-pub type ZKCudaGoldilocksBatchPCS<'a> = ZKCudaConfigImpl<BN254Config, BN254ConfigSha2Raw<'a>, true>;
-pub type ZKCudaBabyBearBatchPCS<'a> = ZKCudaConfigImpl<BN254Config, BN254ConfigSha2Raw<'a>, true>;
+pub type ZKCudaM31BatchPCS<'a> = ZKCudaConfigImpl<M31Config, M31Config, true>;
+pub type ZKCudaGF2BatchPCS<'a> = ZKCudaConfigImpl<GF2Config, GF2Config, true>;
+pub type ZKCudaGoldilocksBatchPCS<'a> = ZKCudaConfigImpl<GoldilocksConfig, GoldilocksConfig, true>;
+pub type ZKCudaBabyBearBatchPCS<'a> = ZKCudaConfigImpl<BabyBearConfig, BabyBearConfig, true>;
