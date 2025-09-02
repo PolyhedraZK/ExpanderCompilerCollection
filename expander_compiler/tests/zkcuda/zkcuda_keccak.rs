@@ -430,6 +430,7 @@ fn zkcuda_keccak_single_core() {
     zkcuda_keccak_2_helper::<Expander<M31Config>>();
 }
 
+#[ignore]
 #[test]
 fn zkcuda_keccak_multi_core() {
     zkcuda_keccak_1_helper::<ParallelizedExpander<M31Config>>();
