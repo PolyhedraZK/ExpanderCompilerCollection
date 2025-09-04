@@ -78,7 +78,6 @@ pub fn prepare_inputs_with_local_vals<F: Field>(
         input_vals[partition.offset..partition.offset + partition.len]
             .copy_from_slice(val.as_ref());
     }
-    // panic!("1");
     input_vals
 }
 
