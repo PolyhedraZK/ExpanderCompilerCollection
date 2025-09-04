@@ -3,7 +3,7 @@ use gkr_engine::GKREngine;
 
 use crate::{
     frontend::{BN254Config, BabyBearConfig, Config, GF2Config, GoldilocksConfig, M31Config},
-    zkcuda::proving_system::expander_pcs_defered::BN254ConfigSha2UniKZG,
+    zkcuda::proving_system::expander_pcs_defered::{BN254ConfigMIMCUniKZG, BN254ConfigSha2UniKZG},
 };
 
 pub trait ZKCudaConfig {
@@ -41,6 +41,7 @@ where
 // Concrete ZKCudaConfig types for various configurations
 pub type ZKCudaBN254Hyrax<'a> = ZKCudaConfigImpl<BN254Config, BN254ConfigSha2Hyrax<'a>, false>;
 pub type ZKCudaBN254KZG<'a> = ZKCudaConfigImpl<BN254Config, BN254ConfigSha2UniKZG<'a>, false>;
+pub type ZKCudaBN254MIMCKZG<'a> = ZKCudaConfigImpl<BN254Config, BN254ConfigMIMCUniKZG<'a>, false>;
 
 pub type ZKCudaM31<'a> = ZKCudaConfigImpl<M31Config, M31x16ConfigSha2RawVanilla<'a>, false>;
 pub type ZKCudaGF2<'a> = ZKCudaConfigImpl<GF2Config, GF2Config, false>;
@@ -52,6 +53,8 @@ pub type ZKCudaBN254HyraxBatchPCS<'a> =
     ZKCudaConfigImpl<BN254Config, BN254ConfigSha2Hyrax<'a>, true>;
 pub type ZKCudaBN254KZGBatchPCS<'a> =
     ZKCudaConfigImpl<BN254Config, BN254ConfigSha2UniKZG<'a>, true>;
+pub type ZKCudaBN254MIMCKZGBatchPCS<'a> =
+    ZKCudaConfigImpl<BN254Config, BN254ConfigMIMCUniKZG<'a>, true>;
 
 pub type ZKCudaM31BatchPCS<'a> = ZKCudaConfigImpl<M31Config, M31Config, true>;
 pub type ZKCudaGF2BatchPCS<'a> = ZKCudaConfigImpl<GF2Config, GF2Config, true>;
