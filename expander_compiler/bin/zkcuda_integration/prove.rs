@@ -35,7 +35,6 @@ where
     std::fs::write("/tmp/proof.bin", &bytes).unwrap();
 }
 
-#[allow(clippy::needless_range_loop)]
 fn main() {
     main_impl::<ZKCudaBN254KZG, MyCGDef>();
 }
