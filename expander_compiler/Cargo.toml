@@ -40,7 +40,6 @@ shared_memory.workspace = true
 tiny-keccak.workspace = true
 tokio.workspace = true
 once_cell = "1.21.3"
-stacker.workspace = true
 
 [dev-dependencies]
 rayon = "1.9"
