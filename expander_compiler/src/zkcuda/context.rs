@@ -332,10 +332,6 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 is_broadcast.push(NOT_BROADCAST);
                 continue;
             }
-            /*println!(
-                "Checking shape compatibility for input/output {}: kernel_shape={:?}, io_shape={:?}, num_parallel={}",
-                i, kernel_shape, io, num_parallel
-            );*/
             let io_shape = if let Some(handle) = io {
                 handle.shape_history.shape()
             } else {
