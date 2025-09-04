@@ -32,7 +32,7 @@ halo2curves = { git = "https://github.com/PolyhedraZK/halo2curves", default-feat
     "bits",
 ] }
 hex = "0.4"
-mpi = "0.8.0"
+mpi = { git = "https://github.com/rsmpi/rsmpi", rev = "61796831954b679cbe267c1b704ddbcb7fef3715" }
 num-bigint = "0.4.6"
 num_cpus = "1.16.0"
 num-traits = "0.2.19"
