@@ -1,12 +1,14 @@
 use expander_compiler::frontend::*;
+use expander_compiler::zkcuda::proving_system::expander::config::{
+    ZKCudaBN254Hyrax, ZKCudaBN254HyraxBatchPCS, ZKCudaBN254KZG, ZKCudaBN254KZGBatchPCS,
+};
 use expander_compiler::zkcuda::proving_system::Expander;
 use expander_compiler::zkcuda::proving_system::ProvingSystem;
+use expander_compiler::zkcuda::proving_system::{ExpanderNoOverSubscribe, ParallelizedExpander};
 use expander_compiler::zkcuda::shape::Reshape;
 use expander_compiler::zkcuda::{context::*, kernel::*};
-use serdes::ExpSerde;
 use serde::{Deserialize, Serialize};
-use expander_compiler::zkcuda::proving_system::expander::config::{ZKCudaBN254Hyrax, ZKCudaBN254HyraxBatchPCS, ZKCudaBN254KZG, ZKCudaBN254KZGBatchPCS,};
-use expander_compiler::zkcuda::proving_system::{ExpanderNoOverSubscribe, ParallelizedExpander,};
+use serdes::ExpSerde;
 const SIZE: usize = 64;
 const SIZE2: usize = 4096;
 #[kernel]
@@ -118,7 +120,7 @@ fn zkcuda_matmul_sum() {
         }
     }
     let mut mat_b: Vec<Vec<BN254Fr>> = vec![];
-    for i in 0..parallel_count/4 {
+    for i in 0..parallel_count / 4 {
         mat_b.push(vec![]);
         for j in 0..64 {
             mat_b[i].push(BN254Fr::from((i * 2333 + j + 11111) as u32));
@@ -132,11 +134,15 @@ fn zkcuda_matmul_sum() {
     let computation_graph = ctx.compile_computation_graph().unwrap();
     ctx.solve_witness().unwrap();
     let (prover_setup, _) = ExpanderNoOverSubscribe::<ZKCudaBN254Hyrax>::setup(&computation_graph);
-    let proof = ExpanderNoOverSubscribe::<ZKCudaBN254Hyrax>::prove(&prover_setup, &computation_graph, ctx.export_device_memories());
+    let proof = ExpanderNoOverSubscribe::<ZKCudaBN254Hyrax>::prove(
+        &prover_setup,
+        &computation_graph,
+        ctx.export_device_memories(),
+    );
     // let file = std::fs::File::create("proof.txt").unwrap();
     // let writer = std::io::BufWriter::new(file);
     // proof.serialize_into(writer);
-    <ExpanderNoOverSubscribe::<ZKCudaBN254Hyrax> as ProvingSystem<BN254Config>>::post_process();
+    <ExpanderNoOverSubscribe<ZKCudaBN254Hyrax> as ProvingSystem<BN254Config>>::post_process();
 }
 #[test]
 fn zkcuda_sum() {

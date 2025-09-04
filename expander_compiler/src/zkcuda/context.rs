@@ -1,5 +1,3 @@
-use core::num;
-
 use arith::SimdField;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serdes::ExpSerde;
@@ -303,15 +301,12 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         &self,
         values: &[SIMDField<C>],
         s: &mut [SIMDField<C>],
-        is_broadcast: usize,
         parallel_index: usize,
         chunk_size: Option<usize>,
     ) {
         let chunk_size = chunk_size.unwrap();
         let start_index = chunk_size * parallel_index % values.len();
-        s.copy_from_slice(
-            &values[start_index..(start_index + chunk_size)],
-        );
+        s.copy_from_slice(&values[start_index..(start_index + chunk_size)]);
     }
 
     pub fn call_kernel(
@@ -351,7 +346,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                         .as_ref()
                         .unwrap()
                         .shape_history
-                        .get_initial_split_list(ib/num_parallel+1);
+                        .get_initial_split_list(ib / num_parallel + 1);
                     // let isl = vec![1,64,4096];
                     let t = io.as_ref().unwrap().id;
                     self.device_memories[t].required_shape_products = merge_shape_products(
@@ -373,7 +368,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             }
         }
         for (io_spec, ib) in kernel.io_specs().iter().zip(is_broadcast.iter()) {
-            if io_spec.is_output && *ib!=1 {
+            if io_spec.is_output && *ib != 1 {
                 panic!("Output is broadcasted, but it shouldn't be");
             }
         }
@@ -383,9 +378,8 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         let mut outputs_tmp = vec![Vec::new(); kernel.io_specs().len()];
         let mut ir_inputs_all = vec![Vec::new(); kernel.io_specs().len()];
         let mut chunk_sizes: Vec<Option<usize>> = vec![None; kernel.io_specs().len()];
-        for ((((input, &ib), ir_inputs), chunk_size), kernel_shape) in ios
+        for (((input, ir_inputs), chunk_size), kernel_shape) in ios
             .iter()
-            .zip(is_broadcast.iter())
             .zip(ir_inputs_all.iter_mut())
             .zip(chunk_sizes.iter_mut())
             .zip(kernel.io_shapes().iter())
@@ -415,7 +409,6 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 self.ir_copy_from_device_memory(
                     &ir_inputs_all[i],
                     &mut ir_inputs[*input_start..*input_end],
-                    is_broadcast[i],
                     parallel_i,
                     chunk_sizes[i],
                 );
@@ -624,9 +617,9 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                     psi.push(s.as_ref().map(|t| {
                         if ib == kernel_call.num_parallel {
                             t.0.clone()
-                        } else{
-                            keep_shape_since(&t.0, kernel_call.num_parallel/ib)
-                        } 
+                        } else {
+                            keep_shape_since(&t.0, kernel_call.num_parallel / ib)
+                        }
                     }));
                 }
                 let mut pso = Vec::new();
@@ -761,10 +754,9 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             let mut output_chunk_sizes: Vec<Option<usize>> =
                 vec![None; kernel_primitive.io_specs().len()];
             let mut any_shape = None;
-            for (((input, &ib), ir_inputs), chunk_size) in kernel_call
+            for ((input, ir_inputs), chunk_size) in kernel_call
                 .input_handles
                 .iter()
-                .zip(kernel_call.is_broadcast.iter())
                 .zip(ir_inputs_all.iter_mut())
                 .zip(input_chunk_sizes.iter_mut())
             {
@@ -822,7 +814,6 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                     self.ir_copy_from_device_memory(
                         ir_inputs,
                         &mut inputs[*input_start..*input_end],
-                        chunk_size.unwrap_or(2),
                         parallel_i,
                         *chunk_size,
                     );
@@ -842,7 +833,6 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                     self.ir_copy_from_device_memory(
                         ir_outputs,
                         &mut inputs[*output_start..*output_end],
-                        chunk_size.unwrap_or(1),
                         parallel_i,
                         *chunk_size,
                     );
@@ -890,7 +880,6 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             .map(|dm| {
                 let shape = prefix_products_to_shape(&dm.required_shape_products);
                 let im = shape_padded_mapping(&shape);
-                let tmp = im.map_inputs(&dm.values);
                 im.map_inputs(&dm.values)
             })
             .collect()

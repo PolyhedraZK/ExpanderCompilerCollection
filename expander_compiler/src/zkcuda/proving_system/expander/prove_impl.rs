@@ -57,7 +57,8 @@ pub fn get_local_vals<'vals_life, F: Field>(
         .zip(is_broadcast.iter())
         .map(|(vals, is_broadcast)| {
             let is_broadcast_next_power_of_two = is_broadcast.next_power_of_two();
-            let local_val_len = vals.as_ref().len() / (parallel_num / is_broadcast_next_power_of_two);
+            let local_val_len =
+                vals.as_ref().len() / (parallel_num / is_broadcast_next_power_of_two);
             let start_index = local_val_len * parallel_index % vals.as_ref().len();
             &vals.as_ref()[start_index..local_val_len + start_index]
         })

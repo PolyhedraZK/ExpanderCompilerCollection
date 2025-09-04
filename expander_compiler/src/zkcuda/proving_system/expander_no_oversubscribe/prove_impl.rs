@@ -432,7 +432,7 @@ where
     FMulti:
         FieldEngine<CircuitField = FBasic::CircuitField, ChallengeField = FBasic::ChallengeField>,
     T: Transcript,
-{   
+{
     let input_vals_multi_copies = local_commitment_values_multi_copies
         .iter()
         .map(|local_commitment_values| {

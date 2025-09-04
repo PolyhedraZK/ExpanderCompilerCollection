@@ -209,7 +209,7 @@ pub fn keep_shape_since(shape: &[usize], x: usize) -> Vec<usize> {
         p *= y;
         if p == x {
             return shape[i + 1..].to_vec();
-        } 
+        }
     }
     unreachable!()
 }
@@ -243,7 +243,7 @@ impl ShapeHistory {
     // This function returns a list of dimension lengths where the initial vector must be split
     // split_first_dim: first dimension of current shape will be split
     pub fn get_initial_split_list(&self, split_first_dim: usize) -> Vec<usize> {
-        let last_entry = self.entries.last().unwrap().minimize(split_first_dim==1);
+        let last_entry = self.entries.last().unwrap().minimize(split_first_dim == 1);
         let mut split_list = prefix_products(&last_entry.shape);
         for e in self.entries.iter().rev().skip(1) {
             let e = e.minimize(false);

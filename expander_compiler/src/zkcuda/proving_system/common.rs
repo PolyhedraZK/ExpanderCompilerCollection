@@ -23,7 +23,9 @@ pub fn check_inputs<C: Config>(
         panic!("Input size mismatch");
     }
     for i in 0..kernel.layered_circuit_input().len() {
-        if kernel.layered_circuit_input()[i].len != values[i].len() / (parallel_count / is_broadcast[i]) {
+        if kernel.layered_circuit_input()[i].len
+            != values[i].len() / (parallel_count / is_broadcast[i])
+        {
             panic!("Input size mismatch");
         }
     }
