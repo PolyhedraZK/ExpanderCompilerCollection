@@ -347,7 +347,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                         .as_ref()
                         .unwrap()
                         .shape_history
-                        .get_initial_split_list(ib == num_parallel);
+                        .get_initial_split_list(ib == NOT_BROADCAST);
                     let t = io.as_ref().unwrap().id;
                     self.device_memories[t].required_shape_products = merge_shape_products(
                         &isl,
