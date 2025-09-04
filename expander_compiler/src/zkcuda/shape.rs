@@ -182,6 +182,7 @@ pub fn merge_shape_products(a: &[usize], b: &[usize]) -> Vec<usize> {
 }
 
 pub fn keep_shape_products_until(shape: &[usize], x: usize) -> Vec<usize> {
+    println!("shape: {:?}, x: {}", shape, x);
     let p = shape.iter().position(|&y| y == x).unwrap();
     shape[..=p].to_vec()
 }

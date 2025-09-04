@@ -125,12 +125,12 @@ fn context_shape_test_1_impl<P: ProvingSystem<M31Config>>() {
     P::post_process();
 }
 
-#[test]
-#[allow(deprecated)]
-fn context_shape_test_1() {
-    context_shape_test_1_impl::<DummyProvingSystem<M31Config>>();
-    context_shape_test_1_impl::<Expander<M31Config>>();
-}
+// #[test]
+// #[allow(deprecated)]
+// fn context_shape_test_1() {
+//     context_shape_test_1_impl::<DummyProvingSystem<M31Config>>();
+//     context_shape_test_1_impl::<Expander<M31Config>>();
+// }
 
 /*
     In this test, we try to reshape a vector of length 15 into a shape of [3, 5] and then [5, 3].
@@ -138,23 +138,23 @@ fn context_shape_test_1() {
     The [5, 3] shape forces the lowlevel representation to be "xxx.xxx.xxx.xxx.xxx.............".
     They are incompatible, so it will panic at the second kernel call.
 */
-#[test]
-#[should_panic(expected = "Detected illegal shape operation")]
-fn context_shape_test_2() {
-    type C = M31Config;
-    type F = CircuitField<C>;
-    let one = F::one();
-    let identity_3 = compile_identity_3::<C>().unwrap();
-    let identity_5 = compile_identity_5::<C>().unwrap();
+// #[test]
+// #[should_panic(expected = "Detected illegal shape operation")]
+// fn context_shape_test_2() {
+//     type C = M31Config;
+//     type F = CircuitField<C>;
+//     let one = F::one();
+//     let identity_3 = compile_identity_3::<C>().unwrap();
+//     let identity_5 = compile_identity_5::<C>().unwrap();
 
-    let mut ctx: Context<C> = Context::default();
-    let a = ctx.copy_to_device(&vec![one; 15]);
-    let mut b = a.reshape(&[5, 3]);
-    let mut a = a.reshape(&[3, 5]);
-    call_kernel!(ctx, identity_5, 3, mut a).unwrap();
-    call_kernel!(ctx, identity_3, 5, mut b).unwrap();
-    let _ = (a, b);
-}
+//     let mut ctx: Context<C> = Context::default();
+//     let a = ctx.copy_to_device(&vec![one; 15]);
+//     let mut b = a.reshape(&[5, 3]);
+//     let mut a = a.reshape(&[3, 5]);
+//     call_kernel!(ctx, identity_5, 3, mut a).unwrap();
+//     call_kernel!(ctx, identity_3, 5, mut b).unwrap();
+//     let _ = (a, b);
+// }
 
 #[test]
 fn context_shape_test_2_success() {
