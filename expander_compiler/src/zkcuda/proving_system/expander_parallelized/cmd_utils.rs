@@ -1,4 +1,4 @@
-use gkr_engine::{ExpanderPCS, FieldEngine, FieldType, GKREngine, PolynomialCommitmentType};
+use gkr_engine::{ExpanderPCS, FieldEngine, FieldType, GKREngine, PolynomialCommitmentType, Transcript};
 use std::process::Command;
 
 #[allow(clippy::zombie_processes)]
