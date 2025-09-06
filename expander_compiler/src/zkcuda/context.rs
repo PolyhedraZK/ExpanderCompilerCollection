@@ -750,9 +750,10 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             let mut output_chunk_sizes: Vec<Option<usize>> =
                 vec![None; kernel_primitive.io_specs().len()];
             let mut any_shape = None;
-            for ((input, ir_inputs), chunk_size) in kernel_call
+            for (((input, &ib), ir_inputs), chunk_size) in kernel_call
                 .input_handles
                 .iter()
+                .zip(kernel_call.is_broadcast.iter())
                 .zip(ir_inputs_all.iter_mut())
                 .zip(input_chunk_sizes.iter_mut())
             {
@@ -766,8 +767,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 let values = handle
                     .shape_history
                     .permute_vec(&self.device_memories[handle.id].values);
-                let kernel_shape = handle.shape_history.shape();
-                *chunk_size = Some(kernel_shape.iter().product());
+                *chunk_size = Some(values.len() * ib / kernel_call.num_parallel);
                 *ir_inputs = values;
             }
             for (((output, &ib), ir_inputs), chunk_size) in kernel_call
