@@ -189,7 +189,7 @@ where
 pub fn extract_pcs_claims<'a, C: GKREngine>(
     commitments_values: &[&'a [SIMDField<C>]],
     gkr_challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
-    is_broadcast: &[bool],
+    is_broadcast: &[usize],
     parallel_count: usize,
 ) -> (
     Vec<&'a [SIMDField<C>]>,

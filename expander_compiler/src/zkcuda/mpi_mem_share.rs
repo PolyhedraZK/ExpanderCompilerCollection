@@ -132,7 +132,7 @@ impl MPISharedMemory for ProofTemplate {
             .map(|_| BitOrder::new_from_memory(ptr))
             .collect();
         let parallel_count = usize::new_from_memory(ptr);
-        let is_broadcast = Vec::<bool>::new_from_memory(ptr);
+        let is_broadcast = Vec::<usize>::new_from_memory(ptr);
 
         ProofTemplate {
             kernel_id,

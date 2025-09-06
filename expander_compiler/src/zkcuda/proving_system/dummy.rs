@@ -74,7 +74,7 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
         _commitments_state: &[&Self::CommitmentState],
         commitments_values: &[&[SIMDField<C>]],
         parallel_count: usize,
-        is_broadcast: &[bool],
+        is_broadcast: &[usize],
     ) -> DummyProof {
         check_inputs(kernel, commitments_values, parallel_count, is_broadcast);
         let mut res = vec![];
@@ -84,6 +84,7 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
                 kernel.layered_circuit_input(),
                 commitments_values,
                 is_broadcast,
+                parallel_count,
                 i,
             );
             let (_, cond) = kernel
@@ -104,7 +105,7 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
         proof: &Self::Proof,
         commitments: &[&Self::Commitment],
         parallel_count: usize,
-        is_broadcast: &[bool],
+        is_broadcast: &[usize],
     ) -> bool {
         let values = commitments.iter().map(|c| &c.vals[..]).collect::<Vec<_>>();
         check_inputs(kernel, &values, parallel_count, is_broadcast);
@@ -114,6 +115,7 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
                 kernel.layered_circuit_input(),
                 &values,
                 is_broadcast,
+                parallel_count,
                 i,
             );
             let (_, cond) = kernel

@@ -59,7 +59,6 @@ where
         values: &[impl AsRef<[SIMDField<ZC::ECCConfig>]>],
     ) -> Option<CombinedProof<ZC::ECCConfig, Expander<ZC::GKRConfig>>> {
         let mut n_bytes_profiler = NBytesProfiler::new();
-
         #[cfg(feature = "zkcuda_profile")]
         {
             use arith::SimdField;

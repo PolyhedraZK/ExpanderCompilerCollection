@@ -601,7 +601,6 @@ impl<C: Config, I: InputType> Circuit<C, I> {
             .map(|segment| segment.all_gates())
             .collect();
         let mut edges = Vec::new();
-        //println!("segments: {}", self.segments.len());
         for (i, i_gates) in all_gates.iter().enumerate() {
             for (j, j_gates) in sampled_gates.iter().enumerate().take(i) {
                 let mut common_count = 0;

@@ -242,8 +242,8 @@ impl ShapeHistory {
     // Suppose we need to ensure that the current shape is legal
     // This function returns a list of dimension lengths where the initial vector must be split
     // split_first_dim: first dimension of current shape will be split
-    pub fn get_initial_split_list(&self, split_first_dim: bool) -> Vec<usize> {
-        let last_entry = self.entries.last().unwrap().minimize(split_first_dim);
+    pub fn get_initial_split_list(&self, keep_first_dim: bool) -> Vec<usize> {
+        let last_entry = self.entries.last().unwrap().minimize(keep_first_dim);
         let mut split_list = prefix_products(&last_entry.shape);
         for e in self.entries.iter().rev().skip(1) {
             let e = e.minimize(false);

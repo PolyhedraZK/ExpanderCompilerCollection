@@ -63,10 +63,8 @@ where
         (None, None)
     };
     commit_timer.stop();
-
     let mut vals_ref = vec![];
     let mut challenges = vec![];
-
     let prove_timer = Timer::new("Prove all kernels", global_mpi_config.is_root());
     let proofs =
         computation_graph
@@ -78,7 +76,6 @@ where
                     .iter()
                     .map(|&idx| values[idx].as_ref())
                     .collect::<Vec<_>>();
-
                 let single_kernel_gkr_timer =
                     Timer::new("small gkr kernel", global_mpi_config.is_root());
                 let gkr_end_state = prove_kernel_gkr_no_oversubscribe::<
@@ -200,7 +197,7 @@ pub fn prove_kernel_gkr_no_oversubscribe<F, T, ECCConfig>(
     kernel: &Kernel<ECCConfig>,
     commitments_values: &[&[F::SimdCircuitField]],
     parallel_count: usize,
-    is_broadcast: &[bool],
+    is_broadcast: &[usize],
     n_bytes_profiler: &mut NBytesProfiler,
 ) -> Option<(T, ExpanderDualVarChallenge<F>)>
 where
@@ -313,6 +310,46 @@ where
             is_broadcast,
             n_bytes_profiler,
         ),
+        4096 => prove_kernel_gkr_internal::<F, BN254ConfigXN<4096>, T, ECCConfig>(
+            &local_mpi_config,
+            kernel,
+            commitments_values,
+            parallel_count,
+            is_broadcast,
+            n_bytes_profiler,
+        ),
+        8192 => prove_kernel_gkr_internal::<F, BN254ConfigXN<8192>, T, ECCConfig>(
+            &local_mpi_config,
+            kernel,
+            commitments_values,
+            parallel_count,
+            is_broadcast,
+            n_bytes_profiler,
+        ),
+        16384 => prove_kernel_gkr_internal::<F, BN254ConfigXN<16384>, T, ECCConfig>(
+            &local_mpi_config,
+            kernel,
+            commitments_values,
+            parallel_count,
+            is_broadcast,
+            n_bytes_profiler,
+        ),
+        32768 => prove_kernel_gkr_internal::<F, BN254ConfigXN<32768>, T, ECCConfig>(
+            &local_mpi_config,
+            kernel,
+            commitments_values,
+            parallel_count,
+            is_broadcast,
+            n_bytes_profiler,
+        ),
+        65536 => prove_kernel_gkr_internal::<F, BN254ConfigXN<65536>, T, ECCConfig>(
+            &local_mpi_config,
+            kernel,
+            commitments_values,
+            parallel_count,
+            is_broadcast,
+            n_bytes_profiler,
+        ),
         _ => {
             panic!("Unsupported parallel count: {parallel_count}");
         }
@@ -324,7 +361,7 @@ pub fn prove_kernel_gkr_internal<FBasic, FMulti, T, ECCConfig>(
     kernel: &Kernel<ECCConfig>,
     commitments_values: &[&[FBasic::SimdCircuitField]],
     parallel_count: usize,
-    is_broadcast: &[bool],
+    is_broadcast: &[usize],
     n_bytes_profiler: &mut NBytesProfiler,
 ) -> Option<(T, ExpanderDualVarChallenge<FBasic>)>
 where
@@ -337,7 +374,6 @@ where
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
     let n_copies = parallel_count / world_size;
-
     let local_commitment_values = get_local_vals_multi_copies(
         commitments_values,
         is_broadcast,
@@ -365,7 +401,7 @@ where
 
 pub fn get_local_vals_multi_copies<'vals_life, F: Field>(
     global_vals: &'vals_life [impl AsRef<[F]>],
-    is_broadcast: &[bool],
+    is_broadcast: &[usize],
     local_world_rank: usize,
     n_copies: usize,
     parallel_count: usize,

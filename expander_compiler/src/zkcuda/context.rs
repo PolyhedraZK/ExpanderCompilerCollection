@@ -24,6 +24,7 @@ use super::{
 };
 
 pub use macros::call_kernel;
+const NOT_BROADCAST: usize = 1;
 
 struct DeviceMemory<C: Config> {
     values: Vec<SIMDField<C>>,
@@ -44,7 +45,7 @@ pub struct KernelCall {
     num_parallel: usize,
     input_handles: Vec<DeviceMemoryHandle>,
     output_handles: Vec<DeviceMemoryHandle>,
-    is_broadcast: Vec<bool>,
+    is_broadcast: Vec<usize>,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, ExpSerde)]
@@ -53,7 +54,7 @@ pub struct ProofTemplate {
     pub commitment_indices: Vec<usize>,
     pub commitment_bit_orders: Vec<BitOrder>,
     pub parallel_count: usize,
-    pub is_broadcast: Vec<bool>,
+    pub is_broadcast: Vec<usize>,
 }
 
 impl ProofTemplate {
@@ -69,7 +70,7 @@ impl ProofTemplate {
     pub fn parallel_count(&self) -> usize {
         self.parallel_count
     }
-    pub fn is_broadcast(&self) -> &[bool] {
+    pub fn is_broadcast(&self) -> &[usize] {
         &self.is_broadcast
     }
 }
@@ -156,17 +157,19 @@ fn check_shape_compat(
     kernel_shape: &Shape,
     io_shape: &Shape,
     parallel_count: usize,
-) -> Option<bool> {
+) -> Option<usize> {
     if kernel_shape.len() == io_shape.len() {
         if *kernel_shape == *io_shape {
-            Some(true)
+            Some(parallel_count)
         } else {
             None
         }
     } else if kernel_shape.len() + 1 == io_shape.len() {
         if io_shape.iter().skip(1).eq(kernel_shape.iter()) {
             if io_shape[0] == parallel_count {
-                Some(false)
+                Some(1)
+            } else if parallel_count % io_shape[0] == 0 {
+                Some(parallel_count / io_shape[0])
             } else {
                 None
             }
@@ -299,18 +302,12 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         &self,
         values: &[SIMDField<C>],
         s: &mut [SIMDField<C>],
-        is_broadcast: bool,
         parallel_index: usize,
         chunk_size: Option<usize>,
     ) {
-        if is_broadcast {
-            s.copy_from_slice(values);
-        } else {
-            let chunk_size = chunk_size.unwrap();
-            s.copy_from_slice(
-                &values[chunk_size * parallel_index..chunk_size * (parallel_index + 1)],
-            );
-        }
+        let chunk_size = chunk_size.unwrap();
+        let start_index = chunk_size * parallel_index % values.len();
+        s.copy_from_slice(&values[start_index..(start_index + chunk_size)]);
     }
 
     pub fn call_kernel(
@@ -332,13 +329,9 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             .enumerate()
         {
             if !spec.is_input {
-                is_broadcast.push(false);
+                is_broadcast.push(NOT_BROADCAST);
                 continue;
             }
-            /*println!(
-                "Checking shape compatibility for input/output {}: kernel_shape={:?}, io_shape={:?}, num_parallel={}",
-                i, kernel_shape, io, num_parallel
-            );*/
             let io_shape = if let Some(handle) = io {
                 handle.shape_history.shape()
             } else {
@@ -350,7 +343,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                         .as_ref()
                         .unwrap()
                         .shape_history
-                        .get_initial_split_list(!ib);
+                        .get_initial_split_list(ib == NOT_BROADCAST);
                     let t = io.as_ref().unwrap().id;
                     self.device_memories[t].required_shape_products = merge_shape_products(
                         &isl,
@@ -371,7 +364,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             }
         }
         for (io_spec, ib) in kernel.io_specs().iter().zip(is_broadcast.iter()) {
-            if io_spec.is_output && *ib {
+            if io_spec.is_output && *ib != NOT_BROADCAST {
                 panic!("Output is broadcasted, but it shouldn't be");
             }
         }
@@ -381,11 +374,11 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         let mut outputs_tmp = vec![Vec::new(); kernel.io_specs().len()];
         let mut ir_inputs_all = vec![Vec::new(); kernel.io_specs().len()];
         let mut chunk_sizes: Vec<Option<usize>> = vec![None; kernel.io_specs().len()];
-        for (((input, &ib), ir_inputs), chunk_size) in ios
+        for (((input, ir_inputs), chunk_size), kernel_shape) in ios
             .iter()
-            .zip(is_broadcast.iter())
             .zip(ir_inputs_all.iter_mut())
             .zip(chunk_sizes.iter_mut())
+            .zip(kernel.io_shapes().iter())
         {
             if input.is_none() {
                 continue;
@@ -394,9 +387,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             let values = handle
                 .shape_history
                 .permute_vec(&self.device_memories[handle.id].values);
-            if !ib {
-                *chunk_size = Some(values.len() / num_parallel);
-            }
+            *chunk_size = Some(kernel_shape.iter().product());
             *ir_inputs = values;
         }
         let mut ir_inputs_per_parallel = Vec::new();
@@ -414,7 +405,6 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 self.ir_copy_from_device_memory(
                     &ir_inputs_all[i],
                     &mut ir_inputs[*input_start..*input_end],
-                    is_broadcast[i],
                     parallel_i,
                     chunk_sizes[i],
                 );
@@ -513,7 +503,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                     .zip(kernel_call.input_handles.iter())
                     .zip(kernel_call.is_broadcast.iter())
                 {
-                    if !spec.is_input || ib {
+                    if !spec.is_input || ib > NOT_BROADCAST {
                         continue;
                     }
                     let pad_shape = get_pad_shape(input_handle).unwrap();
@@ -526,7 +516,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                     .zip(kernel_call.output_handles.iter())
                     .zip(kernel_call.is_broadcast.iter())
                 {
-                    if !spec.is_output || ib {
+                    if !spec.is_output || ib > NOT_BROADCAST {
                         continue;
                     }
                     let pad_shape = get_pad_shape(output_handle).unwrap();
@@ -576,7 +566,6 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         self.state = ContextState::ComputationGraphDone;
 
         let dm_shapes = self.propagate_and_get_shapes();
-
         let (mut cg_kernels, cg_proof_templates, cg_commitments_lens) = if let Some(cg) = cg {
             for (i, kernel) in cg.kernels.iter().enumerate() {
                 assert_eq!(self.kernels.add(kernel), i);
@@ -622,10 +611,10 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 let mut psi = Vec::new();
                 for (s, &ib) in pad_shapes_input.iter().zip(kernel_call.is_broadcast.iter()) {
                     psi.push(s.as_ref().map(|t| {
-                        if ib {
+                        if ib == kernel_call.num_parallel {
                             t.0.clone()
                         } else {
-                            keep_shape_since(&t.0, kernel_call.num_parallel)
+                            keep_shape_since(&t.0, kernel_call.num_parallel / ib)
                         }
                     }));
                 }
@@ -635,7 +624,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                     .zip(kernel_call.is_broadcast.iter())
                 {
                     pso.push(s.as_ref().map(|t| {
-                        if ib {
+                        if ib == kernel_call.num_parallel {
                             t.0.clone()
                         } else {
                             keep_shape_since(&t.0, kernel_call.num_parallel)
@@ -661,7 +650,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                     commitment_indices.push(handle.as_ref().unwrap().id);
                     commitment_bit_orders.push(shape.1.clone());
                     is_broadcast.push(ib);
-                    if !ib {
+                    if ib == NOT_BROADCAST {
                         any_shape = Some(shape.0.clone());
                     }
                 }
@@ -678,7 +667,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                     commitment_indices.push(handle.as_ref().unwrap().id);
                     commitment_bit_orders.push(shape.1.clone());
                     is_broadcast.push(ib);
-                    if !ib {
+                    if ib == NOT_BROADCAST {
                         any_shape = Some(shape.0.clone());
                     }
                 }
@@ -695,7 +684,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 dm_max += 1;
                 commitment_bit_orders.push((0..n.trailing_zeros() as usize).collect());
                 commitments_lens.push(n);
-                is_broadcast.push(false);
+                is_broadcast.push(NOT_BROADCAST);
             }
 
             let kernel_id = self.kernels.add(&kernel);
@@ -778,9 +767,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 let values = handle
                     .shape_history
                     .permute_vec(&self.device_memories[handle.id].values);
-                if !ib {
-                    *chunk_size = Some(values.len() / kernel_call.num_parallel);
-                }
+                *chunk_size = Some(values.len() * ib / kernel_call.num_parallel);
                 *ir_inputs = values;
             }
             for (((output, &ib), ir_inputs), chunk_size) in kernel_call
@@ -800,7 +787,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 let values = handle
                     .shape_history
                     .permute_vec(&self.device_memories[handle.id].values);
-                assert!(!ib);
+                assert!(ib == NOT_BROADCAST);
                 *chunk_size = Some(values.len() / kernel_call.num_parallel);
                 *ir_inputs = values;
             }
@@ -823,7 +810,6 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                     self.ir_copy_from_device_memory(
                         ir_inputs,
                         &mut inputs[*input_start..*input_end],
-                        chunk_size.is_none(),
                         parallel_i,
                         *chunk_size,
                     );
@@ -843,7 +829,6 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                     self.ir_copy_from_device_memory(
                         ir_outputs,
                         &mut inputs[*output_start..*output_end],
-                        chunk_size.is_none(),
                         parallel_i,
                         *chunk_size,
                     );

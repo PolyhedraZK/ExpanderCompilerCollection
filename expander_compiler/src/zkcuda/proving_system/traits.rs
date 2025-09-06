@@ -30,7 +30,7 @@ pub trait KernelWiseProvingSystem<C: Config> {
         commitments_state: &[&Self::CommitmentState],
         commitments_values: &[&[SIMDField<C>]],
         parallel_count: usize,
-        is_broadcast: &[bool],
+        is_broadcast: &[usize],
     ) -> Self::Proof;
 
     fn verify_kernel(
@@ -39,7 +39,7 @@ pub trait KernelWiseProvingSystem<C: Config> {
         proof: &Self::Proof,
         commitments: &[&Self::Commitment],
         parallel_count: usize,
-        is_broadcast: &[bool],
+        is_broadcast: &[usize],
     ) -> bool;
 
     fn post_process() {}
