@@ -30,7 +30,7 @@ fn test_poseidon_m31x16_hash_to_state_input_len8() {
     .unwrap();
 
     let assignment = PoseidonSpongeLen8Circuit::<M31> {
-        inputs: [M31::from(114514); 8],
+        inputs: [M31::from(114514u32); 8],
         outputs: [
             M31 { v: 1021105124 },
             M31 { v: 1342990709 },
@@ -88,7 +88,7 @@ fn test_poseidon_m31x16_hash_to_state_input_len16() {
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let assignment = PoseidonSpongeLen16Circuit::<M31> {
-        inputs: [M31::from(114514); 16],
+        inputs: [M31::from(114514u32); 16],
         outputs: [
             M31 { v: 1510043913 },
             M31 { v: 1840611937 },
