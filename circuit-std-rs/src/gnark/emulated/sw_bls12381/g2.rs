@@ -739,9 +739,9 @@ mod tests {
         let mut hint_registry = HintRegistry::<M31>::new();
         register_hint(&mut hint_registry);
         let mut assignment = MapToG2Circuit::<M31> {
-            in0: [[M31::from(0); 48]; 2],
-            in1: [[M31::from(0); 48]; 2],
-            out: [[[M31::from(0); 48]; 2]; 2],
+            in0: [[M31::ZERO; 48]; 2],
+            in1: [[M31::ZERO; 48]; 2],
+            out: [[[M31::ZERO; 48]; 2]; 2],
         };
         let p1_x_bytes = [
             75, 240, 55, 239, 72, 231, 76, 188, 20, 26, 234, 236, 23, 166, 182, 159, 239, 165, 10,
@@ -785,14 +785,14 @@ mod tests {
         ];
 
         for i in 0..48 {
-            assignment.in0[0][i] = M31::from(p1_x_bytes[i]);
-            assignment.in0[1][i] = M31::from(p1_y_bytes[i]);
-            assignment.in1[0][i] = M31::from(p2_x_bytes[i]);
-            assignment.in1[1][i] = M31::from(p2_y_bytes[i]);
-            assignment.out[0][0][i] = M31::from(out0_x_bytes[i]);
-            assignment.out[0][1][i] = M31::from(out0_y_bytes[i]);
-            assignment.out[1][0][i] = M31::from(out1_x_bytes[i]);
-            assignment.out[1][1][i] = M31::from(out1_y_bytes[i]);
+            assignment.in0[0][i] = M31::from(p1_x_bytes[i] as u32);
+            assignment.in0[1][i] = M31::from(p1_y_bytes[i] as u32);
+            assignment.in1[0][i] = M31::from(p2_x_bytes[i] as u32);
+            assignment.in1[1][i] = M31::from(p2_y_bytes[i] as u32);
+            assignment.out[0][0][i] = M31::from(out0_x_bytes[i] as u32);
+            assignment.out[0][1][i] = M31::from(out0_y_bytes[i] as u32);
+            assignment.out[1][0][i] = M31::from(out1_x_bytes[i] as u32);
+            assignment.out[1][1][i] = M31::from(out1_y_bytes[i] as u32);
         }
 
         debug_eval(&MapToG2Circuit::default(), &assignment, hint_registry);
@@ -804,8 +804,8 @@ mod tests {
         let mut hint_registry = HintRegistry::<M31>::new();
         register_hint(&mut hint_registry);
         let mut assignment = HashToG2Circuit::<M31> {
-            msg: [M31::from(0); 32],
-            out: [[[M31::from(0); 48]; 2]; 2],
+            msg: [M31::ZERO; 32],
+            out: [[[M31::ZERO; 48]; 2]; 2],
         };
         let msg_bytes = [
             140, 148, 79, 140, 170, 85, 208, 7, 114, 138, 47, 198, 231, 255, 48, 104, 221, 225, 3,
@@ -832,13 +832,13 @@ mod tests {
             182, 253, 89, 144, 170, 191, 128, 66, 207, 1,
         ];
         for i in 0..32 {
-            assignment.msg[i] = M31::from(msg_bytes[i]);
+            assignment.msg[i] = M31::from(msg_bytes[i] as u32);
         }
         for i in 0..48 {
-            assignment.out[0][0][i] = M31::from(out0_x_bytes[i]);
-            assignment.out[0][1][i] = M31::from(out0_y_bytes[i]);
-            assignment.out[1][0][i] = M31::from(out1_x_bytes[i]);
-            assignment.out[1][1][i] = M31::from(out1_y_bytes[i]);
+            assignment.out[0][0][i] = M31::from(out0_x_bytes[i] as u32);
+            assignment.out[0][1][i] = M31::from(out0_y_bytes[i] as u32);
+            assignment.out[1][0][i] = M31::from(out1_x_bytes[i] as u32);
+            assignment.out[1][1][i] = M31::from(out1_y_bytes[i] as u32);
         }
 
         debug_eval(&HashToG2Circuit::default(), &assignment, hint_registry);

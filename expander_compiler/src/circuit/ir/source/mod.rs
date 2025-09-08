@@ -350,7 +350,7 @@ impl<C: Config> common::Instruction<C> for Instruction<C> {
                 }
                 match op {
                     BoolBinOpType::Xor => {
-                        EvalResult::Value(x + y - CircuitField::<C>::from(2) * x * y)
+                        EvalResult::Value(x + y - CircuitField::<C>::from(2_u32) * x * y)
                     }
                     BoolBinOpType::Or => EvalResult::Value(x + y - x * y),
                     BoolBinOpType::And => EvalResult::Value(x * y),

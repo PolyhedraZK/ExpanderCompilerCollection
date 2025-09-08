@@ -99,7 +99,7 @@ pub fn prove_gkr_with_local_vals<F: FieldEngine, T: Transcript>(
     expander_circuit.evaluate();
     let (claimed_v, challenge) =
         gkr_prove(expander_circuit, prover_scratch, transcript, mpi_config);
-    assert_eq!(claimed_v, F::ChallengeField::from(0));
+    assert_eq!(claimed_v, F::ChallengeField::from(0_u32));
     challenge
 }
 

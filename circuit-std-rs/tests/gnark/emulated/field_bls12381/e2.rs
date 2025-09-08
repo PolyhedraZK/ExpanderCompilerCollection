@@ -1,3 +1,4 @@
+use arith::Field;
 use circuit_std_rs::{
     gnark::{
         element::new_internal_element,
@@ -47,9 +48,9 @@ fn test_e2_add() {
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2AddCircuit::<M31> {
-        x: [[M31::from(0); 48], [M31::from(0); 48]],
-        y: [[M31::from(0); 48], [M31::from(0); 48]],
-        z: [[M31::from(0); 48], [M31::from(0); 48]],
+        x: [[M31::ZERO; 48], [M31::ZERO; 48]],
+        y: [[M31::ZERO; 48], [M31::ZERO; 48]],
+        z: [[M31::ZERO; 48], [M31::ZERO; 48]],
     };
 
     let x0_bytes = [
@@ -137,9 +138,9 @@ fn test_e2_sub() {
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2SubCircuit::<M31> {
-        x: [[M31::from(0); 48], [M31::from(0); 48]],
-        y: [[M31::from(0); 48], [M31::from(0); 48]],
-        z: [[M31::from(0); 48], [M31::from(0); 48]],
+        x: [[M31::ZERO; 48], [M31::ZERO; 48]],
+        y: [[M31::ZERO; 48], [M31::ZERO; 48]],
+        z: [[M31::ZERO; 48], [M31::ZERO; 48]],
     };
 
     let x0_bytes = [
@@ -218,8 +219,8 @@ fn test_e2_double() {
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2DoubleCircuit::<M31> {
-        x: [[M31::from(0); 48], [M31::from(0); 48]],
-        z: [[M31::from(0); 48], [M31::from(0); 48]],
+        x: [[M31::ZERO; 48], [M31::ZERO; 48]],
+        z: [[M31::ZERO; 48], [M31::ZERO; 48]],
     };
 
     let x0_bytes = [
@@ -291,9 +292,9 @@ fn test_e2_mul() {
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2MulCircuit::<M31> {
-        x: [[M31::from(0); 48], [M31::from(0); 48]],
-        y: [[M31::from(0); 48], [M31::from(0); 48]],
-        z: [[M31::from(0); 48], [M31::from(0); 48]],
+        x: [[M31::ZERO; 48], [M31::ZERO; 48]],
+        y: [[M31::ZERO; 48], [M31::ZERO; 48]],
+        z: [[M31::ZERO; 48], [M31::ZERO; 48]],
     };
 
     let x0_bytes = [
@@ -373,8 +374,8 @@ fn test_e2_square() {
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2SquareCircuit::<M31> {
-        x: [[M31::from(0); 48], [M31::from(0); 48]],
-        z: [[M31::from(0); 48], [M31::from(0); 48]],
+        x: [[M31::ZERO; 48], [M31::ZERO; 48]],
+        z: [[M31::ZERO; 48], [M31::ZERO; 48]],
     };
 
     let x0_bytes = [
@@ -445,9 +446,9 @@ fn test_e2_div() {
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2DivCircuit::<M31> {
-        x: [[M31::from(0); 48], [M31::from(0); 48]],
-        y: [[M31::from(0); 48], [M31::from(0); 48]],
-        z: [[M31::from(0); 48], [M31::from(0); 48]],
+        x: [[M31::ZERO; 48], [M31::ZERO; 48]],
+        y: [[M31::ZERO; 48], [M31::ZERO; 48]],
+        z: [[M31::ZERO; 48], [M31::ZERO; 48]],
     };
 
     let x0_bytes = [
@@ -528,9 +529,9 @@ fn test_e2_mul_by_element() {
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2MulByElementCircuit::<M31> {
-        a: [[M31::from(0); 48], [M31::from(0); 48]],
-        b: [M31::from(0); 48],
-        c: [[M31::from(0); 48], [M31::from(0); 48]],
+        a: [[M31::ZERO; 48], [M31::ZERO; 48]],
+        b: [M31::ZERO; 48],
+        c: [[M31::ZERO; 48], [M31::ZERO; 48]],
     };
 
     let x0_bytes = [
@@ -611,8 +612,8 @@ fn test_e2_mul_by_non_residue() {
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2MulByNonResidueCircuit::<M31> {
-        a: [[M31::from(0); 48], [M31::from(0); 48]],
-        c: [[M31::from(0); 48], [M31::from(0); 48]],
+        a: [[M31::ZERO; 48], [M31::ZERO; 48]],
+        c: [[M31::ZERO; 48], [M31::ZERO; 48]],
     };
 
     let x0_bytes = [
@@ -684,8 +685,8 @@ fn test_e2_neg() {
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2NegCircuit::<M31> {
-        a: [[M31::from(0); 48], [M31::from(0); 48]],
-        c: [[M31::from(0); 48], [M31::from(0); 48]],
+        a: [[M31::ZERO; 48], [M31::ZERO; 48]],
+        c: [[M31::ZERO; 48], [M31::ZERO; 48]],
     };
 
     let x0_bytes = [
@@ -753,8 +754,8 @@ fn test_e2_conjugate() {
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2ConjugateCircuit::<M31> {
-        a: [[M31::from(0); 48], [M31::from(0); 48]],
-        c: [[M31::from(0); 48], [M31::from(0); 48]],
+        a: [[M31::ZERO; 48], [M31::ZERO; 48]],
+        c: [[M31::ZERO; 48], [M31::ZERO; 48]],
     };
 
     let x0_bytes = [
@@ -821,8 +822,8 @@ fn test_e2_inverse() {
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E2InverseCircuit::<M31> {
-        a: [[M31::from(0); 48], [M31::from(0); 48]],
-        c: [[M31::from(0); 48], [M31::from(0); 48]],
+        a: [[M31::ZERO; 48], [M31::ZERO; 48]],
+        c: [[M31::ZERO; 48], [M31::ZERO; 48]],
     };
 
     let x0_bytes = [

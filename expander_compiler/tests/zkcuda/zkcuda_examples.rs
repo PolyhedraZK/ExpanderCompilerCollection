@@ -1,6 +1,6 @@
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::proving_system::expander::config::{
-    ZKCudaBN254KZG, ZKCudaBN254KZGBatchPCS,
+    ZKCudaBN254KZG, ZKCudaBN254KZGBatchPCS, ZKCudaBN254MIMCKZGBatchPCS,
 };
 use expander_compiler::zkcuda::proving_system::expander_pcs_defered::BN254ConfigSha2UniKZG;
 use expander_compiler::zkcuda::proving_system::{
@@ -48,7 +48,7 @@ fn zkcuda_test<C: Config, P: ProvingSystem<C>>() {
     call_kernel!(ctx, kernel_add_16, 1, b, mut c).unwrap();
     let c = c.reshape(&[]);
     let result: CircuitField<C> = ctx.copy_to_host(c);
-    assert_eq!(result, CircuitField::<C>::from(32 * 33 / 2));
+    assert_eq!(result, CircuitField::<C>::from(32 * 33 / 2 as u32));
 
     let computation_graph = ctx.compile_computation_graph().unwrap();
     ctx.solve_witness().unwrap();
@@ -89,7 +89,6 @@ fn zkcuda_test_multi_core() {
     zkcuda_test::<GF2Config, ParallelizedExpander<GF2Config>>();
     zkcuda_test::<GoldilocksConfig, ParallelizedExpander<GoldilocksConfig>>();
     zkcuda_test::<BabyBearConfig, ParallelizedExpander<BabyBearConfig>>();
-    zkcuda_test::<BN254Config, ParallelizedExpander<BN254Config>>();
     zkcuda_test::<BN254Config, ParallelizedExpander<BN254ConfigSha2Hyrax>>();
     zkcuda_test::<BN254Config, ParallelizedExpander<BN254ConfigSha2UniKZG>>();
 
@@ -97,6 +96,7 @@ fn zkcuda_test_multi_core() {
     // zkcuda_test::<_, ExpanderNoOverSubscribe<ZKCudaBN254HyraxBatchPCS>>();
     zkcuda_test::<_, ExpanderNoOverSubscribe<ZKCudaBN254KZG>>();
     zkcuda_test::<_, ExpanderNoOverSubscribe<ZKCudaBN254KZGBatchPCS>>();
+    zkcuda_test::<_, ExpanderNoOverSubscribe<ZKCudaBN254MIMCKZGBatchPCS>>();
 }
 
 fn zkcuda_test_simd_prepare_ctx() -> Context<M31Config> {
@@ -255,7 +255,7 @@ fn zkcuda_to_binary() {
     let kernel: KernelPrimitive<M31Config> = compile_convert_to_binary().unwrap();
     let mut ctx: Context<M31Config, _> = Context::new(hint_registry);
 
-    let a = M31::from(0x55);
+    let a = M31::from(0x55 as u32);
     let a = ctx.copy_to_device(&a);
     let a = a.reshape(&[1]);
     let mut b: DeviceMemoryHandle = None;
@@ -265,14 +265,14 @@ fn zkcuda_to_binary() {
     assert_eq!(
         result,
         vec![
-            M31::from(1),
-            M31::from(0),
-            M31::from(1),
-            M31::from(0),
-            M31::from(1),
-            M31::from(0),
-            M31::from(1),
-            M31::from(0)
+            M31::from(1u32),
+            M31::from(0u32),
+            M31::from(1u32),
+            M31::from(0u32),
+            M31::from(1u32),
+            M31::from(0u32),
+            M31::from(1u32),
+            M31::from(0u32)
         ]
     );
 

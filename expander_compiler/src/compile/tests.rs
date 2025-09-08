@@ -28,11 +28,11 @@ fn simple_div() {
     let (input_solver, lc) = super::compile::<_, NormalInputType>(&root).unwrap();
     assert_eq!(input_solver.circuits[&0].outputs.len(), 4);
     let (o, cond) = lc.eval_unsafe(vec![
-        CField::from(2),
-        CField::from(3),
-        CField::from(5),
-        CField::from(7),
+        CField::from(2 as u32),
+        CField::from(3 as u32),
+        CField::from(5 as u32),
+        CField::from(7 as u32),
     ]);
-    assert_eq!(o[0], CField::from(10));
+    assert_eq!(o[0], CField::from(10 as u32));
     assert!(!cond);
 }

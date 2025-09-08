@@ -1,3 +1,4 @@
+use arith::Field;
 use circuit_std_rs::{
     gnark::{
         element::new_internal_element,
@@ -82,9 +83,9 @@ fn test_e6_add() {
     let mut hint_registry = HintRegistry::<M31>::new();
     register_hint(&mut hint_registry);
     let mut assignment = E6AddCircuit::<M31> {
-        x: [[[M31::from(0); 48]; 2]; 3],
-        y: [[[M31::from(0); 48]; 2]; 3],
-        z: [[[M31::from(0); 48]; 2]; 3],
+        x: [[[M31::ZERO; 48]; 2]; 3],
+        y: [[[M31::ZERO; 48]; 2]; 3],
+        z: [[[M31::ZERO; 48]; 2]; 3],
     };
 
     let x0_b0_a0_bytes = [
@@ -179,24 +180,24 @@ fn test_e6_add() {
     ];
 
     for i in 0..48 {
-        assignment.x[0][0][i] = M31::from(x0_b0_a0_bytes[i]);
-        assignment.x[0][1][i] = M31::from(x0_b0_a1_bytes[i]);
-        assignment.x[1][0][i] = M31::from(x0_b1_a0_bytes[i]);
-        assignment.x[1][1][i] = M31::from(x0_b1_a1_bytes[i]);
-        assignment.x[2][0][i] = M31::from(x0_b2_a0_bytes[i]);
-        assignment.x[2][1][i] = M31::from(x0_b2_a1_bytes[i]);
-        assignment.y[0][0][i] = M31::from(x1_b0_a0_bytes[i]);
-        assignment.y[0][1][i] = M31::from(x1_b0_a1_bytes[i]);
-        assignment.y[1][0][i] = M31::from(x1_b1_a0_bytes[i]);
-        assignment.y[1][1][i] = M31::from(x1_b1_a1_bytes[i]);
-        assignment.y[2][0][i] = M31::from(x1_b2_a0_bytes[i]);
-        assignment.y[2][1][i] = M31::from(x1_b2_a1_bytes[i]);
-        assignment.z[0][0][i] = M31::from(x2_b0_a0_bytes[i]);
-        assignment.z[0][1][i] = M31::from(x2_b0_a1_bytes[i]);
-        assignment.z[1][0][i] = M31::from(x2_b1_a0_bytes[i]);
-        assignment.z[1][1][i] = M31::from(x2_b1_a1_bytes[i]);
-        assignment.z[2][0][i] = M31::from(x2_b2_a0_bytes[i]);
-        assignment.z[2][1][i] = M31::from(x2_b2_a1_bytes[i]);
+        assignment.x[0][0][i] = M31::from(x0_b0_a0_bytes[i] as u32);
+        assignment.x[0][1][i] = M31::from(x0_b0_a1_bytes[i] as u32);
+        assignment.x[1][0][i] = M31::from(x0_b1_a0_bytes[i] as u32);
+        assignment.x[1][1][i] = M31::from(x0_b1_a1_bytes[i] as u32);
+        assignment.x[2][0][i] = M31::from(x0_b2_a0_bytes[i] as u32);
+        assignment.x[2][1][i] = M31::from(x0_b2_a1_bytes[i] as u32);
+        assignment.y[0][0][i] = M31::from(x1_b0_a0_bytes[i] as u32);
+        assignment.y[0][1][i] = M31::from(x1_b0_a1_bytes[i] as u32);
+        assignment.y[1][0][i] = M31::from(x1_b1_a0_bytes[i] as u32);
+        assignment.y[1][1][i] = M31::from(x1_b1_a1_bytes[i] as u32);
+        assignment.y[2][0][i] = M31::from(x1_b2_a0_bytes[i] as u32);
+        assignment.y[2][1][i] = M31::from(x1_b2_a1_bytes[i] as u32);
+        assignment.z[0][0][i] = M31::from(x2_b0_a0_bytes[i] as u32);
+        assignment.z[0][1][i] = M31::from(x2_b0_a1_bytes[i] as u32);
+        assignment.z[1][0][i] = M31::from(x2_b1_a0_bytes[i] as u32);
+        assignment.z[1][1][i] = M31::from(x2_b1_a1_bytes[i] as u32);
+        assignment.z[2][0][i] = M31::from(x2_b2_a0_bytes[i] as u32);
+        assignment.z[2][1][i] = M31::from(x2_b2_a1_bytes[i] as u32);
     }
 
     debug_eval(&E6AddCircuit::default(), &assignment, hint_registry);
@@ -275,9 +276,9 @@ fn test_e6_sub() {
     register_hint(&mut hint_registry);
 
     let mut assignment = E6SubCircuit::<M31> {
-        x: [[[M31::from(0); 48]; 2]; 3],
-        y: [[[M31::from(0); 48]; 2]; 3],
-        z: [[[M31::from(0); 48]; 2]; 3],
+        x: [[[M31::ZERO; 48]; 2]; 3],
+        y: [[[M31::ZERO; 48]; 2]; 3],
+        z: [[[M31::ZERO; 48]; 2]; 3],
     };
 
     let x0_b0_a0_bytes = [
@@ -372,24 +373,24 @@ fn test_e6_sub() {
     ];
 
     for i in 0..48 {
-        assignment.x[0][0][i] = M31::from(x0_b0_a0_bytes[i]);
-        assignment.x[0][1][i] = M31::from(x0_b0_a1_bytes[i]);
-        assignment.x[1][0][i] = M31::from(x0_b1_a0_bytes[i]);
-        assignment.x[1][1][i] = M31::from(x0_b1_a1_bytes[i]);
-        assignment.x[2][0][i] = M31::from(x0_b2_a0_bytes[i]);
-        assignment.x[2][1][i] = M31::from(x0_b2_a1_bytes[i]);
-        assignment.y[0][0][i] = M31::from(x1_b0_a0_bytes[i]);
-        assignment.y[0][1][i] = M31::from(x1_b0_a1_bytes[i]);
-        assignment.y[1][0][i] = M31::from(x1_b1_a0_bytes[i]);
-        assignment.y[1][1][i] = M31::from(x1_b1_a1_bytes[i]);
-        assignment.y[2][0][i] = M31::from(x1_b2_a0_bytes[i]);
-        assignment.y[2][1][i] = M31::from(x1_b2_a1_bytes[i]);
-        assignment.z[0][0][i] = M31::from(x2_b0_a0_bytes[i]);
-        assignment.z[0][1][i] = M31::from(x2_b0_a1_bytes[i]);
-        assignment.z[1][0][i] = M31::from(x2_b1_a0_bytes[i]);
-        assignment.z[1][1][i] = M31::from(x2_b1_a1_bytes[i]);
-        assignment.z[2][0][i] = M31::from(x2_b2_a0_bytes[i]);
-        assignment.z[2][1][i] = M31::from(x2_b2_a1_bytes[i]);
+        assignment.x[0][0][i] = M31::from(x0_b0_a0_bytes[i] as u32);
+        assignment.x[0][1][i] = M31::from(x0_b0_a1_bytes[i] as u32);
+        assignment.x[1][0][i] = M31::from(x0_b1_a0_bytes[i] as u32);
+        assignment.x[1][1][i] = M31::from(x0_b1_a1_bytes[i] as u32);
+        assignment.x[2][0][i] = M31::from(x0_b2_a0_bytes[i] as u32);
+        assignment.x[2][1][i] = M31::from(x0_b2_a1_bytes[i] as u32);
+        assignment.y[0][0][i] = M31::from(x1_b0_a0_bytes[i] as u32);
+        assignment.y[0][1][i] = M31::from(x1_b0_a1_bytes[i] as u32);
+        assignment.y[1][0][i] = M31::from(x1_b1_a0_bytes[i] as u32);
+        assignment.y[1][1][i] = M31::from(x1_b1_a1_bytes[i] as u32);
+        assignment.y[2][0][i] = M31::from(x1_b2_a0_bytes[i] as u32);
+        assignment.y[2][1][i] = M31::from(x1_b2_a1_bytes[i] as u32);
+        assignment.z[0][0][i] = M31::from(x2_b0_a0_bytes[i] as u32);
+        assignment.z[0][1][i] = M31::from(x2_b0_a1_bytes[i] as u32);
+        assignment.z[1][0][i] = M31::from(x2_b1_a0_bytes[i] as u32);
+        assignment.z[1][1][i] = M31::from(x2_b1_a1_bytes[i] as u32);
+        assignment.z[2][0][i] = M31::from(x2_b2_a0_bytes[i] as u32);
+        assignment.z[2][1][i] = M31::from(x2_b2_a1_bytes[i] as u32);
     }
 
     debug_eval(&E6SubCircuit::default(), &assignment, hint_registry);
@@ -467,9 +468,9 @@ fn test_e6_mul() {
     register_hint(&mut hint_registry);
 
     let mut assignment = E6MulCircuit::<M31> {
-        x: [[[M31::from(0); 48]; 2]; 3],
-        y: [[[M31::from(0); 48]; 2]; 3],
-        z: [[[M31::from(0); 48]; 2]; 3],
+        x: [[[M31::ZERO; 48]; 2]; 3],
+        y: [[[M31::ZERO; 48]; 2]; 3],
+        z: [[[M31::ZERO; 48]; 2]; 3],
     };
 
     let x0_b0_a0_bytes = [
@@ -564,24 +565,24 @@ fn test_e6_mul() {
     ];
 
     for i in 0..48 {
-        assignment.x[0][0][i] = M31::from(x0_b0_a0_bytes[i]);
-        assignment.x[0][1][i] = M31::from(x0_b0_a1_bytes[i]);
-        assignment.x[1][0][i] = M31::from(x0_b1_a0_bytes[i]);
-        assignment.x[1][1][i] = M31::from(x0_b1_a1_bytes[i]);
-        assignment.x[2][0][i] = M31::from(x0_b2_a0_bytes[i]);
-        assignment.x[2][1][i] = M31::from(x0_b2_a1_bytes[i]);
-        assignment.y[0][0][i] = M31::from(x1_b0_a0_bytes[i]);
-        assignment.y[0][1][i] = M31::from(x1_b0_a1_bytes[i]);
-        assignment.y[1][0][i] = M31::from(x1_b1_a0_bytes[i]);
-        assignment.y[1][1][i] = M31::from(x1_b1_a1_bytes[i]);
-        assignment.y[2][0][i] = M31::from(x1_b2_a0_bytes[i]);
-        assignment.y[2][1][i] = M31::from(x1_b2_a1_bytes[i]);
-        assignment.z[0][0][i] = M31::from(x2_b0_a0_bytes[i]);
-        assignment.z[0][1][i] = M31::from(x2_b0_a1_bytes[i]);
-        assignment.z[1][0][i] = M31::from(x2_b1_a0_bytes[i]);
-        assignment.z[1][1][i] = M31::from(x2_b1_a1_bytes[i]);
-        assignment.z[2][0][i] = M31::from(x2_b2_a0_bytes[i]);
-        assignment.z[2][1][i] = M31::from(x2_b2_a1_bytes[i]);
+        assignment.x[0][0][i] = M31::from(x0_b0_a0_bytes[i] as u32);
+        assignment.x[0][1][i] = M31::from(x0_b0_a1_bytes[i] as u32);
+        assignment.x[1][0][i] = M31::from(x0_b1_a0_bytes[i] as u32);
+        assignment.x[1][1][i] = M31::from(x0_b1_a1_bytes[i] as u32);
+        assignment.x[2][0][i] = M31::from(x0_b2_a0_bytes[i] as u32);
+        assignment.x[2][1][i] = M31::from(x0_b2_a1_bytes[i] as u32);
+        assignment.y[0][0][i] = M31::from(x1_b0_a0_bytes[i] as u32);
+        assignment.y[0][1][i] = M31::from(x1_b0_a1_bytes[i] as u32);
+        assignment.y[1][0][i] = M31::from(x1_b1_a0_bytes[i] as u32);
+        assignment.y[1][1][i] = M31::from(x1_b1_a1_bytes[i] as u32);
+        assignment.y[2][0][i] = M31::from(x1_b2_a0_bytes[i] as u32);
+        assignment.y[2][1][i] = M31::from(x1_b2_a1_bytes[i] as u32);
+        assignment.z[0][0][i] = M31::from(x2_b0_a0_bytes[i] as u32);
+        assignment.z[0][1][i] = M31::from(x2_b0_a1_bytes[i] as u32);
+        assignment.z[1][0][i] = M31::from(x2_b1_a0_bytes[i] as u32);
+        assignment.z[1][1][i] = M31::from(x2_b1_a1_bytes[i] as u32);
+        assignment.z[2][0][i] = M31::from(x2_b2_a0_bytes[i] as u32);
+        assignment.z[2][1][i] = M31::from(x2_b2_a1_bytes[i] as u32);
     }
 
     debug_eval(&E6MulCircuit::default(), &assignment, hint_registry);
@@ -644,8 +645,8 @@ fn test_e6_square() {
     register_hint(&mut hint_registry);
 
     let mut assignment = E6SquareCircuit::<M31> {
-        x: [[[M31::from(0); 48]; 2]; 3],
-        z: [[[M31::from(0); 48]; 2]; 3],
+        x: [[[M31::ZERO; 48]; 2]; 3],
+        z: [[[M31::ZERO; 48]; 2]; 3],
     };
 
     let x0_b0_a0_bytes = [
@@ -710,18 +711,18 @@ fn test_e6_square() {
     ];
 
     for i in 0..48 {
-        assignment.x[0][0][i] = M31::from(x0_b0_a0_bytes[i]);
-        assignment.x[0][1][i] = M31::from(x0_b0_a1_bytes[i]);
-        assignment.x[1][0][i] = M31::from(x0_b1_a0_bytes[i]);
-        assignment.x[1][1][i] = M31::from(x0_b1_a1_bytes[i]);
-        assignment.x[2][0][i] = M31::from(x0_b2_a0_bytes[i]);
-        assignment.x[2][1][i] = M31::from(x0_b2_a1_bytes[i]);
-        assignment.z[0][0][i] = M31::from(x2_b0_a0_bytes[i]);
-        assignment.z[0][1][i] = M31::from(x2_b0_a1_bytes[i]);
-        assignment.z[1][0][i] = M31::from(x2_b1_a0_bytes[i]);
-        assignment.z[1][1][i] = M31::from(x2_b1_a1_bytes[i]);
-        assignment.z[2][0][i] = M31::from(x2_b2_a0_bytes[i]);
-        assignment.z[2][1][i] = M31::from(x2_b2_a1_bytes[i]);
+        assignment.x[0][0][i] = M31::from(x0_b0_a0_bytes[i] as u32);
+        assignment.x[0][1][i] = M31::from(x0_b0_a1_bytes[i] as u32);
+        assignment.x[1][0][i] = M31::from(x0_b1_a0_bytes[i] as u32);
+        assignment.x[1][1][i] = M31::from(x0_b1_a1_bytes[i] as u32);
+        assignment.x[2][0][i] = M31::from(x0_b2_a0_bytes[i] as u32);
+        assignment.x[2][1][i] = M31::from(x0_b2_a1_bytes[i] as u32);
+        assignment.z[0][0][i] = M31::from(x2_b0_a0_bytes[i] as u32);
+        assignment.z[0][1][i] = M31::from(x2_b0_a1_bytes[i] as u32);
+        assignment.z[1][0][i] = M31::from(x2_b1_a0_bytes[i] as u32);
+        assignment.z[1][1][i] = M31::from(x2_b1_a1_bytes[i] as u32);
+        assignment.z[2][0][i] = M31::from(x2_b2_a0_bytes[i] as u32);
+        assignment.z[2][1][i] = M31::from(x2_b2_a1_bytes[i] as u32);
     }
 
     debug_eval(&E6SquareCircuit::default(), &assignment, hint_registry);
@@ -801,9 +802,9 @@ fn test_e6_div() {
     register_hint(&mut hint_registry);
 
     let mut assignment = E6DivCircuit::<M31> {
-        x: [[[M31::from(0); 48]; 2]; 3],
-        y: [[[M31::from(0); 48]; 2]; 3],
-        z: [[[M31::from(0); 48]; 2]; 3],
+        x: [[[M31::ZERO; 48]; 2]; 3],
+        y: [[[M31::ZERO; 48]; 2]; 3],
+        z: [[[M31::ZERO; 48]; 2]; 3],
     };
 
     let x0_b0_a0_bytes = [
@@ -898,24 +899,24 @@ fn test_e6_div() {
     ];
 
     for i in 0..48 {
-        assignment.x[0][0][i] = M31::from(x0_b0_a0_bytes[i]);
-        assignment.x[0][1][i] = M31::from(x0_b0_a1_bytes[i]);
-        assignment.x[1][0][i] = M31::from(x0_b1_a0_bytes[i]);
-        assignment.x[1][1][i] = M31::from(x0_b1_a1_bytes[i]);
-        assignment.x[2][0][i] = M31::from(x0_b2_a0_bytes[i]);
-        assignment.x[2][1][i] = M31::from(x0_b2_a1_bytes[i]);
-        assignment.y[0][0][i] = M31::from(x1_b0_a0_bytes[i]);
-        assignment.y[0][1][i] = M31::from(x1_b0_a1_bytes[i]);
-        assignment.y[1][0][i] = M31::from(x1_b1_a0_bytes[i]);
-        assignment.y[1][1][i] = M31::from(x1_b1_a1_bytes[i]);
-        assignment.y[2][0][i] = M31::from(x1_b2_a0_bytes[i]);
-        assignment.y[2][1][i] = M31::from(x1_b2_a1_bytes[i]);
-        assignment.z[0][0][i] = M31::from(x2_b0_a0_bytes[i]);
-        assignment.z[0][1][i] = M31::from(x2_b0_a1_bytes[i]);
-        assignment.z[1][0][i] = M31::from(x2_b1_a0_bytes[i]);
-        assignment.z[1][1][i] = M31::from(x2_b1_a1_bytes[i]);
-        assignment.z[2][0][i] = M31::from(x2_b2_a0_bytes[i]);
-        assignment.z[2][1][i] = M31::from(x2_b2_a1_bytes[i]);
+        assignment.x[0][0][i] = M31::from(x0_b0_a0_bytes[i] as u32);
+        assignment.x[0][1][i] = M31::from(x0_b0_a1_bytes[i] as u32);
+        assignment.x[1][0][i] = M31::from(x0_b1_a0_bytes[i] as u32);
+        assignment.x[1][1][i] = M31::from(x0_b1_a1_bytes[i] as u32);
+        assignment.x[2][0][i] = M31::from(x0_b2_a0_bytes[i] as u32);
+        assignment.x[2][1][i] = M31::from(x0_b2_a1_bytes[i] as u32);
+        assignment.y[0][0][i] = M31::from(x1_b0_a0_bytes[i] as u32);
+        assignment.y[0][1][i] = M31::from(x1_b0_a1_bytes[i] as u32);
+        assignment.y[1][0][i] = M31::from(x1_b1_a0_bytes[i] as u32);
+        assignment.y[1][1][i] = M31::from(x1_b1_a1_bytes[i] as u32);
+        assignment.y[2][0][i] = M31::from(x1_b2_a0_bytes[i] as u32);
+        assignment.y[2][1][i] = M31::from(x1_b2_a1_bytes[i] as u32);
+        assignment.z[0][0][i] = M31::from(x2_b0_a0_bytes[i] as u32);
+        assignment.z[0][1][i] = M31::from(x2_b0_a1_bytes[i] as u32);
+        assignment.z[1][0][i] = M31::from(x2_b1_a0_bytes[i] as u32);
+        assignment.z[1][1][i] = M31::from(x2_b1_a1_bytes[i] as u32);
+        assignment.z[2][0][i] = M31::from(x2_b2_a0_bytes[i] as u32);
+        assignment.z[2][1][i] = M31::from(x2_b2_a1_bytes[i] as u32);
     }
 
     debug_eval(&E6DivCircuit::default(), &assignment, hint_registry);
@@ -982,8 +983,8 @@ fn test_e6_mul_by_non_residue() {
     register_hint(&mut hint_registry); // Updated hint registration
 
     let mut assignment = E6MulByNonResidueCircuit::<M31> {
-        a: [[[M31::from(0); 48]; 2]; 3],
-        c: [[[M31::from(0); 48]; 2]; 3],
+        a: [[[M31::ZERO; 48]; 2]; 3],
+        c: [[[M31::ZERO; 48]; 2]; 3],
     };
 
     let x0_b0_a0_bytes = [
@@ -1048,18 +1049,18 @@ fn test_e6_mul_by_non_residue() {
     ];
 
     for i in 0..48 {
-        assignment.a[0][0][i] = M31::from(x0_b0_a0_bytes[i]);
-        assignment.a[0][1][i] = M31::from(x0_b0_a1_bytes[i]);
-        assignment.a[1][0][i] = M31::from(x0_b1_a0_bytes[i]);
-        assignment.a[1][1][i] = M31::from(x0_b1_a1_bytes[i]);
-        assignment.a[2][0][i] = M31::from(x0_b2_a0_bytes[i]);
-        assignment.a[2][1][i] = M31::from(x0_b2_a1_bytes[i]);
-        assignment.c[0][0][i] = M31::from(x2_b0_a0_bytes[i]);
-        assignment.c[0][1][i] = M31::from(x2_b0_a1_bytes[i]);
-        assignment.c[1][0][i] = M31::from(x2_b1_a0_bytes[i]);
-        assignment.c[1][1][i] = M31::from(x2_b1_a1_bytes[i]);
-        assignment.c[2][0][i] = M31::from(x2_b2_a0_bytes[i]);
-        assignment.c[2][1][i] = M31::from(x2_b2_a1_bytes[i]);
+        assignment.a[0][0][i] = M31::from(x0_b0_a0_bytes[i] as u32);
+        assignment.a[0][1][i] = M31::from(x0_b0_a1_bytes[i] as u32);
+        assignment.a[1][0][i] = M31::from(x0_b1_a0_bytes[i] as u32);
+        assignment.a[1][1][i] = M31::from(x0_b1_a1_bytes[i] as u32);
+        assignment.a[2][0][i] = M31::from(x0_b2_a0_bytes[i] as u32);
+        assignment.a[2][1][i] = M31::from(x0_b2_a1_bytes[i] as u32);
+        assignment.c[0][0][i] = M31::from(x2_b0_a0_bytes[i] as u32);
+        assignment.c[0][1][i] = M31::from(x2_b0_a1_bytes[i] as u32);
+        assignment.c[1][0][i] = M31::from(x2_b1_a0_bytes[i] as u32);
+        assignment.c[1][1][i] = M31::from(x2_b1_a1_bytes[i] as u32);
+        assignment.c[2][0][i] = M31::from(x2_b2_a0_bytes[i] as u32);
+        assignment.c[2][1][i] = M31::from(x2_b2_a1_bytes[i] as u32);
     }
 
     debug_eval(
@@ -1131,9 +1132,9 @@ fn test_e6_mul_by_e2() {
     register_hint(&mut hint_registry);
 
     let mut assignment = E6MulByE2Circuit::<M31> {
-        a: [[[M31::from(0); 48]; 2]; 3],
-        b: [[M31::from(0); 48]; 2],
-        c: [[[M31::from(0); 48]; 2]; 3],
+        a: [[[M31::ZERO; 48]; 2]; 3],
+        b: [[M31::ZERO; 48]; 2],
+        c: [[[M31::ZERO; 48]; 2]; 3],
     };
 
     let x0_b0_a0_bytes = [
@@ -1208,20 +1209,20 @@ fn test_e6_mul_by_e2() {
     ];
 
     for i in 0..48 {
-        assignment.a[0][0][i] = M31::from(x0_b0_a0_bytes[i]);
-        assignment.a[0][1][i] = M31::from(x0_b0_a1_bytes[i]);
-        assignment.a[1][0][i] = M31::from(x0_b1_a0_bytes[i]);
-        assignment.a[1][1][i] = M31::from(x0_b1_a1_bytes[i]);
-        assignment.a[2][0][i] = M31::from(x0_b2_a0_bytes[i]);
-        assignment.a[2][1][i] = M31::from(x0_b2_a1_bytes[i]);
-        assignment.b[0][i] = M31::from(x1_a0_bytes[i]);
-        assignment.b[1][i] = M31::from(x1_a1_bytes[i]);
-        assignment.c[0][0][i] = M31::from(x2_b0_a0_bytes[i]);
-        assignment.c[0][1][i] = M31::from(x2_b0_a1_bytes[i]);
-        assignment.c[1][0][i] = M31::from(x2_b1_a0_bytes[i]);
-        assignment.c[1][1][i] = M31::from(x2_b1_a1_bytes[i]);
-        assignment.c[2][0][i] = M31::from(x2_b2_a0_bytes[i]);
-        assignment.c[2][1][i] = M31::from(x2_b2_a1_bytes[i]);
+        assignment.a[0][0][i] = M31::from(x0_b0_a0_bytes[i] as u32);
+        assignment.a[0][1][i] = M31::from(x0_b0_a1_bytes[i] as u32);
+        assignment.a[1][0][i] = M31::from(x0_b1_a0_bytes[i] as u32);
+        assignment.a[1][1][i] = M31::from(x0_b1_a1_bytes[i] as u32);
+        assignment.a[2][0][i] = M31::from(x0_b2_a0_bytes[i] as u32);
+        assignment.a[2][1][i] = M31::from(x0_b2_a1_bytes[i] as u32);
+        assignment.b[0][i] = M31::from(x1_a0_bytes[i] as u32);
+        assignment.b[1][i] = M31::from(x1_a1_bytes[i] as u32);
+        assignment.c[0][0][i] = M31::from(x2_b0_a0_bytes[i] as u32);
+        assignment.c[0][1][i] = M31::from(x2_b0_a1_bytes[i] as u32);
+        assignment.c[1][0][i] = M31::from(x2_b1_a0_bytes[i] as u32);
+        assignment.c[1][1][i] = M31::from(x2_b1_a1_bytes[i] as u32);
+        assignment.c[2][0][i] = M31::from(x2_b2_a0_bytes[i] as u32);
+        assignment.c[2][1][i] = M31::from(x2_b2_a1_bytes[i] as u32);
     }
 
     debug_eval(&E6MulByE2Circuit::default(), &assignment, hint_registry);
@@ -1297,10 +1298,10 @@ fn test_e6_mul_by_01() {
     register_hint(&mut hint_registry);
 
     let mut assignment = E6MulBy01Circuit::<M31> {
-        a: [[[M31::from(0); 48]; 2]; 3],
-        c0: [[M31::from(0); 48]; 2],
-        c1: [[M31::from(0); 48]; 2],
-        c: [[[M31::from(0); 48]; 2]; 3],
+        a: [[[M31::ZERO; 48]; 2]; 3],
+        c0: [[M31::ZERO; 48]; 2],
+        c1: [[M31::ZERO; 48]; 2],
+        c: [[[M31::ZERO; 48]; 2]; 3],
     };
     let x0_b0_a0_bytes = [
         239, 229, 161, 178, 64, 169, 64, 146, 202, 108, 226, 209, 171, 161, 210, 163, 187, 178, 82,
@@ -1384,22 +1385,22 @@ fn test_e6_mul_by_01() {
     ];
 
     for i in 0..48 {
-        assignment.a[0][0][i] = M31::from(x0_b0_a0_bytes[i]);
-        assignment.a[0][1][i] = M31::from(x0_b0_a1_bytes[i]);
-        assignment.a[1][0][i] = M31::from(x0_b1_a0_bytes[i]);
-        assignment.a[1][1][i] = M31::from(x0_b1_a1_bytes[i]);
-        assignment.a[2][0][i] = M31::from(x0_b2_a0_bytes[i]);
-        assignment.a[2][1][i] = M31::from(x0_b2_a1_bytes[i]);
-        assignment.c0[0][i] = M31::from(x1_a0_bytes[i]);
-        assignment.c0[1][i] = M31::from(x1_a1_bytes[i]);
-        assignment.c1[0][i] = M31::from(x2_a0_bytes[i]);
-        assignment.c1[1][i] = M31::from(x2_a1_bytes[i]);
-        assignment.c[0][0][i] = M31::from(x3_b0_a0_bytes[i]);
-        assignment.c[0][1][i] = M31::from(x3_b0_a1_bytes[i]);
-        assignment.c[1][0][i] = M31::from(x3_b1_a0_bytes[i]);
-        assignment.c[1][1][i] = M31::from(x3_b1_a1_bytes[i]);
-        assignment.c[2][0][i] = M31::from(x3_b2_a0_bytes[i]);
-        assignment.c[2][1][i] = M31::from(x3_b2_a1_bytes[i]);
+        assignment.a[0][0][i] = M31::from(x0_b0_a0_bytes[i] as u32);
+        assignment.a[0][1][i] = M31::from(x0_b0_a1_bytes[i] as u32);
+        assignment.a[1][0][i] = M31::from(x0_b1_a0_bytes[i] as u32);
+        assignment.a[1][1][i] = M31::from(x0_b1_a1_bytes[i] as u32);
+        assignment.a[2][0][i] = M31::from(x0_b2_a0_bytes[i] as u32);
+        assignment.a[2][1][i] = M31::from(x0_b2_a1_bytes[i] as u32);
+        assignment.c0[0][i] = M31::from(x1_a0_bytes[i] as u32);
+        assignment.c0[1][i] = M31::from(x1_a1_bytes[i] as u32);
+        assignment.c1[0][i] = M31::from(x2_a0_bytes[i] as u32);
+        assignment.c1[1][i] = M31::from(x2_a1_bytes[i] as u32);
+        assignment.c[0][0][i] = M31::from(x3_b0_a0_bytes[i] as u32);
+        assignment.c[0][1][i] = M31::from(x3_b0_a1_bytes[i] as u32);
+        assignment.c[1][0][i] = M31::from(x3_b1_a0_bytes[i] as u32);
+        assignment.c[1][1][i] = M31::from(x3_b1_a1_bytes[i] as u32);
+        assignment.c[2][0][i] = M31::from(x3_b2_a0_bytes[i] as u32);
+        assignment.c[2][1][i] = M31::from(x3_b2_a1_bytes[i] as u32);
     }
 
     debug_eval(&E6MulBy01Circuit::default(), &assignment, hint_registry);
@@ -1461,8 +1462,8 @@ fn test_e6_neg() {
     register_hint(&mut hint_registry);
 
     let mut assignment = E6NegCircuit::<M31> {
-        a: [[[M31::from(0); 48]; 2]; 3],
-        c: [[[M31::from(0); 48]; 2]; 3],
+        a: [[[M31::ZERO; 48]; 2]; 3],
+        c: [[[M31::ZERO; 48]; 2]; 3],
     };
 
     let x0_b0_a0_bytes = [
@@ -1527,18 +1528,18 @@ fn test_e6_neg() {
     ];
 
     for i in 0..48 {
-        assignment.a[0][0][i] = M31::from(x0_b0_a0_bytes[i]);
-        assignment.a[0][1][i] = M31::from(x0_b0_a1_bytes[i]);
-        assignment.a[1][0][i] = M31::from(x0_b1_a0_bytes[i]);
-        assignment.a[1][1][i] = M31::from(x0_b1_a1_bytes[i]);
-        assignment.a[2][0][i] = M31::from(x0_b2_a0_bytes[i]);
-        assignment.a[2][1][i] = M31::from(x0_b2_a1_bytes[i]);
-        assignment.c[0][0][i] = M31::from(x3_b0_a0_bytes[i]);
-        assignment.c[0][1][i] = M31::from(x3_b0_a1_bytes[i]);
-        assignment.c[1][0][i] = M31::from(x3_b1_a0_bytes[i]);
-        assignment.c[1][1][i] = M31::from(x3_b1_a1_bytes[i]);
-        assignment.c[2][0][i] = M31::from(x3_b2_a0_bytes[i]);
-        assignment.c[2][1][i] = M31::from(x3_b2_a1_bytes[i]);
+        assignment.a[0][0][i] = M31::from(x0_b0_a0_bytes[i] as u32);
+        assignment.a[0][1][i] = M31::from(x0_b0_a1_bytes[i] as u32);
+        assignment.a[1][0][i] = M31::from(x0_b1_a0_bytes[i] as u32);
+        assignment.a[1][1][i] = M31::from(x0_b1_a1_bytes[i] as u32);
+        assignment.a[2][0][i] = M31::from(x0_b2_a0_bytes[i] as u32);
+        assignment.a[2][1][i] = M31::from(x0_b2_a1_bytes[i] as u32);
+        assignment.c[0][0][i] = M31::from(x3_b0_a0_bytes[i] as u32);
+        assignment.c[0][1][i] = M31::from(x3_b0_a1_bytes[i] as u32);
+        assignment.c[1][0][i] = M31::from(x3_b1_a0_bytes[i] as u32);
+        assignment.c[1][1][i] = M31::from(x3_b1_a1_bytes[i] as u32);
+        assignment.c[2][0][i] = M31::from(x3_b2_a0_bytes[i] as u32);
+        assignment.c[2][1][i] = M31::from(x3_b2_a1_bytes[i] as u32);
     }
 
     debug_eval(&E6NegCircuit::default(), &assignment, hint_registry);
@@ -1599,8 +1600,8 @@ fn test_e6_inverse() {
     register_hint(&mut hint_registry);
 
     let mut assignment = E6InverseCircuit::<M31> {
-        a: [[[M31::from(0); 48]; 2]; 3],
-        c: [[[M31::from(0); 48]; 2]; 3],
+        a: [[[M31::ZERO; 48]; 2]; 3],
+        c: [[[M31::ZERO; 48]; 2]; 3],
     };
 
     let x0_b0_a0_bytes = [
@@ -1665,18 +1666,18 @@ fn test_e6_inverse() {
     ];
 
     for i in 0..48 {
-        assignment.a[0][0][i] = M31::from(x0_b0_a0_bytes[i]);
-        assignment.a[0][1][i] = M31::from(x0_b0_a1_bytes[i]);
-        assignment.a[1][0][i] = M31::from(x0_b1_a0_bytes[i]);
-        assignment.a[1][1][i] = M31::from(x0_b1_a1_bytes[i]);
-        assignment.a[2][0][i] = M31::from(x0_b2_a0_bytes[i]);
-        assignment.a[2][1][i] = M31::from(x0_b2_a1_bytes[i]);
-        assignment.c[0][0][i] = M31::from(x3_b0_a0_bytes[i]);
-        assignment.c[0][1][i] = M31::from(x3_b0_a1_bytes[i]);
-        assignment.c[1][0][i] = M31::from(x3_b1_a0_bytes[i]);
-        assignment.c[1][1][i] = M31::from(x3_b1_a1_bytes[i]);
-        assignment.c[2][0][i] = M31::from(x3_b2_a0_bytes[i]);
-        assignment.c[2][1][i] = M31::from(x3_b2_a1_bytes[i]);
+        assignment.a[0][0][i] = M31::from(x0_b0_a0_bytes[i] as u32);
+        assignment.a[0][1][i] = M31::from(x0_b0_a1_bytes[i] as u32);
+        assignment.a[1][0][i] = M31::from(x0_b1_a0_bytes[i] as u32);
+        assignment.a[1][1][i] = M31::from(x0_b1_a1_bytes[i] as u32);
+        assignment.a[2][0][i] = M31::from(x0_b2_a0_bytes[i] as u32);
+        assignment.a[2][1][i] = M31::from(x0_b2_a1_bytes[i] as u32);
+        assignment.c[0][0][i] = M31::from(x3_b0_a0_bytes[i] as u32);
+        assignment.c[0][1][i] = M31::from(x3_b0_a1_bytes[i] as u32);
+        assignment.c[1][0][i] = M31::from(x3_b1_a0_bytes[i] as u32);
+        assignment.c[1][1][i] = M31::from(x3_b1_a1_bytes[i] as u32);
+        assignment.c[2][0][i] = M31::from(x3_b2_a0_bytes[i] as u32);
+        assignment.c[2][1][i] = M31::from(x3_b2_a1_bytes[i] as u32);
     }
 
     debug_eval(&E6InverseCircuit::default(), &assignment, hint_registry);
