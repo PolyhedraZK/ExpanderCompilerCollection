@@ -323,12 +323,12 @@ mod tests {
         };
         for _ in 0..2 {
             circuit.instructions.push(Instruction::InternalVariable {
-                expr: Expression::new_quad(CField::from(100), 1, 1),
+                expr: Expression::new_quad(CField::from(100 as u32), 1, 1),
             });
         }
         for i in 4..=1003 {
             circuit.instructions.push(Instruction::InternalVariable {
-                expr: Expression::new_quad(CField::from(10), 2, 3),
+                expr: Expression::new_quad(CField::from(10 as u32), 2, 3),
             });
             circuit.constraints.push(i);
             circuit.outputs.push(i);
@@ -357,7 +357,7 @@ mod tests {
         }
         for i in 4..=1003 {
             circuit.instructions.push(Instruction::InternalVariable {
-                expr: Expression::new_quad(CField::from(10), 2, 3),
+                expr: Expression::new_quad(CField::from(10 as u32), 2, 3),
             });
             circuit.constraints.push(i);
             circuit.outputs.push(i);
@@ -369,7 +369,7 @@ mod tests {
             1,
             CircuitRelaxed {
                 instructions: vec![Instruction::InternalVariable {
-                    expr: Expression::new_quad(CField::from(100), 1, 1),
+                    expr: Expression::new_quad(CField::from(100 as u32), 1, 1),
                 }],
                 constraints: vec![],
                 outputs: vec![2],

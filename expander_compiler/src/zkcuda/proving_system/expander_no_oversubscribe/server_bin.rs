@@ -4,23 +4,30 @@ use clap::Parser;
 use expander_compiler::zkcuda::proving_system::{
     expander::config::{
         ZKCudaBN254Hyrax, ZKCudaBN254HyraxBatchPCS, ZKCudaBN254KZG, ZKCudaBN254KZGBatchPCS,
+        ZKCudaBN254MIMCKZG, ZKCudaBN254MIMCKZGBatchPCS,
     },
     expander_parallelized::server_ctrl::{serve, ExpanderExecArgs},
     ExpanderNoOverSubscribe,
 };
-use gkr_engine::PolynomialCommitmentType;
+use gkr_engine::{FiatShamirHashType, PolynomialCommitmentType};
 
 async fn async_main() {
     let expander_exec_args = ExpanderExecArgs::parse();
-    assert_eq!(
-        expander_exec_args.fiat_shamir_hash, "SHA256",
-        "Only SHA256 is supported for now"
-    );
 
     let pcs_type = PolynomialCommitmentType::from_str(&expander_exec_args.poly_commit).unwrap();
 
-    match (expander_exec_args.field_type.as_str(), pcs_type) {
-        ("BN254", PolynomialCommitmentType::Hyrax) => {
+    let fiat_shamir_hash = match expander_exec_args.fiat_shamir_hash.as_str() {
+        "SHA256" => FiatShamirHashType::SHA256,
+        "MIMC5" => FiatShamirHashType::MIMC5,
+        _ => panic!("Unsupported Fiat-Shamir hash function"),
+    };
+
+    match (
+        expander_exec_args.field_type.as_str(),
+        pcs_type,
+        fiat_shamir_hash,
+    ) {
+        ("BN254", PolynomialCommitmentType::Hyrax, FiatShamirHashType::SHA256) => {
             if expander_exec_args.batch_pcs {
                 serve::<_, _, ExpanderNoOverSubscribe<ZKCudaBN254HyraxBatchPCS>>(
                     expander_exec_args.port_number,
@@ -33,7 +40,7 @@ async fn async_main() {
                 .await;
             }
         }
-        ("BN254", PolynomialCommitmentType::KZG) => {
+        ("BN254", PolynomialCommitmentType::KZG, FiatShamirHashType::SHA256) => {
             if expander_exec_args.batch_pcs {
                 serve::<_, _, ExpanderNoOverSubscribe<ZKCudaBN254KZGBatchPCS>>(
                     expander_exec_args.port_number,
@@ -46,8 +53,21 @@ async fn async_main() {
                 .await;
             }
         }
-        (field_type, pcs_type) => {
-            panic!("Combination of {field_type:?} and {pcs_type:?} not supported for no oversubscribe expander proving system.");
+        ("BN254", PolynomialCommitmentType::KZG, FiatShamirHashType::MIMC5) => {
+            if expander_exec_args.batch_pcs {
+                serve::<_, _, ExpanderNoOverSubscribe<ZKCudaBN254MIMCKZGBatchPCS>>(
+                    expander_exec_args.port_number,
+                )
+                .await;
+            } else {
+                serve::<_, _, ExpanderNoOverSubscribe<ZKCudaBN254MIMCKZG>>(
+                    expander_exec_args.port_number,
+                )
+                .await;
+            }
+        }
+        (field_type, pcs_type, fiat_shamir_hash) => {
+            panic!("Combination of {field_type:?}, {pcs_type:?}, and {fiat_shamir_hash:?} not supported for no oversubscribe expander proving system.");
         }
     }
 }
