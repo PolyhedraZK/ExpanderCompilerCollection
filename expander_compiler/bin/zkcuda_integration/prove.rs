@@ -2,7 +2,7 @@ mod cg_def;
 use expander_compiler::zkcuda::{
     context::{ComputationGraph, ComputationGraphDefine},
     proving_system::{
-        expander::config::{GetFieldConfig, GetPCS, ZKCudaBN254KZG, ZKCudaConfig},
+        expander::config::{GetFieldConfig, GetPCS, ZKCudaBN254MIMCKZGBatchPCS, ZKCudaConfig},
         ExpanderNoOverSubscribe, ProvingSystem,
     },
 };
@@ -36,5 +36,5 @@ where
 }
 
 fn main() {
-    main_impl::<ZKCudaBN254KZG, MyCGDef>();
+    main_impl::<ZKCudaBN254MIMCKZGBatchPCS, MyCGDef>();
 }
