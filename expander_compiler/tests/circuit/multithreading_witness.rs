@@ -19,8 +19,8 @@ fn multithreading_witness_solving() {
     let mut assignments = Vec::new();
     for _ in 0..1024 {
         assignments.push(Circuit::<M31> {
-            x: M31::from(123),
-            y: M31::from(123),
+            x: M31::from(123u32),
+            y: M31::from(123u32),
         });
     }
     // Since our SimdField is M31x16, we can solve 16 assignments at once

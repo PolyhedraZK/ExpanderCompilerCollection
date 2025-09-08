@@ -17,8 +17,8 @@ fn example_full() {
     let compile_result = compile(&Circuit::default(), CompileOptions::default()).unwrap();
     assert_eq!(compile_result.layered_circuit.layer_ids.len(), 2);
     let assignment = Circuit::<M31> {
-        x: M31::from(123),
-        y: M31::from(123),
+        x: M31::from(123u32),
+        y: M31::from(123u32),
     };
     let witness = compile_result
         .witness_solver
