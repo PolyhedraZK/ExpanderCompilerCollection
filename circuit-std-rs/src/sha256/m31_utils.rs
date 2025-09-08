@@ -1,3 +1,4 @@
+use arith::Field;
 use expander_compiler::frontend::{
     declare_circuit, Config, Define, M31Config, RootAPI, Variable, M31,
 };
@@ -405,7 +406,7 @@ pub fn idiv_mod_bit<C: Config, B: RootAPI<C>>(
 pub fn string_to_m31_array(s: &str, nb_bits: u32) -> [M31; 48] {
     let mut big =
         BigInt::parse_bytes(s.as_bytes(), 10).unwrap_or_else(|| panic!("Failed to parse BigInt"));
-    let mut res = [M31::from(0); 48];
+    let mut res = [M31::ZERO; 48];
     let base = BigInt::from(1) << nb_bits;
     for cur_res in &mut res {
         let tmp = &big % &base;
@@ -433,9 +434,9 @@ fn test_idiv_mod_bit() {
     //compile and test
     let compile_result = compile(&IDIVMODBITCircuit::default(), CompileOptions::default()).unwrap();
     let assignment = IDIVMODBITCircuit::<M31> {
-        value: M31::from(3845),
-        quotient: M31::from(15),
-        remainder: M31::from(5),
+        value: M31::from(3845u32),
+        quotient: M31::from(15u32),
+        remainder: M31::from(5u32),
     };
     let witness = compile_result
         .witness_solver
@@ -471,19 +472,19 @@ fn test_bit_convert() {
     //compile and test
     let compile_result = compile(&BITCONVERTCircuit::default(), CompileOptions::default()).unwrap();
     let assignment = BITCONVERTCircuit::<M31> {
-        big_int: M31::from(3845),
+        big_int: M31::from(3845u32),
         big_int_bytes: [
-            M31::from(0),
-            M31::from(0),
-            M31::from(0),
-            M31::from(0),
-            M31::from(0),
-            M31::from(0),
-            M31::from(15),
-            M31::from(5),
+            M31::ZERO,
+            M31::ZERO,
+            M31::ZERO,
+            M31::ZERO,
+            M31::ZERO,
+            M31::ZERO,
+            M31::from(15u32),
+            M31::from(5u32),
         ],
-        big_int_m31: [M31::from(3845), M31::from(0)],
-        big_int_m31_bytes: [M31::from(0), M31::from(0), M31::from(15), M31::from(5)],
+        big_int_m31: [M31::from(3845u32), M31::ZERO],
+        big_int_m31_bytes: [M31::ZERO, M31::ZERO, M31::from(15u32), M31::from(5u32)],
     };
     let witness = compile_result
         .witness_solver
