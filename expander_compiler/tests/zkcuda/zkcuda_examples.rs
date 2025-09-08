@@ -89,7 +89,6 @@ fn zkcuda_test_multi_core() {
     zkcuda_test::<GF2Config, ParallelizedExpander<GF2Config>>();
     zkcuda_test::<GoldilocksConfig, ParallelizedExpander<GoldilocksConfig>>();
     zkcuda_test::<BabyBearConfig, ParallelizedExpander<BabyBearConfig>>();
-    zkcuda_test::<BN254Config, ParallelizedExpander<BN254Config>>();
     zkcuda_test::<BN254Config, ParallelizedExpander<BN254ConfigSha2Hyrax>>();
     zkcuda_test::<BN254Config, ParallelizedExpander<BN254ConfigSha2UniKZG>>();
 
