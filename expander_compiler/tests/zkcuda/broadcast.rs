@@ -1,3 +1,5 @@
+#![allow(clippy::all)] // disable all clippy warnings in temporary test code
+
 use expander_compiler::frontend::*;
 use expander_compiler::zkcuda::proving_system::expander::config::{
     ZKCudaBN254KZG, ZKCudaBN254KZGBatchPCS, ZKCudaBN254MIMCKZGBatchPCS,
@@ -31,7 +33,7 @@ fn zkcuda_test<C: Config, P: ProvingSystem<C>>() {
     }
     let a = ctx.copy_to_device(&a);
     let mut b: DeviceMemoryHandle = None;
-    call_kernel!(ctx, kernel_add_2, 32, a, mut b).unwrap();
+    call_kernel!(ctx, kernel_add_2, 32, a, mut b).unwrap(); // ideally, broadcast from (4,2) to (32,2)
     let _result: CircuitField<C> = ctx.copy_to_host(b);
     // assert_eq!(result, CircuitField::<C>::from(32 * 33 / 2 as u32));
 
