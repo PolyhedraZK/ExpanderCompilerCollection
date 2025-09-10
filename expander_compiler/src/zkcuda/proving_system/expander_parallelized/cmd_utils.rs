@@ -11,8 +11,7 @@ pub fn start_server<C: GKREngine>(
     port_number: u16,
     batch_pcs: bool,
 ) {
-    let (overscribe, field_name, pcs_name, fiat_shamir_hash) =
-        parse_config::<C>(mpi_size);
+    let (overscribe, field_name, pcs_name, fiat_shamir_hash) = parse_config::<C>(mpi_size);
 
     let batch_pcs_option = if batch_pcs { "--batch-pcs" } else { "" };
     let cmd_str = format!(

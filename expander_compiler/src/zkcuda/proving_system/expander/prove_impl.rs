@@ -57,8 +57,8 @@ pub fn get_local_vals<'vals_life, F: Field>(
         .zip(data_broadcast_count.iter())
         .map(|(vals, data_broadcast_count)| {
             let data_broadcast_count_next_power_of_two = data_broadcast_count.next_power_of_two();
-            let local_val_len =
-                vals.as_ref().len() / (kernel_parallel_count / data_broadcast_count_next_power_of_two);
+            let local_val_len = vals.as_ref().len()
+                / (kernel_parallel_count / data_broadcast_count_next_power_of_two);
             let start_index = local_val_len * kernel_parallel_index % vals.as_ref().len();
             &vals.as_ref()[start_index..local_val_len + start_index]
         })
@@ -213,11 +213,14 @@ pub fn partition_gkr_claims_and_open_pcs_no_mpi_impl<C: GKREngine>(
 ) {
     for (commitment_val, ib) in global_vals.iter().zip(data_broadcast_count) {
         let val_len = commitment_val.as_ref().len();
-        let (challenge_for_pcs, _) = partition_challenge_and_location_for_pcs_no_mpi::<
-            C::FieldConfig,
-        >(
-            gkr_claim, val_len, kernel_parallel_index, kernel_parallel_count, *ib
-        );
+        let (challenge_for_pcs, _) =
+            partition_challenge_and_location_for_pcs_no_mpi::<C::FieldConfig>(
+                gkr_claim,
+                val_len,
+                kernel_parallel_index,
+                kernel_parallel_count,
+                *ib,
+            );
         pcs_local_open_impl::<C>(
             commitment_val.as_ref(),
             &challenge_for_pcs,
