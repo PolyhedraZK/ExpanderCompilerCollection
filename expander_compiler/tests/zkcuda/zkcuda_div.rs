@@ -7,7 +7,9 @@ use gkr::BN254ConfigSha2Hyrax;
 use gkr_engine::FieldEngine;
 
 
-
+//y = floor * a + rem
+//a > rem
+//query = decompose(a-rem) in base 4096 to 4 12-bit limbs
 #[kernel]
 fn div_49_macro<C: Config>(
 	api: &mut API<C>,
@@ -37,16 +39,17 @@ fn zkcuda_div(){
     let kernel_div_49: KernelPrimitive<BN254Config> = compile_div_49_macro().unwrap();
 
     let mut ctx = Context::<BN254Config>::default();
-    
+    // let parallel_count = 6; //would fail
+    let parallel_count = 128; //would pass
     let mut y: Vec<Vec<BN254Fr>> = vec![];
-    for i in 0..96 {
+    for i in 0..parallel_count {
         y.push(vec![]);
         for j in 0..49 {
             y[i].push(BN254Fr::from((i * 77 + j * 7) as u32));
         }
     }
     let mut floor: Vec<Vec<BN254Fr>> = vec![];
-    for i in 0..96 {
+    for i in 0..parallel_count {
         floor.push(vec![]);
         for j in 0..49 {
             floor[i].push(BN254Fr::from((i * 11 + j) as u32));
@@ -54,7 +57,9 @@ fn zkcuda_div(){
     }
     let a = BN254Fr::from(7u32);
     let mut query: Vec<Vec<BN254Fr>> = vec![];
-    for i in 0..96 {
+    //in this case, rem is always 0, so a - rem = a = 7
+    //so, decompose(7) in base 4096 to 4 12-bit limbs = [7,0,0,0]
+    for i in 0..parallel_count {
         query.push(vec![]);
         for j in 0..49*4 {
             if j % 4 == 0 {
@@ -64,8 +69,9 @@ fn zkcuda_div(){
             }
         }
     }
+    
     let mut querycount: Vec<Vec<BN254Fr>> = vec![];
-    for i in 0..96 {
+    for i in 0..parallel_count {
         querycount.push(vec![]);
         for j in 0..4096 {
             if j == 7 {
@@ -81,7 +87,7 @@ fn zkcuda_div(){
     let floor = ctx.copy_to_device(&floor);
     let query = ctx.copy_to_device(&query);
     let querycount = ctx.copy_to_device(&querycount);
-    call_kernel!(ctx, kernel_div_49, 96, y, a, floor, query, querycount).unwrap();
+    call_kernel!(ctx, kernel_div_49, parallel_count, y, a, floor, query, querycount).unwrap();
 
     // type P = Expander<M31Config>;
     let computation_graph = ctx.compile_computation_graph().unwrap();
@@ -93,4 +99,5 @@ fn zkcuda_div(){
         ctx.export_device_memories(),
     );
     assert!(ExpanderNoOverSubscribe::<ZKCudaBN254Hyrax>::verify(&verifier_setup, &computation_graph, &proof));
+    ExpanderNoOverSubscribe::<ZKCudaBN254Hyrax>::post_process();
 }
