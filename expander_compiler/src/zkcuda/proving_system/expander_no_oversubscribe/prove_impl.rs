@@ -212,6 +212,19 @@ where
     let local_mpi_config = local_mpi_config.unwrap();
     let local_world_size = local_mpi_config.world_size();
 
+    macro_rules! call_prove_kernel_gkr_internal {
+        ($n:expr) => {
+            prove_kernel_gkr_internal::<F, BN254ConfigXN<$n>, T, ECCConfig>(
+                &local_mpi_config,
+                kernel,
+                commitments_values,
+                kernel_parallel_count,
+                data_broadcast_count,
+                n_bytes_profiler,
+            )
+        };
+    }
+
     let n_local_copies = kernel_parallel_count / local_world_size;
     match n_local_copies {
         1 => prove_kernel_gkr_internal::<F, F, T, ECCConfig>(
@@ -222,134 +235,22 @@ where
             data_broadcast_count,
             n_bytes_profiler,
         ),
-        2 => prove_kernel_gkr_internal::<F, BN254ConfigXN<2>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            kernel_parallel_count,
-            data_broadcast_count,
-            n_bytes_profiler,
-        ),
-        4 => prove_kernel_gkr_internal::<F, BN254ConfigXN<4>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            kernel_parallel_count,
-            data_broadcast_count,
-            n_bytes_profiler,
-        ),
-        8 => prove_kernel_gkr_internal::<F, BN254ConfigXN<8>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            kernel_parallel_count,
-            data_broadcast_count,
-            n_bytes_profiler,
-        ),
-        16 => prove_kernel_gkr_internal::<F, BN254ConfigXN<16>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            kernel_parallel_count,
-            data_broadcast_count,
-            n_bytes_profiler,
-        ),
-        32 => prove_kernel_gkr_internal::<F, BN254ConfigXN<32>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            kernel_parallel_count,
-            data_broadcast_count,
-            n_bytes_profiler,
-        ),
-        64 => prove_kernel_gkr_internal::<F, BN254ConfigXN<64>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            kernel_parallel_count,
-            data_broadcast_count,
-            n_bytes_profiler,
-        ),
-        128 => prove_kernel_gkr_internal::<F, BN254ConfigXN<128>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            kernel_parallel_count,
-            data_broadcast_count,
-            n_bytes_profiler,
-        ),
-        256 => prove_kernel_gkr_internal::<F, BN254ConfigXN<256>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            kernel_parallel_count,
-            data_broadcast_count,
-            n_bytes_profiler,
-        ),
-        512 => prove_kernel_gkr_internal::<F, BN254ConfigXN<512>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            kernel_parallel_count,
-            data_broadcast_count,
-            n_bytes_profiler,
-        ),
-        1024 => prove_kernel_gkr_internal::<F, BN254ConfigXN<1024>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            kernel_parallel_count,
-            data_broadcast_count,
-            n_bytes_profiler,
-        ),
-        2048 => prove_kernel_gkr_internal::<F, BN254ConfigXN<2048>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            kernel_parallel_count,
-            data_broadcast_count,
-            n_bytes_profiler,
-        ),
-        4096 => prove_kernel_gkr_internal::<F, BN254ConfigXN<4096>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            kernel_parallel_count,
-            data_broadcast_count,
-            n_bytes_profiler,
-        ),
-        8192 => prove_kernel_gkr_internal::<F, BN254ConfigXN<8192>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            kernel_parallel_count,
-            data_broadcast_count,
-            n_bytes_profiler,
-        ),
-        16384 => prove_kernel_gkr_internal::<F, BN254ConfigXN<16384>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            kernel_parallel_count,
-            data_broadcast_count,
-            n_bytes_profiler,
-        ),
-        32768 => prove_kernel_gkr_internal::<F, BN254ConfigXN<32768>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            kernel_parallel_count,
-            data_broadcast_count,
-            n_bytes_profiler,
-        ),
-        65536 => prove_kernel_gkr_internal::<F, BN254ConfigXN<65536>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            kernel_parallel_count,
-            data_broadcast_count,
-            n_bytes_profiler,
-        ),
+        2 => call_prove_kernel_gkr_internal!(2),
+        4 => call_prove_kernel_gkr_internal!(4),
+        8 => call_prove_kernel_gkr_internal!(8),
+        16 => call_prove_kernel_gkr_internal!(16),
+        32 => call_prove_kernel_gkr_internal!(32),
+        64 => call_prove_kernel_gkr_internal!(64),
+        128 => call_prove_kernel_gkr_internal!(128),
+        256 => call_prove_kernel_gkr_internal!(256),
+        512 => call_prove_kernel_gkr_internal!(512),
+        1024 => call_prove_kernel_gkr_internal!(1024),
+        2048 => call_prove_kernel_gkr_internal!(2048),
+        4096 => call_prove_kernel_gkr_internal!(4096),
+        8192 => call_prove_kernel_gkr_internal!(8192),
+        16384 => call_prove_kernel_gkr_internal!(16384),
+        32768 => call_prove_kernel_gkr_internal!(32768),
+        65536 => call_prove_kernel_gkr_internal!(65536),
         _ => {
             panic!("Unsupported parallel count: {kernel_parallel_count}");
         }
