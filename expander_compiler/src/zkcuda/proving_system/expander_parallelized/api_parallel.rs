@@ -71,8 +71,8 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
                     &computation_graph.kernels()[template.kernel_id()],
                     local_proof,
                     &local_commitments,
-                    next_power_of_two(template.parallel_count()),
-                    template.is_broadcast(),
+                    next_power_of_two(template.kernel_parallel_count()),
+                    template.data_broadcast_count(),
                 )
             })
             .collect::<Vec<_>>();

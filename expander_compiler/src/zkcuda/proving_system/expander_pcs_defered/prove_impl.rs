@@ -139,8 +139,8 @@ where
                 global_mpi_config,
                 &computation_graph.kernels()[template.kernel_id()],
                 &commitment_values,
-                next_power_of_two(template.parallel_count()),
-                template.is_broadcast(),
+                next_power_of_two(template.kernel_parallel_count()),
+                template.data_broadcast_count(),
             );
 
             if global_mpi_config.is_root() {
@@ -151,8 +151,8 @@ where
                 let (local_vals_ref, local_challenges) = extract_pcs_claims::<C>(
                     &commitment_values,
                     &challenge,
-                    template.is_broadcast(),
-                    next_power_of_two(template.parallel_count()),
+                    template.data_broadcast_count(),
+                    next_power_of_two(template.kernel_parallel_count()),
                 );
 
                 vals_ref.extend(local_vals_ref);
@@ -189,8 +189,8 @@ where
 pub fn extract_pcs_claims<'a, C: GKREngine>(
     commitments_values: &[&'a [SIMDField<C>]],
     gkr_challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
-    is_broadcast: &[bool],
-    parallel_count: usize,
+    data_broadcast_count: &[usize],
+    kernel_parallel_count: usize,
 ) -> (
     Vec<&'a [SIMDField<C>]>,
     Vec<ExpanderSingleVarChallenge<C::FieldConfig>>,
@@ -200,12 +200,12 @@ where
     let mut commitment_values_rt = vec![];
     let mut challenges = vec![];
 
-    for (&commitment_val, &ib) in commitments_values.iter().zip(is_broadcast) {
+    for (&commitment_val, &ib) in commitments_values.iter().zip(data_broadcast_count) {
         let val_len = commitment_val.len();
         let (challenge_for_pcs, _) = partition_challenge_and_location_for_pcs_mpi(
             gkr_challenge,
             val_len,
-            parallel_count,
+            kernel_parallel_count,
             ib,
         );
 

@@ -42,26 +42,25 @@ where
 /// If it is broadcasted, the same value is used across all parallel instances.
 ///   i.e. global_vals[i] is the same for all parallel instances.
 /// If it is partitioned, each parallel instance gets a slice of the values.
-///   i.e. global_vals[i] is partitioned equally into parallel_num slices, and each
+///   i.e. global_vals[i] is partitioned equally into kernel_parallel_count slices, and each
 ///     parallel instance gets one slice.
 ///
 /// This function returns the local values for each parallel instance based on the global values and the broadcast information.
 pub fn get_local_vals<'vals_life, F: Field>(
     global_vals: &'vals_life [impl AsRef<[F]>],
-    is_broadcast: &[bool],
-    parallel_index: usize,
-    parallel_num: usize,
+    data_broadcast_count: &[usize],
+    kernel_parallel_index: usize,
+    kernel_parallel_count: usize,
 ) -> Vec<&'vals_life [F]> {
     global_vals
         .iter()
-        .zip(is_broadcast.iter())
-        .map(|(vals, is_broadcast)| {
-            if *is_broadcast {
-                vals.as_ref()
-            } else {
-                let local_val_len = vals.as_ref().len() / parallel_num;
-                &vals.as_ref()[local_val_len * parallel_index..local_val_len * (parallel_index + 1)]
-            }
+        .zip(data_broadcast_count.iter())
+        .map(|(vals, data_broadcast_count)| {
+            let data_broadcast_count_next_power_of_two = data_broadcast_count.next_power_of_two();
+            let local_val_len = vals.as_ref().len()
+                / (kernel_parallel_count / data_broadcast_count_next_power_of_two);
+            let start_index = local_val_len * kernel_parallel_index % vals.as_ref().len();
+            &vals.as_ref()[start_index..local_val_len + start_index]
         })
         .collect::<Vec<_>>()
 }
@@ -121,9 +120,9 @@ pub fn prove_gkr_with_local_vals<F: FieldEngine, T: Transcript>(
 /// Arguments:
 /// - `challenge`: The gkr challenge: llll cccc ssss
 /// - `total_vals_len`: The length of llll pppp
-/// - `parallel_index`: The index of the parallel execution. pppp part.
-/// - `parallel_count`: The total number of parallel executions. pppp part.
-/// - `is_broadcast`: Whether the challenge is broadcasted or not.
+/// - `kernel_parallel_index`: The index of the parallel execution. pppp part.
+/// - `kernel_parallel_count`: The total number of parallel executions. pppp part.
+/// - `data_broadcast_count`: Whether the challenge is broadcasted or not.
 ///
 /// Returns:
 ///     llll pppp ssss challenge
@@ -131,26 +130,27 @@ pub fn prove_gkr_with_local_vals<F: FieldEngine, T: Transcript>(
 pub fn partition_challenge_and_location_for_pcs_no_mpi<F: FieldEngine>(
     gkr_challenge: &ExpanderSingleVarChallenge<F>,
     total_vals_len: usize,
-    parallel_index: usize,
-    parallel_count: usize,
-    is_broadcast: bool,
+    kernel_parallel_index: usize,
+    kernel_parallel_count: usize,
+    data_broadcast_count: usize,
 ) -> (ExpanderSingleVarChallenge<F>, Vec<F::ChallengeField>) {
     assert_eq!(gkr_challenge.r_mpi.len(), 0);
     let mut challenge = gkr_challenge.clone();
     let zero = F::ChallengeField::ZERO;
-    if is_broadcast {
+    if data_broadcast_count == kernel_parallel_count {
         let n_vals_vars = total_vals_len.ilog2() as usize;
         let component_idx_vars = challenge.rz[n_vals_vars..].to_vec();
         challenge.rz.resize(n_vals_vars, zero);
         (challenge, component_idx_vars)
     } else {
-        let n_vals_vars = (total_vals_len / parallel_count).ilog2() as usize;
+        let real_kernel_parallel_count = kernel_parallel_count / data_broadcast_count;
+        let n_vals_vars = (total_vals_len / real_kernel_parallel_count).ilog2() as usize;
         let component_idx_vars = challenge.rz[n_vals_vars..].to_vec();
         challenge.rz.resize(n_vals_vars, zero);
 
-        let n_index_vars = parallel_count.ilog2() as usize;
+        let n_index_vars = real_kernel_parallel_count.ilog2() as usize;
         let index_vars = (0..n_index_vars)
-            .map(|i| F::ChallengeField::from(((parallel_index >> i) & 1) as u32))
+            .map(|i| F::ChallengeField::from(((kernel_parallel_index >> i) & 1) as u32))
             .collect::<Vec<_>>();
 
         challenge.rz.extend_from_slice(&index_vars);
@@ -206,19 +206,21 @@ pub fn partition_gkr_claims_and_open_pcs_no_mpi_impl<C: GKREngine>(
     gkr_claim: &ExpanderSingleVarChallenge<C::FieldConfig>,
     global_vals: &[impl AsRef<[<C::FieldConfig as FieldEngine>::SimdCircuitField]>],
     p_keys: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
-    is_broadcast: &[bool],
-    parallel_index: usize,
-    parallel_num: usize,
+    data_broadcast_count: &[usize],
+    kernel_parallel_index: usize,
+    kernel_parallel_count: usize,
     transcript: &mut C::TranscriptConfig,
 ) {
-    for (commitment_val, ib) in global_vals.iter().zip(is_broadcast) {
+    for (commitment_val, ib) in global_vals.iter().zip(data_broadcast_count) {
         let val_len = commitment_val.as_ref().len();
-        let (challenge_for_pcs, _) = partition_challenge_and_location_for_pcs_no_mpi::<
-            C::FieldConfig,
-        >(
-            gkr_claim, val_len, parallel_index, parallel_num, *ib
-        );
-
+        let (challenge_for_pcs, _) =
+            partition_challenge_and_location_for_pcs_no_mpi::<C::FieldConfig>(
+                gkr_claim,
+                val_len,
+                kernel_parallel_index,
+                kernel_parallel_count,
+                *ib,
+            );
         pcs_local_open_impl::<C>(
             commitment_val.as_ref(),
             &challenge_for_pcs,
@@ -229,15 +231,15 @@ pub fn partition_gkr_claims_and_open_pcs_no_mpi_impl<C: GKREngine>(
 }
 
 /// By saying opening local PCS, we mean that the r_mpi challenge is not used
-/// Instead, the parallel_index is interpreted for the vertical index of the local PCS,
+/// Instead, the kernel_parallel_index is interpreted for the vertical index of the local PCS,
 /// and appended to the local PCS challenge.
 pub fn partition_gkr_claims_and_open_pcs_no_mpi<C: GKREngine>(
     gkr_claim: &ExpanderDualVarChallenge<C::FieldConfig>,
     global_vals: &[impl AsRef<[<C::FieldConfig as FieldEngine>::SimdCircuitField]>],
     p_keys: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
-    is_broadcast: &[bool],
-    parallel_index: usize,
-    parallel_num: usize,
+    data_broadcast_count: &[usize],
+    kernel_parallel_index: usize,
+    kernel_parallel_count: usize,
     transcript: &mut C::TranscriptConfig,
 ) {
     let challenges = if let Some(challenge_y) = gkr_claim.challenge_y() {
@@ -251,9 +253,9 @@ pub fn partition_gkr_claims_and_open_pcs_no_mpi<C: GKREngine>(
             &challenge,
             global_vals,
             p_keys,
-            is_broadcast,
-            parallel_index,
-            parallel_num,
+            data_broadcast_count,
+            kernel_parallel_index,
+            kernel_parallel_count,
             transcript,
         );
     });
