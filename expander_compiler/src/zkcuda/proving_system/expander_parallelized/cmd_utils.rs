@@ -1,23 +1,27 @@
-use gkr_engine::{ExpanderPCS, FieldEngine, FieldType, GKREngine, PolynomialCommitmentType};
+use gkr_engine::{
+    ExpanderPCS, FiatShamirHashType, FieldEngine, FieldType, GKREngine, PolynomialCommitmentType,
+    Transcript,
+};
 use std::process::Command;
 
 #[allow(clippy::zombie_processes)]
 pub fn start_server<C: GKREngine>(
     binary: &str,
-    max_kernel_parallel_count: usize,
+    mpi_size: usize,
     port_number: u16,
     batch_pcs: bool,
 ) {
-    let (overscribe, field_name, pcs_name) = parse_config::<C>(max_kernel_parallel_count);
+    let (overscribe, field_name, pcs_name, fiat_shamir_hash) =
+        parse_config::<C>(mpi_size);
 
     let batch_pcs_option = if batch_pcs { "--batch-pcs" } else { "" };
     let cmd_str = format!(
-        "mpiexec -n {max_kernel_parallel_count} {overscribe} {binary} --field-type {field_name} --poly-commit {pcs_name} --port-number {port_number} {batch_pcs_option}"
+        "mpiexec -n {mpi_size} {overscribe} {binary} --field-type {field_name} --poly-commit {pcs_name} --port-number {port_number} {batch_pcs_option} --fiat-shamir-hash {fiat_shamir_hash}"
     );
     exec_command(&cmd_str, false);
 }
 
-fn parse_config<C: GKREngine>(mpi_size: usize) -> (String, String, String)
+fn parse_config<C: GKREngine>(mpi_size: usize) -> (String, String, String, String)
 where
 {
     let oversubscription = if mpi_size > num_cpus::get_physical() {
@@ -43,10 +47,17 @@ where
         _ => panic!("Unsupported PCS type"),
     };
 
+    let fiat_shamir_hash = match <C::TranscriptConfig as Transcript>::HASH_TYPE {
+        FiatShamirHashType::SHA256 => "SHA256", // default
+        FiatShamirHashType::MIMC5 => "MIMC5",   // for recursion
+        _ => panic!("Unsupported hash function"),
+    };
+
     (
         oversubscription.to_string(),
         field_name.to_string(),
         pcs_name.to_string(),
+        fiat_shamir_hash.to_string(),
     )
 }
 

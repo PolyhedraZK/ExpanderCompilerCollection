@@ -23,7 +23,7 @@ fn simple() {
                 gate_muls: vec![GateMul {
                     inputs: [NormalInput { offset: 0 }, NormalInput { offset: 1 }],
                     output: 0,
-                    coef: Coef::Constant(CField::from(2)),
+                    coef: Coef::Constant(CField::from(2 as u32)),
                 }],
                 gate_adds: vec![],
                 gate_consts: vec![],
@@ -65,18 +65,18 @@ fn simple() {
                     GateAdd {
                         inputs: [NormalInput { offset: 0 }],
                         output: 1,
-                        coef: Coef::Constant(CField::from(3)),
+                        coef: Coef::Constant(CField::from(3 as u32)),
                     },
                     GateAdd {
                         inputs: [NormalInput { offset: 1 }],
                         output: 1,
-                        coef: Coef::Constant(CField::from(4)),
+                        coef: Coef::Constant(CField::from(4 as u32)),
                     },
                 ],
                 gate_consts: vec![GateConst {
                     inputs: [],
                     output: 1,
-                    coef: Coef::Constant(CField::from(5)),
+                    coef: Coef::Constant(CField::from(5 as u32)),
                 }],
                 gate_customs: vec![],
             },
@@ -90,10 +90,12 @@ fn simple() {
             .collect();
         let (out, _) = circuit.eval_unsafe(s.clone());
         assert_eq!(out.len(), 2);
-        assert_eq!(out[0], s[0] * s[1] * s[2] * s[3] * CField::from(8));
+        assert_eq!(out[0], s[0] * s[1] * s[2] * s[3] * CField::from(8 as u32));
         assert_eq!(
             out[1],
-            s[0] * s[1] * CField::from(6) + s[2] * s[3] * CField::from(8) + CField::from(5)
+            s[0] * s[1] * CField::from(6 as u32)
+                + s[2] * s[3] * CField::from(8 as u32)
+                + CField::from(5 as u32)
         );
     }
 }

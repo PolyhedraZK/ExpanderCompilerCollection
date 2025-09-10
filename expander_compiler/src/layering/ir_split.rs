@@ -523,13 +523,22 @@ mod tests {
             IrCircuit {
                 instructions: vec![
                     InternalVariable {
-                        expr: Expression::from_terms(vec![Term::new_linear(M31::from(2), 1)]),
+                        expr: Expression::from_terms(vec![Term::new_linear(
+                            M31::from(2 as u32),
+                            1,
+                        )]),
                     },
                     InternalVariable {
-                        expr: Expression::from_terms(vec![Term::new_linear(M31::from(3), 2)]),
+                        expr: Expression::from_terms(vec![Term::new_linear(
+                            M31::from(3 as u32),
+                            2,
+                        )]),
                     },
                     InternalVariable {
-                        expr: Expression::from_terms(vec![Term::new_linear(M31::from(5), 3)]),
+                        expr: Expression::from_terms(vec![Term::new_linear(
+                            M31::from(5 as u32),
+                            3,
+                        )]),
                     },
                 ],
                 constraints: vec![],
@@ -540,12 +549,12 @@ mod tests {
         assert_eq!(root.validate(), Ok(()));
         let new_root = split_to_single_layer(&root);
         assert_eq!(new_root.validate(), Ok(()));
-        let inputs = vec![M31::from(1)];
+        let inputs = vec![M31::from(1 as u32)];
         let (out, cond) = root.eval_unsafe(inputs.clone());
         let (out2, cond2) = new_root.eval_unsafe(inputs.clone());
         assert_eq!(out, out2);
         assert_eq!(cond, cond2);
-        let inputs = vec![M31::from(0)];
+        let inputs = vec![M31::from(0 as u32)];
         let (out, cond) = root.eval_unsafe(inputs.clone());
         let (out2, cond2) = new_root.eval_unsafe(inputs.clone());
         assert_eq!(out, out2);

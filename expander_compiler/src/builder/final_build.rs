@@ -267,11 +267,11 @@ mod tests {
                             var: 1,
                         },
                         ir::expr::LinCombTerm {
-                            coef: CField::from(2),
+                            coef: CField::from(2 as u32),
                             var: 2,
                         },
                     ],
-                    constant: CField::from(3),
+                    constant: CField::from(3 as u32),
                 })],
                 constraints: vec![3],
                 outputs: vec![],
@@ -287,8 +287,8 @@ mod tests {
             ir::dest::Instruction::InternalVariable {
                 expr: Expression::from_terms(vec![
                     Term::new_linear(CField::one(), 1),
-                    Term::new_linear(CField::from(2), 2),
-                    Term::new_const(CField::from(3))
+                    Term::new_linear(CField::from(2 as u32), 2),
+                    Term::new_const(CField::from(3 as u32))
                 ])
             }
         );
@@ -313,12 +313,12 @@ mod tests {
         let root_fin = root_processed.solve_duplicates();
         assert_eq!(root_fin.validate(), Ok(()));
         let (out, _) = root_fin.eval_unsafe(vec![
-            CField::from(2),
-            CField::from(3),
-            CField::from(5),
-            CField::from(7),
+            CField::from(2 as u32),
+            CField::from(3 as u32),
+            CField::from(5 as u32),
+            CField::from(7 as u32),
         ]);
-        assert_eq!(out, vec![CField::from(2 * 3 * 5 * 7)]);
+        assert_eq!(out, vec![CField::from(2 * 3 * 5 * 7 as u32)]);
     }
 
     #[test]

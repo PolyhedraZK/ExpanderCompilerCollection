@@ -17,8 +17,8 @@ impl Define<M31Config> for Circuit<Variable> {
 fn test_circuit_eval_simple() {
     let compile_result = compile(&Circuit::default(), CompileOptions::default()).unwrap();
     let assignment = Circuit::<M31> {
-        sum: M31::from(126),
-        x: [M31::from(1), M31::from(2)],
+        sum: M31::from(126u32),
+        x: [M31::from(1u32), M31::from(2u32)],
     };
     let witness = compile_result
         .witness_solver
@@ -28,8 +28,8 @@ fn test_circuit_eval_simple() {
     assert_eq!(output, vec![true]);
 
     let assignment = Circuit::<M31> {
-        sum: M31::from(127),
-        x: [M31::from(1), M31::from(2)],
+        sum: M31::from(127u32),
+        x: [M31::from(1u32), M31::from(2u32)],
     };
     let witness = compile_result
         .witness_solver

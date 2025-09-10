@@ -170,7 +170,7 @@ fn eval_output() {
                 InternalVariable {
                     expr: Expression::from_terms(vec![
                         Term::new_linear(CField::one(), 6),
-                        Term::new_linear(CField::from(9), 2),
+                        Term::new_linear(CField::from(9 as u32), 2),
                     ]),
                 },
             ],
@@ -185,7 +185,7 @@ fn eval_output() {
             instructions: vec![InternalVariable {
                 expr: Expression::from_terms(vec![
                     Term::new_quad(CField::one(), 1, 1),
-                    Term::new_linear(CField::from(10), 2),
+                    Term::new_linear(CField::from(10 as u32), 2),
                 ]),
             }],
             constraints: vec![],
@@ -195,8 +195,8 @@ fn eval_output() {
     );
     assert_eq!(root.validate(), Ok(()));
     assert_eq!(root.input_size(), 7);
-    let fn2 = |x: CField, y: CField| x * x + y * CField::from(10);
-    let fn1 = |x: CField, r: &[CField]| fn2(fn2(x, r[1]), r[2]) + r[0] * CField::from(9);
+    let fn2 = |x: CField, y: CField| x * x + y * CField::from(10 as u32);
+    let fn1 = |x: CField, r: &[CField]| fn2(fn2(x, r[1]), r[2]) + r[0] * CField::from(9 as u32);
     let fn0 = |x: CField, r: &[CField]| fn1(fn1(x, &r[0..3]), &r[3..]);
     for _ in 0..100 {
         let inputs: Vec<CField> = (0..7)
@@ -236,8 +236,8 @@ fn eval_constraint() {
     );
     assert_eq!(root.validate(), Ok(()));
     assert_eq!(root.input_size(), 2);
-    for i in 0..2 {
-        for j in 0..2 {
+    for i in 0..2u32 {
+        for j in 0..2u32 {
             let (_, cond) = root.eval_unsafe(vec![CField::from(i), CField::from(j)]);
             assert_eq!(i == 0 && j == 0, cond);
         }
