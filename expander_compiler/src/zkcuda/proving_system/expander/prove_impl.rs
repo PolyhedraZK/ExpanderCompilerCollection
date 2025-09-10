@@ -42,7 +42,7 @@ where
 /// If it is broadcasted, the same value is used across all parallel instances.
 ///   i.e. global_vals[i] is the same for all parallel instances.
 /// If it is partitioned, each parallel instance gets a slice of the values.
-///   i.e. global_vals[i] is partitioned equally into parallel_num slices, and each
+///   i.e. global_vals[i] is partitioned equally into kernel_parallel_count slices, and each
 ///     parallel instance gets one slice.
 ///
 /// This function returns the local values for each parallel instance based on the global values and the broadcast information.
@@ -50,7 +50,7 @@ pub fn get_local_vals<'vals_life, F: Field>(
     global_vals: &'vals_life [impl AsRef<[F]>],
     data_broadcast_count: &[usize],
     kernel_parallel_index: usize,
-    parallel_num: usize,
+    kernel_parallel_count: usize,
 ) -> Vec<&'vals_life [F]> {
     global_vals
         .iter()
@@ -58,7 +58,7 @@ pub fn get_local_vals<'vals_life, F: Field>(
         .map(|(vals, data_broadcast_count)| {
             let data_broadcast_count_next_power_of_two = data_broadcast_count.next_power_of_two();
             let local_val_len =
-                vals.as_ref().len() / (parallel_num / data_broadcast_count_next_power_of_two);
+                vals.as_ref().len() / (kernel_parallel_count / data_broadcast_count_next_power_of_two);
             let start_index = local_val_len * kernel_parallel_index % vals.as_ref().len();
             &vals.as_ref()[start_index..local_val_len + start_index]
         })
@@ -208,7 +208,7 @@ pub fn partition_gkr_claims_and_open_pcs_no_mpi_impl<C: GKREngine>(
     p_keys: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
     data_broadcast_count: &[usize],
     kernel_parallel_index: usize,
-    parallel_num: usize,
+    kernel_parallel_count: usize,
     transcript: &mut C::TranscriptConfig,
 ) {
     for (commitment_val, ib) in global_vals.iter().zip(data_broadcast_count) {
@@ -216,7 +216,7 @@ pub fn partition_gkr_claims_and_open_pcs_no_mpi_impl<C: GKREngine>(
         let (challenge_for_pcs, _) = partition_challenge_and_location_for_pcs_no_mpi::<
             C::FieldConfig,
         >(
-            gkr_claim, val_len, kernel_parallel_index, parallel_num, *ib
+            gkr_claim, val_len, kernel_parallel_index, kernel_parallel_count, *ib
         );
         pcs_local_open_impl::<C>(
             commitment_val.as_ref(),
@@ -236,7 +236,7 @@ pub fn partition_gkr_claims_and_open_pcs_no_mpi<C: GKREngine>(
     p_keys: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
     data_broadcast_count: &[usize],
     kernel_parallel_index: usize,
-    parallel_num: usize,
+    kernel_parallel_count: usize,
     transcript: &mut C::TranscriptConfig,
 ) {
     let challenges = if let Some(challenge_y) = gkr_claim.challenge_y() {
@@ -252,7 +252,7 @@ pub fn partition_gkr_claims_and_open_pcs_no_mpi<C: GKREngine>(
             p_keys,
             data_broadcast_count,
             kernel_parallel_index,
-            parallel_num,
+            kernel_parallel_count,
             transcript,
         );
     });
