@@ -73,18 +73,23 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
         _commitments: &[&Self::Commitment],
         _commitments_state: &[&Self::CommitmentState],
         commitments_values: &[&[SIMDField<C>]],
-        parallel_count: usize,
-        is_broadcast: &[usize],
+        kernel_parallel_count: usize,
+        data_broadcast_count: &[usize],
     ) -> DummyProof {
-        check_inputs(kernel, commitments_values, parallel_count, is_broadcast);
+        check_inputs(
+            kernel,
+            commitments_values,
+            kernel_parallel_count,
+            data_broadcast_count,
+        );
         let mut res = vec![];
-        for i in 0..parallel_count {
+        for i in 0..kernel_parallel_count {
             let lc_input = prepare_inputs(
                 kernel.layered_circuit(),
                 kernel.layered_circuit_input(),
                 commitments_values,
-                is_broadcast,
-                parallel_count,
+                data_broadcast_count,
+                kernel_parallel_count,
                 i,
             );
             let (_, cond) = kernel
@@ -104,18 +109,18 @@ impl<C: Config> KernelWiseProvingSystem<C> for DummyProvingSystem<C> {
         kernel: &Kernel<C>,
         proof: &Self::Proof,
         commitments: &[&Self::Commitment],
-        parallel_count: usize,
-        is_broadcast: &[usize],
+        kernel_parallel_count: usize,
+        data_broadcast_count: &[usize],
     ) -> bool {
         let values = commitments.iter().map(|c| &c.vals[..]).collect::<Vec<_>>();
-        check_inputs(kernel, &values, parallel_count, is_broadcast);
-        for i in 0..parallel_count {
+        check_inputs(kernel, &values, kernel_parallel_count, data_broadcast_count);
+        for i in 0..kernel_parallel_count {
             let lc_input = prepare_inputs(
                 kernel.layered_circuit(),
                 kernel.layered_circuit_input(),
                 &values,
-                is_broadcast,
-                parallel_count,
+                data_broadcast_count,
+                kernel_parallel_count,
                 i,
             );
             let (_, cond) = kernel
@@ -175,8 +180,8 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
                     &local_commitments,
                     &local_state,
                     &local_vals,
-                    next_power_of_two(template.parallel_count()),
-                    template.is_broadcast(),
+                    next_power_of_two(template.kernel_parallel_count()),
+                    template.data_broadcast_count(),
                 )
             })
             .collect::<Vec<_>>();
@@ -208,8 +213,8 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
                     &computation_graph.kernels()[template.kernel_id()],
                     local_proof,
                     &local_commitments,
-                    next_power_of_two(template.parallel_count()),
-                    template.is_broadcast(),
+                    next_power_of_two(template.kernel_parallel_count()),
+                    template.data_broadcast_count(),
                 )
             })
             .collect::<Vec<_>>();

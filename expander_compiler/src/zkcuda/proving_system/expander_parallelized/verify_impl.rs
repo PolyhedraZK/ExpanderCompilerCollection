@@ -29,8 +29,8 @@ pub fn verify_kernel<C, ECCConfig>(
     kernel: &Kernel<ECCConfig>,
     proof: &ExpanderProof,
     commitments: &[&ExpanderCommitment<C::FieldConfig, C::PCSConfig>],
-    parallel_count: usize,
-    is_broadcast: &[usize],
+    kernel_parallel_count: usize,
+    data_broadcast_count: &[usize],
 ) -> bool
 where
     C: GKREngine,
@@ -44,7 +44,7 @@ where
 
     let mut cursor = Cursor::new(&proof.data[0].bytes);
     let (mut verified, challenge, claimed_v0, claimed_v1) = gkr_verify(
-        parallel_count,
+        kernel_parallel_count,
         &expander_circuit,
         &[],
         &<C::FieldConfig as FieldEngine>::ChallengeField::ZERO,
@@ -65,8 +65,8 @@ where
         claimed_v0,
         claimed_v1,
         commitments,
-        is_broadcast,
-        parallel_count,
+        data_broadcast_count,
+        kernel_parallel_count,
         &mut transcript,
     );
 
@@ -86,8 +86,8 @@ pub fn verify_pcs_opening_and_aggregation_mpi_impl<C, ECCConfig>(
     challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
     y: &<C::FieldConfig as FieldEngine>::ChallengeField,
     commitments: &[&ExpanderCommitment<C::FieldConfig, C::PCSConfig>],
-    is_broadcast: &[usize],
-    parallel_count: usize,
+    data_broadcast_count: &[usize],
+    kernel_parallel_count: usize,
     transcript: &mut C::TranscriptConfig,
 ) -> bool
 where
@@ -99,14 +99,18 @@ where
         .layered_circuit_input()
         .iter()
         .zip(commitments.iter())
-        .zip(is_broadcast)
+        .zip(data_broadcast_count)
     {
         let val_len =
             <ExpanderCommitment<C::FieldConfig, C::PCSConfig> as Commitment<ECCConfig>>::vals_len(
                 commitment,
             );
-        let (challenge_for_pcs, component_idx_vars) =
-            partition_challenge_and_location_for_pcs_mpi(challenge, val_len, parallel_count, *ib);
+        let (challenge_for_pcs, component_idx_vars) = partition_challenge_and_location_for_pcs_mpi(
+            challenge,
+            val_len,
+            kernel_parallel_count,
+            *ib,
+        );
 
         let claim =
             <C::FieldConfig as FieldEngine>::ChallengeField::deserialize_from(&mut proof_reader)
@@ -145,8 +149,8 @@ pub fn verify_pcs_opening_and_aggregation_mpi<C, ECCConfig>(
     claim_v0: <C::FieldConfig as FieldEngine>::ChallengeField,
     claim_v1: Option<<C::FieldConfig as FieldEngine>::ChallengeField>,
     commitments: &[&ExpanderCommitment<C::FieldConfig, C::PCSConfig>],
-    is_broadcast: &[usize],
-    parallel_count: usize,
+    data_broadcast_count: &[usize],
+    kernel_parallel_count: usize,
     transcript: &mut C::TranscriptConfig,
 ) -> bool
 where
@@ -182,8 +186,8 @@ where
                 challenge,
                 claim,
                 commitments,
-                is_broadcast,
-                parallel_count,
+                data_broadcast_count,
+                kernel_parallel_count,
                 transcript,
             )
         })

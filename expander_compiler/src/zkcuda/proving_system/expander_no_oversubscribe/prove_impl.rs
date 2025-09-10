@@ -86,8 +86,8 @@ where
                     global_mpi_config,
                     &computation_graph.kernels()[template.kernel_id()],
                     &commitment_values,
-                    next_power_of_two(template.parallel_count()),
-                    template.is_broadcast(),
+                    next_power_of_two(template.kernel_parallel_count()),
+                    template.data_broadcast_count(),
                     n_bytes_profiler,
                 );
                 single_kernel_gkr_timer.stop();
@@ -103,8 +103,8 @@ where
                                 extract_pcs_claims::<ZC::GKRConfig>(
                                     &commitment_values,
                                     &challenge,
-                                    template.is_broadcast(),
-                                    next_power_of_two(template.parallel_count()),
+                                    template.data_broadcast_count(),
+                                    next_power_of_two(template.kernel_parallel_count()),
                                 );
 
                             vals_ref.extend(local_vals_ref);
@@ -137,7 +137,7 @@ where
                                         .map(|&idx| &states.as_ref().unwrap()[idx])
                                         .collect::<Vec<_>>(),
                                     c,
-                                    template.is_broadcast(),
+                                    template.data_broadcast_count(),
                                     &mut transcript,
                                 );
                             });
@@ -196,8 +196,8 @@ pub fn prove_kernel_gkr_no_oversubscribe<F, T, ECCConfig>(
     mpi_config: &MPIConfig<'static>,
     kernel: &Kernel<ECCConfig>,
     commitments_values: &[&[F::SimdCircuitField]],
-    parallel_count: usize,
-    is_broadcast: &[usize],
+    kernel_parallel_count: usize,
+    data_broadcast_count: &[usize],
     n_bytes_profiler: &mut NBytesProfiler,
 ) -> Option<(T, ExpanderDualVarChallenge<F>)>
 where
@@ -205,153 +205,153 @@ where
     T: Transcript,
     ECCConfig: Config<FieldConfig = F>,
 {
-    let local_mpi_config = generate_local_mpi_config(mpi_config, parallel_count);
+    let local_mpi_config = generate_local_mpi_config(mpi_config, kernel_parallel_count);
 
     local_mpi_config.as_ref()?;
 
     let local_mpi_config = local_mpi_config.unwrap();
     let local_world_size = local_mpi_config.world_size();
 
-    let n_local_copies = parallel_count / local_world_size;
+    let n_local_copies = kernel_parallel_count / local_world_size;
     match n_local_copies {
         1 => prove_kernel_gkr_internal::<F, F, T, ECCConfig>(
             &local_mpi_config,
             kernel,
             commitments_values,
-            parallel_count,
-            is_broadcast,
+            kernel_parallel_count,
+            data_broadcast_count,
             n_bytes_profiler,
         ),
         2 => prove_kernel_gkr_internal::<F, BN254ConfigXN<2>, T, ECCConfig>(
             &local_mpi_config,
             kernel,
             commitments_values,
-            parallel_count,
-            is_broadcast,
+            kernel_parallel_count,
+            data_broadcast_count,
             n_bytes_profiler,
         ),
         4 => prove_kernel_gkr_internal::<F, BN254ConfigXN<4>, T, ECCConfig>(
             &local_mpi_config,
             kernel,
             commitments_values,
-            parallel_count,
-            is_broadcast,
+            kernel_parallel_count,
+            data_broadcast_count,
             n_bytes_profiler,
         ),
         8 => prove_kernel_gkr_internal::<F, BN254ConfigXN<8>, T, ECCConfig>(
             &local_mpi_config,
             kernel,
             commitments_values,
-            parallel_count,
-            is_broadcast,
+            kernel_parallel_count,
+            data_broadcast_count,
             n_bytes_profiler,
         ),
         16 => prove_kernel_gkr_internal::<F, BN254ConfigXN<16>, T, ECCConfig>(
             &local_mpi_config,
             kernel,
             commitments_values,
-            parallel_count,
-            is_broadcast,
+            kernel_parallel_count,
+            data_broadcast_count,
             n_bytes_profiler,
         ),
         32 => prove_kernel_gkr_internal::<F, BN254ConfigXN<32>, T, ECCConfig>(
             &local_mpi_config,
             kernel,
             commitments_values,
-            parallel_count,
-            is_broadcast,
+            kernel_parallel_count,
+            data_broadcast_count,
             n_bytes_profiler,
         ),
         64 => prove_kernel_gkr_internal::<F, BN254ConfigXN<64>, T, ECCConfig>(
             &local_mpi_config,
             kernel,
             commitments_values,
-            parallel_count,
-            is_broadcast,
+            kernel_parallel_count,
+            data_broadcast_count,
             n_bytes_profiler,
         ),
         128 => prove_kernel_gkr_internal::<F, BN254ConfigXN<128>, T, ECCConfig>(
             &local_mpi_config,
             kernel,
             commitments_values,
-            parallel_count,
-            is_broadcast,
+            kernel_parallel_count,
+            data_broadcast_count,
             n_bytes_profiler,
         ),
         256 => prove_kernel_gkr_internal::<F, BN254ConfigXN<256>, T, ECCConfig>(
             &local_mpi_config,
             kernel,
             commitments_values,
-            parallel_count,
-            is_broadcast,
+            kernel_parallel_count,
+            data_broadcast_count,
             n_bytes_profiler,
         ),
         512 => prove_kernel_gkr_internal::<F, BN254ConfigXN<512>, T, ECCConfig>(
             &local_mpi_config,
             kernel,
             commitments_values,
-            parallel_count,
-            is_broadcast,
+            kernel_parallel_count,
+            data_broadcast_count,
             n_bytes_profiler,
         ),
         1024 => prove_kernel_gkr_internal::<F, BN254ConfigXN<1024>, T, ECCConfig>(
             &local_mpi_config,
             kernel,
             commitments_values,
-            parallel_count,
-            is_broadcast,
+            kernel_parallel_count,
+            data_broadcast_count,
             n_bytes_profiler,
         ),
         2048 => prove_kernel_gkr_internal::<F, BN254ConfigXN<2048>, T, ECCConfig>(
             &local_mpi_config,
             kernel,
             commitments_values,
-            parallel_count,
-            is_broadcast,
+            kernel_parallel_count,
+            data_broadcast_count,
             n_bytes_profiler,
         ),
         4096 => prove_kernel_gkr_internal::<F, BN254ConfigXN<4096>, T, ECCConfig>(
             &local_mpi_config,
             kernel,
             commitments_values,
-            parallel_count,
-            is_broadcast,
+            kernel_parallel_count,
+            data_broadcast_count,
             n_bytes_profiler,
         ),
         8192 => prove_kernel_gkr_internal::<F, BN254ConfigXN<8192>, T, ECCConfig>(
             &local_mpi_config,
             kernel,
             commitments_values,
-            parallel_count,
-            is_broadcast,
+            kernel_parallel_count,
+            data_broadcast_count,
             n_bytes_profiler,
         ),
         16384 => prove_kernel_gkr_internal::<F, BN254ConfigXN<16384>, T, ECCConfig>(
             &local_mpi_config,
             kernel,
             commitments_values,
-            parallel_count,
-            is_broadcast,
+            kernel_parallel_count,
+            data_broadcast_count,
             n_bytes_profiler,
         ),
         32768 => prove_kernel_gkr_internal::<F, BN254ConfigXN<32768>, T, ECCConfig>(
             &local_mpi_config,
             kernel,
             commitments_values,
-            parallel_count,
-            is_broadcast,
+            kernel_parallel_count,
+            data_broadcast_count,
             n_bytes_profiler,
         ),
         65536 => prove_kernel_gkr_internal::<F, BN254ConfigXN<65536>, T, ECCConfig>(
             &local_mpi_config,
             kernel,
             commitments_values,
-            parallel_count,
-            is_broadcast,
+            kernel_parallel_count,
+            data_broadcast_count,
             n_bytes_profiler,
         ),
         _ => {
-            panic!("Unsupported parallel count: {parallel_count}");
+            panic!("Unsupported parallel count: {kernel_parallel_count}");
         }
     }
 }
@@ -360,8 +360,8 @@ pub fn prove_kernel_gkr_internal<FBasic, FMulti, T, ECCConfig>(
     mpi_config: &MPIConfig<'static>,
     kernel: &Kernel<ECCConfig>,
     commitments_values: &[&[FBasic::SimdCircuitField]],
-    parallel_count: usize,
-    is_broadcast: &[usize],
+    kernel_parallel_count: usize,
+    data_broadcast_count: &[usize],
     n_bytes_profiler: &mut NBytesProfiler,
 ) -> Option<(T, ExpanderDualVarChallenge<FBasic>)>
 where
@@ -373,13 +373,13 @@ where
 {
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
-    let n_copies = parallel_count / world_size;
+    let n_copies = kernel_parallel_count / world_size;
     let local_commitment_values = get_local_vals_multi_copies(
         commitments_values,
-        is_broadcast,
+        data_broadcast_count,
         world_rank,
         n_copies,
-        parallel_count,
+        kernel_parallel_count,
     );
 
     let (mut expander_circuit, mut prover_scratch) =
@@ -401,10 +401,10 @@ where
 
 pub fn get_local_vals_multi_copies<'vals_life, F: Field>(
     global_vals: &'vals_life [impl AsRef<[F]>],
-    is_broadcast: &[usize],
+    data_broadcast_count: &[usize],
     local_world_rank: usize,
     n_copies: usize,
-    parallel_count: usize,
+    kernel_parallel_count: usize,
 ) -> Vec<Vec<&'vals_life [F]>> {
     let parallel_indices = (0..n_copies)
         .map(|i| local_world_rank * n_copies + i)
@@ -412,8 +412,13 @@ pub fn get_local_vals_multi_copies<'vals_life, F: Field>(
 
     parallel_indices
         .iter()
-        .map(|&parallel_index| {
-            get_local_vals(global_vals, is_broadcast, parallel_index, parallel_count)
+        .map(|&kernel_parallel_index| {
+            get_local_vals(
+                global_vals,
+                data_broadcast_count,
+                kernel_parallel_index,
+                kernel_parallel_count,
+            )
         })
         .collect::<Vec<_>>()
 }

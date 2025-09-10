@@ -109,8 +109,8 @@ impl MPISharedMemory for ProofTemplate {
                 .iter()
                 .map(|order| order.bytes_size())
                 .sum::<usize>()
-            + self.parallel_count.bytes_size()
-            + self.is_broadcast.bytes_size()
+            + self.kernel_parallel_count.bytes_size()
+            + self.data_broadcast_count.bytes_size()
     }
 
     fn to_memory(&self, ptr: &mut *mut u8) {
@@ -120,8 +120,8 @@ impl MPISharedMemory for ProofTemplate {
         self.commitment_bit_orders
             .iter()
             .for_each(|order| order.to_memory(ptr));
-        self.parallel_count.to_memory(ptr);
-        self.is_broadcast.to_memory(ptr);
+        self.kernel_parallel_count.to_memory(ptr);
+        self.data_broadcast_count.to_memory(ptr);
     }
 
     fn new_from_memory(ptr: &mut *mut u8) -> Self {
@@ -131,15 +131,15 @@ impl MPISharedMemory for ProofTemplate {
         let commitment_bit_orders = (0..commitment_bit_orders_len)
             .map(|_| BitOrder::new_from_memory(ptr))
             .collect();
-        let parallel_count = usize::new_from_memory(ptr);
-        let is_broadcast = Vec::<usize>::new_from_memory(ptr);
+        let kernel_parallel_count = usize::new_from_memory(ptr);
+        let data_broadcast_count = Vec::<usize>::new_from_memory(ptr);
 
         ProofTemplate {
             kernel_id,
             commitment_indices,
             commitment_bit_orders,
-            parallel_count,
-            is_broadcast,
+            kernel_parallel_count,
+            data_broadcast_count,
         }
     }
 
@@ -148,7 +148,7 @@ impl MPISharedMemory for ProofTemplate {
         self.commitment_bit_orders
             .into_iter()
             .for_each(|order| order.discard_control_of_shared_mem());
-        self.is_broadcast.discard_control_of_shared_mem();
+        self.data_broadcast_count.discard_control_of_shared_mem();
     }
 }
 

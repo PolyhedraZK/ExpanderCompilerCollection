@@ -45,7 +45,7 @@ pub struct KernelCall {
     num_parallel: usize,
     input_handles: Vec<DeviceMemoryHandle>,
     output_handles: Vec<DeviceMemoryHandle>,
-    is_broadcast: Vec<usize>,
+    data_broadcast_count: Vec<usize>,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, ExpSerde)]
@@ -53,8 +53,8 @@ pub struct ProofTemplate {
     pub kernel_id: usize,
     pub commitment_indices: Vec<usize>,
     pub commitment_bit_orders: Vec<BitOrder>,
-    pub parallel_count: usize,
-    pub is_broadcast: Vec<usize>,
+    pub kernel_parallel_count: usize,
+    pub data_broadcast_count: Vec<usize>,
 }
 
 impl ProofTemplate {
@@ -67,11 +67,11 @@ impl ProofTemplate {
     pub fn commitment_bit_orders(&self) -> &[BitOrder] {
         &self.commitment_bit_orders
     }
-    pub fn parallel_count(&self) -> usize {
-        self.parallel_count
+    pub fn kernel_parallel_count(&self) -> usize {
+        self.kernel_parallel_count
     }
-    pub fn is_broadcast(&self) -> &[usize] {
-        &self.is_broadcast
+    pub fn data_broadcast_count(&self) -> &[usize] {
+        &self.data_broadcast_count
     }
 }
 
@@ -152,24 +152,24 @@ fn unpack_vec<C: Config>(v: &[SIMDField<C>]) -> Vec<CircuitField<C>> {
     v.iter().map(|x| x.unpack()[0]).collect()
 }
 
-// returns Option<is_broadcast>
+// returns Option<data_broadcast_count>
 fn check_shape_compat(
     kernel_shape: &Shape,
     io_shape: &Shape,
-    parallel_count: usize,
+    kernel_parallel_count: usize,
 ) -> Option<usize> {
     if kernel_shape.len() == io_shape.len() {
         if *kernel_shape == *io_shape {
-            Some(parallel_count)
+            Some(kernel_parallel_count)
         } else {
             None
         }
     } else if kernel_shape.len() + 1 == io_shape.len() {
         if io_shape.iter().skip(1).eq(kernel_shape.iter()) {
-            if io_shape[0] == parallel_count {
+            if io_shape[0] == kernel_parallel_count {
                 Some(1)
-            } else if parallel_count % io_shape[0] == 0 {
-                Some(parallel_count / io_shape[0])
+            } else if kernel_parallel_count % io_shape[0] == 0 {
+                Some(kernel_parallel_count / io_shape[0])
             } else {
                 None
             }
@@ -302,11 +302,11 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         &self,
         values: &[SIMDField<C>],
         s: &mut [SIMDField<C>],
-        parallel_index: usize,
+        kernel_parallel_index: usize,
         chunk_size: Option<usize>,
     ) {
         let chunk_size = chunk_size.unwrap();
-        let start_index = chunk_size * parallel_index % values.len();
+        let start_index = chunk_size * kernel_parallel_index % values.len();
         s.copy_from_slice(&values[start_index..(start_index + chunk_size)]);
     }
 
@@ -320,7 +320,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         if kernel.io_shapes().len() != ios.len() {
             panic!("Invalid number of inputs/outputs");
         }
-        let mut is_broadcast = Vec::with_capacity(ios.len());
+        let mut data_broadcast_count = Vec::with_capacity(ios.len());
         for (i, ((kernel_shape, io), spec)) in kernel
             .io_shapes()
             .iter()
@@ -329,7 +329,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             .enumerate()
         {
             if !spec.is_input {
-                is_broadcast.push(NOT_BROADCAST);
+                data_broadcast_count.push(NOT_BROADCAST);
                 continue;
             }
             let io_shape = if let Some(handle) = io {
@@ -349,7 +349,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                         &isl,
                         &self.device_memories[t].required_shape_products,
                     );
-                    is_broadcast.push(ib)
+                    data_broadcast_count.push(ib)
                 }
                 None => {
                     panic!(
@@ -363,7 +363,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 }
             }
         }
-        for (io_spec, ib) in kernel.io_specs().iter().zip(is_broadcast.iter()) {
+        for (io_spec, ib) in kernel.io_specs().iter().zip(data_broadcast_count.iter()) {
             if io_spec.is_output && *ib != NOT_BROADCAST {
                 panic!("Output is broadcasted, but it shouldn't be");
             }
@@ -470,7 +470,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             num_parallel,
             input_handles,
             output_handles,
-            is_broadcast,
+            data_broadcast_count,
         });
         Ok(())
     }
@@ -501,7 +501,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                     .io_specs()
                     .iter()
                     .zip(kernel_call.input_handles.iter())
-                    .zip(kernel_call.is_broadcast.iter())
+                    .zip(kernel_call.data_broadcast_count.iter())
                 {
                     if !spec.is_input || ib > NOT_BROADCAST {
                         continue;
@@ -514,7 +514,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                     .io_specs()
                     .iter()
                     .zip(kernel_call.output_handles.iter())
-                    .zip(kernel_call.is_broadcast.iter())
+                    .zip(kernel_call.data_broadcast_count.iter())
                 {
                     if !spec.is_output || ib > NOT_BROADCAST {
                         continue;
@@ -609,7 +609,10 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 cg_kernels.drain(..1).next().unwrap()
             } else {
                 let mut psi = Vec::new();
-                for (s, &ib) in pad_shapes_input.iter().zip(kernel_call.is_broadcast.iter()) {
+                for (s, &ib) in pad_shapes_input
+                    .iter()
+                    .zip(kernel_call.data_broadcast_count.iter())
+                {
                     psi.push(s.as_ref().map(|t| {
                         if ib == kernel_call.num_parallel {
                             t.0.clone()
@@ -621,7 +624,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 let mut pso = Vec::new();
                 for (s, &ib) in pad_shapes_output
                     .iter()
-                    .zip(kernel_call.is_broadcast.iter())
+                    .zip(kernel_call.data_broadcast_count.iter())
                 {
                     pso.push(s.as_ref().map(|t| {
                         if ib == kernel_call.num_parallel {
@@ -637,19 +640,19 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             let mut commitment_indices: Vec<usize> = Vec::new();
             let mut commitment_bit_orders: Vec<BitOrder> = Vec::new();
             let mut any_shape = None;
-            let mut is_broadcast = Vec::new();
+            let mut data_broadcast_count = Vec::new();
             for (((spec, pad_shape), handle), &ib) in kernel_primitive
                 .io_specs()
                 .iter()
                 .zip(&pad_shapes_input)
                 .zip(kernel_call.input_handles.iter())
-                .zip(kernel_call.is_broadcast.iter())
+                .zip(kernel_call.data_broadcast_count.iter())
             {
                 if spec.is_input {
                     let shape = pad_shape.as_ref().unwrap();
                     commitment_indices.push(handle.as_ref().unwrap().id);
                     commitment_bit_orders.push(shape.1.clone());
-                    is_broadcast.push(ib);
+                    data_broadcast_count.push(ib);
                     if ib == NOT_BROADCAST {
                         any_shape = Some(shape.0.clone());
                     }
@@ -660,13 +663,13 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 .iter()
                 .zip(&pad_shapes_output)
                 .zip(kernel_call.output_handles.iter())
-                .zip(kernel_call.is_broadcast.iter())
+                .zip(kernel_call.data_broadcast_count.iter())
             {
                 if spec.is_output {
                     let shape = pad_shape.as_ref().unwrap();
                     commitment_indices.push(handle.as_ref().unwrap().id);
                     commitment_bit_orders.push(shape.1.clone());
-                    is_broadcast.push(ib);
+                    data_broadcast_count.push(ib);
                     if ib == NOT_BROADCAST {
                         any_shape = Some(shape.0.clone());
                     }
@@ -684,7 +687,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 dm_max += 1;
                 commitment_bit_orders.push((0..n.trailing_zeros() as usize).collect());
                 commitments_lens.push(n);
-                is_broadcast.push(NOT_BROADCAST);
+                data_broadcast_count.push(NOT_BROADCAST);
             }
 
             let kernel_id = self.kernels.add(&kernel);
@@ -692,8 +695,8 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 kernel_id,
                 commitment_indices,
                 commitment_bit_orders,
-                parallel_count: dim0_len,
-                is_broadcast,
+                kernel_parallel_count: dim0_len,
+                data_broadcast_count,
             });
         }
 
@@ -753,7 +756,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             for (((input, &ib), ir_inputs), chunk_size) in kernel_call
                 .input_handles
                 .iter()
-                .zip(kernel_call.is_broadcast.iter())
+                .zip(kernel_call.data_broadcast_count.iter())
                 .zip(ir_inputs_all.iter_mut())
                 .zip(input_chunk_sizes.iter_mut())
             {
@@ -773,7 +776,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             for (((output, &ib), ir_inputs), chunk_size) in kernel_call
                 .output_handles
                 .iter()
-                .zip(kernel_call.is_broadcast.iter())
+                .zip(kernel_call.data_broadcast_count.iter())
                 .zip(ir_outputs_all.iter_mut())
                 .zip(output_chunk_sizes.iter_mut())
             {

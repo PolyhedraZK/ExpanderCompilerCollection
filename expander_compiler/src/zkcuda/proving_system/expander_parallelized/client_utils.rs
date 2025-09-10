@@ -101,22 +101,22 @@ where
     );
     fs::write(&setup_filename, bytes).expect("Failed to write computation graph to file");
 
-    let max_parallel_count = computation_graph
+    let max_kernel_parallel_count = computation_graph
         .proof_templates()
         .iter()
-        .map(|t| t.parallel_count())
+        .map(|t| t.kernel_parallel_count())
         .max()
         .unwrap_or(1);
-    let max_parallel_count = next_power_of_two(max_parallel_count);
+    let max_kernel_parallel_count = next_power_of_two(max_kernel_parallel_count);
 
     let mpi_size = if allow_oversubscribe {
-        max_parallel_count
+        max_kernel_parallel_count
     } else {
         let num_cpus = prev_power_of_two(num_cpus::get_physical());
-        if max_parallel_count > num_cpus {
+        if max_kernel_parallel_count > num_cpus {
             num_cpus
         } else {
-            max_parallel_count
+            max_kernel_parallel_count
         }
     };
 

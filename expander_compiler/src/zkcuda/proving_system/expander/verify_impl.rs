@@ -76,9 +76,9 @@ pub fn verify_pcs_opening_and_aggregation_no_mpi_impl<C, ECCConfig>(
     challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
     y: &<C::FieldConfig as FieldEngine>::ChallengeField,
     commitments: &[&ExpanderCommitment<C::FieldConfig, C::PCSConfig>],
-    is_broadcast: &[usize],
-    parallel_index: usize,
-    parallel_count: usize,
+    data_broadcast_count: &[usize],
+    kernel_parallel_index: usize,
+    kernel_parallel_count: usize,
     transcript: &mut C::TranscriptConfig,
 ) -> bool
 where
@@ -90,7 +90,7 @@ where
         .layered_circuit_input()
         .iter()
         .zip(commitments.iter())
-        .zip(is_broadcast)
+        .zip(data_broadcast_count)
     {
         let val_len =
             <ExpanderCommitment<C::FieldConfig, C::PCSConfig> as Commitment<ECCConfig>>::vals_len(
@@ -100,8 +100,8 @@ where
             partition_challenge_and_location_for_pcs_no_mpi(
                 challenge,
                 val_len,
-                parallel_index,
-                parallel_count,
+                kernel_parallel_index,
+                kernel_parallel_count,
                 *ib,
             );
 
@@ -144,9 +144,9 @@ pub fn verify_pcs_opening_and_aggregation_no_mpi<C, ECCConfig>(
     claim_v0: <C::FieldConfig as FieldEngine>::ChallengeField,
     claim_v1: Option<<C::FieldConfig as FieldEngine>::ChallengeField>,
     commitments: &[&ExpanderCommitment<C::FieldConfig, C::PCSConfig>],
-    is_broadcast: &[usize],
-    parallel_index: usize,
-    parallel_count: usize,
+    data_broadcast_count: &[usize],
+    kernel_parallel_index: usize,
+    kernel_parallel_count: usize,
     transcript: &mut C::TranscriptConfig,
 ) -> bool
 where
@@ -176,9 +176,9 @@ where
                 &challenge,
                 &claim,
                 commitments,
-                is_broadcast,
-                parallel_index,
-                parallel_count,
+                data_broadcast_count,
+                kernel_parallel_index,
+                kernel_parallel_count,
                 transcript,
             )
         })

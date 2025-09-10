@@ -13,18 +13,18 @@ use super::super::kernel::Kernel;
 pub fn check_inputs<C: Config>(
     kernel: &Kernel<C>,
     values: &[&[SIMDField<C>]],
-    parallel_count: usize,
-    is_broadcast: &[usize],
+    kernel_parallel_count: usize,
+    data_broadcast_count: &[usize],
 ) {
     if kernel.layered_circuit_input().len() != values.len() {
         panic!("Input size mismatch");
     }
-    if kernel.layered_circuit_input().len() != is_broadcast.len() {
+    if kernel.layered_circuit_input().len() != data_broadcast_count.len() {
         panic!("Input size mismatch");
     }
     for i in 0..kernel.layered_circuit_input().len() {
         if kernel.layered_circuit_input()[i].len
-            != values[i].len() / (parallel_count / is_broadcast[i])
+            != values[i].len() / (kernel_parallel_count / data_broadcast_count[i])
         {
             panic!("Input size mismatch");
         }
@@ -35,16 +35,20 @@ pub fn prepare_inputs<C: Config>(
     layered_circuit: &Circuit<C, NormalInputType>,
     partition_info: &[LayeredCircuitInputVec],
     values: &[&[SIMDField<C>]],
-    is_broadcast: &[usize],
-    parallel_count: usize,
-    parallel_index: usize,
+    data_broadcast_count: &[usize],
+    kernel_parallel_count: usize,
+    kernel_parallel_index: usize,
 ) -> Vec<SIMDField<C>> {
     let mut lc_input = vec![SIMDField::<C>::zero(); layered_circuit.input_size()];
-    for ((input, value), ib) in partition_info.iter().zip(values.iter()).zip(is_broadcast) {
-        let parallel_index = parallel_index % (parallel_count / ib);
+    for ((input, value), ib) in partition_info
+        .iter()
+        .zip(values.iter())
+        .zip(data_broadcast_count)
+    {
+        let kernel_parallel_index = kernel_parallel_index % (kernel_parallel_count / ib);
         for (i, x) in value
             .iter()
-            .skip(parallel_index * input.len)
+            .skip(kernel_parallel_index * input.len)
             .take(input.len)
             .enumerate()
         {
