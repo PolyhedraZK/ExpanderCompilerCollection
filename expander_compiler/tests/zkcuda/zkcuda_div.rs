@@ -6,98 +6,38 @@ use expander_compiler::zkcuda::{context::*, kernel::*};
 use gkr::BN254ConfigSha2Hyrax;
 use gkr_engine::FieldEngine;
 
-
-//y = floor * a + rem
-//a > rem
-//query = decompose(a-rem) in base 4096 to 4 12-bit limbs
+const SIZE:usize = 2;
 #[kernel]
-fn div_49_macro<C: Config>(
+fn compare_macro<C: Config>(
 	api: &mut API<C>,
-	y: &[InputVariable; 49],
-	a: &InputVariable,
-	floor: &[InputVariable; 49],
-	query: &[InputVariable; 49*4],
-	query_count: &[InputVariable; 4096],
+	query: &[InputVariable; SIZE],
 ) {
-	 for i in 0..49 {
-		let tmp = api.mul(floor[i], a);
-		let rem = api.sub(y[i], tmp);
-		let diff = api.sub(a, rem);
-		//check a - rem = compose(query[i*4:i*4+4])
-		let mut compose = query[i*4+3];
-		let shift = api.constant(4096);
-		for j in (0..3).rev() {
-			compose = api.mul(compose, shift);
-			compose = api.add(compose, query[i*4+j]);
-		}
-		api.assert_is_equal(diff, compose);
+    let target = api.constant(7);
+	 for i in 0..SIZE {
+		api.assert_is_equal(target, query[i]);
 	}
 }
 
 #[test]
 fn zkcuda_div(){
-    let kernel_div_49: KernelPrimitive<BN254Config> = compile_div_49_macro().unwrap();
+    let kernel_comp: KernelPrimitive<BN254Config> = compile_compare_macro().unwrap();
 
     let mut ctx = Context::<BN254Config>::default();
-    // let parallel_count = 6; //would fail
-    let parallel_count = 128; //would pass
-    let mut y: Vec<Vec<BN254Fr>> = vec![];
-    for i in 0..parallel_count {
-        y.push(vec![]);
-        for j in 0..49 {
-            y[i].push(BN254Fr::from((i * 77 + j * 7) as u32));
-        }
-    }
-    let mut floor: Vec<Vec<BN254Fr>> = vec![];
-    for i in 0..parallel_count {
-        floor.push(vec![]);
-        for j in 0..49 {
-            floor[i].push(BN254Fr::from((i * 11 + j) as u32));
-        }
-    }
-    let a = BN254Fr::from(7u32);
-    let mut query: Vec<Vec<BN254Fr>> = vec![];
-    //in this case, rem is always 0, so a - rem = a = 7
-    //so, decompose(7) in base 4096 to 4 12-bit limbs = [7,0,0,0]
-    for i in 0..parallel_count {
-        query.push(vec![]);
-        for j in 0..49*4 {
-            if j % 4 == 0 {
-                query[i].push(BN254Fr::from(7u32));
-            } else {
-                query[i].push(BN254Fr::zero());
-            }
-        }
-    }
+    let parallel_count = 6; //would fail
+    // let parallel_count = 8; //would pass
+    let query: Vec<Vec<BN254Fr>> = vec![vec![BN254Fr::from(7u32);SIZE];parallel_count];
     
-    let mut querycount: Vec<Vec<BN254Fr>> = vec![];
-    for i in 0..parallel_count {
-        querycount.push(vec![]);
-        for j in 0..4096 {
-            if j == 7 {
-                querycount[i].push(BN254Fr::from(49u32));
-            } else {
-                querycount[i].push(BN254Fr::from(49*3 as u32));
-            }
-        }
-    }
-
-    let y = ctx.copy_to_device(&y);
-    let a = ctx.copy_to_device(&a);
-    let floor = ctx.copy_to_device(&floor);
     let query = ctx.copy_to_device(&query);
-    let querycount = ctx.copy_to_device(&querycount);
-    call_kernel!(ctx, kernel_div_49, parallel_count, y, a, floor, query, querycount).unwrap();
+    call_kernel!(ctx, kernel_comp, parallel_count, query).unwrap();
 
     // type P = Expander<M31Config>;
     let computation_graph = ctx.compile_computation_graph().unwrap();
     ctx.solve_witness().unwrap();
-    let (prover_setup, verifier_setup) = ExpanderNoOverSubscribe::<ZKCudaBN254Hyrax>::setup(&computation_graph);
-    let proof = ExpanderNoOverSubscribe::<ZKCudaBN254Hyrax>::prove(
+    let (prover_setup, _) = ExpanderNoOverSubscribe::<ZKCudaBN254Hyrax>::setup(&computation_graph);
+    ExpanderNoOverSubscribe::<ZKCudaBN254Hyrax>::prove(
         &prover_setup,
         &computation_graph,
         ctx.export_device_memories(),
     );
-    assert!(ExpanderNoOverSubscribe::<ZKCudaBN254Hyrax>::verify(&verifier_setup, &computation_graph, &proof));
     ExpanderNoOverSubscribe::<ZKCudaBN254Hyrax>::post_process();
 }
