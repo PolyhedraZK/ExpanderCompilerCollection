@@ -148,10 +148,9 @@ pub fn read_circuit<C, ECCConfig>(
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
 {
-    let computation_graph_bytes =
-        std::fs::read(setup_file).expect("Failed to read computation graph from file");
-
     let (cg, win) = if global_mpi_config.is_root() {
+        let computation_graph_bytes =
+            std::fs::read(setup_file).expect("Failed to read computation graph from file");
         let cg = ComputationGraph::<ECCConfig>::deserialize_from(std::io::Cursor::new(
             computation_graph_bytes,
         ))
