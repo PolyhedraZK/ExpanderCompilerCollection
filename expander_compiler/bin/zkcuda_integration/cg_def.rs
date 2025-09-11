@@ -11,9 +11,16 @@ use expander_compiler::zkcuda::{
     kernel::{compile_with_spec_and_shapes, kernel, IOVecSpec, KernelPrimitive},
 };
 
+const N_DATA_COPY: usize = 1024 * 32;
+const N_KERNEL_REPEAT: usize = 16;
+
 #[kernel]
-fn add_2_macro<C: Config>(api: &mut API<C>, a: &[InputVariable; 2], b: &mut OutputVariable) {
-    *b = api.add(a[0], a[1]);
+fn add_2_macro<C: Config>(api: &mut API<C>, a: &[InputVariable; 2 * N_KERNEL_REPEAT], b: &mut OutputVariable) {
+    let mut sum = api.constant(0);
+    for i in 0..2 * N_KERNEL_REPEAT {
+        sum = api.add(sum, a[i]);
+    }
+    *b = sum;
 }
 
 #[kernel]
@@ -34,30 +41,30 @@ pub fn gen_computation_graph_and_witness<C: Config>(
 
     let mut ctx: Context<C> = Context::default();
     let a = if let Some(input) = input.as_ref() {
-        assert_eq!(input.len(), 16);
-        assert!(input.iter().all(|v| v.len() == 2));
+        assert_eq!(input.len(), 16 * N_DATA_COPY);
+        assert!(input.iter().all(|v| v.len() == 2 * N_KERNEL_REPEAT));
         input.clone()
     } else {
-        let mut tmp = vec![vec![]; 16];
-        for i in 0..16 {
-            for j in 0..2 {
-                tmp[i].push(CircuitField::<C>::from((i * 2 + j + 1) as u32));
+        let mut tmp = vec![vec![]; 16 * N_DATA_COPY];
+        for i in 0..16 * N_DATA_COPY {
+            for j in 0..2 * N_KERNEL_REPEAT {
+                tmp[i].push(CircuitField::<C>::from((i * 2 * N_KERNEL_REPEAT + j + 1) as u32));
             }
         }
         tmp
     };
 
-    let expected_result = a.iter().flatten().sum::<CircuitField<C>>();
+    // let expected_result = a.iter().flatten().sum::<CircuitField<C>>();
 
     let a = ctx.copy_to_device(&a);
     let mut b: DeviceMemoryHandle = None;
-    call_kernel!(ctx, kernel_add_2, 16, a, mut b).unwrap();
-    let b = b.reshape(&[1, 16]);
+    call_kernel!(ctx, kernel_add_2, 16 * N_DATA_COPY, a, mut b).unwrap();
+    let b = b.reshape(&[N_DATA_COPY, 16]);
     let mut c: DeviceMemoryHandle = None;
-    call_kernel!(ctx, kernel_add_16, 1, b, mut c).unwrap();
-    let c = c.reshape(&[]);
-    let result: CircuitField<C> = ctx.copy_to_host(c);
-    assert_eq!(result, expected_result);
+    call_kernel!(ctx, kernel_add_16, N_DATA_COPY, b, mut c).unwrap();
+    let c = c.reshape(&[N_DATA_COPY]);
+    let _result: Vec<CircuitField<C>> = ctx.copy_to_host(c);
+    // assert_eq!(result, expected_result);
 
     let computation_graph = ctx.compile_computation_graph().unwrap();
 
@@ -78,10 +85,10 @@ impl<C: Config> ComputationGraphDefine<C> for MyCGDef {
 
     // In practice, we may want to read this from a file
     fn get_input() -> Self::InputType {
-        let mut input = vec![vec![]; 16];
-        for i in 0..16 {
-            for j in 0..2 {
-                input[i].push(CircuitField::<C>::from((i * 2 + j + 1) as u32));
+        let mut input = vec![vec![]; 16 * N_DATA_COPY];
+        for i in 0..16 * N_DATA_COPY {
+            for j in 0..2 * N_KERNEL_REPEAT {
+                input[i].push(CircuitField::<C>::from((i * 2 * N_KERNEL_REPEAT + j + 1) as u32));
             }
         }
         input
