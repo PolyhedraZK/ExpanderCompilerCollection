@@ -7,15 +7,15 @@ use crate::{
     field::FieldArith,
     hints::registry::{EmptyHintCaller, HintCaller},
     utils::{error::Error, pool::Pool},
-    zkcuda::shape::keep_shape_until,
+    zkcuda::shape::{keep_shape_until, multi_dimension_data_padding},
 };
 
 use super::{
     kernel::{compile_primitive, Kernel, KernelPrimitive},
     shape::{
         keep_shape_products_until, keep_shape_since, merge_shape_products, prefix_products,
-        prefix_products_to_shape, shape_padded_mapping, shape_prepend, shape_vec_len,
-        shape_vec_padded_len, BitOrder, Reshape, Shape, ShapeHistory, Transpose,
+        prefix_products_to_shape, shape_prepend, shape_vec_len, shape_vec_padded_len, BitOrder,
+        Reshape, Shape, ShapeHistory, Transpose,
     },
     vec_shaped::{
         flatten_shaped, flatten_shaped_pack_simd, unflatten_shaped, unflatten_shaped_unpack_simd,
@@ -890,8 +890,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             .iter()
             .map(|dm| {
                 let shape = prefix_products_to_shape(&dm.required_shape_products);
-                let im = shape_padded_mapping(&shape);
-                im.map_inputs(&dm.values)
+                multi_dimension_data_padding(&shape, &dm.values)
             })
             .collect()
     }
