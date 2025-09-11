@@ -228,6 +228,40 @@ pub fn shape_padded_mapping(shape: &[usize]) -> InputMapping {
     InputMapping::new(step, cur)
 }
 
+#[allow(clippy::needless_range_loop)]
+pub fn multi_dimension_data_padding<T: Default + Clone>(shape: &[usize], data: &[T]) -> Vec<T> {
+    if shape.is_empty() {
+        assert!(data.len() == 1);
+        return vec![data[0].clone()];
+    }
+
+    if shape.len() == 1 {
+        assert_eq!(data.len(), shape[0]);
+        let padded_len = next_power_of_two(shape[0]);
+        let mut ret = vec![T::default(); padded_len];
+        ret[..data.len()].clone_from_slice(data);
+        for i in data.len()..padded_len {
+            ret[i] = data[data.len() - 1].clone();
+        }
+        ret
+    } else {
+        assert!(data.len() % shape[0] == 0);
+        let chunk_size = data.len() / shape[0];
+        let mut ret = data
+            .chunks_exact(chunk_size)
+            .map(|chunk| multi_dimension_data_padding(&shape[1..], chunk))
+            .collect::<Vec<_>>();
+        let padded_len = next_power_of_two(shape[0]);
+        if padded_len > shape[0] {
+            let last_chunk = ret.last().unwrap().clone();
+            for _ in shape[0]..padded_len {
+                ret.push(last_chunk.clone());
+            }
+        }
+        ret.into_iter().flatten().collect()
+    }
+}
+
 impl ShapeHistory {
     pub fn new(initial_shape: Shape) -> Self {
         Self {
@@ -385,6 +419,54 @@ impl Transpose for ShapeHistory {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_multi_dimension_data_padding_1d() {
+        let shape = vec![3];
+        let data = vec![1, 2, 3];
+        let padded = multi_dimension_data_padding(&shape, &data);
+        // next_power_of_two(3) == 4, last element repeated
+        assert_eq!(padded, vec![1, 2, 3, 3]);
+    }
+
+    #[test]
+    fn test_multi_dimension_data_padding_2d() {
+        let shape = vec![2, 3];
+        let data = vec![1, 2, 3, 4, 5, 6];
+        let padded = multi_dimension_data_padding(&shape, &data);
+        // next_power_of_two(2) == 2, next_power_of_two(3) == 4
+        // Each row: [1,2,3], [4,5,6] padded to [1,2,3,3], [4,5,6,6]
+        // No extra row needed
+        assert_eq!(padded, vec![1, 2, 3, 3, 4, 5, 6, 6]);
+    }
+
+    #[test]
+    fn test_multi_dimension_data_padding_2d_row_padding() {
+        let shape = vec![3, 2];
+        let data = vec![1, 2, 3, 4, 5, 6];
+        let padded = multi_dimension_data_padding(&shape, &data);
+        // next_power_of_two(3) == 4, next_power_of_two(2) == 2
+        // Each row: [1,2], [3,4], [5,6] (no row padding needed)
+        // Add one more row: repeat last row [5,6]
+        assert_eq!(padded, vec![1, 2, 3, 4, 5, 6, 5, 6]);
+    }
+
+    #[test]
+    fn test_multi_dimension_data_padding_empty_shape() {
+        let shape: Vec<usize> = vec![];
+        let data = vec![42];
+        let padded = multi_dimension_data_padding(&shape, &data);
+        assert_eq!(padded, vec![42]);
+    }
+
+    #[test]
+    fn test_multi_dimension_data_padding_3d() {
+        let shape = vec![2, 2, 2];
+        let data = vec![1, 2, 3, 4, 5, 6, 7, 8];
+        let padded = multi_dimension_data_padding(&shape, &data);
+        // next_power_of_two(2) == 2 for all dims, so no padding needed
+        assert_eq!(padded, data);
+    }
 
     #[test]
     fn test_entry_minimize() {
