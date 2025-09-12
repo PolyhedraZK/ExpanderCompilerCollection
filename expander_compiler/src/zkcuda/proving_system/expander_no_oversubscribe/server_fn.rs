@@ -10,9 +10,7 @@ use crate::{
                 config::{GetFieldConfig, GetPCS, ZKCudaConfig},
                 structs::{ExpanderProverSetup, ExpanderVerifierSetup},
             },
-            expander_no_oversubscribe::{
-                profiler::NBytesProfiler, prove_impl::mpi_prove_no_oversubscribe_impl,
-            },
+            expander_no_oversubscribe::prove_impl::mpi_prove_no_oversubscribe_impl,
             expander_parallelized::{server_ctrl::SharedMemoryWINWrapper, server_fns::ServerFns},
             CombinedProof, Expander, ExpanderNoOverSubscribe, ExpanderPCSDefered,
             ParallelizedExpander,
@@ -58,44 +56,11 @@ where
         computation_graph: &ComputationGraph<ZC::ECCConfig>,
         values: &[impl AsRef<[SIMDField<ZC::ECCConfig>]>],
     ) -> Option<CombinedProof<ZC::ECCConfig, Expander<ZC::GKRConfig>>> {
-        let mut n_bytes_profiler = NBytesProfiler::new();
-
-        #[cfg(feature = "zkcuda_profile")]
-        {
-            use arith::SimdField;
-            use gkr_engine::MPIEngine;
-
-            values.iter().for_each(|vals| {
-                vals.as_ref().iter().for_each(|fr| {
-                    let fr_unpacked = fr.unpack();
-                    assert!(fr_unpacked.len() == 1);
-                    n_bytes_profiler.add_fr(fr_unpacked[0]);
-                });
-            });
-            if global_mpi_config.is_root() {
-                println!("NBytesProfiler stats before proving:");
-                n_bytes_profiler.print_stats();
-            }
-        }
-
-        let proof = mpi_prove_no_oversubscribe_impl::<ZC>(
+        mpi_prove_no_oversubscribe_impl::<ZC>(
             global_mpi_config,
             prover_setup,
             computation_graph,
             values,
-            &mut n_bytes_profiler,
-        );
-
-        #[cfg(feature = "zkcuda_profile")]
-        {
-            use gkr_engine::MPIEngine;
-
-            if global_mpi_config.is_root() {
-                println!("NBytesProfiler stats after proving:");
-                n_bytes_profiler.print_stats();
-            }
-        }
-
-        proof
+        )
     }
 }
