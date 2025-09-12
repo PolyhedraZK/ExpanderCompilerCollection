@@ -26,8 +26,8 @@ use crate::{
 fn verifier_extract_pcs_claims<'a, C, ECCConfig>(
     commitments: &[&'a ExpanderCommitment<C::FieldConfig, C::PCSConfig>],
     gkr_challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
-    is_broadcast: &[bool],
-    parallel_count: usize,
+    data_broadcast_count: &[usize],
+    kernel_parallel_count: usize,
 ) -> (
     Vec<&'a ExpanderCommitment<C::FieldConfig, C::PCSConfig>>,
     Vec<ExpanderSingleVarChallenge<C::FieldConfig>>,
@@ -39,7 +39,7 @@ where
     let mut commitments_rt = vec![];
     let mut challenges = vec![];
 
-    for (&commitment, ib) in commitments.iter().zip(is_broadcast) {
+    for (&commitment, ib) in commitments.iter().zip(data_broadcast_count) {
         let val_len =
             <ExpanderCommitment<C::FieldConfig, C::PCSConfig> as Commitment<ECCConfig>>::vals_len(
                 commitment,
@@ -47,7 +47,7 @@ where
         let (challenge_for_pcs, _) = partition_challenge_and_location_for_pcs_mpi(
             gkr_challenge,
             val_len,
-            parallel_count,
+            kernel_parallel_count,
             *ib,
         );
 
@@ -61,7 +61,7 @@ where
 pub fn verify_gkr<C, ECCConfig>(
     kernel: &Kernel<ECCConfig>,
     proof: &ExpanderProof,
-    parallel_count: usize,
+    kernel_parallel_count: usize,
 ) -> (bool, ExpanderDualVarChallenge<C::FieldConfig>)
 where
     C: GKREngine,
@@ -74,7 +74,7 @@ where
 
     let mut cursor = Cursor::new(&proof.data[0].bytes);
     let (verified, challenge, _claimed_v0, _claimed_v1) = gkr_verify(
-        parallel_count,
+        kernel_parallel_count,
         &expander_circuit,
         &[],
         &<C::FieldConfig as FieldEngine>::ChallengeField::ZERO,
@@ -166,7 +166,7 @@ where
             let (verified, challenge) = verify_gkr::<C, ECCConfig>(
                 &computation_graph.kernels()[template.kernel_id()],
                 local_proof,
-                next_power_of_two(template.parallel_count()),
+                next_power_of_two(template.kernel_parallel_count()),
             );
 
             assert!(challenge.challenge_y().is_none());
@@ -175,8 +175,8 @@ where
             let (local_commitments, challenges) = verifier_extract_pcs_claims::<C, ECCConfig>(
                 &local_commitments,
                 &challenge,
-                template.is_broadcast(),
-                next_power_of_two(template.parallel_count()),
+                template.data_broadcast_count(),
+                next_power_of_two(template.kernel_parallel_count()),
             );
 
             (verified, local_commitments, challenges)

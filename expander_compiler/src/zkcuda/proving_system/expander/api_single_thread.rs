@@ -60,11 +60,16 @@ where
         _commitments: &[&Self::Commitment],
         _commitments_state: &[&Self::CommitmentState],
         commitments_values: &[&[SIMDField<C>]],
-        parallel_count: usize,
-        is_broadcast: &[bool],
+        kernel_parallel_count: usize,
+        data_broadcast_count: &[usize],
     ) -> Self::Proof {
         let timer = Timer::new("prove", true);
-        check_inputs(kernel, commitments_values, parallel_count, is_broadcast);
+        check_inputs(
+            kernel,
+            commitments_values,
+            kernel_parallel_count,
+            data_broadcast_count,
+        );
 
         let (mut expander_circuit, mut prover_scratch) =
             prepare_expander_circuit::<C::FieldConfig, ECCConfig>(kernel, 1);
@@ -72,14 +77,14 @@ where
         let mut proof = ExpanderProof { data: vec![] };
 
         // For each parallel index, generate the GKR and PCS opening proof
-        for parallel_index in 0..parallel_count {
+        for kernel_parallel_index in 0..kernel_parallel_count {
             // TODO: Init with commitments
             let mut transcript = C::TranscriptConfig::new();
             let local_vals = get_local_vals(
                 commitments_values,
-                is_broadcast,
-                parallel_index,
-                parallel_count,
+                data_broadcast_count,
+                kernel_parallel_index,
+                kernel_parallel_count,
             );
             let challenge = prove_gkr_with_local_vals::<C::FieldConfig, C::TranscriptConfig>(
                 &mut expander_circuit,
@@ -94,9 +99,9 @@ where
                 &challenge,
                 commitments_values,
                 prover_setup,
-                is_broadcast,
-                parallel_index,
-                parallel_count,
+                data_broadcast_count,
+                kernel_parallel_index,
+                kernel_parallel_count,
                 &mut transcript,
             );
 
@@ -112,13 +117,13 @@ where
         kernel: &Kernel<ECCConfig>,
         proof: &Self::Proof,
         commitments: &[&Self::Commitment],
-        parallel_count: usize,
-        is_broadcast: &[bool],
+        kernel_parallel_count: usize,
+        data_broadcast_count: &[usize],
     ) -> bool {
         let timer = Timer::new("verify", true);
         let mut expander_circuit = kernel.layered_circuit().export_to_expander_flatten();
 
-        for i in 0..parallel_count {
+        for i in 0..kernel_parallel_count {
             let mut transcript = C::TranscriptConfig::new();
             expander_circuit.fill_rnd_coefs(&mut transcript);
 
@@ -145,9 +150,9 @@ where
                 claimed_v0,
                 claimed_v1,
                 commitments,
-                is_broadcast,
+                data_broadcast_count,
                 i,
-                parallel_count,
+                kernel_parallel_count,
                 &mut transcript,
             );
 
@@ -214,8 +219,8 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
                     &local_commitments,
                     &local_state,
                     &local_vals,
-                    next_power_of_two(template.parallel_count()),
-                    template.is_broadcast(),
+                    next_power_of_two(template.kernel_parallel_count()),
+                    template.data_broadcast_count(),
                 )
             })
             .collect::<Vec<_>>();
@@ -247,8 +252,8 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
                     &computation_graph.kernels()[template.kernel_id()],
                     local_proof,
                     &local_commitments,
-                    next_power_of_two(template.parallel_count()),
-                    template.is_broadcast(),
+                    next_power_of_two(template.kernel_parallel_count()),
+                    template.data_broadcast_count(),
                 )
             })
             .collect::<Vec<_>>();

@@ -70,8 +70,8 @@ where
                 global_mpi_config,
                 &computation_graph.kernels()[template.kernel_id()],
                 &commitment_values,
-                next_power_of_two(template.parallel_count()),
-                template.is_broadcast(),
+                next_power_of_two(template.kernel_parallel_count()),
+                template.data_broadcast_count(),
             );
             single_kernel_gkr_timer.stop();
 
@@ -94,7 +94,7 @@ where
                             .map(|&idx| &states.as_ref().unwrap()[idx])
                             .collect::<Vec<_>>(),
                         c,
-                        template.is_broadcast(),
+                        template.data_broadcast_count(),
                         &mut transcript,
                     );
                 });
@@ -126,15 +126,15 @@ pub fn prove_kernel_gkr<F, T, ECCConfig>(
     mpi_config: &MPIConfig<'static>,
     kernel: &Kernel<ECCConfig>,
     commitments_values: &[&[F::SimdCircuitField]],
-    parallel_count: usize,
-    is_broadcast: &[bool],
+    kernel_parallel_count: usize,
+    data_broadcast_count: &[usize],
 ) -> Option<(T, ExpanderDualVarChallenge<F>)>
 where
     F: FieldEngine,
     T: Transcript,
     ECCConfig: Config<FieldConfig = F>,
 {
-    let local_mpi_config = generate_local_mpi_config(mpi_config, parallel_count);
+    let local_mpi_config = generate_local_mpi_config(mpi_config, kernel_parallel_count);
 
     local_mpi_config.as_ref()?;
 
@@ -144,7 +144,7 @@ where
 
     let local_commitment_values = get_local_vals(
         commitments_values,
-        is_broadcast,
+        data_broadcast_count,
         local_world_rank,
         local_world_size,
     );
@@ -168,23 +168,27 @@ where
 pub fn partition_challenge_and_location_for_pcs_mpi<F: FieldEngine>(
     gkr_challenge: &ExpanderSingleVarChallenge<F>,
     total_vals_len: usize,
-    parallel_count: usize,
-    is_broadcast: bool,
+    kernel_parallel_count: usize,
+    data_broadcast_count: usize,
 ) -> (ExpanderSingleVarChallenge<F>, Vec<F::ChallengeField>) {
     let mut challenge = gkr_challenge.clone();
     let zero = F::ChallengeField::ZERO;
-    if is_broadcast {
+    if data_broadcast_count == kernel_parallel_count {
         let n_vals_vars = total_vals_len.ilog2() as usize;
         let component_idx_vars = challenge.rz[n_vals_vars..].to_vec();
         challenge.rz.resize(n_vals_vars, zero);
         challenge.r_mpi.clear();
         (challenge, component_idx_vars)
     } else {
-        let n_vals_vars = (total_vals_len / parallel_count).ilog2() as usize;
+        let n_vals_vars = (total_vals_len
+            / (kernel_parallel_count / data_broadcast_count.next_power_of_two()))
+        .ilog2() as usize;
         let component_idx_vars = challenge.rz[n_vals_vars..].to_vec();
         challenge.rz.resize(n_vals_vars, zero);
-
-        challenge.rz.extend_from_slice(&challenge.r_mpi);
+        //TODO: what is challenge.r_mpi, why need it when broadcast is false?
+        challenge.rz.extend_from_slice(
+            &challenge.r_mpi[..(kernel_parallel_count / data_broadcast_count).ilog2() as usize],
+        );
         challenge.r_mpi.clear();
         (challenge, component_idx_vars)
     }
@@ -196,20 +200,20 @@ pub fn partition_single_gkr_claim_and_open_pcs_mpi<C: GKREngine>(
     commitments_values: &[impl AsRef<[SIMDField<C>]>],
     commitments_state: &[&ExpanderCommitmentState<C::FieldConfig, C::PCSConfig>],
     gkr_challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
-    is_broadcast: &[bool],
+    data_broadcast_count: &[usize],
     transcript: &mut C::TranscriptConfig,
 ) {
-    let parallel_count = 1 << gkr_challenge.r_mpi.len();
+    let kernel_parallel_count = 1 << gkr_challenge.r_mpi.len();
     for ((commitment_val, _state), ib) in commitments_values
         .iter()
         .zip(commitments_state)
-        .zip(is_broadcast)
+        .zip(data_broadcast_count)
     {
         let val_len = commitment_val.as_ref().len();
         let (challenge_for_pcs, _) = partition_challenge_and_location_for_pcs_mpi(
             gkr_challenge,
             val_len,
-            parallel_count,
+            kernel_parallel_count,
             *ib,
         );
 

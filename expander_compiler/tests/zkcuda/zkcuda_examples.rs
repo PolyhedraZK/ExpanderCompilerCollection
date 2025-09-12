@@ -63,7 +63,6 @@ fn zkcuda_test<C: Config, P: ProvingSystem<C>>() {
 }
 
 #[test]
-#[allow(deprecated)]
 fn zkcuda_test_single_core_dummy() {
     // DO NOT USE DUMMY PROVING SYSTEM IN PRODUCTION!!!
     zkcuda_test::<

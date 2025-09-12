@@ -301,7 +301,6 @@ fn reorder_ir_inputs<C: Config>(
         lc_in[i].len = n;
         assert!(var_max % n == 0);
         let im = shape_padded_mapping(&pad_shapes[i]);
-        // println!("{:?}", im.mapping());
         for (j, &k) in im.mapping().iter().enumerate() {
             var_new_id[prev + j + 1] = var_max + k + 1;
         }
