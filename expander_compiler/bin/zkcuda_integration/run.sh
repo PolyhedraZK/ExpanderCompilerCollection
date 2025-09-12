@@ -1,6 +1,6 @@
 
 #!/bin/bash
-cargo build --release --bin zkcuda_setup --bin zkcuda_prove --bin zkcuda_verify --bin zkcuda_cleanup --bin expander_server_no_oversubscribe
+cargo build --release --features expander_compiler/profile --bin zkcuda_setup --bin zkcuda_prove --bin zkcuda_verify --bin zkcuda_cleanup --bin expander_server_no_oversubscribe
 
 # setup the server
 cargo run --release --bin zkcuda_setup
