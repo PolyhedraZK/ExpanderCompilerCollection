@@ -134,6 +134,7 @@ where
     T: Transcript,
     ECCConfig: Config<FieldConfig = F>,
 {
+    eprintln!("Entering prove_kernel_gkr");
     let local_mpi_config = generate_local_mpi_config(mpi_config, parallel_count);
 
     local_mpi_config.as_ref()?;
@@ -162,6 +163,7 @@ where
         &local_mpi_config,
     );
 
+    eprintln!("Exiting prove_kernel_gkr");
     Some((transcript, challenge))
 }
 

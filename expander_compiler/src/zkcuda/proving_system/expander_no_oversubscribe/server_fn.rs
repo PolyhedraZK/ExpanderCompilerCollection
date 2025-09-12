@@ -30,6 +30,7 @@ where
         verifier_setup: &mut ExpanderVerifierSetup<GetFieldConfig<ZC>, GetPCS<ZC>>,
         mpi_win: &mut Option<SharedMemoryWINWrapper>,
     ) {
+        eprintln!("Entering setup_request_handler for ExpanderNoOverSubscribe");
         match ZC::BATCH_PCS {
             true => ExpanderPCSDefered::<ZC::GKRConfig>::setup_request_handler(
                 global_mpi_config,
@@ -48,6 +49,7 @@ where
                 mpi_win,
             ),
         }
+        eprintln!("Exiting setup_request_handler for ExpanderNoOverSubscribe");
     }
 
     fn prove_request_handler(
