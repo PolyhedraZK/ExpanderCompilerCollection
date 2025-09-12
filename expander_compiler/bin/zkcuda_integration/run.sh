@@ -5,6 +5,10 @@ cargo build --release --features expander_compiler/profile --bin zkcuda_setup --
 # setup the server
 cargo run --release --bin zkcuda_setup
 
+# sleep 10 seconds
+echo "sleeping 10 seconds for the server to be ready..."
+sleep 10
+
 # prove a first instance
 cargo run --release --bin zkcuda_prove
 cargo run --release --bin zkcuda_verify
