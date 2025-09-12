@@ -64,6 +64,8 @@ where
     };
     commit_timer.stop();
 
+    std::thread::sleep(std::time::Duration::from_secs(10));
+
     let mut vals_ref = vec![];
     let mut challenges = vec![];
 
@@ -157,6 +159,8 @@ where
             })
             .collect::<Vec<_>>();
     prove_timer.stop();
+
+    std::thread::sleep(std::time::Duration::from_secs(10));
 
     match ZC::BATCH_PCS {
         true => {
