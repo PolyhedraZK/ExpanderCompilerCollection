@@ -110,7 +110,7 @@ unsafe impl GlobalAlloc for ProfilingAllocator {
 }
 
 #[global_allocator]
-static ALLOCATOR: ProfilingAllocator = ProfilingAllocator::new(1024 * 16);
+static ALLOCATOR: ProfilingAllocator = ProfilingAllocator::new(1024 * 1024 * 16); // 16 MB threshold
 
 // Optional: Print stats on program exit
 impl Drop for ProfilingAllocator {
