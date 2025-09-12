@@ -11,8 +11,8 @@ use expander_compiler::zkcuda::{
     kernel::{compile_with_spec_and_shapes, kernel, IOVecSpec, KernelPrimitive},
 };
 
-const N_DATA_COPY: usize = 1024 * 32;
-const N_KERNEL_REPEAT: usize = 16;
+const N_DATA_COPY: usize = 1024 * 8;
+const N_KERNEL_REPEAT: usize = 16 * 4;
 
 #[kernel]
 fn add_2_macro<C: Config>(api: &mut API<C>, a: &[InputVariable; 2 * N_KERNEL_REPEAT], b: &mut OutputVariable) {
