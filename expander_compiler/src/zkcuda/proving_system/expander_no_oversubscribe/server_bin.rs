@@ -178,6 +178,8 @@ async fn async_main() {
             panic!("Combination of {field_type:?}, {pcs_type:?}, and {fiat_shamir_hash:?} not supported for no oversubscribe expander proving system.");
         }
     }
+
+    ALLOCATOR.print_stats();
 }
 
 pub fn main() {
