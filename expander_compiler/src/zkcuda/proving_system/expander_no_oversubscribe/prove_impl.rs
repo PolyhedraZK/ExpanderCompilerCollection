@@ -283,7 +283,7 @@ where
         parallel_count,
     );
 
-    eprint!("Preparing expander circuit and prover scratchpad...");
+    eprintln!("Preparing expander circuit and prover scratchpad...");
     let (mut expander_circuit, mut prover_scratch) =
         prepare_expander_circuit::<FMulti, ECCConfig>(kernel, world_size);
     eprintln!("Circuit and scratchpad prepared");
@@ -362,12 +362,12 @@ where
     expander_circuit.layers[0].input_vals = input_vals;
     eprintln!("Input vals multiple copies packed into single input vals");
 
-    eprint!("Evaluating expander circuit...");
+    eprintln!("Evaluating expander circuit...");
     expander_circuit.fill_rnd_coefs(transcript);
     expander_circuit.evaluate();
     eprintln!("Expander circuit evaluated");
 
-    eprint!("Proving GKR...");
+    eprintln!("Proving GKR...");
     let (claimed_v, challenge) =
         gkr::gkr_prove(expander_circuit, prover_scratch, transcript, mpi_config);
     assert_eq!(claimed_v, FBasic::ChallengeField::from(0u32));
