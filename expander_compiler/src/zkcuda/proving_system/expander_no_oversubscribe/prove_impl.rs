@@ -95,6 +95,7 @@ where
                 match ZC::BATCH_PCS {
                     true => {
                         if global_mpi_config.is_root() {
+                            eprintln!("Entering pcs claim extraction");
                             let (mut transcript, challenge) = gkr_end_state.unwrap();
                             assert!(challenge.challenge_y().is_none());
                             let challenge = challenge.challenge_x();
@@ -110,6 +111,7 @@ where
                             vals_ref.extend(local_vals_ref);
                             challenges.extend(local_challenges);
 
+                            eprintln!("Exiting pcs claim extraction");
                             Some(ExpanderProof {
                                 data: vec![transcript.finalize_and_get_proof()],
                             })
@@ -158,6 +160,7 @@ where
     match ZC::BATCH_PCS {
         true => {
             if global_mpi_config.is_root() {
+                eprintln!("Entering Batch PCS Opening");
                 let mut proofs = proofs.into_iter().map(|p| p.unwrap()).collect::<Vec<_>>();
 
                 let pcs_opening_timer = Timer::new("Batch PCS Opening for all kernels", true);
@@ -169,6 +172,7 @@ where
                 pcs_opening_timer.stop();
 
                 proofs.push(pcs_batch_opening);
+                eprintln!("Exiting Batch PCS Opening");
                 Some(CombinedProof {
                     commitments: commitments.unwrap(),
                     proofs,
@@ -204,6 +208,7 @@ where
     T: Transcript,
     ECCConfig: Config<FieldConfig = F>,
 {
+    eprint!("Entering prove_kernel_gkr_no_oversubscribe");
     let local_mpi_config = generate_local_mpi_config(mpi_config, parallel_count);
 
     local_mpi_config.as_ref()?;
@@ -224,7 +229,7 @@ where
     }
 
     let n_local_copies = parallel_count / local_world_size;
-    match n_local_copies {
+    let ret = match n_local_copies {
         1 => prove_kernel_gkr_internal::<F, F, T, ECCConfig>(
             &local_mpi_config,
             kernel,
@@ -246,7 +251,9 @@ where
         _ => {
             panic!("Unsupported parallel count: {parallel_count}");
         }
-    }
+    };
+    eprintln!("Exiting prove_kernel_gkr_no_oversubscribe");
+    ret
 }
 
 pub fn prove_kernel_gkr_internal<FBasic, FMulti, T, ECCConfig>(
@@ -263,6 +270,7 @@ where
     T: Transcript,
     ECCConfig: Config<FieldConfig = FBasic>,
 {
+    eprint!("Entering prove_kernel_gkr_internal");
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
     let n_copies = parallel_count / world_size;
@@ -288,6 +296,7 @@ where
         mpi_config,
     );
 
+    eprintln!("Exiting prove_kernel_gkr_internal");
     Some((transcript, challenge))
 }
 
