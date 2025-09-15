@@ -7,7 +7,12 @@ use circuit_std_rs::{
 use expander_compiler::{
     field::{BN254Fr, Goldilocks},
     frontend::*,
-    zkcuda::{context::*, kernel::*, proving_system::{expander::config::ZKCudaBN254Hyrax, *}, shape::Reshape},
+    zkcuda::{
+        context::*,
+        kernel::*,
+        proving_system::{expander::config::ZKCudaBN254Hyrax, *},
+        shape::Reshape,
+    },
 };
 use serdes::ExpSerde;
 
@@ -215,9 +220,13 @@ fn rangeproof_zkcuda_no_oversubscribe_test() {
     let computation_graph = ctx.compile_computation_graph().unwrap();
     ctx.solve_witness().unwrap();
     let (prover_setup, _) = ExpanderNoOverSubscribe::<ZKCudaBN254Hyrax>::setup(&computation_graph);
-    let proof = ExpanderNoOverSubscribe::<ZKCudaBN254Hyrax>::prove(&prover_setup, &computation_graph, ctx.export_device_memories());
+    let proof = ExpanderNoOverSubscribe::<ZKCudaBN254Hyrax>::prove(
+        &prover_setup,
+        &computation_graph,
+        ctx.export_device_memories(),
+    );
     let file = std::fs::File::create("proof.txt").unwrap();
     let writer = std::io::BufWriter::new(file);
-    proof.serialize_into(writer);
-    <ExpanderNoOverSubscribe::<ZKCudaBN254Hyrax> as ProvingSystem<BN254Config>>::post_process();
+    proof.serialize_into(writer).expect("serialize failed");
+    <ExpanderNoOverSubscribe<ZKCudaBN254Hyrax> as ProvingSystem<BN254Config>>::post_process();
 }
