@@ -65,14 +65,14 @@ impl<C: Config> MPISharedMemory for ComputationGraph<C> {
 
 impl<C: Config> MPISharedMemory for Kernel<C> {
     fn bytes_size(&self) -> usize {
-        if !self.hint_solver.is_none() {
+        if self.hint_solver.is_some() {
             eprintln!("Warning: Shared Memory will ignore the hint solver in Kernel");
         }
         self.layered_circuit.bytes_size() + self.layered_circuit_input.bytes_size()
     }
 
     fn to_memory(&self, ptr: &mut *mut u8) {
-        if !self.hint_solver.is_none() {
+        if self.hint_solver.is_some() {
             eprintln!("Warning: Shared Memory will ignore the hint solver in Kernel");
         }
         self.layered_circuit.to_memory(ptr);
