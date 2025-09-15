@@ -7,8 +7,9 @@ use circuit_std_rs::{
 use expander_compiler::{
     field::{BN254Fr, Goldilocks},
     frontend::*,
-    zkcuda::{context::*, kernel::*, proving_system::*, shape::Reshape},
+    zkcuda::{context::*, kernel::*, proving_system::{expander::config::ZKCudaBN254Hyrax, *}, shape::Reshape},
 };
+use serdes::ExpSerde;
 
 #[test]
 fn logup_test() {
@@ -195,4 +196,28 @@ fn rangeproof_zkcuda_test_fail() {
         ctx.export_device_memories(),
     );
     assert!(P::verify(&verifier_setup, &computation_graph, &proof));
+}
+
+#[test]
+fn rangeproof_zkcuda_no_oversubscribe_test() {
+    let mut hint_registry = HintRegistry::<BN254Fr>::new();
+    hint_registry.register("myhint.querycounthint", query_count_hint);
+    hint_registry.register("myhint.rangeproofhint", rangeproof_hint);
+    //compile and test
+    let kernel: KernelPrimitive<BN254Config> = compile_rangeproof_test_kernel().unwrap();
+    let mut ctx: Context<BN254Config, _> = Context::new(hint_registry);
+
+    let a = BN254Fr::from((1 << 9) as u32);
+    let a = ctx.copy_to_device(&a);
+    let a = a.reshape(&[1]);
+    call_kernel!(ctx, kernel, 1, a).unwrap();
+
+    let computation_graph = ctx.compile_computation_graph().unwrap();
+    ctx.solve_witness().unwrap();
+    let (prover_setup, _) = ExpanderNoOverSubscribe::<ZKCudaBN254Hyrax>::setup(&computation_graph);
+    let proof = ExpanderNoOverSubscribe::<ZKCudaBN254Hyrax>::prove(&prover_setup, &computation_graph, ctx.export_device_memories());
+    let file = std::fs::File::create("proof.txt").unwrap();
+    let writer = std::io::BufWriter::new(file);
+    proof.serialize_into(writer);
+    <ExpanderNoOverSubscribe::<ZKCudaBN254Hyrax> as ProvingSystem<BN254Config>>::post_process();
 }
