@@ -208,7 +208,7 @@ where
     T: Transcript,
     ECCConfig: Config<FieldConfig = F>,
 {
-    eprint!("Entering prove_kernel_gkr_no_oversubscribe");
+    eprintln!("Entering prove_kernel_gkr_no_oversubscribe");
     let local_mpi_config = generate_local_mpi_config(mpi_config, parallel_count);
 
     local_mpi_config.as_ref()?;
@@ -270,7 +270,7 @@ where
     T: Transcript,
     ECCConfig: Config<FieldConfig = FBasic>,
 {
-    eprint!("Entering prove_kernel_gkr_internal");
+    eprintln!("Entering prove_kernel_gkr_internal");
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
     let n_copies = parallel_count / world_size;
@@ -283,8 +283,10 @@ where
         parallel_count,
     );
 
+    eprint!("Preparing expander circuit and prover scratchpad...");
     let (mut expander_circuit, mut prover_scratch) =
         prepare_expander_circuit::<FMulti, ECCConfig>(kernel, world_size);
+    eprintln!("Circuit and scratchpad prepared");
 
     let mut transcript = T::new();
     let challenge = prove_gkr_with_local_vals_multi_copies::<FBasic, FMulti, T>(
@@ -333,6 +335,7 @@ where
         FieldEngine<CircuitField = FBasic::CircuitField, ChallengeField = FBasic::ChallengeField>,
     T: Transcript,
 {
+    eprintln!("Preparing input vals multiple copies");
     let input_vals_multi_copies = local_commitment_values_multi_copies
         .iter()
         .map(|local_commitment_values| {
@@ -343,7 +346,9 @@ where
             )
         })
         .collect::<Vec<_>>();
+    eprintln!("Input vals multiple copies prepared");
 
+    eprintln!("Packing input vals multiple copies into single input vals");
     let mut input_vals =
         vec![FMulti::SimdCircuitField::ZERO; 1 << expander_circuit.log_input_size()];
 
@@ -355,13 +360,18 @@ where
         *vals = FMulti::SimdCircuitField::pack(&vals_unpacked);
     }
     expander_circuit.layers[0].input_vals = input_vals;
+    eprintln!("Input vals multiple copies packed into single input vals");
 
+    eprint!("Evaluating expander circuit...");
     expander_circuit.fill_rnd_coefs(transcript);
     expander_circuit.evaluate();
+    eprintln!("Expander circuit evaluated");
 
+    eprint!("Proving GKR...");
     let (claimed_v, challenge) =
         gkr::gkr_prove(expander_circuit, prover_scratch, transcript, mpi_config);
     assert_eq!(claimed_v, FBasic::ChallengeField::from(0u32));
+    eprintln!("GKR proved");
 
     let n_simd_vars_basic = FBasic::SimdCircuitField::PACK_SIZE.ilog2() as usize;
 
