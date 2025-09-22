@@ -1,7 +1,10 @@
 mod common;
 
 use circuit_std_rs::{
-    logup::{query_count_hint, rangeproof_hint, LogUpRangeProofTable},
+    logup::{
+        query_count_by_key_hint, query_count_hint, rangeproof_hint, LogUpRangeProofTable,
+        LogUpSingleKeyTable,
+    },
     LogUpCircuit, LogUpParams,
 };
 use expander_compiler::{
@@ -61,6 +64,71 @@ fn rangeproof_logup_test() {
     )
     .unwrap();
     let assignment = LogUpRangeproofCircuit { test: M31::ZERO };
+    let witness = compile_result
+        .witness_solver
+        .solve_witness_with_hints(&assignment, &mut hint_registry)
+        .unwrap();
+    let output = compile_result.layered_circuit.run(&witness);
+    assert_eq!(output, vec![true]);
+}
+const QUERY_TABLE_SIZE:usize = 1024;
+declare_circuit!(LogUpSingleKeyCircuit {
+    index: [Variable; QUERY_TABLE_SIZE],
+    value: [Variable; QUERY_TABLE_SIZE],
+    table: [Variable; QUERY_TABLE_SIZE],
+});
+impl Define<M31Config> for LogUpSingleKeyCircuit<Variable> {
+    fn define<Builder: RootAPI<M31Config>>(&self, builder: &mut Builder) {
+        let mut table = LogUpSingleKeyTable::new(8);
+        let mut table_key = vec![];
+        for i in 0..QUERY_TABLE_SIZE {
+            table_key.push(builder.constant(i as u32));
+        }
+        let mut table_values = vec![];
+        for i in 0..QUERY_TABLE_SIZE {
+            table_values.push(vec![self.table[i]]);
+        }
+        table.new_table(table_key, table_values);
+        let mut query_values = vec![];
+        for i in 0..QUERY_TABLE_SIZE {
+            query_values.push(vec![self.value[i]]);
+        }
+        table.batch_query(self.index.to_vec(), query_values);
+        //m31 field, repeat 3 times to achieve 90-bit security (or 4 times for 120-bit security)
+        table.final_check(builder);
+        table.final_check(builder);
+        table.final_check(builder);
+    }
+}
+
+#[test]
+fn rangeproof_logup_singlekey_test() {
+    use rand::SeedableRng;
+    use rand::Rng;
+    let mut hint_registry = HintRegistry::<M31>::new();
+    hint_registry.register("myhint.querycounthint", query_count_hint);
+    hint_registry.register("myhint.rangeproofhint", rangeproof_hint);
+    hint_registry.register("myhint.querycountbykeyhint", query_count_by_key_hint);
+    //compile and test
+    let compile_result =
+        compile(&LogUpSingleKeyCircuit::default(), CompileOptions::default()).unwrap();
+    let mut assignment = LogUpSingleKeyCircuit::default();
+    let mut rng = rand::rngs::StdRng::seed_from_u64(1235);
+    let mut index = [0; QUERY_TABLE_SIZE];
+    let mut value = [0; QUERY_TABLE_SIZE];
+    let mut table = [0; QUERY_TABLE_SIZE];
+    for i in 0..QUERY_TABLE_SIZE {
+        index[i] = rng.gen_range(0..QUERY_TABLE_SIZE) as u32;
+        table[i] = rng.gen_range(0..QUERY_TABLE_SIZE) as u32;
+    }
+    for i in 0..QUERY_TABLE_SIZE {
+        value[i] = table[index[i] as usize];
+    }
+    for i in 0..QUERY_TABLE_SIZE {
+        assignment.index[i] = M31::from(index[i]);
+        assignment.value[i] = M31::from(value[i]);
+        assignment.table[i] = M31::from(table[i]);
+    }
     let witness = compile_result
         .witness_solver
         .solve_witness_with_hints(&assignment, &mut hint_registry)
