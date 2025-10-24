@@ -235,8 +235,8 @@ fn keccak_gf2_vec() {
 
     let mut assignment = Keccak256Circuit::<GF2>::default();
     let mut rng = rand::rngs::StdRng::seed_from_u64(1235);
-    assignment.p = vec![vec![GF2::from(0); 64 * 8]; N_HASHES];
-    assignment.out = vec![vec![GF2::from(0); 32 * 8]; N_HASHES];
+    assignment.p = vec![vec![GF2::from(0u32); 64 * 8]; N_HASHES];
+    assignment.out = vec![vec![GF2::from(0u32); 32 * 8]; N_HASHES];
     for k in 0..N_HASHES {
         let mut data = vec![0u8; 64];
         for i in 0..64 {
@@ -263,7 +263,7 @@ fn keccak_gf2_vec() {
     println!("test 1 passed");
 
     for k in 0..N_HASHES {
-        assignment.p[k][0] = assignment.p[k][0] - GF2::from(1);
+        assignment.p[k][0] = assignment.p[k][0] - GF2::from(1u32);
     }
     let witness = witness_solver.solve_witness(&assignment).unwrap();
     let res = layered_circuit.run(&witness);
@@ -273,7 +273,7 @@ fn keccak_gf2_vec() {
     let mut assignments = Vec::new();
     for _ in 0..15 {
         for k in 0..N_HASHES {
-            assignment.p[k][0] = assignment.p[k][0] - GF2::from(1);
+            assignment.p[k][0] = assignment.p[k][0] - GF2::from(1u32);
         }
         assignments.push(assignment.clone());
     }

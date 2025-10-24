@@ -261,7 +261,7 @@ fn keccak_gf2_full() {
     println!("test 1 passed");
 
     for k in 0..N_HASHES {
-        assignment.p[k][0] = assignment.p[k][0] - GF2::from(1);
+        assignment.p[k][0] = assignment.p[k][0] - GF2::from(1u32);
     }
     let witness = witness_solver.solve_witness(&assignment).unwrap();
     let res = layered_circuit.run(&witness);
@@ -271,7 +271,7 @@ fn keccak_gf2_full() {
     let mut assignments = Vec::new();
     for _ in 0..8 {
         for k in 0..N_HASHES {
-            assignment.p[k][0] = assignment.p[k][0] - GF2::from(1);
+            assignment.p[k][0] = assignment.p[k][0] - GF2::from(1u32);
         }
         assignments.push(assignment.clone());
     }

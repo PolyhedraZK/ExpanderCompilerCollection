@@ -54,7 +54,7 @@ fn rangeproof_logup_test() {
         CompileOptions::default(),
     )
     .unwrap();
-    let assignment = LogUpRangeproofCircuit { test: M31::from(0) };
+    let assignment = LogUpRangeproofCircuit { test: M31::from(0u32) };
     let witness = compile_result
         .witness_solver
         .solve_witness_with_hints(&assignment, &mut hint_registry)
@@ -153,7 +153,7 @@ fn rangeproof_zkcuda_test() {
     let kernel: KernelPrimitive<M31Config> = compile_rangeproof_test_kernel().unwrap();
     let mut ctx: Context<M31Config, _> = Context::new(hint_registry);
 
-    let a = M31::from(1 << 9);
+    let a = M31::from(1u32 << 9);
     let a = ctx.copy_to_device(&a);
     let a = a.reshape(&[1]);
     call_kernel!(ctx, kernel, 1, a).unwrap();
@@ -180,7 +180,7 @@ fn rangeproof_zkcuda_test_fail() {
     let kernel: KernelPrimitive<M31Config> = compile_rangeproof_test_kernel().unwrap();
     let mut ctx: Context<M31Config, _> = Context::new(hint_registry);
 
-    let a = M31::from(1 << 11);
+    let a = M31::from(1u32 << 11);
     let a = ctx.copy_to_device(&a);
     let a = a.reshape(&[1]);
     call_kernel!(ctx, kernel, 1, a).unwrap();

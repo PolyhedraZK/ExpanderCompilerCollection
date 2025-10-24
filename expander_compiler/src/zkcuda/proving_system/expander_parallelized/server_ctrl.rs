@@ -12,7 +12,7 @@ use axum::Router;
 use clap::Parser;
 use expander_utils::timer::Timer;
 use mpi::environment::Universe;
-use mpi::ffi::MPI_Win;
+use mpi::ffi::ompi_win_t;
 use mpi::topology::SimpleCommunicator;
 use mpi::traits::Communicator;
 
@@ -51,7 +51,7 @@ pub static mut UNIVERSE: Option<Universe> = None;
 pub static mut GLOBAL_COMMUNICATOR: Option<SimpleCommunicator> = None;
 pub static mut LOCAL_COMMUNICATOR: Option<SimpleCommunicator> = None;
 pub struct SharedMemoryWINWrapper {
-    pub win: MPI_Win,
+    pub win: *mut ompi_win_t,
 }
 unsafe impl Send for SharedMemoryWINWrapper {}
 unsafe impl Sync for SharedMemoryWINWrapper {}
