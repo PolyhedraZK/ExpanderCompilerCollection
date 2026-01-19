@@ -112,7 +112,12 @@ where
     let mpi_size = if allow_oversubscribe {
         max_parallel_count
     } else {
-        let num_cpus = prev_power_of_two(num_cpus::get_physical());
+        // 支持通过环境变量 ZKML_NUM_CPUS 覆盖 CPU 数量（用于 Docker 等环境）
+        let num_cpus = std::env::var("ZKML_NUM_CPUS")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or_else(num_cpus::get_physical);
+        let num_cpus = prev_power_of_two(num_cpus);
         if max_parallel_count > num_cpus {
             num_cpus
         } else {

@@ -616,8 +616,9 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 .map(get_pad_shape)
                 .collect::<Vec<_>>();
             let kernel_primitive = self.kernel_primitives.get(kernel_call.kernel_id);
-            let kernel = if let Some(cg_kernels) = cg_kernels.as_mut() {
-                cg_kernels.drain(..1).next().unwrap()
+            let kernel = if cg_kernels.is_some() {
+                // 从已加载的 kernels 中通过 kernel_id 获取
+                self.kernels.get(kernel_call.kernel_id).clone()
             } else {
                 let mut psi = Vec::new();
                 for (s, &ib) in pad_shapes_input.iter().zip(kernel_call.is_broadcast.iter()) {
@@ -708,8 +709,9 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             });
         }
 
-        if let Some(cg_kernels) = cg_kernels {
-            assert!(cg_kernels.is_empty());
+        if let Some(_cg_kernels) = cg_kernels {
+            // 不再检查 cg_kernels 是否为空，因为我们不再消耗它
+            // kernels 已经在之前通过 self.kernels.add() 添加了
             assert_eq!(cg_proof_templates.unwrap(), self.proof_templates);
             assert_eq!(cg_commitments_lens.unwrap(), commitments_lens);
             Ok(None)

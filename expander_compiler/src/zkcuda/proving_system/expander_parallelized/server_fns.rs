@@ -19,6 +19,57 @@ use crate::{
     },
 };
 
+/// 获取所有 expander_server 进程的内存占用（单位：MB）
+/// 返回 (VmRSS物理内存, VmSize虚拟内存)
+fn get_total_expander_memory_mb() -> (usize, usize) {
+    use std::fs;
+    use std::io::{BufRead, BufReader};
+
+    let mut total_rss_kb = 0usize;
+    let mut total_vmsize_kb = 0usize;
+
+    // 遍历 /proc 目录
+    if let Ok(entries) = fs::read_dir("/proc") {
+        for entry in entries.flatten() {
+            if let Ok(file_name) = entry.file_name().into_string() {
+                // 只处理数字目录（进程PID）
+                if file_name.chars().all(|c| c.is_ascii_digit()) {
+                    // 读取 /proc/[pid]/comm 检查进程名
+                    let comm_path = format!("/proc/{}/comm", file_name);
+                    if let Ok(comm) = fs::read_to_string(&comm_path) {
+                        if comm.trim() == "expander_server" {
+                            // 读取 /proc/[pid]/status 获取内存信息
+                            let status_path = format!("/proc/{}/status", file_name);
+                            if let Ok(file) = fs::File::open(&status_path) {
+                                let reader = BufReader::new(file);
+                                for line in reader.lines().flatten() {
+                                    if line.starts_with("VmRSS:") {
+                                        // VmRSS: 12345 kB (物理内存)
+                                        if let Some(rss_str) = line.split_whitespace().nth(1) {
+                                            if let Ok(rss_kb) = rss_str.parse::<usize>() {
+                                                total_rss_kb += rss_kb;
+                                            }
+                                        }
+                                    } else if line.starts_with("VmSize:") {
+                                        // VmSize: 12345 kB (虚拟内存)
+                                        if let Some(size_str) = line.split_whitespace().nth(1) {
+                                            if let Ok(size_kb) = size_str.parse::<usize>() {
+                                                total_vmsize_kb += size_kb;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    (total_rss_kb / 1024, total_vmsize_kb / 1024) // 转换为MB
+}
+
 pub trait ServerFns<C, ECCConfig>
 where
     C: gkr_engine::GKREngine,
@@ -45,6 +96,10 @@ where
         witness_target: &mut Vec<Vec<SIMDField<C>>>,
         mpi_shared_memory_win: &mut Option<SharedMemoryWINWrapper>,
     ) {
+        let (rss_start, vmsize_start) = get_total_expander_memory_mb();
+        println!("[MPI Rank {}] setup_shared_witness: START - disposing old witness, MEMORY = {} MB (RSS), {} MB (VmSize)",
+                 global_mpi_config.world_rank(), rss_start, vmsize_start);
+
         // dispose of the previous shared memory if it exists
         while let Some(w) = witness_target.pop() {
             w.discard_control_of_shared_mem();
@@ -55,6 +110,10 @@ where
             global_mpi_config.free_shared_mem(&mut win_wrapper.win);
         }
 
+        let (rss_after_dispose, vmsize_after_dispose) = get_total_expander_memory_mb();
+        println!("[MPI Rank {}] setup_shared_witness: Old witness disposed, MEMORY = {} MB (RSS), {} MB (VmSize), calling read_shared_witness_from_shared_memory",
+                 global_mpi_config.world_rank(), rss_after_dispose, vmsize_after_dispose);
+
         // Allocate new shared memory for the witness
         let (witness_v, wt_shared_memory_win) =
             SharedMemoryEngine::read_shared_witness_from_shared_memory::<C::FieldConfig>(
@@ -62,6 +121,10 @@ where
             );
         *witness_target = witness_v;
         *mpi_shared_memory_win = Some(wt_shared_memory_win);
+
+        let (rss_end, vmsize_end) = get_total_expander_memory_mb();
+        println!("[MPI Rank {}] setup_shared_witness: DONE - witness loaded into local memory, MEMORY = {} MB (RSS), {} MB (VmSize)",
+                 global_mpi_config.world_rank(), rss_end, vmsize_end);
     }
 
     fn shared_memory_clean_up(
@@ -123,7 +186,17 @@ where
         C: GKREngine,
         ECCConfig: Config<FieldConfig = C::FieldConfig>,
     {
-        mpi_prove_impl(global_mpi_config, prover_setup, computation_graph, values)
+        let (rss_start, vmsize_start) = get_total_expander_memory_mb();
+        println!("[MPI Rank {}] prove_request_handler: START - witness is being used for proving, MEMORY = {} MB (RSS), {} MB (VmSize)",
+                 global_mpi_config.world_rank(), rss_start, vmsize_start);
+
+        let proof = mpi_prove_impl(global_mpi_config, prover_setup, computation_graph, values);
+
+        let (rss_end, vmsize_end) = get_total_expander_memory_mb();
+        println!("[MPI Rank {}] prove_request_handler: DONE - witness is still in memory but no longer actively used, MEMORY = {} MB (RSS), {} MB (VmSize)",
+                 global_mpi_config.world_rank(), rss_end, vmsize_end);
+
+        proof
     }
 }
 
