@@ -1,4 +1,3 @@
-use crate::zkcuda::cpu_monitor::CpuMonitor;
 use arith::{Field, Fr, SimdField};
 use expander_utils::timer::Timer;
 use gkr_engine::{
@@ -7,33 +6,6 @@ use gkr_engine::{
 };
 use std::collections::HashMap;
 use std::fs;
-
-/// 获取当前进程的内存使用情况 (RSS, 单位: KB)
-fn get_memory_kb() -> u64 {
-    #[cfg(target_os = "linux")]
-    {
-        if let Ok(content) = std::fs::read_to_string("/proc/self/statm") {
-            let parts: Vec<&str> = content.split_whitespace().collect();
-            if parts.len() >= 2 {
-                if let Ok(rss_pages) = parts[1].parse::<u64>() {
-                    return rss_pages * 4; // 页大小 4KB
-                }
-            }
-        }
-    }
-    0
-}
-
-fn log_memory(rank: usize, tag: &str) {
-    let mem_kb = get_memory_kb();
-    eprintln!(
-        "[MEM] rank={} {} : {} KB ({:.2} MB)",
-        rank,
-        tag,
-        mem_kb,
-        mem_kb as f64 / 1024.0
-    );
-}
 
 use crate::{
     frontend::{Config, SIMDField},
@@ -93,16 +65,6 @@ where
 
     let commit_timer = Timer::new("Commit to all input", global_mpi_config.is_root());
     let (commitments, states) = if global_mpi_config.is_root() {
-        eprintln!("\n========== COMMIT PHASE START ==========");
-        eprintln!(
-            "[RANK {}] Starting commit on {} values",
-            global_mpi_config.world_rank(),
-            values.len()
-        );
-
-        // 启动CPU监控（每200ms采样一次）
-        let _cpu_monitor = CpuMonitor::start("COMMIT", 200);
-
         let (commitments, states) = values
             .iter()
             .map(|value| match ZC::BATCH_PCS {
@@ -117,15 +79,8 @@ where
             })
             .unzip::<_, _, Vec<_>, Vec<_>>();
 
-        // _cpu_monitor在这里自动drop，停止监控
-        eprintln!("========== COMMIT PHASE END ==========\n");
-
         (Some(commitments), Some(states))
     } else {
-        eprintln!(
-            "[RANK {}] Skipping commit (not root)",
-            global_mpi_config.world_rank()
-        );
         (None, None)
     };
     commit_timer.stop();
@@ -228,23 +183,13 @@ where
         true => {
             if global_mpi_config.is_root() {
                 let mut proofs = proofs.into_iter().map(|p| p.unwrap()).collect::<Vec<_>>();
-                eprintln!("\n========== PCS OPENING PHASE START ==========");
-                eprintln!(
-                    "[RANK {}] Starting batch PCS opening for {} values, {} challenges",
-                    global_mpi_config.world_rank(),
-                    vals_ref.len(),
-                    challenges.len()
-                );
                 let pcs_opening_timer = Timer::new("Batch PCS Opening for all kernels", true);
-                // 启动CPU监控
-                let _cpu_monitor = CpuMonitor::start("PCS_OPENING", 200);
                 let pcs_batch_opening = open_defered_pcs::<ZC::GKRConfig, ZC::ECCConfig>(
                     prover_setup,
                     &vals_ref,
                     &challenges,
                 );
                 pcs_opening_timer.stop();
-                eprintln!("========== PCS OPENING PHASE END ==========\n");
 
                 proofs.push(pcs_batch_opening);
                 Some(CombinedProof {
@@ -413,8 +358,6 @@ where
     let world_size = mpi_config.world_size();
     let n_copies = parallel_count / world_size;
 
-    log_memory(world_rank, "prove_kernel_gkr_internal::start");
-
     let local_commitment_values = get_local_vals_multi_copies(
         commitments_values,
         is_broadcast,
@@ -422,17 +365,9 @@ where
         n_copies,
         parallel_count,
     );
-    log_memory(
-        world_rank,
-        "prove_kernel_gkr_internal::after_get_local_vals",
-    );
 
     let (mut expander_circuit, mut prover_scratch) =
         prepare_expander_circuit::<FMulti, ECCConfig>(kernel, world_size);
-    log_memory(
-        world_rank,
-        "prove_kernel_gkr_internal::after_prepare_expander_circuit",
-    );
 
     let mut transcript = T::new();
     let challenge = prove_gkr_with_local_vals_multi_copies::<FBasic, FMulti, T>(
@@ -444,12 +379,6 @@ where
         mpi_config,
         n_bytes_profiler,
     );
-    log_memory(world_rank, "prove_kernel_gkr_internal::after_prove_gkr");
-
-    // expander_circuit 和 prover_scratch 在这里被 drop
-    drop(expander_circuit);
-    drop(prover_scratch);
-    log_memory(world_rank, "prove_kernel_gkr_internal::after_drop_circuit");
 
     Some((transcript, challenge))
 }
@@ -488,8 +417,6 @@ where
         FieldEngine<CircuitField = FBasic::CircuitField, ChallengeField = FBasic::ChallengeField>,
     T: Transcript,
 {
-    let world_rank = mpi_config.world_rank();
-    log_memory(world_rank, "prove_gkr::start");
 
     let input_vals_multi_copies = local_commitment_values_multi_copies
         .iter()
@@ -501,7 +428,6 @@ where
             )
         })
         .collect::<Vec<_>>();
-    log_memory(world_rank, "prove_gkr::after_prepare_inputs");
 
     let mut input_vals =
         vec![FMulti::SimdCircuitField::ZERO; 1 << expander_circuit.log_input_size()];
@@ -514,13 +440,10 @@ where
         *vals = FMulti::SimdCircuitField::pack(&vals_unpacked);
     }
     expander_circuit.layers[0].input_vals = input_vals;
-    log_memory(world_rank, "prove_gkr::after_set_input_vals");
 
     expander_circuit.fill_rnd_coefs(transcript);
-    log_memory(world_rank, "prove_gkr::after_fill_rnd_coefs");
 
     expander_circuit.evaluate();
-    log_memory(world_rank, "prove_gkr::after_evaluate");
 
     #[cfg(feature = "zkcuda_profile")]
     {
@@ -535,7 +458,6 @@ where
 
     let (claimed_v, challenge) =
         gkr::gkr_prove(expander_circuit, prover_scratch, transcript, mpi_config);
-    log_memory(world_rank, "prove_gkr::after_gkr_prove");
 
     assert_eq!(claimed_v, FBasic::ChallengeField::from(0u32));
 
@@ -1025,7 +947,6 @@ where
     let commit_timer = Timer::new("Commit to all input", global_mpi_config.is_root());
     let (commitments, states) = if global_mpi_config.is_root() {
         eprintln!("[RANK {}] === COMMIT PHASE ===", my_rank);
-        let _cpu_monitor = CpuMonitor::start("COMMIT", 200);
 
         let (commitments, states) = values
             .iter()
@@ -1083,6 +1004,7 @@ where
     // Execute tasks step by step
     let mut all_proofs: Vec<Option<ExpanderProof>> =
         vec![None; computation_graph.proof_templates().len()];
+    let prove_timer = Timer::new("Prove all kernels", global_mpi_config.is_root());
 
     for (step, task_name) in my_tasks.iter().enumerate() {
         eprintln!(
@@ -1319,6 +1241,7 @@ where
         "[RANK {}] All ranks ready, proceeding to result collection",
         my_rank
     );
+    prove_timer.stop();
 
     // ========== MPI Result Collection (for BATCH_PCS mode) ==========
     // Collect vals_ref and challenges from all subgroup roots to global root

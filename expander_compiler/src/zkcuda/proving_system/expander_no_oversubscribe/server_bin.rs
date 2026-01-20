@@ -73,7 +73,6 @@ async fn async_main() {
 }
 
 pub fn main() {
-    println!("Enter expander_server no oversubscribe!");
     let stack_size_mb = std::env::var("THREAD_STACK_SIZE_MB")
         .ok()
         .and_then(|v| v.parse::<usize>().ok())

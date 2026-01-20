@@ -1,5 +1,4 @@
 pub mod context;
-pub mod cpu_monitor;
 pub mod kernel;
 pub mod mpi_mem_share;
 pub mod proving_system;

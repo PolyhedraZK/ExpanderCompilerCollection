@@ -228,12 +228,6 @@ impl SharedMemoryEngine {
     pub fn read_shared_witness_from_shared_memory<F: FieldEngine>(
         global_mpi_config: &MPIConfig<'static>,
     ) -> (Vec<Vec<F::SimdCircuitField>>, SharedMemoryWINWrapper) {
-        use std::time::Instant;
-
-        let (rss_before, vmsize_before) = get_total_expander_memory_mb();
-        // 打印关键信息：进程rank和witness长度
-        println!("[MPI Rank {}] read_shared_witness_from_shared_memory: MEMORY_BEFORE = {} MB (RSS), {} MB (VmSize)",
-                 global_mpi_config.world_rank(), rss_before, vmsize_before);
         let (mut mpi_shared_mem_ptr, mem_win) = if global_mpi_config.is_root() {
             let witness = Self::read_witness_from_shared_memory::<F>();
             let bytes_size = std::mem::size_of::<usize>()
@@ -253,158 +247,11 @@ impl SharedMemoryEngine {
 
         global_mpi_config.barrier();
 
-        // ⏸️ 等待检查点：等待 /tmp/continue_witness_test 文件出现才继续
-        let checkpoint_file = "/tmp/continue_witness_test1";
-        println!(
-            "[MPI Rank {}] ⏸️  CHECKPOINT: Waiting for file '{}' to continue...",
-            global_mpi_config.world_rank(),
-            checkpoint_file
-        );
-        println!("[MPI Rank {}] ⏸️  You can now check memory usage. Create the file to continue: touch {}",
-                 global_mpi_config.world_rank(), checkpoint_file);
-
-        let mut check_count = 0;
-        loop {
-            if std::path::Path::new(checkpoint_file).exists() {
-                println!(
-                    "[MPI Rank {}] ✅ Checkpoint file detected, continuing execution",
-                    global_mpi_config.world_rank()
-                );
-                break;
-            }
-
-            check_count += 1;
-            std::thread::sleep(std::time::Duration::from_millis(500));
-        }
-        // ⏱️ 开始计时：测量从共享内存读取witness的耗时
-        let read_start = Instant::now();
 
         let n_witness = usize::new_from_memory(&mut mpi_shared_mem_ptr);
-        let read_n_witness_duration = read_start.elapsed();
-
-        println!(
-            "[MPI Rank {}] ⏱️  Read n_witness={} took {:.3} µs",
-            global_mpi_config.world_rank(),
-            n_witness,
-            read_n_witness_duration.as_micros()
-        );
-
-        let witness_read_start = Instant::now();
         let witness = (0..n_witness)
             .map(|_| Vec::<F::SimdCircuitField>::new_from_memory(&mut mpi_shared_mem_ptr))
             .collect::<Vec<_>>();
-        let witness_read_duration = witness_read_start.elapsed();
-
-        println!("[MPI Rank {}] ⏱️  Read {} witness components from shared memory took {:.3} ms ({:.3} µs)",
-                 global_mpi_config.world_rank(),
-                 n_witness,
-                 witness_read_duration.as_secs_f64() * 1000.0,
-                 witness_read_duration.as_micros());
-
-        let (rss_after, vmsize_after) = get_total_expander_memory_mb();
-
-        // 打印每个witness component的大小
-        let total_elements: usize = witness.iter().map(|v| v.len()).sum();
-        let total_bytes: usize = witness
-            .iter()
-            .map(|v| v.len() * std::mem::size_of_val(&v[0]))
-            .sum();
-        let rss_increase = rss_after.saturating_sub(rss_before);
-        let vmsize_increase = vmsize_after.saturating_sub(vmsize_before);
-        println!("[MPI Rank {}] Copied witness to local memory: {} components, {} total elements, ~{} MB witness data",
-                 global_mpi_config.world_rank(),
-                 witness.len(),
-                 total_elements,
-                 total_bytes / 1024 / 1024);
-        println!(
-            "[MPI Rank {}] MEMORY_AFTER_COPY: RSS = {} MB (+{} MB), VmSize = {} MB (+{} MB)",
-            global_mpi_config.world_rank(),
-            rss_after,
-            rss_increase,
-            vmsize_after,
-            vmsize_increase
-        );
-
-        // ⏸️ 等待检查点：等待 /tmp/continue_witness_test 文件出现才继续
-        let checkpoint_file = "/tmp/continue_witness_test";
-        println!(
-            "[MPI Rank {}] ⏸️  CHECKPOINT: Waiting for file '{}' to continue...",
-            global_mpi_config.world_rank(),
-            checkpoint_file
-        );
-        println!("[MPI Rank {}] ⏸️  You can now check memory usage. Create the file to continue: touch {}",
-                 global_mpi_config.world_rank(), checkpoint_file);
-
-        let mut check_count = 0;
-        loop {
-            if std::path::Path::new(checkpoint_file).exists() {
-                println!(
-                    "[MPI Rank {}] ✅ Checkpoint file detected, continuing execution",
-                    global_mpi_config.world_rank()
-                );
-                break;
-            }
-
-            // 每10次检查打印一次内存状态（避免日志过多）
-            if check_count % 10 == 0 {
-                let (rss, vmsize) = get_total_expander_memory_mb();
-                println!(
-                    "[MPI Rank {}] ⏳ Still waiting... (check #{}, RSS = {} MB, VmSize = {} MB)",
-                    global_mpi_config.world_rank(),
-                    check_count,
-                    rss,
-                    vmsize
-                );
-            }
-
-            check_count += 1;
-            std::thread::sleep(std::time::Duration::from_millis(500));
-        }
-
-        // 🔥 主动访问witness数据，强制触发物理页分配
-        println!("[MPI Rank {}] 🔥 Now actively accessing witness data to trigger physical page allocation...",
-                 global_mpi_config.world_rank());
-
-        let access_start = Instant::now();
-
-        // 遍历所有witness数据，真正读取每个元素的字节
-        let mut dummy_sum = 0u64;
-        for component in witness.iter() {
-            // 将Vec转为字节切片，确保访问实际内存
-            let bytes: &[u8] = unsafe {
-                std::slice::from_raw_parts(
-                    component.as_ptr() as *const u8,
-                    component.len() * std::mem::size_of::<F::SimdCircuitField>(),
-                )
-            };
-
-            // 每隔4KB(页面大小)读取一个字节，确保触碰所有页面
-            for i in (0..bytes.len()).step_by(4096) {
-                unsafe {
-                    // 使用read_volatile防止编译器优化
-                    dummy_sum = dummy_sum.wrapping_add(std::ptr::read_volatile(&bytes[i]) as u64);
-                }
-            }
-        }
-
-        let access_duration = access_start.elapsed();
-        println!(
-            "[MPI Rank {}] 🔥 Finished accessing witness data (dummy_sum = {}, took {:.3}s)",
-            global_mpi_config.world_rank(),
-            dummy_sum,
-            access_duration.as_secs_f64()
-        );
-
-        // 再次测量内存，看是否因为访问而增长
-        let (rss_after_access, vmsize_after_access) = get_total_expander_memory_mb();
-        let rss_increase_by_access = rss_after_access.saturating_sub(rss_after);
-        println!(
-            "[MPI Rank {}] 📊 MEMORY_AFTER_ACCESS: RSS = {} MB (+{} MB from copy), VmSize = {} MB",
-            global_mpi_config.world_rank(),
-            rss_after_access,
-            rss_increase_by_access,
-            vmsize_after_access
-        );
 
         (witness, SharedMemoryWINWrapper { win: mem_win })
     }
