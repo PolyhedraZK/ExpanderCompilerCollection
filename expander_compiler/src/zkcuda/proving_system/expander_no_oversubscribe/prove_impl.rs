@@ -48,10 +48,9 @@ where
     // Check for schedule file and use scheduler if available
     if std::path::Path::new("schedule.txt").exists() {
         let my_rank = global_mpi_config.world_rank();
-        eprintln!(
-            "[RANK {}] ⚡ Schedule file detected, using scheduled execution",
-            my_rank
-        );
+        if my_rank == 0 {
+            eprintln!("⚡ Schedule file detected, using scheduled execution");
+        }
         return mpi_prove_no_oversubscribe_with_schedule::<ZC>(
             global_mpi_config,
             "schedule.txt",
@@ -670,11 +669,6 @@ fn mark_task_completed(task_name: &str, my_rank: usize, peers: &[usize]) {
                     "[RANK {}] Warning: Failed to write marker for {}: {}",
                     my_rank, task_name, e
                 );
-            } else {
-                eprintln!(
-                    "[RANK {}] ✓ Marked task {} as completed",
-                    my_rank, task_name
-                );
             }
         }
     }
@@ -686,52 +680,44 @@ fn wait_for_dependencies(task_name: &str, dependencies: &[String], my_rank: usiz
         return;
     }
 
-    eprintln!(
-        "[RANK {}] Task {} waiting for {} dependencies: {:?}",
-        my_rank,
-        task_name,
-        dependencies.len(),
-        dependencies
-    );
+    let mut need_wait = false;
+    let mut waited_deps = vec![];
 
     for dep in dependencies {
         let marker_path = format!(".task_sync/{}.done", dep);
 
         if std::path::Path::new(&marker_path).exists() {
-            eprintln!(
-                "[RANK {}]   ✓ Dependency {} already satisfied",
-                my_rank, dep
-            );
             continue;
         }
 
-        eprintln!("[RANK {}]   ⏳ Waiting for dependency: {}", my_rank, dep);
+        if !need_wait {
+            need_wait = true;
+        }
 
         let start_time = std::time::Instant::now();
         while !std::path::Path::new(&marker_path).exists() {
             std::thread::sleep(std::time::Duration::from_millis(100));
 
-            // Timeout check (optional, for debugging)
+            // Timeout warning
             if start_time.elapsed().as_secs() > 600 {
                 eprintln!(
-                    "[RANK {}]   ⚠️  WARNING: Waiting for {} over 10 minutes!",
+                    "[RANK {}] ⚠️  WARNING: Waiting for {} over 10 minutes!",
                     my_rank, dep
                 );
             }
         }
 
-        eprintln!(
-            "[RANK {}]   ✓ Dependency {} satisfied (waited {:.1}s)",
-            my_rank,
-            dep,
-            start_time.elapsed().as_secs_f64()
-        );
+        if start_time.elapsed().as_secs_f64() > 0.5 {
+            waited_deps.push((dep.clone(), start_time.elapsed().as_secs_f64()));
+        }
     }
 
-    eprintln!(
-        "[RANK {}] All dependencies for {} satisfied",
-        my_rank, task_name
-    );
+    // Only log if actually waited
+    if !waited_deps.is_empty() && my_rank % 8 == 0 {
+        eprintln!("[RANK {}] Task {} waited for {} deps (longest: {:.1}s)",
+            my_rank, task_name, waited_deps.len(),
+            waited_deps.iter().map(|(_, t)| t).fold(0.0f64, |a, &b| a.max(b)));
+    }
 }
 
 /// Create MPI subgroup for a specific task
@@ -812,25 +798,15 @@ where
         }
     };
 
-    eprintln!("[RANK {}] ========== SCHEDULER MODE ==========", my_rank);
-    eprintln!(
-        "[RANK {}] Loaded schedule with {} ranks, max {} steps",
-        my_rank,
-        schedule.rank_tasks.len(),
-        schedule.max_steps()
-    );
+    if global_mpi_config.is_root() {
+        eprintln!("========== SCHEDULER MODE ==========");
+        eprintln!("  Schedule: {} ranks, max {} steps",
+            schedule.rank_tasks.len(), schedule.max_steps());
+    }
 
     // Safety checks
     let num_templates = computation_graph.proof_templates().len();
     let num_values = values.len();
-    eprintln!(
-        "[RANK {}] Computation graph has {} templates",
-        my_rank, num_templates
-    );
-    eprintln!(
-        "[RANK {}] Values array has {} elements",
-        my_rank, num_values
-    );
 
     if num_templates == 0 {
         eprintln!(
@@ -873,22 +849,17 @@ where
     let task_dependencies = if std::path::Path::new("task_dependencies.txt").exists() {
         match parse_task_dependencies("task_dependencies.txt") {
             Ok(deps) => {
-                eprintln!("[RANK {}] Loaded {} task dependencies", my_rank, deps.len());
+                if global_mpi_config.is_root() {
+                    eprintln!("  Loaded {} task dependencies", deps.len());
+                }
                 deps
             }
             Err(e) => {
-                eprintln!(
-                    "[RANK {}] Warning: Failed to load dependencies: {}",
-                    my_rank, e
-                );
+                eprintln!("[RANK {}] ERROR: Failed to load dependencies: {}", my_rank, e);
                 HashMap::new()
             }
         }
     } else {
-        eprintln!(
-            "[RANK {}] No task_dependencies.txt found, using file-based sync",
-            my_rank
-        );
         HashMap::new()
     };
 
@@ -903,31 +874,22 @@ where
                 }
             }
         }
-        eprintln!("[RANK 0] Initialized .task_sync directory");
     }
-    global_mpi_config.barrier(); // Wait for directory creation
+    global_mpi_config.barrier();
 
     // ========== PRE-CREATE ALL MPI SUBGROUPS ==========
-    // CRITICAL: Create all task subgroups BEFORE any task execution
-    // This allows ranks to proceed asynchronously without collective deadlock
-    eprintln!(
-        "[RANK {}] Pre-creating MPI subgroups for all tasks...",
-        my_rank
-    );
-
     let all_unique_tasks = schedule.get_all_unique_tasks();
     let mut task_mpi_configs: HashMap<String, Option<MPIConfig<'static>>> = HashMap::new();
+
+    if global_mpi_config.is_root() {
+        eprintln!("  Pre-creating MPI subgroups for {} tasks...", all_unique_tasks.len());
+    }
 
     for task_name in &all_unique_tasks {
         let peers = schedule.find_all_peers_for_task(task_name);
 
-        eprintln!(
-            "[RANK {}] Creating MPI subgroup for task {} (peers: {:?})",
-            my_rank, task_name, peers
-        );
-
         // All 32 ranks call this together (collective operation)
-        let mpi_config = if peers.len() >= 1 {
+        let mpi_config = if !peers.is_empty() {
             create_mpi_subgroup_for_task(global_mpi_config, &peers, task_name)
         } else {
             None
@@ -936,12 +898,10 @@ where
         task_mpi_configs.insert(task_name.clone(), mpi_config);
     }
 
-    eprintln!(
-        "[RANK {}] Pre-created {} MPI subgroups",
-        my_rank,
-        task_mpi_configs.len()
-    );
-    global_mpi_config.barrier(); // Ensure all subgroups created before proceeding
+    if global_mpi_config.is_root() {
+        eprintln!("  MPI subgroups ready");
+    }
+    global_mpi_config.barrier();
 
     // Commit phase (only root)
     let commit_timer = Timer::new("Commit to all input", global_mpi_config.is_root());
@@ -999,22 +959,14 @@ where
         }
     };
 
-    eprintln!("[RANK {}] My tasks: {:?}", my_rank, my_tasks);
-
     // Execute tasks step by step
     let mut all_proofs: Vec<Option<ExpanderProof>> =
         vec![None; computation_graph.proof_templates().len()];
     let prove_timer = Timer::new("Prove all kernels", global_mpi_config.is_root());
 
     for (step, task_name) in my_tasks.iter().enumerate() {
-        eprintln!(
-            "[RANK {}] === STEP {} === Task: {}",
-            my_rank, step, task_name
-        );
-
         // Skip idle steps
         if task_name == "idle" || task_name == "..." {
-            // Idle ranks still participate in MPI collective operations
             continue;
         }
 
@@ -1048,14 +1000,8 @@ where
         let i_am_participant = all_peers.contains(&my_rank);
 
         if !i_am_participant {
-            eprintln!("[RANK {}] Not participating in task {}", my_rank, task_name);
             continue;
         }
-
-        eprintln!(
-            "[RANK {}] Task {} peers: {:?} (using pre-created MPI subgroup)",
-            my_rank, task_name, all_peers
-        );
 
         let template = &computation_graph.proof_templates()[template_idx];
 
@@ -1098,14 +1044,6 @@ where
         );
 
         let gkr_end_state = if let Some(ref local_config) = local_mpi_config {
-            eprintln!(
-                "[RANK {}] Executing task {} with {} peers (local_rank={}, group_size={})",
-                my_rank,
-                task_name,
-                all_peers.len(),
-                local_config.world_rank(),
-                local_config.world_size()
-            );
 
             prove_kernel_gkr_no_oversubscribe::<GetFieldConfig<ZC>, GetTranscript<ZC>, ZC::ECCConfig>(
                 local_config,
@@ -1166,10 +1104,6 @@ where
                 .unwrap_or(true);
 
             if is_subgroup_root {
-                eprintln!(
-                    "[RANK {}] I am subgroup root for task {}",
-                    my_rank, task_name
-                );
                 i_am_subgroup_root_for_tasks.push(template_idx);
 
                 match ZC::BATCH_PCS {
@@ -1230,17 +1164,8 @@ where
         mark_task_completed(task_name, my_rank, &all_peers);
     }
 
-    // ========== CRITICAL: Global barrier ==========
-    // Wait for all ranks to complete all their tasks before proceeding to PCS opening
-    eprintln!(
-        "[RANK {}] All my tasks completed, waiting for other ranks...",
-        my_rank
-    );
+    // Wait for all ranks to complete all tasks
     global_mpi_config.barrier();
-    eprintln!(
-        "[RANK {}] All ranks ready, proceeding to result collection",
-        my_rank
-    );
     prove_timer.stop();
 
     // ========== MPI Result Collection (for BATCH_PCS mode) ==========
@@ -1250,13 +1175,6 @@ where
         use serdes::ExpSerde;
 
         let i_am_subgroup_root = !i_am_subgroup_root_for_tasks.is_empty();
-
-        eprintln!(
-            "[RANK {}] Am I subgroup root? {} (for {} tasks)",
-            my_rank,
-            i_am_subgroup_root,
-            i_am_subgroup_root_for_tasks.len()
-        );
 
         // Step 0: All ranks send a flag to root indicating if they are subgroup roots
         let my_flag = if i_am_subgroup_root { 1u8 } else { 0u8 };
@@ -1284,10 +1202,6 @@ where
 
         // Step 1: Non-root subgroup roots send their results to rank 0
         if i_am_subgroup_root && my_rank != 0 {
-            eprintln!(
-                "[RANK {}] Sending my results to global root (indexed by template)",
-                my_rank
-            );
 
             // Serialize the indexed structures (maintains template order)
             let mut vals_bytes = Vec::new();
@@ -1329,14 +1243,10 @@ where
                     .process_at_rank(0)
                     .synchronous_send(&proofs_bytes[..]);
             }
-
-            eprintln!("[RANK {}] Results sent to global root", my_rank);
         }
 
         // Step 2: Global root receives all results
         if global_mpi_config.is_root() {
-            eprintln!("[RANK 0] Collecting results from all subgroup roots...");
-
             let flags = all_flags.unwrap();
 
             // Identify which ranks are subgroup roots (have flag=1)
@@ -1347,15 +1257,11 @@ where
                 .map(|(rank, _)| rank)
                 .collect();
 
-            eprintln!("[RANK 0] Subgroup roots detected: {:?}", subgroup_roots);
-
             // Receive from each subgroup root (except self)
             for &sender_rank in &subgroup_roots {
                 if sender_rank == 0 {
                     continue; // Skip self
                 }
-
-                eprintln!("[RANK 0] Receiving results from rank {}", sender_rank);
 
                 // Receive sizes
                 let (sizes, _status) = unsafe {
@@ -1420,14 +1326,6 @@ where
                     }
                 }
 
-                let received_count = received_vals_per_template
-                    .iter()
-                    .filter(|v| v.is_some())
-                    .count();
-                eprintln!(
-                    "[RANK 0] Received results from rank {} ({} templates)",
-                    sender_rank, received_count
-                );
             }
 
             // Build final vals_ref and challenges in template order
@@ -1443,17 +1341,18 @@ where
                 }
             }
 
-            eprintln!(
-                "[RANK 0] Result collection complete. Total: {} vals, {} challenges, {} proofs",
-                vals_ref_owned.len(),
-                challenges_final.len(),
-                all_proofs.iter().filter(|p| p.is_some()).count()
-            );
+            let completed_templates = all_proofs.iter().filter(|p| p.is_some()).count();
+            eprintln!("Result collection: {}/{} templates, {} vals, {} challenges",
+                completed_templates, num_templates,
+                vals_ref_owned.len(), challenges_final.len());
 
-            eprintln!("[RANK 0] Templates coverage:");
-            for (idx, val) in vals_per_template.iter().enumerate() {
-                let status = if val.is_some() { "✓" } else { "✗" };
-                eprintln!("  Template {}: {}", idx, status);
+            if completed_templates < num_templates {
+                eprintln!("⚠️  WARNING: Only {}/{} templates completed!", completed_templates, num_templates);
+                for (idx, val) in vals_per_template.iter().enumerate() {
+                    if val.is_none() {
+                        eprintln!("  Missing: Template {}", idx);
+                    }
+                }
             }
         }
     }
