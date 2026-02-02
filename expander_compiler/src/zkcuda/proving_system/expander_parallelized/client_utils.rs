@@ -87,7 +87,7 @@ where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
 {
-    let setup_timer = Timer::new("setup", true);
+    let setup_timer = Timer::new("new setup", true);
     println!("Starting server with binary: {server_binary}");
 
     let mut bytes = vec![];
@@ -141,7 +141,11 @@ where
 
     setup_timer.stop();
 
-    SharedMemoryEngine::read_pcs_setup_from_shared_memory()
+    // SharedMemoryEngine::read_pcs_setup_from_shared_memory()
+    (
+        ExpanderProverSetup::default(),
+        ExpanderVerifierSetup::default(),
+    )
 }
 
 pub fn client_send_witness_and_prove<C, ECCConfig>(
@@ -163,6 +167,19 @@ where
     proof
 }
 
+
+pub fn client_send_witness_and_prove_nowait<C, ECCConfig>(
+    device_memories: Vec<Vec<SIMDField<ECCConfig>>>,
+) 
+where
+    C: GKREngine,
+    ECCConfig: Config<FieldConfig = C::FieldConfig>,
+{
+    let timer = Timer::new("prove", true);
+
+    SharedMemoryEngine::write_witness_to_shared_memory::<C::FieldConfig>(device_memories);
+    ClientHttpHelper::request_prove();
+}
 /// Run an async function in a blocking context.
 #[inline(always)]
 pub fn wait_async<F, T>(f: F) -> T
