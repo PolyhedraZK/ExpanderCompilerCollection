@@ -709,7 +709,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             });
         }
 
-        if let Some(_cg_kernels) = cg_kernels {
+        if cg_kernels.is_some() {
             // No longer checking if cg_kernels is empty since we no longer consume it
             // Kernels were already added earlier via self.kernels.add()
             assert_eq!(cg_proof_templates.unwrap(), self.proof_templates);
