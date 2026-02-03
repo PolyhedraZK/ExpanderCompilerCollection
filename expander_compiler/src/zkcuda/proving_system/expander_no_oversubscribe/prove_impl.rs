@@ -416,7 +416,6 @@ where
         FieldEngine<CircuitField = FBasic::CircuitField, ChallengeField = FBasic::ChallengeField>,
     T: Transcript,
 {
-
     let input_vals_multi_copies = local_commitment_values_multi_copies
         .iter()
         .map(|local_commitment_values| {
@@ -714,9 +713,16 @@ fn wait_for_dependencies(task_name: &str, dependencies: &[String], my_rank: usiz
 
     // Only log if actually waited
     if !waited_deps.is_empty() && my_rank % 8 == 0 {
-        eprintln!("[RANK {}] Task {} waited for {} deps (longest: {:.1}s)",
-            my_rank, task_name, waited_deps.len(),
-            waited_deps.iter().map(|(_, t)| t).fold(0.0f64, |a, &b| a.max(b)));
+        eprintln!(
+            "[RANK {}] Task {} waited for {} deps (longest: {:.1}s)",
+            my_rank,
+            task_name,
+            waited_deps.len(),
+            waited_deps
+                .iter()
+                .map(|(_, t)| t)
+                .fold(0.0f64, |a, &b| a.max(b))
+        );
     }
 }
 
@@ -800,8 +806,11 @@ where
 
     if global_mpi_config.is_root() {
         eprintln!("========== SCHEDULER MODE ==========");
-        eprintln!("  Schedule: {} ranks, max {} steps",
-            schedule.rank_tasks.len(), schedule.max_steps());
+        eprintln!(
+            "  Schedule: {} ranks, max {} steps",
+            schedule.rank_tasks.len(),
+            schedule.max_steps()
+        );
     }
 
     // Safety checks
@@ -855,7 +864,10 @@ where
                 deps
             }
             Err(e) => {
-                eprintln!("[RANK {}] ERROR: Failed to load dependencies: {}", my_rank, e);
+                eprintln!(
+                    "[RANK {}] ERROR: Failed to load dependencies: {}",
+                    my_rank, e
+                );
                 HashMap::new()
             }
         }
@@ -882,7 +894,10 @@ where
     let mut task_mpi_configs: HashMap<String, Option<MPIConfig<'static>>> = HashMap::new();
 
     if global_mpi_config.is_root() {
-        eprintln!("  Pre-creating MPI subgroups for {} tasks...", all_unique_tasks.len());
+        eprintln!(
+            "  Pre-creating MPI subgroups for {} tasks...",
+            all_unique_tasks.len()
+        );
     }
 
     for task_name in &all_unique_tasks {
@@ -1044,7 +1059,6 @@ where
         );
 
         let gkr_end_state = if let Some(ref local_config) = local_mpi_config {
-
             prove_kernel_gkr_no_oversubscribe::<GetFieldConfig<ZC>, GetTranscript<ZC>, ZC::ECCConfig>(
                 local_config,
                 &computation_graph.kernels()[template.kernel_id()],
@@ -1202,7 +1216,6 @@ where
 
         // Step 1: Non-root subgroup roots send their results to rank 0
         if i_am_subgroup_root && my_rank != 0 {
-
             // Serialize the indexed structures (maintains template order)
             let mut vals_bytes = Vec::new();
             vals_per_template.serialize_into(&mut vals_bytes).unwrap();
@@ -1325,7 +1338,6 @@ where
                         all_proofs[template_idx] = received_all_proofs[template_idx].clone();
                     }
                 }
-
             }
 
             // Build final vals_ref and challenges in template order
@@ -1342,12 +1354,19 @@ where
             }
 
             let completed_templates = all_proofs.iter().filter(|p| p.is_some()).count();
-            eprintln!("Result collection: {}/{} templates, {} vals, {} challenges",
-                completed_templates, num_templates,
-                vals_ref_owned.len(), challenges_final.len());
+            eprintln!(
+                "Result collection: {}/{} templates, {} vals, {} challenges",
+                completed_templates,
+                num_templates,
+                vals_ref_owned.len(),
+                challenges_final.len()
+            );
 
             if completed_templates < num_templates {
-                eprintln!("⚠️  WARNING: Only {}/{} templates completed!", completed_templates, num_templates);
+                eprintln!(
+                    "⚠️  WARNING: Only {}/{} templates completed!",
+                    completed_templates, num_templates
+                );
                 for (idx, val) in vals_per_template.iter().enumerate() {
                     if val.is_none() {
                         eprintln!("  Missing: Template {}", idx);

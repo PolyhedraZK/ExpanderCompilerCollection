@@ -4,8 +4,6 @@ use gkr_engine::{
     ExpanderDualVarChallenge, ExpanderSingleVarChallenge, FieldEngine, GKREngine, MPIConfig,
     MPIEngine, Transcript,
 };
-use std::collections::HashMap;
-use std::fs;
 
 use crate::{
     frontend::{Config, SIMDField},

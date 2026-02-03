@@ -328,7 +328,11 @@ impl LogUpSingleKeyTable {
 
         assert_eq_rational(builder, &v_table, &v_query);
     }
-    pub fn final_check_with_query_count<C: Config, B: RootAPI<C>>(&mut self, builder: &mut B, query_count: &[Variable]) {
+    pub fn final_check_with_query_count<C: Config, B: RootAPI<C>>(
+        &mut self,
+        builder: &mut B,
+        query_count: &[Variable],
+    ) {
         if self.table.is_empty() || self.query_keys.is_empty() {
             panic!("empty table or empty query");
         }
@@ -487,7 +491,11 @@ impl LogUpRangeProofTable {
         assert_eq_rational(builder, &v_table, &v_query);
     }
 
-    pub fn final_check_with_query_count<C: Config, B: RootAPI<C>>(&mut self, builder: &mut B, query_count: &[Variable]) {
+    pub fn final_check_with_query_count<C: Config, B: RootAPI<C>>(
+        &mut self,
+        builder: &mut B,
+        query_count: &[Variable],
+    ) {
         let alpha = builder.get_random_value();
         let inputs = self.query_keys.clone();
 

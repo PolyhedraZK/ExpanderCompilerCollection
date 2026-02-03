@@ -112,7 +112,6 @@ where
     let mpi_size = if allow_oversubscribe {
         max_parallel_count
     } else {
-        // 支持通过环境变量 ZKML_NUM_CPUS 覆盖 CPU 数量（用于 Docker 等环境）
         let num_cpus = std::env::var("ZKML_NUM_CPUS")
             .ok()
             .and_then(|s| s.parse().ok())
@@ -167,19 +166,6 @@ where
     proof
 }
 
-
-pub fn client_send_witness_and_prove_nowait<C, ECCConfig>(
-    device_memories: Vec<Vec<SIMDField<ECCConfig>>>,
-) 
-where
-    C: GKREngine,
-    ECCConfig: Config<FieldConfig = C::FieldConfig>,
-{
-    let timer = Timer::new("prove", true);
-
-    SharedMemoryEngine::write_witness_to_shared_memory::<C::FieldConfig>(device_memories);
-    ClientHttpHelper::request_prove();
-}
 /// Run an async function in a blocking context.
 #[inline(always)]
 pub fn wait_async<F, T>(f: F) -> T

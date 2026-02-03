@@ -24,10 +24,8 @@ pub fn start_server<C: GKREngine>(
 fn parse_config<C: GKREngine>(mpi_size: usize) -> (String, String, String, String)
 where
 {
-    // 支持通过环境变量强制启用 oversubscribe（用于 Docker 等 CPU ID 不连续的环境）
     let force_oversubscribe = std::env::var("ZKML_FORCE_OVERSUBSCRIBE").is_ok();
 
-    // 支持通过环境变量 ZKML_NUM_CPUS 覆盖 CPU 数量
     let num_cpus = std::env::var("ZKML_NUM_CPUS")
         .ok()
         .and_then(|s| s.parse().ok())

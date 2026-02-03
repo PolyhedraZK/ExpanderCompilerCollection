@@ -9,57 +9,6 @@ use shared_memory::{Shmem, ShmemConf};
 
 use crate::circuit::config::Config;
 
-/// 获取所有 expander_server 进程的内存占用（单位：MB）
-/// 返回 (VmRSS物理内存, VmSize虚拟内存)
-fn get_total_expander_memory_mb() -> (usize, usize) {
-    use std::fs;
-    use std::io::{BufRead, BufReader};
-
-    let mut total_rss_kb = 0usize;
-    let mut total_vmsize_kb = 0usize;
-
-    // 遍历 /proc 目录
-    if let Ok(entries) = fs::read_dir("/proc") {
-        for entry in entries.flatten() {
-            if let Ok(file_name) = entry.file_name().into_string() {
-                // 只处理数字目录（进程PID）
-                if file_name.chars().all(|c| c.is_ascii_digit()) {
-                    // 读取 /proc/[pid]/comm 检查进程名
-                    let comm_path = format!("/proc/{}/comm", file_name);
-                    if let Ok(comm) = fs::read_to_string(&comm_path) {
-                        if comm.trim() == "expander_server" {
-                            // 读取 /proc/[pid]/status 获取内存信息
-                            let status_path = format!("/proc/{}/status", file_name);
-                            if let Ok(file) = fs::File::open(&status_path) {
-                                let reader = BufReader::new(file);
-                                for line in reader.lines().flatten() {
-                                    if line.starts_with("VmRSS:") {
-                                        // VmRSS: 12345 kB (物理内存)
-                                        if let Some(rss_str) = line.split_whitespace().nth(1) {
-                                            if let Ok(rss_kb) = rss_str.parse::<usize>() {
-                                                total_rss_kb += rss_kb;
-                                            }
-                                        }
-                                    } else if line.starts_with("VmSize:") {
-                                        // VmSize: 12345 kB (虚拟内存)
-                                        if let Some(size_str) = line.split_whitespace().nth(1) {
-                                            if let Ok(size_kb) = size_str.parse::<usize>() {
-                                                total_vmsize_kb += size_kb;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    (total_rss_kb / 1024, total_vmsize_kb / 1024) // 转换为MB
-}
-
 use crate::zkcuda::proving_system::expander::structs::{
     ExpanderProverSetup, ExpanderVerifierSetup,
 };
@@ -246,7 +195,6 @@ impl SharedMemoryEngine {
         };
 
         global_mpi_config.barrier();
-
 
         let n_witness = usize::new_from_memory(&mut mpi_shared_mem_ptr);
         let witness = (0..n_witness)

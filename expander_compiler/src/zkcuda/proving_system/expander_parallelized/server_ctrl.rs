@@ -28,7 +28,7 @@ use std::sync::Mutex as SyncMutex;
 use tokio::sync::{oneshot, Mutex};
 
 pub static SERVER_IP: &str = "127.0.0.1";
-pub static SERVER_PORT: Lazy<SyncMutex<u16>> = Lazy::new(|| SyncMutex::new(5555));
+pub static SERVER_PORT: Lazy<SyncMutex<u16>> = Lazy::new(|| SyncMutex::new(3000));
 
 pub fn parse_port_number() -> u16 {
     let mut port = SERVER_PORT.lock().unwrap();
@@ -298,12 +298,12 @@ where
     if global_mpi_config.is_root() {
         let (tx, rx) = oneshot::channel::<()>();
         state.shutdown_tx.lock().await.replace(tx);
-        
+
         let app = Router::new()
             .route("/", post(root_main::<C, ECCConfig, S>))
             .route("/", get(|| async { "Expander Server is running" }))
             .with_state(state.clone());
-            
+
         let ip: IpAddr = SERVER_IP.parse().expect("Invalid SERVER_IP");
         let port_val = port_number.parse::<u16>().unwrap_or_else(|e| {
             eprintln!("Error: Invalid port number '{port_number}'. {e}.");
@@ -379,7 +379,7 @@ pub struct ExpanderExecArgs {
     pub poly_commit: String,
 
     /// The port number for the server to listen on.
-    #[arg(short, long, default_value = "5555")]
+    #[arg(short, long, default_value = "3000")]
     pub port_number: String,
 
     /// Whether to batch PCS opening in proving.

@@ -6,7 +6,7 @@ use crate::zkcuda::proving_system::expander::structs::{
 };
 use crate::zkcuda::proving_system::expander_parallelized::client_utils::{
     client_launch_server_and_setup, client_parse_args, client_send_witness_and_prove, wait_async,
-    ClientHttpHelper, client_send_witness_and_prove_nowait
+    ClientHttpHelper,
 };
 use crate::zkcuda::proving_system::{
     CombinedProof, ExpanderPCSDefered, ParallelizedExpander, ProvingSystem,
@@ -81,10 +81,7 @@ where
 {
     /// Lightweight prove that doesn't require computation_graph or prover_setup.
     /// Use this after setup() to allow releasing those large data structures before proving.
-    pub fn prove_lightweight(
-        device_memories: Vec<Vec<SIMDField<ZC::ECCConfig>>>,
-    )  {
+    pub fn prove_lightweight(device_memories: Vec<Vec<SIMDField<ZC::ECCConfig>>>) {
         client_send_witness_and_prove::<ZC::GKRConfig, ZC::ECCConfig>(device_memories);
-        // client_send_witness_and_prove_nowait::<ZC::GKRConfig, ZC::ECCConfig>(device_memories);
     }
 }
