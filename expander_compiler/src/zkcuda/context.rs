@@ -577,7 +577,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
 
         let dm_shapes = self.propagate_and_get_shapes();
 
-        let (mut cg_kernels, cg_proof_templates, cg_commitments_lens) = if let Some(cg) = cg {
+        let (cg_kernels, cg_proof_templates, cg_commitments_lens) = if let Some(cg) = cg {
             for (i, kernel) in cg.kernels.iter().enumerate() {
                 assert_eq!(self.kernels.add(kernel), i);
             }
@@ -617,7 +617,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 .collect::<Vec<_>>();
             let kernel_primitive = self.kernel_primitives.get(kernel_call.kernel_id);
             let kernel = if cg_kernels.is_some() {
-                // 从已加载的 kernels 中通过 kernel_id 获取
+                // Get kernel from loaded kernels by kernel_id
                 self.kernels.get(kernel_call.kernel_id).clone()
             } else {
                 let mut psi = Vec::new();
@@ -710,8 +710,8 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         }
 
         if let Some(_cg_kernels) = cg_kernels {
-            // 不再检查 cg_kernels 是否为空，因为我们不再消耗它
-            // kernels 已经在之前通过 self.kernels.add() 添加了
+            // No longer checking if cg_kernels is empty since we no longer consume it
+            // Kernels were already added earlier via self.kernels.add()
             assert_eq!(cg_proof_templates.unwrap(), self.proof_templates);
             assert_eq!(cg_commitments_lens.unwrap(), commitments_lens);
             Ok(None)
