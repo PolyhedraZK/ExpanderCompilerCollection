@@ -24,8 +24,16 @@ pub fn start_server<C: GKREngine>(
 fn parse_config<C: GKREngine>(mpi_size: usize) -> (String, String, String, String)
 where
 {
-    let oversubscription = if mpi_size > num_cpus::get_physical() {
-        println!("Warning: Not enough cores available for the requested number of processes. Using oversubscription.");
+    let force_oversubscribe = std::env::var("ZKML_FORCE_OVERSUBSCRIBE").is_ok();
+
+    let num_cpus = std::env::var("ZKML_NUM_CPUS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or_else(num_cpus::get_physical);
+    let oversubscription = if force_oversubscribe || mpi_size > num_cpus {
+        if mpi_size > num_cpus {
+            println!("Warning: Not enough cores available for the requested number of processes. Using oversubscription.");
+        }
         "--oversubscribe"
     } else {
         ""

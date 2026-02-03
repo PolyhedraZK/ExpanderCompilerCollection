@@ -87,7 +87,7 @@ where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
 {
-    let setup_timer = Timer::new("setup", true);
+    let setup_timer = Timer::new("new setup", true);
     println!("Starting server with binary: {server_binary}");
 
     let mut bytes = vec![];
@@ -112,7 +112,11 @@ where
     let mpi_size = if allow_oversubscribe {
         max_parallel_count
     } else {
-        let num_cpus = prev_power_of_two(num_cpus::get_physical());
+        let num_cpus = std::env::var("ZKML_NUM_CPUS")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or_else(num_cpus::get_physical);
+        let num_cpus = prev_power_of_two(num_cpus);
         if max_parallel_count > num_cpus {
             num_cpus
         } else {
@@ -136,7 +140,11 @@ where
 
     setup_timer.stop();
 
-    SharedMemoryEngine::read_pcs_setup_from_shared_memory()
+    // SharedMemoryEngine::read_pcs_setup_from_shared_memory()
+    (
+        ExpanderProverSetup::default(),
+        ExpanderVerifierSetup::default(),
+    )
 }
 
 pub fn client_send_witness_and_prove<C, ECCConfig>(
