@@ -426,7 +426,7 @@ impl LogUpRangeProofTable {
             let rem = n % self.rangeproof_bits;
             let shift = self.rangeproof_bits - rem;
             let constant = (1 << shift) - 1;
-            let mut mul_factor = 0;
+            let mut mul_factor = 1;
             mul_factor <<= n;
             let a_shift = builder.mul(constant, mul_factor);
             new_a = builder.add(a, a_shift);
