@@ -888,6 +888,17 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             ContextState::WitnessDone,
             "Please finish computation graph and witness solving before exporting device memories."
         );
+        self.export_device_memories_impl()
+    }
+
+    /// Export device memories without checking the context state.
+    /// Use this when you need to export memories outside the normal workflow,
+    /// e.g., for memory optimization where you want to export and then drop the context.
+    pub fn export_device_memories_unchecked(&self) -> Vec<Vec<SIMDField<C>>> {
+        self.export_device_memories_impl()
+    }
+
+    fn export_device_memories_impl(&self) -> Vec<Vec<SIMDField<C>>> {
         self.device_memories
             .iter()
             .map(|dm| {
