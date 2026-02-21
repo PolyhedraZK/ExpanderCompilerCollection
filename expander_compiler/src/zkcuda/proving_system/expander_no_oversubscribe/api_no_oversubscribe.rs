@@ -73,3 +73,15 @@ where
         wait_async(ClientHttpHelper::request_exit())
     }
 }
+
+impl<ZC: ZKCudaConfig> ExpanderNoOverSubscribe<ZC>
+where
+    <GetPCS<ZC> as ExpanderPCS<GetFieldConfig<ZC>>>::Commitment:
+        AsRef<<GetPCS<ZC> as ExpanderPCS<GetFieldConfig<ZC>>>::Commitment>,
+{
+    /// Lightweight prove that doesn't require computation_graph or prover_setup.
+    /// Use this after setup() to allow releasing those large data structures before proving.
+    pub fn prove_lightweight(device_memories: Vec<Vec<SIMDField<ZC::ECCConfig>>>) {
+        client_send_witness_and_prove::<ZC::GKRConfig, ZC::ECCConfig>(device_memories);
+    }
+}
