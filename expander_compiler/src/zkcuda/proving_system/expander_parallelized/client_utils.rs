@@ -87,7 +87,7 @@ where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
 {
-    let setup_timer = Timer::new("new setup", true);
+    let setup_timer = Timer::new("setup", true);
     println!("Starting server with binary: {server_binary}");
 
     let mut bytes = vec![];
@@ -182,13 +182,6 @@ where
             SharedMemoryEngine::wait_for_witness_read_complete();
             unsafe {
                 super::shared_memory_utils::SHARED_MEMORY.witness = None;
-            }
-            #[cfg(all(target_os = "linux", target_env = "gnu"))]
-            unsafe {
-                extern "C" {
-                    fn malloc_trim(pad: usize) -> i32;
-                }
-                malloc_trim(0);
             }
         })
         .await

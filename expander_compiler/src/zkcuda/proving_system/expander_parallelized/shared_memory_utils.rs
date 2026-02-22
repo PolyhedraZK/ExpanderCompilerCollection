@@ -133,8 +133,11 @@ impl SharedMemoryEngine {
         }
     }
 
-    /// Client: poll until witness_ack becomes 1
+    /// Client: poll until witness_ack becomes 1, with a timeout to avoid hanging
+    /// if the server crashes.
     pub fn wait_for_witness_read_complete() {
+        const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
+        let start = std::time::Instant::now();
         unsafe {
             let ptr = SHARED_MEMORY
                 .witness_ack
@@ -144,6 +147,12 @@ impl SharedMemoryEngine {
             loop {
                 if std::ptr::read_volatile(ptr) != 0 {
                     break;
+                }
+                if start.elapsed() > TIMEOUT {
+                    panic!(
+                        "Timed out waiting for server to read witness ({}s)",
+                        TIMEOUT.as_secs()
+                    );
                 }
                 std::thread::sleep(std::time::Duration::from_millis(10));
             }
