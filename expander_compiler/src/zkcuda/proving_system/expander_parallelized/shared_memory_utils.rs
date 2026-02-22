@@ -145,7 +145,7 @@ impl SharedMemoryEngine {
                 if std::ptr::read_volatile(ptr) != 0 {
                     break;
                 }
-                std::thread::sleep(std::time::Duration::from_millis(500));
+                std::thread::sleep(std::time::Duration::from_millis(10));
             }
         }
     }

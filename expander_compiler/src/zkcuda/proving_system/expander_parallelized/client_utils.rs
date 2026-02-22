@@ -160,11 +160,14 @@ where
     SharedMemoryEngine::reset_witness_ack();
     SharedMemoryEngine::write_witness_to_shared_memory::<C::FieldConfig>(device_memories);
 
-    extern "C" {
-        fn malloc_trim(pad: usize) -> i32;
-    }
-    unsafe {
-        malloc_trim(0);
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    {
+        extern "C" {
+            fn malloc_trim(pad: usize) -> i32;
+        }
+        unsafe {
+            malloc_trim(0);
+        }
     }
 
     // Async: send prove request + poll for witness ack to release shared memory early
@@ -179,6 +182,12 @@ where
             SharedMemoryEngine::wait_for_witness_read_complete();
             unsafe {
                 super::shared_memory_utils::SHARED_MEMORY.witness = None;
+            }
+            #[cfg(all(target_os = "linux", target_env = "gnu"))]
+            unsafe {
+                extern "C" {
+                    fn malloc_trim(pad: usize) -> i32;
+                }
                 malloc_trim(0);
             }
         })
