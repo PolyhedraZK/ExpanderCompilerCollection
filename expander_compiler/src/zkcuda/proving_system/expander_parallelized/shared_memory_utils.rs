@@ -18,12 +18,15 @@ pub struct SharedMemory {
     pub pcs_setup: Option<Shmem>,
     pub witness: Option<Shmem>,
     pub proof: Option<Shmem>,
+    /// 1-byte signal: 0 = witness not read, 1 = server finished reading witness
+    pub witness_ack: Option<Shmem>,
 }
 
 pub static mut SHARED_MEMORY: SharedMemory = SharedMemory {
     pcs_setup: None,
     witness: None,
     proof: None,
+    witness_ack: None,
 };
 
 pub struct SharedMemoryEngine {}
@@ -104,6 +107,47 @@ impl SharedMemoryEngine {
     pub fn read_pcs_setup_from_shared_memory<F: FieldEngine, PCS: ExpanderPCS<F>>(
     ) -> (ExpanderProverSetup<F, PCS>, ExpanderVerifierSetup<F, PCS>) {
         Self::read_object_from_shared_memory("pcs_setup", 0)
+    }
+
+    /// Client: reset witness_ack to 0 (call before writing witness)
+    pub fn reset_witness_ack() {
+        unsafe {
+            Self::allocate_shared_memory_if_necessary(
+                &mut SHARED_MEMORY.witness_ack,
+                "witness_ack",
+                1,
+            );
+            let ptr = SHARED_MEMORY.witness_ack.as_mut().unwrap().as_ptr();
+            std::ptr::write_volatile(ptr, 0u8);
+        }
+    }
+
+    /// Server: set witness_ack to 1 (call after reading witness)
+    pub fn signal_witness_read_complete() {
+        let shmem = ShmemConf::new()
+            .flink("witness_ack")
+            .open()
+            .expect("Failed to open witness_ack shared memory");
+        unsafe {
+            std::ptr::write_volatile(shmem.as_ptr(), 1u8);
+        }
+    }
+
+    /// Client: poll until witness_ack becomes 1
+    pub fn wait_for_witness_read_complete() {
+        unsafe {
+            let ptr = SHARED_MEMORY
+                .witness_ack
+                .as_ref()
+                .expect("witness_ack not initialized, call reset_witness_ack first")
+                .as_ptr() as *const u8;
+            loop {
+                if std::ptr::read_volatile(ptr) != 0 {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(500));
+            }
+        }
     }
 
     pub fn write_witness_to_shared_memory<F: FieldEngine>(values: Vec<Vec<F::SimdCircuitField>>) {
