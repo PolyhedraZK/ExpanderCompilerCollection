@@ -140,11 +140,11 @@ where
 
     setup_timer.stop();
 
-    // Skip reading PCS setup from shared memory; return default to reduce memory
-    (
-        ExpanderProverSetup::default(),
-        ExpanderVerifierSetup::default(),
-    )
+    // Prover setup not needed on client side (server does the proving).
+    // Verifier setup is required for verification, so read it from shared memory.
+    let (_prover_setup, verifier_setup) =
+        SharedMemoryEngine::read_pcs_setup_from_shared_memory::<C::FieldConfig, C::PCSConfig>();
+    (ExpanderProverSetup::default(), verifier_setup)
 }
 
 pub fn client_send_witness_and_prove<C, ECCConfig>(
