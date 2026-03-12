@@ -140,7 +140,11 @@ where
 
     setup_timer.stop();
 
-    SharedMemoryEngine::read_pcs_setup_from_shared_memory()
+    // Prover setup not needed on client side (server does the proving).
+    // Verifier setup is required for verification, so read it from shared memory.
+    let (_prover_setup, verifier_setup) =
+        SharedMemoryEngine::read_pcs_setup_from_shared_memory::<C::FieldConfig, C::PCSConfig>();
+    (ExpanderProverSetup::default(), verifier_setup)
 }
 
 pub fn client_send_witness_and_prove<C, ECCConfig>(
@@ -152,8 +156,39 @@ where
 {
     let timer = Timer::new("prove", true);
 
+    // Reset ack signal, then write witness
+    SharedMemoryEngine::reset_witness_ack();
     SharedMemoryEngine::write_witness_to_shared_memory::<C::FieldConfig>(device_memories);
-    wait_async(ClientHttpHelper::request_prove());
+
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    {
+        extern "C" {
+            fn malloc_trim(pad: usize) -> i32;
+        }
+        unsafe {
+            malloc_trim(0);
+        }
+    }
+
+    // Async: send prove request + poll for witness ack to release shared memory early
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let prove_handle = tokio::spawn(async {
+            ClientHttpHelper::request_prove().await;
+        });
+
+        // Poll witness_ack; once server confirms read, release witness shared memory
+        tokio::task::spawn_blocking(|| {
+            SharedMemoryEngine::wait_for_witness_read_complete();
+            unsafe {
+                super::shared_memory_utils::SHARED_MEMORY.witness = None;
+            }
+        })
+        .await
+        .expect("Witness cleanup task failed");
+
+        prove_handle.await.expect("Prove task failed");
+    });
 
     let proof = SharedMemoryEngine::read_proof_from_shared_memory();
 

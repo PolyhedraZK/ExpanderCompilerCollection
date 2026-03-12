@@ -149,6 +149,9 @@ where
             let mut witness_win = state.wt_shared_memory_win.lock().await;
             S::setup_shared_witness(&state.global_mpi_config, &mut witness, &mut witness_win);
 
+            // Signal client: witness has been read, shared memory can be released
+            SharedMemoryEngine::signal_witness_read_complete();
+
             let prover_setup_guard = state.prover_setup.lock().await;
             let computation_graph = state.computation_graph.lock().await;
 
