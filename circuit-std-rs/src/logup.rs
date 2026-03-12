@@ -328,6 +328,35 @@ impl LogUpSingleKeyTable {
 
         assert_eq_rational(builder, &v_table, &v_query);
     }
+
+    pub fn final_check_with_query_count<C: Config, B: RootAPI<C>>(
+        &mut self,
+        builder: &mut B,
+        query_count: &[Variable],
+    ) {
+        if self.table.is_empty() || self.query_keys.is_empty() {
+            panic!("empty table or empty query");
+        }
+
+        let value_len = self.table[0].len();
+
+        let alpha = builder.get_random_value();
+        let randomness = get_column_randomness(builder, value_len);
+
+        let table_combined = combine_columns(builder, &self.table, &randomness);
+        let v_table = logup_poly_val(builder, &table_combined, query_count, &alpha);
+
+        let query_combined = combine_columns(builder, &self.query_results, &randomness);
+        let one = builder.constant(1);
+        let v_query = logup_poly_val(
+            builder,
+            &query_combined,
+            &vec![one; query_combined.len()],
+            &alpha,
+        );
+
+        assert_eq_rational(builder, &v_table, &v_query);
+    }
 }
 
 pub struct LogUpRangeProofTable {
@@ -445,6 +474,25 @@ impl LogUpRangeProofTable {
         let query_count = builder.new_hint("myhint.querycounthint", &inputs, self.table_keys.len());
 
         let v_table = logup_poly_val(builder, &self.table_keys, &query_count, &alpha);
+
+        let one = builder.constant(1);
+        let v_query = logup_poly_val(
+            builder,
+            &self.query_keys,
+            &vec![one; self.query_keys.len()],
+            &alpha,
+        );
+        assert_eq_rational(builder, &v_table, &v_query);
+    }
+
+    pub fn final_check_with_query_count<C: Config, B: RootAPI<C>>(
+        &mut self,
+        builder: &mut B,
+        query_count: &[Variable],
+    ) {
+        let alpha = builder.get_random_value();
+
+        let v_table = logup_poly_val(builder, &self.table_keys, query_count, &alpha);
 
         let one = builder.constant(1);
         let v_query = logup_poly_val(
