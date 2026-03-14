@@ -148,6 +148,7 @@ pub fn read_circuit<C, ECCConfig>(
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
 {
+    eprintln!("Entering read_circuit");
     let (cg, win) = if global_mpi_config.is_root() {
         let computation_graph_bytes =
             std::fs::read(setup_file).expect("Failed to read computation graph from file");
@@ -162,4 +163,5 @@ pub fn read_circuit<C, ECCConfig>(
 
     *computation_graph = cg;
     mpi_win.replace(SharedMemoryWINWrapper { win });
+    eprintln!("Exiting read_circuit");
 }

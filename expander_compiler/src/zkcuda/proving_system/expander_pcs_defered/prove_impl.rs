@@ -37,6 +37,7 @@ where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
 {
+    eprintln!("Entering max_len_setup_commit_impl");
     assert_eq!(prover_setup.p_keys.len(), 1);
     let len_to_commit = prover_setup.p_keys.keys().next().cloned().unwrap();
 
@@ -47,6 +48,7 @@ where
         local_commit_impl::<C, ECCConfig>(prover_setup.p_keys.get(&len_to_commit).unwrap(), vals);
 
     commitment.vals_len = actual_len; // Store the actual length in the commitment
+    eprintln!("Exiting max_len_setup_commit_impl");
     (commitment, state)
 }
 
@@ -106,6 +108,7 @@ where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
 {
+    eprintln!("Entering mpi_prove_with_pcs_defered");
     let commit_timer = Timer::new("Commit to all input", global_mpi_config.is_root());
     let (commitments, _states) = if global_mpi_config.is_root() {
         let (commitments, states) = values
@@ -144,6 +147,7 @@ where
             );
 
             if global_mpi_config.is_root() {
+                eprintln!("Entering pcs claim extraction");
                 let (mut transcript, challenge) = gkr_end_state.unwrap();
                 assert!(challenge.challenge_y().is_none());
                 let challenge = challenge.challenge_x();
@@ -157,7 +161,7 @@ where
 
                 vals_ref.extend(local_vals_ref);
                 challenges.extend(local_challenges);
-
+                eprintln!("Exiting pcs claim extraction");
                 Some(ExpanderProof {
                     data: vec![transcript.finalize_and_get_proof()],
                 })
@@ -168,22 +172,26 @@ where
         .collect::<Vec<_>>();
     prove_timer.stop();
 
-    if global_mpi_config.is_root() {
+    let ret = if global_mpi_config.is_root() {
+        eprintln!("Entering pcs batch opening");
         let mut proofs = proofs.into_iter().map(|p| p.unwrap()).collect::<Vec<_>>();
 
         let pcs_opening_timer = Timer::new("Batch PCS Opening for all kernels", true);
         let pcs_batch_opening =
             open_defered_pcs::<C, ECCConfig>(prover_setup, &vals_ref, &challenges);
         pcs_opening_timer.stop();
-
         proofs.push(pcs_batch_opening);
+        eprintln!("Exiting pcs batch opening");
         Some(CombinedProof {
             commitments: commitments.unwrap(),
             proofs,
         })
     } else {
         None
-    }
+    };
+
+    eprintln!("Exiting mpi_prove_with_pcs_defered");
+    ret
 }
 
 pub fn extract_pcs_claims<'a, C: GKREngine>(

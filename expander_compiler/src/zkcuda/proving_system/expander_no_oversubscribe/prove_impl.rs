@@ -20,7 +20,6 @@ use crate::{
                 },
                 structs::{ExpanderProof, ExpanderProverSetup},
             },
-            expander_no_oversubscribe::profiler::NBytesProfiler,
             expander_parallelized::{
                 prove_impl::partition_single_gkr_claim_and_open_pcs_mpi,
                 server_ctrl::generate_local_mpi_config,
@@ -38,7 +37,6 @@ pub fn mpi_prove_no_oversubscribe_impl<ZC: ZKCudaConfig>(
     prover_setup: &ExpanderProverSetup<GetFieldConfig<ZC>, GetPCS<ZC>>,
     computation_graph: &ComputationGraph<ZC::ECCConfig>,
     values: &[impl AsRef<[SIMDField<ZC::ECCConfig>]>],
-    n_bytes_profiler: &mut NBytesProfiler,
 ) -> Option<CombinedProof<ZC::ECCConfig, Expander<ZC::GKRConfig>>>
 where
     <ZC::GKRConfig as GKREngine>::FieldConfig: FieldEngine<CircuitField = Fr, ChallengeField = Fr>,
@@ -91,13 +89,13 @@ where
                     &commitment_values,
                     next_power_of_two(template.parallel_count()),
                     template.is_broadcast(),
-                    n_bytes_profiler,
                 );
                 single_kernel_gkr_timer.stop();
 
                 match ZC::BATCH_PCS {
                     true => {
                         if global_mpi_config.is_root() {
+                            eprintln!("Entering pcs claim extraction");
                             let (mut transcript, challenge) = gkr_end_state.unwrap();
                             assert!(challenge.challenge_y().is_none());
                             let challenge = challenge.challenge_x();
@@ -113,6 +111,7 @@ where
                             vals_ref.extend(local_vals_ref);
                             challenges.extend(local_challenges);
 
+                            eprintln!("Exiting pcs claim extraction");
                             Some(ExpanderProof {
                                 data: vec![transcript.finalize_and_get_proof()],
                             })
@@ -161,6 +160,7 @@ where
     match ZC::BATCH_PCS {
         true => {
             if global_mpi_config.is_root() {
+                eprintln!("Entering Batch PCS Opening");
                 let mut proofs = proofs.into_iter().map(|p| p.unwrap()).collect::<Vec<_>>();
 
                 let pcs_opening_timer = Timer::new("Batch PCS Opening for all kernels", true);
@@ -172,6 +172,7 @@ where
                 pcs_opening_timer.stop();
 
                 proofs.push(pcs_batch_opening);
+                eprintln!("Exiting Batch PCS Opening");
                 Some(CombinedProof {
                     commitments: commitments.unwrap(),
                     proofs,
@@ -201,13 +202,13 @@ pub fn prove_kernel_gkr_no_oversubscribe<F, T, ECCConfig>(
     commitments_values: &[&[F::SimdCircuitField]],
     parallel_count: usize,
     is_broadcast: &[bool],
-    n_bytes_profiler: &mut NBytesProfiler,
 ) -> Option<(T, ExpanderDualVarChallenge<F>)>
 where
     F: FieldEngine<CircuitField = Fr, ChallengeField = Fr>,
     T: Transcript,
     ECCConfig: Config<FieldConfig = F>,
 {
+    eprintln!("Entering prove_kernel_gkr_no_oversubscribe");
     let local_mpi_config = generate_local_mpi_config(mpi_config, parallel_count);
 
     local_mpi_config.as_ref()?;
@@ -215,108 +216,44 @@ where
     let local_mpi_config = local_mpi_config.unwrap();
     let local_world_size = local_mpi_config.world_size();
 
+    macro_rules! call_prove_kernel_gkr_internal {
+        ($n:expr) => {
+            prove_kernel_gkr_internal::<F, BN254ConfigXN<$n>, T, ECCConfig>(
+                &local_mpi_config,
+                kernel,
+                commitments_values,
+                parallel_count,
+                is_broadcast,
+            )
+        };
+    }
+
     let n_local_copies = parallel_count / local_world_size;
-    match n_local_copies {
+    let ret = match n_local_copies {
         1 => prove_kernel_gkr_internal::<F, F, T, ECCConfig>(
             &local_mpi_config,
             kernel,
             commitments_values,
             parallel_count,
             is_broadcast,
-            n_bytes_profiler,
         ),
-        2 => prove_kernel_gkr_internal::<F, BN254ConfigXN<2>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            parallel_count,
-            is_broadcast,
-            n_bytes_profiler,
-        ),
-        4 => prove_kernel_gkr_internal::<F, BN254ConfigXN<4>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            parallel_count,
-            is_broadcast,
-            n_bytes_profiler,
-        ),
-        8 => prove_kernel_gkr_internal::<F, BN254ConfigXN<8>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            parallel_count,
-            is_broadcast,
-            n_bytes_profiler,
-        ),
-        16 => prove_kernel_gkr_internal::<F, BN254ConfigXN<16>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            parallel_count,
-            is_broadcast,
-            n_bytes_profiler,
-        ),
-        32 => prove_kernel_gkr_internal::<F, BN254ConfigXN<32>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            parallel_count,
-            is_broadcast,
-            n_bytes_profiler,
-        ),
-        64 => prove_kernel_gkr_internal::<F, BN254ConfigXN<64>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            parallel_count,
-            is_broadcast,
-            n_bytes_profiler,
-        ),
-        128 => prove_kernel_gkr_internal::<F, BN254ConfigXN<128>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            parallel_count,
-            is_broadcast,
-            n_bytes_profiler,
-        ),
-        256 => prove_kernel_gkr_internal::<F, BN254ConfigXN<256>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            parallel_count,
-            is_broadcast,
-            n_bytes_profiler,
-        ),
-        512 => prove_kernel_gkr_internal::<F, BN254ConfigXN<512>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            parallel_count,
-            is_broadcast,
-            n_bytes_profiler,
-        ),
-        1024 => prove_kernel_gkr_internal::<F, BN254ConfigXN<1024>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            parallel_count,
-            is_broadcast,
-            n_bytes_profiler,
-        ),
-        2048 => prove_kernel_gkr_internal::<F, BN254ConfigXN<2048>, T, ECCConfig>(
-            &local_mpi_config,
-            kernel,
-            commitments_values,
-            parallel_count,
-            is_broadcast,
-            n_bytes_profiler,
-        ),
+        2 => call_prove_kernel_gkr_internal!(2),
+        4 => call_prove_kernel_gkr_internal!(4),
+        8 => call_prove_kernel_gkr_internal!(8),
+        16 => call_prove_kernel_gkr_internal!(16),
+        32 => call_prove_kernel_gkr_internal!(32),
+        64 => call_prove_kernel_gkr_internal!(64),
+        128 => call_prove_kernel_gkr_internal!(128),
+        256 => call_prove_kernel_gkr_internal!(256),
+        512 => call_prove_kernel_gkr_internal!(512),
+        1024 => call_prove_kernel_gkr_internal!(1024),
+        2048 => call_prove_kernel_gkr_internal!(2048),
         _ => {
             panic!("Unsupported parallel count: {parallel_count}");
         }
-    }
+    };
+    eprintln!("Exiting prove_kernel_gkr_no_oversubscribe");
+    ret
 }
 
 pub fn prove_kernel_gkr_internal<FBasic, FMulti, T, ECCConfig>(
@@ -325,7 +262,6 @@ pub fn prove_kernel_gkr_internal<FBasic, FMulti, T, ECCConfig>(
     commitments_values: &[&[FBasic::SimdCircuitField]],
     parallel_count: usize,
     is_broadcast: &[bool],
-    n_bytes_profiler: &mut NBytesProfiler,
 ) -> Option<(T, ExpanderDualVarChallenge<FBasic>)>
 where
     FBasic: FieldEngine<CircuitField = Fr, ChallengeField = Fr>,
@@ -334,6 +270,7 @@ where
     T: Transcript,
     ECCConfig: Config<FieldConfig = FBasic>,
 {
+    eprintln!("Entering prove_kernel_gkr_internal");
     let world_rank = mpi_config.world_rank();
     let world_size = mpi_config.world_size();
     let n_copies = parallel_count / world_size;
@@ -346,8 +283,10 @@ where
         parallel_count,
     );
 
+    eprintln!("Preparing expander circuit and prover scratchpad...");
     let (mut expander_circuit, mut prover_scratch) =
         prepare_expander_circuit::<FMulti, ECCConfig>(kernel, world_size);
+    eprintln!("Circuit and scratchpad prepared");
 
     let mut transcript = T::new();
     let challenge = prove_gkr_with_local_vals_multi_copies::<FBasic, FMulti, T>(
@@ -357,9 +296,9 @@ where
         kernel.layered_circuit_input(),
         &mut transcript,
         mpi_config,
-        n_bytes_profiler,
     );
 
+    eprintln!("Exiting prove_kernel_gkr_internal");
     Some((transcript, challenge))
 }
 
@@ -389,7 +328,6 @@ pub fn prove_gkr_with_local_vals_multi_copies<FBasic, FMulti, T>(
     partition_info: &[LayeredCircuitInputVec],
     transcript: &mut T,
     mpi_config: &MPIConfig,
-    _n_bytes_profiler: &mut NBytesProfiler,
 ) -> ExpanderDualVarChallenge<FBasic>
 where
     FBasic: FieldEngine<CircuitField = Fr, ChallengeField = Fr>,
@@ -397,6 +335,7 @@ where
         FieldEngine<CircuitField = FBasic::CircuitField, ChallengeField = FBasic::ChallengeField>,
     T: Transcript,
 {
+    eprintln!("Preparing input vals multiple copies");
     let input_vals_multi_copies = local_commitment_values_multi_copies
         .iter()
         .map(|local_commitment_values| {
@@ -407,7 +346,9 @@ where
             )
         })
         .collect::<Vec<_>>();
+    eprintln!("Input vals multiple copies prepared");
 
+    eprintln!("Packing input vals multiple copies into single input vals");
     let mut input_vals =
         vec![FMulti::SimdCircuitField::ZERO; 1 << expander_circuit.log_input_size()];
 
@@ -419,24 +360,18 @@ where
         *vals = FMulti::SimdCircuitField::pack(&vals_unpacked);
     }
     expander_circuit.layers[0].input_vals = input_vals;
+    eprintln!("Input vals multiple copies packed into single input vals");
 
+    eprintln!("Evaluating expander circuit...");
     expander_circuit.fill_rnd_coefs(transcript);
     expander_circuit.evaluate();
+    eprintln!("Expander circuit evaluated");
 
-    #[cfg(feature = "zkcuda_profile")]
-    {
-        expander_circuit.layers.iter().for_each(|layer| {
-            layer.input_vals.iter().for_each(|val| {
-                val.unpack().iter().for_each(|fr| {
-                    _n_bytes_profiler.add_fr(*fr);
-                })
-            });
-        });
-    }
-
+    eprintln!("Proving GKR...");
     let (claimed_v, challenge) =
         gkr::gkr_prove(expander_circuit, prover_scratch, transcript, mpi_config);
     assert_eq!(claimed_v, FBasic::ChallengeField::from(0u32));
+    eprintln!("GKR proved");
 
     let n_simd_vars_basic = FBasic::SimdCircuitField::PACK_SIZE.ilog2() as usize;
 

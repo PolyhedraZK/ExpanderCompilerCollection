@@ -23,6 +23,7 @@ where
     C: GKREngine,
     ECCConfig: Config<FieldConfig = C::FieldConfig>,
 {
+    eprintln!("Entering pcs_setup_max_length_only");
     let mut p_keys = HashMap::new();
     let mut v_keys = HashMap::new();
     let max_commitment_len = computation_graph
@@ -40,6 +41,7 @@ where
     p_keys.insert(max_commitment_len, p_key);
     v_keys.insert(max_commitment_len, v_key);
 
+    eprintln!("Exiting pcs_setup_max_length_only");
     (
         ExpanderProverSetup { p_keys },
         ExpanderVerifierSetup { v_keys },

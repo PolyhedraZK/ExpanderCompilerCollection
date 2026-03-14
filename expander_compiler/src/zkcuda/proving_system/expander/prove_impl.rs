@@ -28,12 +28,16 @@ where
     ECCConfig: Config,
     ECCConfig::FieldConfig: FieldEngine<CircuitField = F::CircuitField>,
 {
+    eprintln!("Exporting to expander circuit...");
     let mut expander_circuit = kernel.layered_circuit().export_to_expander().flatten();
     expander_circuit.pre_process_gkr();
+    eprintln!("Expander circuit exported, n_layers = {}", expander_circuit.layers.len());
 
+    eprintln!("Preparing prover scratch pad...");
     let (max_num_input_var, max_num_output_var) = super::utils::max_n_vars(&expander_circuit);
     let prover_scratch =
         ProverScratchPad::<F>::new(max_num_input_var, max_num_output_var, mpi_world_size);
+    eprintln!("Prover scratch pad prepared");
 
     (expander_circuit, prover_scratch)
 }
