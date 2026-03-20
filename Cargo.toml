@@ -66,3 +66,24 @@ serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", pac
 gkr_engine = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 gkr_hashers = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 expander_utils = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "utils" }
+
+[patch."https://github.com/PolyhedraZK/Expander"]
+arith = { path = "../Expander/arith" }
+babybear = { path = "../Expander/arith/babybear" }
+crosslayer_prototype = { path = "../Expander/crosslayer_prototype" }
+circuit = { path = "../Expander/circuit" }
+transcript = { path = "../Expander/transcript" }
+bin = { path = "../Expander/bin" }
+gkr = { path = "../Expander/gkr" }
+gf2 = { path = "../Expander/arith/gf2" }
+mersenne31 = { path = "../Expander/arith/mersenne31" }
+goldilocks = { path = "../Expander/arith/goldilocks" }
+poly_commit = { path = "../Expander/poly_commit" }
+polynomials = { path = "../Expander/arith/polynomials" }
+sumcheck = { path = "../Expander/sumcheck" }
+serdes = { path = "../Expander/serdes" }
+gkr_engine = { path = "../Expander/gkr_engine" }
+gkr_hashers = { path = "../Expander/hasher" }
+utils = { path = "../Expander/utils" }
+config_macros = { path = "../Expander/config_macros" }
+serdes_derive = { path = "../Expander/serdes_derive" }

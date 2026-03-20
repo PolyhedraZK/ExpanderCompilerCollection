@@ -2,7 +2,7 @@ use std::{fmt::Debug, hash::Hash};
 
 pub use gkr::{
     BN254ConfigMIMC5Raw, BabyBearx16ConfigSha2Raw, GF2ExtConfigSha2Raw, Goldilocksx8ConfigSha2Raw,
-    M31x16ConfigSha2RawVanilla,
+    M31x16ConfigSha2OrionVanilla, M31x16ConfigSha2RawVanilla,
 };
 use gkr_engine::{FieldEngine, GKREngine};
 
@@ -38,12 +38,17 @@ pub type SIMDField<C> = <<C as GKREngine>::FieldConfig as FieldEngine>::SimdCirc
 // TODO: We should probably not include it in ECC.
 pub type BN254Config = BN254ConfigMIMC5Raw<'static>;
 pub type M31Config = M31x16ConfigSha2RawVanilla<'static>;
+pub type M31OrionConfig = M31x16ConfigSha2OrionVanilla<'static>;
 pub type GF2Config = GF2ExtConfigSha2Raw<'static>;
 pub type GoldilocksConfig = Goldilocksx8ConfigSha2Raw<'static>;
 pub type BabyBearConfig = BabyBearx16ConfigSha2Raw<'static>;
 
 impl Config for M31Config {
     const CONFIG_ID: usize = 1;
+}
+
+impl Config for M31OrionConfig {
+    const CONFIG_ID: usize = 6;
 }
 
 impl Config for BN254Config {
