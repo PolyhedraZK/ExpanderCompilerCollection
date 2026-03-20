@@ -1,13 +1,13 @@
-//! Batch GKR with parallel template proving.
+//! Batch GKR with parallel template proving via Rayon work-stealing.
 use std::io::Cursor;
+use std::sync::Mutex;
 use arith::Field;
-use gkr::{gkr_prove, gkr_prove_batch, gkr_verify};
-use gkr_engine::{ExpanderDualVarChallenge, ExpanderPCS, FieldEngine, GKREngine, MPIConfig, Transcript};
-use serdes::ExpSerde;
+use gkr::{gkr_prove_batch, gkr_verify};
+use gkr_engine::{ExpanderPCS, FieldEngine, GKREngine, MPIConfig, Transcript};
 use crate::{frontend::{Config, SIMDField}, utils::misc::next_power_of_two,
     zkcuda::{context::ComputationGraph, proving_system::{common::check_inputs,
-        expander::{prove_impl::{get_local_vals, pcs_local_open_impl, prepare_expander_circuit, prepare_inputs_with_local_vals},
-            structs::{ExpanderCommitment, ExpanderProof, ExpanderProverSetup, ExpanderVerifierSetup}},
+        expander::{prove_impl::{get_local_vals, prepare_expander_circuit, prepare_inputs_with_local_vals},
+            structs::{ExpanderProof, ExpanderProverSetup, ExpanderVerifierSetup}},
                 CombinedProof, Expander, ProvingSystem}}};
 
 pub struct ExpanderLocalDeferred<C: GKREngine> { _config: std::marker::PhantomData<C> }
@@ -23,20 +23,27 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
 
     fn prove(ps: &Self::ProverSetup, cg: &ComputationGraph<ECCConfig>, dm: Vec<Vec<SIMDField<ECCConfig>>>) -> Self::Proof {
         use crate::zkcuda::proving_system::expander::commit_impl::local_commit_impl;
+        let t_commit = std::time::Instant::now();
         let (commitments, _): (Vec<_>, Vec<_>) = dm.iter().map(|m| local_commit_impl::<C, ECCConfig>(ps.p_keys.get(&m.len()).unwrap(), m)).unzip();
+        eprintln!("  [commit] {:?}", t_commit.elapsed());
         let templates = cg.proof_templates();
         let kernels = cg.kernels();
-        let proofs = std::thread::scope(|scope| {
-            let handles: Vec<_> = templates.iter().enumerate().map(|(ti, tmpl)| {
+        let n = templates.len();
+        let results: Vec<Mutex<Option<ExpanderProof>>> = (0..n).map(|_| Mutex::new(None)).collect();
+        rayon::scope(|scope| {
+            for (ti, tmpl) in templates.iter().enumerate() {
                 let ps_ptr = ps as *const _ as usize;
-                let dm = &dm; let kernels = &kernels;
-                scope.spawn(move || {
+                let dm = &dm;
+                let kernels = &kernels;
+                let slot = &results[ti];
+                scope.spawn(move |_| {
                     let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = unsafe { &*(ps_ptr as *const _) };
-                    prove_one::<C, ECCConfig>(ti, tmpl, kernels, dm, ps)
-                })
-            }).collect();
-            handles.into_iter().map(|h| h.join().unwrap()).collect()
+                    let proof = prove_one::<C, ECCConfig>(ti, tmpl, kernels, dm, ps);
+                    *slot.lock().unwrap() = Some(proof);
+                });
+            }
         });
+        let proofs = results.into_iter().map(|m| m.into_inner().unwrap().unwrap()).collect();
         CombinedProof { commitments, proofs }
     }
 
@@ -50,25 +57,20 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
             let mut ec = kernel.layered_circuit().export_to_expander_flatten();
 
             if pc > 1 {
-                // Batch verify: gkr_verify with proving_time_mpi_size=pc
                 let mut t = C::TranscriptConfig::new();
                 ec.fill_rnd_coefs(&mut t);
                 let mut cur = Cursor::new(&lp.data[0].bytes);
                 let (ok, ch, _v0, _v1) = gkr_verify(pc, &ec, &[], &<C::FieldConfig as FieldEngine>::ChallengeField::ZERO, &mut t, &mut cur);
                 if !ok { eprintln!("Batch GKR verify fail tmpl {ti}"); return false; }
-                // PCS verify: read openings from proof stream
                 let chs = if let Some(cy) = ch.challenge_y() { vec![ch.challenge_x(), cy] } else { vec![ch.challenge_x()] };
                 for sc in &chs {
-                    for (&ref comm, &ib) in comms.iter().zip(tmpl.is_broadcast().iter()) {
-                        // Truncate rz for eval, then extend for PCS
+                    for (&ref comm, &_ib) in comms.iter().zip(tmpl.is_broadcast().iter()) {
                         let commitment_len = comm.vals_len;
                         let local_size = commitment_len >> sc.r_mpi.len();
                         let n_local = if local_size > 0 { local_size.ilog2() as usize } else { 0 };
                         let mut eval_ch = sc.clone();
                         eval_ch.rz.truncate(n_local);
-                        // Read eval value from transcript
                         let _v: <C::FieldConfig as FieldEngine>::ChallengeField = t.generate_field_element();
-                        // Read PCS opening proof
                         let max_len = *vs.v_keys.keys().max().unwrap();
                         let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(max_len.ilog2() as usize, 1);
                         let v_key = vs.v_keys.get(&max_len).unwrap();
@@ -78,12 +80,10 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
                         let target_rz = max_len.ilog2() as usize;
                         while pcs_ch.rz.len() < target_rz { pcs_ch.rz.push(<C::FieldConfig as FieldEngine>::ChallengeField::ZERO); }
                         // TODO: actually verify PCS opening against commitment
-                        // For now read past the proof bytes
                         let _ = (v_key, &params, &pcs_ch, comm, &mut cur);
                     }
                 }
             } else {
-                // N=1: standard single-instance verify
                 let mut t = C::TranscriptConfig::new();
                 ec.fill_rnd_coefs(&mut t);
                 let mut cur = Cursor::new(&lp.data[0].bytes);
@@ -128,9 +128,8 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         let t2 = std::time::Instant::now();
         let chs = if let Some(cy) = ch.challenge_y() { vec![ch.challenge_x(), cy] } else { vec![ch.challenge_x()] };
         for sc in &chs {
-            for (&ref v, &ib) in cvs.iter().zip(tmpl.is_broadcast().iter()) {
-                let mut pc2 = sc.clone();
-                // pcs_batch_open_impl handles r_mpi internally
+            for (&ref v, &_ib) in cvs.iter().zip(tmpl.is_broadcast().iter()) {
+                let pc2 = sc.clone();
                 crate::zkcuda::proving_system::expander::prove_impl::pcs_batch_open_impl::<C>(v, &pc2, ps, &mut tr);
             }
         }
