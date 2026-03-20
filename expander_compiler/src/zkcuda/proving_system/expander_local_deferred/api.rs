@@ -150,8 +150,19 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         let lv = get_local_vals(&cvs, tmpl.is_broadcast(), 0, 1);
         let ch = crate::zkcuda::proving_system::expander::prove_impl::prove_gkr_with_local_vals::<C::FieldConfig, C::TranscriptConfig>(
             &mut c, &mut s, &lv, kernel.layered_circuit_input(), &mut tr, &MPIConfig::prover_new(None, None));
-        crate::zkcuda::proving_system::expander::prove_impl::partition_gkr_claims_and_open_pcs_no_mpi::<C>(
-            &ch, &cvs, ps, tmpl.is_broadcast(), 0, 1, &mut tr);
+        // Open PCS with commit scratch pads for Orion compatibility
+        let challenges = if let Some(cy) = ch.challenge_y() { vec![ch.challenge_x(), cy] } else { vec![ch.challenge_x()] };
+        for sc in &challenges {
+            for (ci, (v, &ib)) in cvs.iter().zip(tmpl.is_broadcast().iter()).enumerate() {
+                let comm_idx = tmpl.commitment_indices()[ci];
+                let val_len = v.len();
+                let (challenge_for_pcs, _) = crate::zkcuda::proving_system::expander::prove_impl::partition_challenge_and_location_for_pcs_no_mpi::<C::FieldConfig>(
+                    sc, val_len, 0, 1, ib);
+                let scratch = &commit_states[comm_idx].scratch;
+                crate::zkcuda::proving_system::expander::prove_impl::pcs_local_open_with_scratch::<C>(
+                    v, &challenge_for_pcs, ps, &mut tr, Some(scratch));
+            }
+        }
         eprintln!("  [batch] tmpl[{}] N=1 t={:?}", ti, t0.elapsed());
         ExpanderProof { data: vec![tr.finalize_and_get_proof()] }
     }

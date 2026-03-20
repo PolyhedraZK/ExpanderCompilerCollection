@@ -164,6 +164,16 @@ pub fn pcs_local_open_impl<C: GKREngine>(
     p_keys: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
     transcript: &mut C::TranscriptConfig,
 ) {
+    pcs_local_open_with_scratch::<C>(vals, challenge, p_keys, transcript, None);
+}
+
+pub fn pcs_local_open_with_scratch<C: GKREngine>(
+    vals: &[<C::FieldConfig as FieldEngine>::SimdCircuitField],
+    challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
+    p_keys: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
+    transcript: &mut C::TranscriptConfig,
+    commit_scratch: Option<&<C::PCSConfig as ExpanderPCS<C::FieldConfig>>::ScratchPad>,
+) {
     assert_eq!(challenge.r_mpi.len(), 0);
 
     let val_len = vals.len();
@@ -172,13 +182,14 @@ pub fn pcs_local_open_impl<C: GKREngine>(
     let p_key = p_keys.p_keys.get(&val_len).unwrap();
 
     let poly = RefMultiLinearPoly::from_ref(vals);
-    // TODO: Change this function in Expander to use rayon.
-    eprintln!("  PCS: vals={} rz={} simd={} mpi={}", vals.len(), challenge.rz.len(), challenge.r_simd.len(), challenge.r_mpi.len());
     let v = <C::FieldConfig as FieldEngine>::single_core_eval_circuit_vals_at_expander_challenge(
         vals, challenge,
     );
     transcript.append_field_element(&v);
 
+    let default_scratch = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::init_scratch_pad(
+        &params, &MPIConfig::prover_new(None, None));
+    let scratch = commit_scratch.unwrap_or(&default_scratch);
     transcript.lock_proof();
     let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::open(
         &params,
@@ -187,10 +198,7 @@ pub fn pcs_local_open_impl<C: GKREngine>(
         &poly,
         challenge,
         transcript,
-        &<C::PCSConfig as ExpanderPCS<C::FieldConfig>>::init_scratch_pad(
-            &params,
-            &MPIConfig::prover_new(None, None),
-        ),
+        scratch,
     )
     .unwrap();
     transcript.unlock_proof();
