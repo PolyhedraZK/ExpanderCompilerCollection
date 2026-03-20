@@ -24,12 +24,13 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
     fn prove(ps: &Self::ProverSetup, cg: &ComputationGraph<ECCConfig>, dm: Vec<Vec<SIMDField<ECCConfig>>>) -> Self::Proof {
         use crate::zkcuda::proving_system::expander::commit_impl::local_commit_impl;
         let t_commit = std::time::Instant::now();
-        let (commitments, _): (Vec<_>, Vec<_>) = dm.iter().map(|m| local_commit_impl::<C, ECCConfig>(ps.p_keys.get(&m.len()).unwrap(), m)).unzip();
+        let (commitments, commit_states): (Vec<_>, Vec<_>) = dm.iter().map(|m| local_commit_impl::<C, ECCConfig>(ps.p_keys.get(&m.len()).unwrap(), m)).unzip();
         eprintln!("  [commit] {:?}", t_commit.elapsed());
         let templates = cg.proof_templates();
         let kernels = cg.kernels();
         let n = templates.len();
         let results: Vec<Mutex<Option<ExpanderProof>>> = (0..n).map(|_| Mutex::new(None)).collect();
+        let commit_states = &commit_states;
         rayon::scope(|scope| {
             for (ti, tmpl) in templates.iter().enumerate() {
                 let ps_ptr = ps as *const _ as usize;
@@ -38,7 +39,7 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
                 let slot = &results[ti];
                 scope.spawn(move |_| {
                     let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = unsafe { &*(ps_ptr as *const _) };
-                    let proof = prove_one::<C, ECCConfig>(ti, tmpl, kernels, dm, ps);
+                    let proof = prove_one::<C, ECCConfig>(ti, tmpl, kernels, dm, ps, commit_states);
                     *slot.lock().unwrap() = Some(proof);
                 });
             }
@@ -103,6 +104,7 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     kernels: &[crate::zkcuda::kernel::Kernel<ECCConfig>],
     dm: &[Vec<SIMDField<ECCConfig>>],
     ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
+    commit_states: &[crate::zkcuda::proving_system::expander::structs::ExpanderCommitmentState<C::FieldConfig, C::PCSConfig>],
 ) -> ExpanderProof {
     let kernel = &kernels[tmpl.kernel_id()];
     let cvs: Vec<&[SIMDField<C>]> = tmpl.commitment_indices().iter().map(|&i| dm[i].as_slice()).collect();
@@ -131,9 +133,12 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         let t2 = std::time::Instant::now();
         let chs = if let Some(cy) = ch.challenge_y() { vec![ch.challenge_x(), cy] } else { vec![ch.challenge_x()] };
         for sc in &chs {
-            for (&ref v, &_ib) in cvs.iter().zip(tmpl.is_broadcast().iter()) {
+            for (ci, (&ref v, &_ib)) in cvs.iter().zip(tmpl.is_broadcast().iter()).enumerate() {
                 let pc2 = sc.clone();
-                crate::zkcuda::proving_system::expander::prove_impl::pcs_batch_open_impl::<C>(v, &pc2, ps, &mut tr);
+                let comm_idx = tmpl.commitment_indices()[ci];
+                let scratch = &commit_states[comm_idx].scratch;
+                crate::zkcuda::proving_system::expander::prove_impl::pcs_batch_open_with_scratch::<C>(
+                    v, &pc2, ps, &mut tr, Some(scratch));
             }
         }
         let t3 = std::time::Instant::now();

@@ -267,6 +267,16 @@ pub fn pcs_batch_open_impl<C: GKREngine>(
     p_keys: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
     transcript: &mut C::TranscriptConfig,
 ) {
+    pcs_batch_open_with_scratch::<C>(vals, challenge, p_keys, transcript, None);
+}
+
+pub fn pcs_batch_open_with_scratch<C: GKREngine>(
+    vals: &[<C::FieldConfig as FieldEngine>::SimdCircuitField],
+    challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
+    p_keys: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
+    transcript: &mut C::TranscriptConfig,
+    commit_scratch: Option<&<C::PCSConfig as ExpanderPCS<C::FieldConfig>>::ScratchPad>,
+) {
     // Use the actual commitment size, not max_len (avoids O(max_len) padding waste)
     let commit_len = vals.len();
     let params =
@@ -298,6 +308,9 @@ pub fn pcs_batch_open_impl<C: GKREngine>(
     let poly = RefMultiLinearPoly::from_ref(vals);
 
     transcript.lock_proof();
+    let default_scratch = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::init_scratch_pad(
+        &params, &MPIConfig::prover_new(None, None));
+    let scratch = commit_scratch.unwrap_or(&default_scratch);
     let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::open(
         &params,
         &MPIConfig::prover_new(None, None),
@@ -305,10 +318,7 @@ pub fn pcs_batch_open_impl<C: GKREngine>(
         &poly,
         &pcs_challenge,
         transcript,
-        &<C::PCSConfig as ExpanderPCS<C::FieldConfig>>::init_scratch_pad(
-            &params,
-            &MPIConfig::prover_new(None, None),
-        ),
+        scratch,
     )
     .unwrap();
     transcript.unlock_proof();
