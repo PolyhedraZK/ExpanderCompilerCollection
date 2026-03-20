@@ -21,3 +21,6 @@ pub use expander_pcs_defered::api_pcs_defered::*;
 
 pub mod expander_no_oversubscribe;
 pub use expander_no_oversubscribe::api_no_oversubscribe::*;
+
+pub mod expander_local_deferred;
+pub use expander_local_deferred::api::*;

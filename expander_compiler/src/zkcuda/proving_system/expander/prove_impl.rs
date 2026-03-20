@@ -173,6 +173,7 @@ pub fn pcs_local_open_impl<C: GKREngine>(
 
     let poly = RefMultiLinearPoly::from_ref(vals);
     // TODO: Change this function in Expander to use rayon.
+    eprintln!("  PCS: vals={} rz={} simd={} mpi={}", vals.len(), challenge.rz.len(), challenge.r_simd.len(), challenge.r_mpi.len());
     let v = <C::FieldConfig as FieldEngine>::single_core_eval_circuit_vals_at_expander_challenge(
         vals, challenge,
     );
@@ -257,4 +258,70 @@ pub fn partition_gkr_claims_and_open_pcs_no_mpi<C: GKREngine>(
             transcript,
         );
     });
+}
+
+/// Batch-compatible PCS opening: allows non-empty r_mpi and uses max-length key.
+pub fn pcs_batch_open_impl<C: GKREngine>(
+    vals: &[<C::FieldConfig as FieldEngine>::SimdCircuitField],
+    challenge: &ExpanderSingleVarChallenge<C::FieldConfig>,
+    p_keys: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
+    transcript: &mut C::TranscriptConfig,
+) {
+    let max_len = *p_keys.p_keys.keys().max().expect("no PCS keys");
+    let params =
+        <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(max_len.ilog2() as usize, 1);
+    let p_key = p_keys.p_keys.get(&max_len).unwrap();
+
+    // Truncate rz to match commitment size
+    let local_size = vals.len() >> challenge.r_mpi.len();
+    let n_local_vars = if local_size > 0 { local_size.ilog2() as usize } else { 0 };
+    let mut eval_challenge = challenge.clone();
+    eval_challenge.rz.truncate(n_local_vars);
+    
+    let v = <C::FieldConfig as FieldEngine>::single_core_eval_circuit_vals_at_expander_challenge(
+        vals, &eval_challenge,
+    );
+    transcript.append_field_element(&v);
+
+    // For PCS: merge r_mpi into rz and pad vals to max_len
+    let mut pcs_challenge = challenge.clone();
+    pcs_challenge.rz.extend_from_slice(&pcs_challenge.r_mpi);
+    pcs_challenge.r_mpi = vec![];
+
+    // Pad to max_len for PCS key compatibility
+    let padded: Vec<_> = if vals.len() < max_len {
+        let mut p = vals.to_vec();
+        p.resize(max_len, Default::default());
+        p
+    } else {
+        vals.to_vec()
+    };
+    // Extend rz to match padded length
+    let target_rz_len = max_len.ilog2() as usize;
+    while pcs_challenge.rz.len() < target_rz_len {
+        pcs_challenge.rz.push(<C::FieldConfig as FieldEngine>::ChallengeField::ZERO);
+    }
+    let poly = RefMultiLinearPoly::from_ref(&padded);
+
+    transcript.lock_proof();
+    let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::open(
+        &params,
+        &MPIConfig::prover_new(None, None),
+        p_key,
+        &poly,
+        &pcs_challenge,
+        transcript,
+        &<C::PCSConfig as ExpanderPCS<C::FieldConfig>>::init_scratch_pad(
+            &params,
+            &MPIConfig::prover_new(None, None),
+        ),
+    )
+    .unwrap();
+    transcript.unlock_proof();
+
+    let mut buffer = vec![];
+    opening
+        .serialize_into(&mut buffer)
+        .expect("Failed to serialize opening");
+    transcript.append_u8_slice(&buffer);
 }
