@@ -899,8 +899,9 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
     }
 
     fn export_device_memories_impl(&self) -> Vec<Vec<SIMDField<C>>> {
+        use rayon::prelude::*;
         self.device_memories
-            .iter()
+            .par_iter()
             .map(|dm| {
                 let shape = prefix_products_to_shape(&dm.required_shape_products);
                 multi_dimension_data_padding(&shape, &dm.values)
