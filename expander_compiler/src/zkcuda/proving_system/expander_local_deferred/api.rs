@@ -24,7 +24,16 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
     fn prove(ps: &Self::ProverSetup, cg: &ComputationGraph<ECCConfig>, dm: Vec<Vec<SIMDField<ECCConfig>>>) -> Self::Proof {
         use crate::zkcuda::proving_system::expander::commit_impl::local_commit_impl;
         let t_commit = std::time::Instant::now();
-        let (commitments, commit_states): (Vec<_>, Vec<_>) = dm.iter().map(|m| local_commit_impl::<C, ECCConfig>(ps.p_keys.get(&m.len()).unwrap(), m)).unzip();
+        // Parallel commits: each device memory commits independently
+        let ps_ptr = ps as *const _ as usize;
+        let commit_results: Vec<_> = {
+            use rayon::prelude::*;
+            dm.par_iter().map(|m| {
+                let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = unsafe { &*(ps_ptr as *const _) };
+                local_commit_impl::<C, ECCConfig>(ps.p_keys.get(&m.len()).unwrap(), m)
+            }).collect()
+        };
+        let (commitments, commit_states): (Vec<_>, Vec<_>) = commit_results.into_iter().unzip();
         eprintln!("  [commit] {:?}", t_commit.elapsed());
         let templates = cg.proof_templates();
         let kernels = cg.kernels();
