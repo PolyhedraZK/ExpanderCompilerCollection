@@ -143,7 +143,12 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             }
             circuits[pi].evaluate();
         }
-        let mut sps: Vec<_> = (0..pc).map(|_| bs.clone()).collect();
+        // Use new() instead of clone(): calloc (zero-page) vs alloc+memcpy
+        let max_in = tc.layers.iter().map(|l| l.input_var_num).max().unwrap_or(0);
+        let max_out = tc.layers.iter().map(|l| l.output_var_num).max().unwrap_or(0);
+        let mut sps: Vec<_> = (0..pc).map(|_| {
+            sumcheck::ProverScratchPad::<C::FieldConfig>::new(max_in, max_out, 1)
+        }).collect();
         let t1 = std::time::Instant::now();
         let (cv, ch) = gkr_prove_batch(&circuits, &mut sps, &mut tr);
         // Drop batch circuits without freeing shared gates or aliased buffers
