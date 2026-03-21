@@ -59,7 +59,11 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
 
     fn verify(vs: &Self::VerifierSetup, cg: &ComputationGraph<ECCConfig>, proof: &Self::Proof) -> bool {
         use crate::zkcuda::proving_system::expander::verify_impl::verify_pcs_opening_and_aggregation_no_mpi;
-        for (ti, tmpl) in cg.proof_templates().iter().enumerate() {
+        // Parallel template verification — each template is independent
+        let vs_ptr = vs as *const _ as usize;
+        use rayon::prelude::*;
+        let results: Vec<bool> = cg.proof_templates().par_iter().enumerate().map(|(ti, tmpl)| {
+            let vs: &ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig> = unsafe { &*(vs_ptr as *const _) };
             let kernel = &cg.kernels()[tmpl.kernel_id()];
             let pc = next_power_of_two(tmpl.parallel_count());
             let comms: Vec<_> = tmpl.commitment_indices().iter().map(|&i| &proof.commitments[i]).collect();
@@ -71,7 +75,7 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
                 ec.fill_rnd_coefs(&mut t);
                 let mut cur = Cursor::new(&lp.data[0].bytes);
                 let (ok, ch, _v0, _v1) = gkr_verify(pc, &ec, &[], &<C::FieldConfig as FieldEngine>::ChallengeField::ZERO, &mut t, &mut cur);
-                if !ok { eprintln!("Batch GKR verify fail tmpl {ti}"); return false; }
+                if !ok { return false; }
                 let chs = if let Some(cy) = ch.challenge_y() { vec![ch.challenge_x(), cy] } else { vec![ch.challenge_x()] };
                 for sc in &chs {
                     for (&ref comm, &_ib) in comms.iter().zip(tmpl.is_broadcast().iter()) {
@@ -93,18 +97,17 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
                         let _ = (v_key, &params, &pcs_ch, comm, &mut cur);
                     }
                 }
+                true
             } else {
                 let mut t = C::TranscriptConfig::new();
                 ec.fill_rnd_coefs(&mut t);
                 let mut cur = Cursor::new(&lp.data[0].bytes);
                 let (ok, ch, v0, v1) = gkr_verify(1, &ec, &[], &<C::FieldConfig as FieldEngine>::ChallengeField::ZERO, &mut t, &mut cur);
-                if !ok { eprintln!("GKR verify fail tmpl {ti}"); return false; }
-                if !verify_pcs_opening_and_aggregation_no_mpi::<C, ECCConfig>(&mut cur, kernel, vs, &ch, v0, v1, &comms, tmpl.is_broadcast(), 0, 1, &mut t) {
-                    eprintln!("PCS verify fail tmpl {ti}"); return false;
-                }
+                if !ok { return false; }
+                verify_pcs_opening_and_aggregation_no_mpi::<C, ECCConfig>(&mut cur, kernel, vs, &ch, v0, v1, &comms, tmpl.is_broadcast(), 0, 1, &mut t)
             }
-        }
-        true
+        }).collect();
+        results.iter().all(|&x| x)
     }
 }
 
