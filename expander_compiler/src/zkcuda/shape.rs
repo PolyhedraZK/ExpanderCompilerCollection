@@ -244,6 +244,34 @@ pub fn multi_dimension_data_padding<T: Default + Clone>(shape: &[usize], data: &
             ret[i] = data[data.len() - 1].clone();
         }
         ret
+    } else if shape.len() == 2 {
+        // Fast path for 2D (most common): 1 allocation, no intermediate Vecs
+        let n_rows = shape[0];
+        let n_cols = shape[1];
+        assert_eq!(data.len(), n_rows * n_cols);
+        let padded_rows = next_power_of_two(n_rows);
+        let padded_cols = next_power_of_two(n_cols);
+        let mut ret = vec![T::default(); padded_rows * padded_cols];
+        for i in 0..n_rows {
+            let src = &data[i * n_cols..(i + 1) * n_cols];
+            let dst_start = i * padded_cols;
+            ret[dst_start..dst_start + n_cols].clone_from_slice(src);
+            // Pad columns with last element
+            let last = src[n_cols - 1].clone();
+            for j in n_cols..padded_cols {
+                ret[dst_start + j] = last.clone();
+            }
+        }
+        // Pad rows by duplicating last row
+        if padded_rows > n_rows {
+            let last_row_start = (n_rows - 1) * padded_cols;
+            for i in n_rows..padded_rows {
+                let dst_start = i * padded_cols;
+                let src = ret[last_row_start..last_row_start + padded_cols].to_vec();
+                ret[dst_start..dst_start + padded_cols].clone_from_slice(&src);
+            }
+        }
+        ret
     } else {
         assert!(data.len() % shape[0] == 0);
         let chunk_size = data.len() / shape[0];
