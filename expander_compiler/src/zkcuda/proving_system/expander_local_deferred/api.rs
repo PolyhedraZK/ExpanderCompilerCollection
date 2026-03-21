@@ -169,14 +169,14 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         // Adaptive scratch pad: ScratchPadBatch for huge N, parallel alloc for moderate N
         let max_in = tc.layers.iter().map(|l| l.input_var_num).max().unwrap_or(0);
         let max_out = tc.layers.iter().map(|l| l.output_var_num).max().unwrap_or(0);
+        // Sequential scratch pad alloc (no nested Rayon contention with template parallelism)
         let mut _sp_batch: Option<sumcheck::ScratchPadBatch<C::FieldConfig>> = None;
         let mut _sps_vec: Vec<sumcheck::ProverScratchPad<C::FieldConfig>> = Vec::new();
         let sps: &mut [sumcheck::ProverScratchPad<C::FieldConfig>] = if pc >= 32768 {
             _sp_batch = Some(sumcheck::ScratchPadBatch::<C::FieldConfig>::new(pc, max_in, max_out, 1));
             _sp_batch.as_mut().unwrap().as_mut_slice()
         } else {
-            use rayon::prelude::*;
-            _sps_vec = (0..pc).into_par_iter().map(|_| {
+            _sps_vec = (0..pc).map(|_| {
                 sumcheck::ProverScratchPad::<C::FieldConfig>::new(max_in, max_out, 1)
             }).collect();
             &mut _sps_vec
