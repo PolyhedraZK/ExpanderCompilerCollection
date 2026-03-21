@@ -130,10 +130,11 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         let mut tc = bc.clone(); tc.fill_rnd_coefs(&mut tr);
         let is = 1 << tc.log_input_size();
         // Use clone_for_batch to share gate arrays (avoids O(N × gates) clone overhead)
+        let ki = kernel.layered_circuit_input();
         let mut circuits: Vec<_> = (0..pc).map(|pi| {
             let mut c = unsafe { tc.clone_for_batch() };
             let lv = get_local_vals(&cvs, tmpl.is_broadcast(), pi, pc);
-            c.layers[0].input_vals = prepare_inputs_with_local_vals(is, kernel.layered_circuit_input(), &lv);
+            c.layers[0].input_vals = prepare_inputs_with_local_vals(is, ki, &lv);
             c.evaluate(); c
         }).collect();
         let mut sps: Vec<_> = (0..pc).map(|_| bs.clone()).collect();
