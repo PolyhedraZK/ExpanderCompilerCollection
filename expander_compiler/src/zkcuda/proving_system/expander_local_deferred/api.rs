@@ -129,19 +129,25 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         let mut tr = C::TranscriptConfig::new();
         let mut tc = bc.clone(); tc.fill_rnd_coefs(&mut tr);
         let is = 1 << tc.log_input_size();
-        // Use clone_for_batch to share gate arrays (avoids O(N × gates) clone overhead)
+        // Flat-buffer batch: zero malloc during circuit prep
         let ki = kernel.layered_circuit_input();
-        let mut circuits: Vec<_> = (0..pc).map(|pi| {
-            let mut c = unsafe { tc.clone_for_batch() };
+        let (mut circuits, _flat_bufs) = unsafe { tc.create_batch(pc) };
+        for pi in 0..pc {
             let lv = get_local_vals(&cvs, tmpl.is_broadcast(), pi, pc);
-            c.layers[0].input_vals = prepare_inputs_with_local_vals(is, ki, &lv);
-            c.evaluate(); c
-        }).collect();
+            // Write inputs directly into the flat buffer (no allocation)
+            let input = &mut circuits[pi].layers[0].input_vals;
+            for v in input.iter_mut() { *v = Default::default(); }
+            for (partition, val) in ki.iter().zip(lv.iter()) {
+                input[partition.offset..partition.offset + partition.len]
+                    .copy_from_slice(val.as_ref());
+            }
+            circuits[pi].evaluate();
+        }
         let mut sps: Vec<_> = (0..pc).map(|_| bs.clone()).collect();
         let t1 = std::time::Instant::now();
         let (cv, ch) = gkr_prove_batch(&circuits, &mut sps, &mut tr);
-        // Drop batch clones without freeing shared gate memory
-        for c in circuits { unsafe { c.drop_batch_clone(); } }
+        // Drop batch circuits without freeing shared gates or aliased buffers
+        unsafe { expander_circuit::Circuit::drop_batch(circuits); }
         assert_eq!(cv, <C::FieldConfig as FieldEngine>::ChallengeField::from(0u32));
         let t2 = std::time::Instant::now();
         let chs = if let Some(cy) = ch.challenge_y() { vec![ch.challenge_x(), cy] } else { vec![ch.challenge_x()] };
