@@ -166,12 +166,23 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             }
             circuits[pi].evaluate();
         }
-        // Flat-buffer batch scratch pads: 3 allocations instead of N×13
+        // Adaptive scratch pad: ScratchPadBatch for huge N, parallel alloc for moderate N
         let max_in = tc.layers.iter().map(|l| l.input_var_num).max().unwrap_or(0);
         let max_out = tc.layers.iter().map(|l| l.output_var_num).max().unwrap_or(0);
-        let mut sp_batch = sumcheck::ScratchPadBatch::<C::FieldConfig>::new(pc, max_in, max_out, 1);
+        let mut _sp_batch: Option<sumcheck::ScratchPadBatch<C::FieldConfig>> = None;
+        let mut _sps_vec: Vec<sumcheck::ProverScratchPad<C::FieldConfig>> = Vec::new();
+        let sps: &mut [sumcheck::ProverScratchPad<C::FieldConfig>] = if pc >= 32768 {
+            _sp_batch = Some(sumcheck::ScratchPadBatch::<C::FieldConfig>::new(pc, max_in, max_out, 1));
+            _sp_batch.as_mut().unwrap().as_mut_slice()
+        } else {
+            use rayon::prelude::*;
+            _sps_vec = (0..pc).into_par_iter().map(|_| {
+                sumcheck::ProverScratchPad::<C::FieldConfig>::new(max_in, max_out, 1)
+            }).collect();
+            &mut _sps_vec
+        };
         let t1 = std::time::Instant::now();
-        let (cv, ch) = gkr_prove_batch(&circuits, sp_batch.as_mut_slice(), &mut tr);
+        let (cv, ch) = gkr_prove_batch(&circuits, sps, &mut tr);
         // Drop batch circuits without freeing shared gates or aliased buffers
         unsafe { expander_circuit::Circuit::drop_batch(circuits); }
         assert_eq!(cv, <C::FieldConfig as FieldEngine>::ChallengeField::from(0u32));
