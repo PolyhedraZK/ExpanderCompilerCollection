@@ -143,17 +143,12 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             }
             circuits[pi].evaluate();
         }
-        // Parallel scratch pad allocation across Rayon threads
+        // Flat-buffer batch scratch pads: 3 allocations instead of N×13
         let max_in = tc.layers.iter().map(|l| l.input_var_num).max().unwrap_or(0);
         let max_out = tc.layers.iter().map(|l| l.output_var_num).max().unwrap_or(0);
-        let mut sps: Vec<_> = {
-            use rayon::prelude::*;
-            (0..pc).into_par_iter().map(|_| {
-                sumcheck::ProverScratchPad::<C::FieldConfig>::new(max_in, max_out, 1)
-            }).collect()
-        };
+        let mut sp_batch = sumcheck::ScratchPadBatch::<C::FieldConfig>::new(pc, max_in, max_out, 1);
         let t1 = std::time::Instant::now();
-        let (cv, ch) = gkr_prove_batch(&circuits, &mut sps, &mut tr);
+        let (cv, ch) = gkr_prove_batch(&circuits, sp_batch.as_mut_slice(), &mut tr);
         // Drop batch circuits without freeing shared gates or aliased buffers
         unsafe { expander_circuit::Circuit::drop_batch(circuits); }
         assert_eq!(cv, <C::FieldConfig as FieldEngine>::ChallengeField::from(0u32));
