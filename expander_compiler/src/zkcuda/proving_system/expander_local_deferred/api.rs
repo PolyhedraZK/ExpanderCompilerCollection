@@ -40,17 +40,31 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
         let n = templates.len();
         let results: Vec<Mutex<Option<ExpanderProof>>> = (0..n).map(|_| Mutex::new(None)).collect();
         let commit_states = &commit_states;
+        // Two-phase scheduling: small templates first (avoid Rayon starvation)
+        let small_threshold = 256;
+        // Phase 1: small templates sequentially (each gets full Rayon pool)
+        for (ti, tmpl) in templates.iter().enumerate() {
+            let pc = next_power_of_two(tmpl.parallel_count());
+            if pc <= small_threshold {
+                let proof = prove_one::<C, ECCConfig>(ti, tmpl, kernels, &dm, ps, commit_states);
+                *results[ti].lock().unwrap() = Some(proof);
+            }
+        }
+        // Phase 2: big templates in parallel
         rayon::scope(|scope| {
             for (ti, tmpl) in templates.iter().enumerate() {
-                let ps_ptr = ps as *const _ as usize;
-                let dm = &dm;
-                let kernels = &kernels;
-                let slot = &results[ti];
-                scope.spawn(move |_| {
-                    let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = unsafe { &*(ps_ptr as *const _) };
-                    let proof = prove_one::<C, ECCConfig>(ti, tmpl, kernels, dm, ps, commit_states);
-                    *slot.lock().unwrap() = Some(proof);
-                });
+                let pc = next_power_of_two(tmpl.parallel_count());
+                if pc > small_threshold {
+                    let ps_ptr = ps as *const _ as usize;
+                    let dm = &dm;
+                    let kernels = &kernels;
+                    let slot = &results[ti];
+                    scope.spawn(move |_| {
+                        let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = unsafe { &*(ps_ptr as *const _) };
+                        let proof = prove_one::<C, ECCConfig>(ti, tmpl, kernels, dm, ps, commit_states);
+                        *slot.lock().unwrap() = Some(proof);
+                    });
+                }
             }
         });
         let proofs = results.into_iter().map(|m| m.into_inner().unwrap().unwrap()).collect();
