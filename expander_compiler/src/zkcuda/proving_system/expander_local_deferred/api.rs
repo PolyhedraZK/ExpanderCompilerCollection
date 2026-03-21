@@ -172,7 +172,7 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         // Sequential scratch pad alloc (no nested Rayon contention with template parallelism)
         let mut _sp_batch: Option<sumcheck::ScratchPadBatch<C::FieldConfig>> = None;
         let mut _sps_vec: Vec<sumcheck::ProverScratchPad<C::FieldConfig>> = Vec::new();
-        let sps: &mut [sumcheck::ProverScratchPad<C::FieldConfig>] = if pc >= 32768 {
+        let sps: &mut [sumcheck::ProverScratchPad<C::FieldConfig>] = if pc >= 512 {
             _sp_batch = Some(sumcheck::ScratchPadBatch::<C::FieldConfig>::new(pc, max_in, max_out, 1));
             _sp_batch.as_mut().unwrap().as_mut_slice()
         } else {
