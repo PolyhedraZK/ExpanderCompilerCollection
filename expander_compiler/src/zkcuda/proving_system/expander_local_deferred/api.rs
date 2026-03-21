@@ -132,14 +132,23 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         // Flat-buffer batch: zero malloc during circuit prep
         let ki = kernel.layered_circuit_input();
         let (mut circuits, _flat_bufs) = unsafe { tc.create_batch(pc) };
+        let is_bc = tmpl.is_broadcast();
         for pi in 0..pc {
-            let lv = get_local_vals(&cvs, tmpl.is_broadcast(), pi, pc);
-            // Write inputs directly into the flat buffer (no allocation)
+            // Inline get_local_vals: zero alloc, write directly into flat buffer
             let input = &mut circuits[pi].layers[0].input_vals;
             for v in input.iter_mut() { *v = Default::default(); }
-            for (partition, val) in ki.iter().zip(lv.iter()) {
+            for (ci, (partition, (&ref vals, &ib))) in ki.iter()
+                .zip(cvs.iter().zip(is_bc.iter()))
+                .enumerate()
+            {
+                let local_slice = if ib {
+                    vals.as_ref()
+                } else {
+                    let chunk = vals.len() / pc;
+                    &vals[chunk * pi..chunk * (pi + 1)]
+                };
                 input[partition.offset..partition.offset + partition.len]
-                    .copy_from_slice(val.as_ref());
+                    .copy_from_slice(local_slice);
             }
             circuits[pi].evaluate();
         }
