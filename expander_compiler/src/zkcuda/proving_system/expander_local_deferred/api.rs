@@ -183,7 +183,7 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         };
         // Optional: dump circuit data for GPU prover
         if std::env::var("DUMP_GPU_DATA").is_ok() {
-            dump_circuits_for_gpu(ti, pc, &tc, &circuits);
+            dump_circuits_for_gpu::<C::FieldConfig>(ti, pc, &tc, &circuits);
         }
         let t1 = std::time::Instant::now();
         let (cv, ch) = gkr_prove_batch(&circuits, sps, &mut tr);
@@ -230,11 +230,11 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
 
 /// Dump circuit data (gates + witness) to binary files for GPU prover.
 /// Each template gets its own directory: gpu_data/tmpl_{ti}/
-fn dump_circuits_for_gpu<C: GKREngine>(
+fn dump_circuits_for_gpu<F: gkr_engine::FieldEngine>(
     ti: usize,
     pc: usize,
-    template_circuit: &expander_circuit::Circuit<C>,
-    circuits: &[expander_circuit::Circuit<C>],
+    template_circuit: &expander_circuit::Circuit<F>,
+    circuits: &[expander_circuit::Circuit<F>],
 ) {
     use std::io::Write;
     let dir = format!("gpu_data/tmpl_{}", ti);
