@@ -280,21 +280,21 @@ fn dump_circuits_for_gpu<F: gkr_engine::FieldEngine>(
         }
     }
 
-    // Write witness (input_vals) per instance per layer
-    // Each instance's layer 0 input_vals = the actual witness
-    // Format: raw M31x16 values as [u32; 16] per element
-    for (pi, circuit) in circuits.iter().enumerate() {
-        let mut wf = std::fs::File::create(format!("{}/witness_{}.bin", dir, pi)).unwrap();
-        // Only dump layer 0 input_vals (other layers computed by evaluate())
-        let vals = &circuit.layers[0].input_vals;
-        // SimdCircuitField = M31x16, each is [M31; 16] = [u32; 16] = 64 bytes
-        let bytes: &[u8] = unsafe {
-            std::slice::from_raw_parts(
-                vals.as_ptr() as *const u8,
-                vals.len() * std::mem::size_of_val(&vals[0]),
-            )
-        };
-        wf.write_all(bytes).unwrap();
+    // Write ALL witness data to ONE file: witness.bin
+    // Layout: [instance_0_layer0_input_vals | instance_1_layer0_input_vals | ...]
+    // Each instance = layer0.input_vals as raw M31x16 bytes (contiguous)
+    {
+        let mut wf = std::fs::File::create(format!("{}/witness.bin", dir)).unwrap();
+        for circuit in circuits.iter() {
+            let vals = &circuit.layers[0].input_vals;
+            let bytes: &[u8] = unsafe {
+                std::slice::from_raw_parts(
+                    vals.as_ptr() as *const u8,
+                    vals.len() * std::mem::size_of_val(&vals[0]),
+                )
+            };
+            wf.write_all(bytes).unwrap();
+        }
     }
 
     eprintln!("  [dump] tmpl[{}] N={} layers={} → {}/", ti, pc, num_layers, dir);
