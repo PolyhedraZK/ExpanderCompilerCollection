@@ -273,8 +273,10 @@ fn dump_circuits_for_gpu<F: gkr_engine::FieldEngine>(
         for gate in &layer.add {
             af.write_all(&(gate.o_id as u32).to_le_bytes()).unwrap();
             af.write_all(&(gate.i_ids[0] as u32).to_le_bytes()).unwrap();
-            let coef_bytes: [u8; 4] = unsafe { std::mem::transmute(gate.coef) };
-            af.write_all(&coef_bytes).unwrap();
+            let coef_bytes: &[u8] = unsafe {
+                std::slice::from_raw_parts(&gate.coef as *const _ as *const u8, 4)
+            };
+            af.write_all(coef_bytes).unwrap();
         }
     }
 
