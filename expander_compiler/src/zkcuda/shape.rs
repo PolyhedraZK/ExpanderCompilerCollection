@@ -369,6 +369,11 @@ impl ShapeHistory {
         }
     }
 
+    /// Returns true if permute_vec would just clone the data (no actual permutation).
+    pub fn is_identity_permutation(&self) -> bool {
+        self.entries.iter().all(|e| e.axes.is_none())
+    }
+
     pub fn permute_vec<T: Default + Clone>(&self, s: &[T]) -> Vec<T> {
         let mut idx = None;
         for e in self.entries.iter() {

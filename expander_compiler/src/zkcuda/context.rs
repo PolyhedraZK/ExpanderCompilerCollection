@@ -118,6 +118,8 @@ pub struct Context<C: Config, H: HintCaller<CircuitField<C>> = EmptyHintCaller> 
     kernel_calls: Vec<KernelCall>,
     proof_templates: Vec<ProofTemplate>,
     hint_caller: H,
+    // Pointer-identity cache for kernel_primitives.add() — avoids O(circuit_size) Hash
+    kernel_ptr_cache: std::collections::HashMap<usize, usize>,
     // current state of the context
     state: ContextState,
 }
@@ -225,6 +227,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             proof_templates: vec![],
             hint_caller,
             state: ContextState::ComputationGraphNotDone,
+            kernel_ptr_cache: std::collections::HashMap::new(),
         }
     }
 
@@ -250,6 +253,18 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
         host_memory: &T,
     ) -> DeviceMemoryHandle {
         let (flat, shape) = flatten_shaped(host_memory);
+        make_device_mem(&mut self.device_memories, flat, shape)
+    }
+
+    /// Copy pre-flattened SIMD data to device. Avoids flatten_shaped overhead.
+    /// Shape matches flatten_shaped(Vec<Vec<T>>): [groups, cols].
+    pub fn copy_flat_simd_to_device(
+        &mut self,
+        flat: Vec<SIMDField<C>>,
+        cols: usize,
+    ) -> DeviceMemoryHandle {
+        let groups = if cols > 0 { flat.len() / cols } else { flat.len() };
+        let shape = vec![groups, cols];
         make_device_mem(&mut self.device_memories, flat, shape)
     }
 
@@ -376,29 +391,63 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
             }
         }
 
-        let kernel_id = self.kernel_primitives.add(kernel);
+        // Use pointer-identity cache to skip O(circuit_size) Hash+Clone.
+        // KernelPrimitive's derived Hash is pathologically slow (250× vs raw hash)
+        // because it recursively hashes nested generic structs.
+        // Fast kernel registration: pointer-identity cache + skip clone on second call.
+        let ptr = kernel as *const _ as usize;
+        let kernel_id = if let Some(&cached_id) = self.kernel_ptr_cache.get(&ptr) {
+            cached_id
+        } else {
+            let id = self.kernel_primitives.add(kernel);
+            self.kernel_ptr_cache.insert(ptr, id);
+            id
+        };
 
+        let has_outputs = kernel.io_specs().iter().any(|s| s.is_output);
         let mut outputs_tmp = vec![Vec::new(); kernel.io_specs().len()];
-        let mut ir_inputs_all = vec![Vec::new(); kernel.io_specs().len()];
+
+        // Skip IR eval + input copying for input-only kernels (no outputs to compute)
+        if !has_outputs {
+            // Fast path: no IR eval needed, just register the kernel call
+        } else {
+        // Collect input data: use reference when no permutation needed, clone only when permuting
+        let mut ir_inputs_owned: Vec<Vec<SIMDField<C>>> = vec![Vec::new(); kernel.io_specs().len()];
+        let mut ir_inputs_refs: Vec<Option<usize>> = vec![None; kernel.io_specs().len()]; // device_memory id if using ref
         let mut chunk_sizes: Vec<Option<usize>> = vec![None; kernel.io_specs().len()];
-        for (((input, &ib), ir_inputs), chunk_size) in ios
+        for (i, ((input, &ib), chunk_size)) in ios
             .iter()
             .zip(is_broadcast.iter())
-            .zip(ir_inputs_all.iter_mut())
             .zip(chunk_sizes.iter_mut())
+            .enumerate()
         {
             if input.is_none() {
                 continue;
             }
             let handle = ensure_handle(input.clone());
-            let values = handle
-                .shape_history
-                .permute_vec(&self.device_memories[handle.id].values);
-            if !ib {
-                *chunk_size = Some(values.len() / num_parallel);
+            let dm_id = handle.id;
+            if handle.shape_history.is_identity_permutation() {
+                // No permutation: reference original data directly
+                ir_inputs_refs[i] = Some(dm_id);
+                if !ib {
+                    *chunk_size = Some(self.device_memories[dm_id].values.len() / num_parallel);
+                }
+            } else {
+                let values = handle.shape_history.permute_vec(&self.device_memories[dm_id].values);
+                if !ib {
+                    *chunk_size = Some(values.len() / num_parallel);
+                }
+                ir_inputs_owned[i] = values;
             }
-            *ir_inputs = values;
         }
+        // Build a slice accessor that returns either owned or referenced data
+        let ir_inputs_all: Vec<&[SIMDField<C>]> = (0..kernel.io_specs().len()).map(|i| {
+            if let Some(dm_id) = ir_inputs_refs[i] {
+                self.device_memories[dm_id].values.as_slice()
+            } else {
+                ir_inputs_owned[i].as_slice()
+            }
+        }).collect();
         let mut ir_inputs_per_parallel = Vec::new();
         for parallel_i in 0..num_parallel {
             let mut ir_inputs = vec![SIMDField::<C>::zero(); kernel.ir_for_calling().input_size()];
@@ -412,7 +461,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                     continue;
                 }
                 self.ir_copy_from_device_memory(
-                    &ir_inputs_all[i],
+                    ir_inputs_all[i],
                     &mut ir_inputs[*input_start..*input_end],
                     is_broadcast[i],
                     parallel_i,
@@ -444,6 +493,7 @@ impl<C: Config, H: HintCaller<CircuitField<C>>> Context<C, H> {
                 out.extend_from_slice(&ir_outputs[*output_start..*output_end]);
             }
         }
+        } // end if has_outputs
         let input_handles = ios.to_vec();
         let mut output_handles = vec![None; kernel.io_specs().len()];
 

@@ -50,7 +50,7 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
                 *results[ti].lock().unwrap() = Some(proof);
             }
         }
-        // Phase 2: big templates in parallel
+        // Phase 2: big templates in parallel (Rayon work-stealing handles load balancing)
         rayon::scope(|scope| {
             for (ti, tmpl) in templates.iter().enumerate() {
                 let pc = next_power_of_two(tmpl.parallel_count());
