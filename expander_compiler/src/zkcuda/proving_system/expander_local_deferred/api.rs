@@ -261,8 +261,10 @@ fn dump_circuits_for_gpu<F: gkr_engine::FieldEngine>(
             gf.write_all(&(gate.o_id as u32).to_le_bytes()).unwrap();
             gf.write_all(&(gate.i_ids[0] as u32).to_le_bytes()).unwrap();
             gf.write_all(&(gate.i_ids[1] as u32).to_le_bytes()).unwrap();
-            // coef is M31, extract .v field via unsafe transmute
-            let coef_bytes: [u8; 4] = unsafe { std::mem::transmute(gate.coef) };
+            // coef is CircuitField (M31 = 4 bytes)
+            let coef_bytes: &[u8] = unsafe {
+                std::slice::from_raw_parts(&gate.coef as *const _ as *const u8, 4)
+            };
             gf.write_all(&coef_bytes).unwrap();
         }
 
