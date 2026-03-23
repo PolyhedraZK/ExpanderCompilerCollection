@@ -181,6 +181,10 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             }).collect();
             &mut _sps_vec
         };
+        // Optional: dump circuit data for GPU prover
+        if std::env::var("DUMP_GPU_DATA").is_ok() {
+            dump_circuits_for_gpu(ti, pc, &tc, &circuits);
+        }
         let t1 = std::time::Instant::now();
         let (cv, ch) = gkr_prove_batch(&circuits, sps, &mut tr);
         // Drop batch circuits without freeing shared gates or aliased buffers
@@ -222,4 +226,72 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         eprintln!("  [batch] tmpl[{}] N=1 t={:?}", ti, t0.elapsed());
         ExpanderProof { data: vec![tr.finalize_and_get_proof()] }
     }
+}
+
+/// Dump circuit data (gates + witness) to binary files for GPU prover.
+/// Each template gets its own directory: gpu_data/tmpl_{ti}/
+fn dump_circuits_for_gpu<C: GKREngine>(
+    ti: usize,
+    pc: usize,
+    template_circuit: &expander_circuit::Circuit<C>,
+    circuits: &[expander_circuit::Circuit<C>],
+) {
+    use std::io::Write;
+    let dir = format!("gpu_data/tmpl_{}", ti);
+    std::fs::create_dir_all(&dir).ok();
+
+    let num_layers = template_circuit.layers.len();
+
+    // Write header: N, num_layers, per-layer sizes
+    let mut hdr = std::fs::File::create(format!("{}/header.bin", dir)).unwrap();
+    hdr.write_all(&(pc as u32).to_le_bytes()).unwrap();
+    hdr.write_all(&(num_layers as u32).to_le_bytes()).unwrap();
+    for layer in &template_circuit.layers {
+        hdr.write_all(&(layer.input_var_num as u32).to_le_bytes()).unwrap();
+        hdr.write_all(&(layer.output_var_num as u32).to_le_bytes()).unwrap();
+        hdr.write_all(&(layer.mul.len() as u32).to_le_bytes()).unwrap();
+        hdr.write_all(&(layer.add.len() as u32).to_le_bytes()).unwrap();
+    }
+
+    // Write gates per layer (shared across all instances)
+    for (li, layer) in template_circuit.layers.iter().enumerate() {
+        // Mul gates: [o_id, x_id, y_id, coef] x n_mul
+        let mut gf = std::fs::File::create(format!("{}/layer_{}_mul.bin", dir, li)).unwrap();
+        for gate in &layer.mul {
+            gf.write_all(&(gate.o_id as u32).to_le_bytes()).unwrap();
+            gf.write_all(&(gate.i_ids[0] as u32).to_le_bytes()).unwrap();
+            gf.write_all(&(gate.i_ids[1] as u32).to_le_bytes()).unwrap();
+            // coef is M31, extract .v field via unsafe transmute
+            let coef_bytes: [u8; 4] = unsafe { std::mem::transmute(gate.coef) };
+            gf.write_all(&coef_bytes).unwrap();
+        }
+
+        // Add gates: [o_id, x_id, coef] x n_add
+        let mut af = std::fs::File::create(format!("{}/layer_{}_add.bin", dir, li)).unwrap();
+        for gate in &layer.add {
+            af.write_all(&(gate.o_id as u32).to_le_bytes()).unwrap();
+            af.write_all(&(gate.i_ids[0] as u32).to_le_bytes()).unwrap();
+            let coef_bytes: [u8; 4] = unsafe { std::mem::transmute(gate.coef) };
+            af.write_all(&coef_bytes).unwrap();
+        }
+    }
+
+    // Write witness (input_vals) per instance per layer
+    // Each instance's layer 0 input_vals = the actual witness
+    // Format: raw M31x16 values as [u32; 16] per element
+    for (pi, circuit) in circuits.iter().enumerate() {
+        let mut wf = std::fs::File::create(format!("{}/witness_{}.bin", dir, pi)).unwrap();
+        // Only dump layer 0 input_vals (other layers computed by evaluate())
+        let vals = &circuit.layers[0].input_vals;
+        // SimdCircuitField = M31x16, each is [M31; 16] = [u32; 16] = 64 bytes
+        let bytes: &[u8] = unsafe {
+            std::slice::from_raw_parts(
+                vals.as_ptr() as *const u8,
+                vals.len() * std::mem::size_of_val(&vals[0]),
+            )
+        };
+        wf.write_all(bytes).unwrap();
+    }
+
+    eprintln!("  [dump] tmpl[{}] N={} layers={} → {}/", ti, pc, num_layers, dir);
 }
