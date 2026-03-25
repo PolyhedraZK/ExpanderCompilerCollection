@@ -183,7 +183,7 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         };
         // Optional: dump circuit data for GPU prover
         if std::env::var("DUMP_GPU_DATA").is_ok() {
-            dump_circuits_for_gpu::<C::FieldConfig>(ti, pc, &tc, &circuits);
+            dump_circuits_for_gpu::<C::FieldConfig>(ti, pc, &tc, &circuits, tc.rnd_coefs.len());
         }
         let t1 = std::time::Instant::now();
         let (cv, ch) = gkr_prove_batch(&circuits, sps, &mut tr);
@@ -203,7 +203,13 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         }
         let t3 = std::time::Instant::now();
         eprintln!("  [batch] tmpl[{}] N={} prep={:?} gkr={:?} pcs={:?}", ti, pc, t1-t0, t2-t1, t3-t2);
-        ExpanderProof { data: vec![tr.finalize_and_get_proof()] }
+        let final_proof = tr.finalize_and_get_proof();
+        if std::env::var("DUMP_GPU_DATA").is_ok() {
+            let dir = format!("gpu_data/tmpl_{}", ti);
+            std::fs::write(format!("{}/rust_proof.bin", dir), &final_proof.bytes).unwrap();
+            eprintln!("  [dump] tmpl[{}] full proof: {} bytes", ti, final_proof.bytes.len());
+        }
+        ExpanderProof { data: vec![final_proof] }
     } else {
         let mut tr = C::TranscriptConfig::new();
         let mut c = bc; let mut s = bs;
@@ -235,6 +241,7 @@ fn dump_circuits_for_gpu<F: gkr_engine::FieldEngine>(
     pc: usize,
     template_circuit: &expander_circuit::Circuit<F>,
     circuits: &[expander_circuit::Circuit<F>],
+    rnd_coef_count: usize,
 ) {
     use std::io::Write;
     let dir = format!("gpu_data/tmpl_{}", ti);
@@ -251,7 +258,10 @@ fn dump_circuits_for_gpu<F: gkr_engine::FieldEngine>(
         hdr.write_all(&(layer.output_var_num as u32).to_le_bytes()).unwrap();
         hdr.write_all(&(layer.mul.len() as u32).to_le_bytes()).unwrap();
         hdr.write_all(&(layer.add.len() as u32).to_le_bytes()).unwrap();
+        hdr.write_all(&(layer.const_.len() as u32).to_le_bytes()).unwrap();
     }
+    // rnd_coef_count: needed for GPU prover to advance transcript state
+    hdr.write_all(&(rnd_coef_count as u32).to_le_bytes()).unwrap();
 
     // Write gates per layer (shared across all instances)
     for (li, layer) in template_circuit.layers.iter().enumerate() {
@@ -278,6 +288,16 @@ fn dump_circuits_for_gpu<F: gkr_engine::FieldEngine>(
             };
             af.write_all(coef_bytes).unwrap();
         }
+
+        // Const gates: [o_id, coef] x n_const
+        let mut cf = std::fs::File::create(format!("{}/layer_{}_const.bin", dir, li)).unwrap();
+        for gate in &layer.const_ {
+            cf.write_all(&(gate.o_id as u32).to_le_bytes()).unwrap();
+            let coef_bytes: &[u8] = unsafe {
+                std::slice::from_raw_parts(&gate.coef as *const _ as *const u8, 4)
+            };
+            cf.write_all(coef_bytes).unwrap();
+        }
     }
 
     // Write ALL witness data to ONE file: witness.bin
@@ -297,5 +317,11 @@ fn dump_circuits_for_gpu<F: gkr_engine::FieldEngine>(
         }
     }
 
-    eprintln!("  [dump] tmpl[{}] N={} layers={} → {}/", ti, pc, num_layers, dir);
+    // Report const_ and uni gates (not exported yet!)
+    for (li, layer) in template_circuit.layers.iter().enumerate() {
+        if !layer.const_.is_empty() || !layer.uni.is_empty() {
+            eprintln!("  [dump] tmpl[{}] L{}: const_={} uni={}", ti, li, layer.const_.len(), layer.uni.len());
+        }
+    }
+    eprintln!("  [dump] tmpl[{}] N={} layers={} rnd_coefs={} → {}/", ti, pc, num_layers, rnd_coef_count, dir);
 }
