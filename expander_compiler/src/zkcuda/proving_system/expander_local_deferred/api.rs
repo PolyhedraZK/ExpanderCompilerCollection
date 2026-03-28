@@ -353,6 +353,19 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     }
     eprintln!("  [gpu] prep {} templates: {:?}", gpu_count, t_prep.elapsed());
 
+    // Warm up CUDA FFI context (avoids 159ms cold start during PCS opening)
+    {
+        extern "C" { fn gpu_linear_combine_m31ext3(
+            a: *const u32, b: *const u32, c: u32, d: u32, e: *mut u32,
+            f: u32, g: *const u32, h: *mut u32); }
+        let dummy = [0u32; 48];
+        let mut out = [0u32; 3];
+        unsafe { gpu_linear_combine_m31ext3(
+            dummy.as_ptr(), dummy.as_ptr(), 1, 1, out.as_mut_ptr(),
+            0, dummy.as_ptr(), std::ptr::null_mut()); }
+        eprintln!("  [gpu] CUDA FFI warmed up");
+    }
+
     // ---- Phase 2: GPU GKR via persistent server ----
     let t_gpu = std::time::Instant::now();
     gpu_server_prove();
