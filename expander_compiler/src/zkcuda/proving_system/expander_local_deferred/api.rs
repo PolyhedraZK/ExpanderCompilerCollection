@@ -25,6 +25,7 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
         use crate::zkcuda::proving_system::expander::commit_impl::local_commit_impl;
         let t_commit = std::time::Instant::now();
         let ps_ptr = ps as *const _ as usize;
+        // PCS commit: CPU for now (GPU commit verified but integration pending)
         let commit_results: Vec<_> = {
             use rayon::prelude::*;
             dm.par_iter().map(|m| {
