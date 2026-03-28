@@ -298,9 +298,39 @@ pub fn pcs_batch_open_with_scratch<C: GKREngine>(
     let mut eval_challenge = challenge.clone();
     eval_challenge.rz.truncate(n_local_vars);
 
-    let v = <C::FieldConfig as FieldEngine>::single_core_eval_circuit_vals_at_expander_challenge(
-        vals, &eval_challenge,
-    );
+    let v = if std::env::var("USE_GPU_PROVER").is_ok() && commit_len >= 32768 {
+        // GPU eval at challenge
+        let rz_flat: Vec<u32> = unsafe {
+            std::slice::from_raw_parts(eval_challenge.rz.as_ptr() as *const u32,
+                eval_challenge.rz.len() * 3).to_vec()
+        };
+        let simd_flat: Vec<u32> = unsafe {
+            std::slice::from_raw_parts(eval_challenge.r_simd.as_ptr() as *const u32,
+                eval_challenge.r_simd.len() * 3).to_vec()
+        };
+        let vals_ptr = vals.as_ptr() as *const u32;
+        let mut result = [0u32; 3];
+
+        extern "C" {
+            fn gpu_eval_at_challenge_m31ext3(
+                packed_vals: *const u32, commit_len: u32,
+                rz: *const u32, n_rz_vars: u32,
+                r_simd: *const u32,
+                result: *mut u32);
+        }
+        unsafe {
+            gpu_eval_at_challenge_m31ext3(
+                vals_ptr, commit_len as u32,
+                rz_flat.as_ptr(), eval_challenge.rz.len() as u32,
+                simd_flat.as_ptr(), result.as_mut_ptr());
+        }
+        // Convert result back to ChallengeField
+        unsafe { std::ptr::read(result.as_ptr() as *const <C::FieldConfig as FieldEngine>::ChallengeField) }
+    } else {
+        <C::FieldConfig as FieldEngine>::single_core_eval_circuit_vals_at_expander_challenge(
+            vals, &eval_challenge,
+        )
+    };
     transcript.append_field_element(&v);
 
     // For PCS: merge r_mpi into rz
