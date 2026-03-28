@@ -211,7 +211,7 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         eprintln!("  [batch] tmpl[{}] N={} prep={:?} gkr={:?} pcs={:?}", ti, pc, t1-t0, t2-t1, t3-t2);
         let final_proof = tr.finalize_and_get_proof();
         if std::env::var("DUMP_GPU_DATA").is_ok() {
-            let dir = format!("gpu_data/tmpl_{}", ti);
+            let dir = format!("/dev/shm/gpu_data/tmpl_{}", ti);
             std::fs::write(format!("{}/rust_proof.bin", dir), &final_proof.bytes).unwrap();
             eprintln!("  [dump] tmpl[{}] full proof: {} bytes", ti, final_proof.bytes.len());
         }
@@ -303,6 +303,33 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         dump_circuits_for_gpu::<C::FieldConfig>(ti, pc, &tc, &circuits, tc.rnd_coefs.len());
         unsafe { expander_circuit::Circuit::drop_batch(circuits); }
 
+        // Dump SRS + commitment data for GPU PCS
+        for &ci in tmpl.commitment_indices() {
+            let commit_len = dm[ci].len();
+            // Dump SRS (once per unique commit_len)
+            if let Some(p_key) = ps.p_keys.get(&commit_len) {
+                let p_key_ptr = p_key as *const _ as *const poly_commit::orion::OrionSRS;
+                let srs: &poly_commit::orion::OrionSRS = unsafe { &*p_key_ptr };
+                dump_orion_srs_m31(srs, commit_len);
+            }
+            // Dump commitment data (raw SIMD-packed M31 values)
+            let commit_path = format!("/dev/shm/gpu_data/commit_{}.bin", ci);
+            if !std::path::Path::new(&commit_path).exists() {
+                use std::io::Write;
+                let vals = &dm[ci];
+                let bytes: &[u8] = unsafe {
+                    std::slice::from_raw_parts(
+                        vals.as_ptr() as *const u8,
+                        vals.len() * std::mem::size_of_val(&vals[0]),
+                    )
+                };
+                let mut f = std::fs::File::create(&commit_path).unwrap();
+                f.write_all(bytes).unwrap();
+                eprintln!("  [gpu] commit data ci={} len={} → {} ({} bytes)",
+                          ci, commit_len, commit_path, bytes.len());
+            }
+        }
+
         gpu_templates.push(Some(PreparedTemplate {
             ti, pc, tc, tr,
             cvs_indices: tmpl.commitment_indices().to_vec(),
@@ -312,30 +339,21 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     }
     eprintln!("  [gpu] prep {} templates: {:?}", gpu_count, t_prep.elapsed());
 
-    // ---- Phase 2: Single GPU binary call for ALL templates ----
+    // ---- Phase 2: GPU GKR via persistent server ----
     let t_gpu = std::time::Instant::now();
-    let status = std::process::Command::new("cuda/gpu_prover_v2")
-        .status()
-        .expect("Failed to launch cuda/gpu_prover_v2");
-    assert!(status.success(), "GPU prover failed");
-    eprintln!("  [gpu] single GPU call: {:?}", t_gpu.elapsed());
+    gpu_server_prove();
+    eprintln!("  [gpu] GPU GKR: {:?}", t_gpu.elapsed());
 
-    // ---- Phase 3: Replay + PCS for each template (parallel) ----
+    // ---- Phase 3: Replay + PCS for each template ----
     let t_pcs = std::time::Instant::now();
-    let ps_ptr = ps as *const _ as usize;
 
     let proofs: Vec<ExpanderProof> = gpu_templates.into_iter().enumerate().map(|(ti, prep)| {
         if let Some(mut p) = prep {
-            // Read GPU proof
-            let gpu_proof = std::fs::read(format!("gpu_data/tmpl_{}/gpu_proof.bin", p.ti))
+            let gpu_proof = std::fs::read(format!("/dev/shm/gpu_data/tmpl_{}/gpu_proof.bin", p.ti))
                 .expect("GPU proof file missing");
-
-            // Replay through transcript
             let (cv, ch) = gpu_gkr_prove_from_bytes::<C>(&p.tc, p.pc, &gpu_proof, &mut p.tr);
             assert_eq!(cv, <C::FieldConfig as FieldEngine>::ChallengeField::from(0u32));
 
-            // PCS opening
-            let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = unsafe { &*(ps_ptr as *const _) };
             let cvs: Vec<&[SIMDField<C>]> = p.cvs_indices.iter().map(|&i| dm[i].as_slice()).collect();
             let chs = if let Some(cy) = ch.challenge_y() { vec![ch.challenge_x(), cy] } else { vec![ch.challenge_x()] };
             for sc in &chs {
@@ -349,9 +367,7 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             }
             ExpanderProof { data: vec![p.tr.finalize_and_get_proof()] }
         } else {
-            // N=1 template: CPU path
             let tmpl = &templates[ti];
-            let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = unsafe { &*(ps_ptr as *const _) };
             prove_one::<C, ECCConfig>(ti, tmpl, kernels, dm, ps, commit_states)
         }
     }).collect();
@@ -433,8 +449,52 @@ fn gpu_gkr_prove_from_bytes<C: GKREngine>(
     (<C::FieldConfig as FieldEngine>::ChallengeField::ZERO, ch)
 }
 
+/// Persistent GPU server: launch once, reuse across calls.
+/// Sends "PROVE\n" to stdin, reads "GPU_DONE <ms>\n" from stdout.
+fn gpu_server_prove() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::sync::Mutex;
+
+    static GPU_SERVER: std::sync::OnceLock<Mutex<GpuServer>> = std::sync::OnceLock::new();
+
+    struct GpuServer {
+        child: std::process::Child,
+        stdin: std::process::ChildStdin,
+        stdout: BufReader<std::process::ChildStdout>,
+    }
+
+    let server = GPU_SERVER.get_or_init(|| {
+        let t0 = std::time::Instant::now();
+        let mut child = std::process::Command::new("cuda/gpu_prover_v2")
+            .arg("--server")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::inherit())
+            .spawn()
+            .expect("Failed to launch cuda/gpu_prover_v2 --server");
+        let stdin = child.stdin.take().unwrap();
+        let stdout = BufReader::new(child.stdout.take().unwrap());
+        let mut s = GpuServer { child, stdin, stdout };
+        // Wait for "GPU_SERVER_READY"
+        let mut line = String::new();
+        s.stdout.read_line(&mut line).expect("GPU server didn't respond");
+        assert!(line.starts_with("GPU_SERVER_READY"), "GPU server: {}", line.trim());
+        eprintln!("  [gpu] server started: {:?}", t0.elapsed());
+        Mutex::new(s)
+    });
+
+    let mut s = server.lock().unwrap();
+    writeln!(s.stdin, "PROVE").expect("Failed to write to GPU server");
+    s.stdin.flush().unwrap();
+    let mut line = String::new();
+    s.stdout.read_line(&mut line).expect("GPU server didn't respond to PROVE");
+    assert!(line.starts_with("GPU_DONE") || line.starts_with("GPU_ERROR"),
+        "GPU server unexpected: {}", line.trim());
+    eprintln!("  [gpu] server response: {}", line.trim());
+}
+
 /// Dump circuit data (gates + witness) to binary files for GPU prover.
-/// Each template gets its own directory: gpu_data/tmpl_{ti}/
+/// Each template gets its own directory: /dev/shm/gpu_data/tmpl_{ti}/
 fn dump_circuits_for_gpu<F: gkr_engine::FieldEngine>(
     ti: usize,
     pc: usize,
@@ -443,7 +503,7 @@ fn dump_circuits_for_gpu<F: gkr_engine::FieldEngine>(
     rnd_coef_count: usize,
 ) {
     use std::io::Write;
-    let dir = format!("gpu_data/tmpl_{}", ti);
+    let dir = format!("/dev/shm/gpu_data/tmpl_{}", ti);
     std::fs::create_dir_all(&dir).ok();
 
     let num_layers = template_circuit.layers.len();
@@ -525,6 +585,69 @@ fn dump_circuits_for_gpu<F: gkr_engine::FieldEngine>(
     eprintln!("  [dump] tmpl[{}] N={} layers={} rnd_coefs={} → {}/", ti, pc, num_layers, rnd_coef_count, dir);
 }
 
+/// Dump Orion SRS (expander graphs) for GPU PCS.
+/// Format: msg_len(u32) | codeword_len(u32) | n_graphs(u32) | n_leaves_per_query(u32)
+/// Then per graph: input_start(u32) | output_start(u32) | output_end(u32)
+///   | row_ptrs[R+1](u32) | col_indices[nnz](u32)
+fn dump_srs_for_gpu(commit_len: usize, ps: &impl std::any::Any) {
+    // We access OrionSRS through the prover setup's p_keys
+    // This is a generic function — actual implementation needs concrete types
+    // For now, skip if SRS file already exists
+    let srs_path = format!("/dev/shm/gpu_data/srs_{}.bin", commit_len);
+    if std::path::Path::new(&srs_path).exists() { return; }
+    eprintln!("  [gpu] SRS dump for commit_len={} not yet implemented (needs concrete type access)", commit_len);
+}
+
+/// Dump OrionSRS expander graphs to binary file (concrete M31 type).
+/// Called once per unique commit_len.
+fn dump_orion_srs_m31(
+    srs: &poly_commit::orion::OrionSRS,
+    commit_len: usize,
+) {
+    use std::io::Write;
+    let srs_path = format!("/dev/shm/gpu_data/srs_{}.bin", commit_len);
+    if std::path::Path::new(&srs_path).exists() { return; }
+
+    let code = &srs.code_instance;
+    let msg_len = code.msg_len() as u32;
+    let cw_len = code.code_len() as u32;
+    let n_graphs = (code.g0s.len() + code.g1s.len()) as u32;
+    let n_leaves_per_query = srs.num_leaves_per_mt_query as u32;
+
+    let mut f = std::fs::File::create(&srs_path).unwrap();
+    f.write_all(&msg_len.to_le_bytes()).unwrap();
+    f.write_all(&cw_len.to_le_bytes()).unwrap();
+    f.write_all(&n_graphs.to_le_bytes()).unwrap();
+    f.write_all(&n_leaves_per_query.to_le_bytes()).unwrap();
+
+    // Write g0s then g1s (same order as Rust encode_in_place: chain!(g0s, g1s))
+    for gp in code.g0s.iter().chain(code.g1s.iter()) {
+        f.write_all(&(gp.input_starts as u32).to_le_bytes()).unwrap();
+        f.write_all(&(gp.output_starts as u32).to_le_bytes()).unwrap();
+        f.write_all(&(gp.output_ends as u32).to_le_bytes()).unwrap();
+
+        let g = &gp.graph;
+        let r_size = g.r_vertices_size;
+        // Build CSR: row_ptrs[R+1], col_indices[nnz]
+        let mut row_ptrs = Vec::with_capacity(r_size + 1);
+        row_ptrs.push(0u32);
+        let mut col_indices = Vec::new();
+        for ni in &g.neighborings {
+            for &idx in ni {
+                col_indices.push(idx as u32);
+            }
+            row_ptrs.push(col_indices.len() as u32);
+        }
+        // Write row_ptrs
+        for v in &row_ptrs { f.write_all(&v.to_le_bytes()).unwrap(); }
+        // Write col_indices
+        for v in &col_indices { f.write_all(&v.to_le_bytes()).unwrap(); }
+    }
+
+    eprintln!("  [gpu] SRS dump: msg_len={} cw_len={} graphs={} → {}",
+              msg_len, cw_len, n_graphs, srs_path);
+}
+
 /// GPU GKR proving: call GPU binary, read proof bytes, replay through transcript.
 /// Returns the same (claimed_value, challenge) tuple as gkr_prove_batch.
 fn gpu_gkr_prove<C: GKREngine>(
@@ -547,7 +670,7 @@ fn gpu_gkr_prove<C: GKREngine>(
     assert!(status.success(), "GPU prover exited with error");
 
     // 2. Read GPU proof bytes
-    let gpu_proof = std::fs::read(format!("gpu_data/tmpl_{}/gpu_proof.bin", ti))
+    let gpu_proof = std::fs::read(format!("/dev/shm/gpu_data/tmpl_{}/gpu_proof.bin", ti))
         .expect("Failed to read GPU proof");
     eprintln!("  [gpu] tmpl[{}] gpu_proof={} bytes ({:?})", ti, gpu_proof.len(), t_gpu.elapsed());
 
