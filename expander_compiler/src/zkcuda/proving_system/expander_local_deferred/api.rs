@@ -331,6 +331,20 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             }
         }
 
+        // Dump PCS metadata for this template
+        {
+            use std::io::Write;
+            let meta_path = format!("/dev/shm/gpu_data/tmpl_{}/pcs_meta.bin", ti);
+            let mut mf = std::fs::File::create(&meta_path).unwrap();
+            let n_commits = tmpl.commitment_indices().len() as u32;
+            mf.write_all(&n_commits.to_le_bytes()).unwrap();
+            for (&ci, &ib) in tmpl.commitment_indices().iter().zip(tmpl.is_broadcast().iter()) {
+                mf.write_all(&(ci as u32).to_le_bytes()).unwrap();
+                mf.write_all(&(dm[ci].len() as u32).to_le_bytes()).unwrap();
+                mf.write_all(&(if ib { 1u32 } else { 0u32 }).to_le_bytes()).unwrap();
+            }
+        }
+
         gpu_templates.push(Some(PreparedTemplate {
             ti, pc, tc, tr,
             cvs_indices: tmpl.commitment_indices().to_vec(),
