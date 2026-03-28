@@ -364,13 +364,16 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
 
     let proofs: Vec<ExpanderProof> = gpu_templates.into_iter().enumerate().map(|(ti, prep)| {
         if let Some(mut p) = prep {
+            let t_replay = std::time::Instant::now();
             let gpu_proof = std::fs::read(format!("/dev/shm/gpu_data/tmpl_{}/gpu_proof.bin", p.ti))
                 .expect("GPU proof file missing");
             let (cv, ch) = gpu_gkr_prove_from_bytes::<C>(&p.tc, p.pc, &gpu_proof, &mut p.tr);
             assert_eq!(cv, <C::FieldConfig as FieldEngine>::ChallengeField::from(0u32));
+            let t_replay_done = std::time::Instant::now();
 
             let cvs: Vec<&[SIMDField<C>]> = p.cvs_indices.iter().map(|&i| dm[i].as_slice()).collect();
             let chs = if let Some(cy) = ch.challenge_y() { vec![ch.challenge_x(), cy] } else { vec![ch.challenge_x()] };
+            let t_pcs_start = std::time::Instant::now();
             for sc in &chs {
                 for (ci, (&ref v, &_ib)) in cvs.iter().zip(p.is_broadcast.iter()).enumerate() {
                     let pc2 = sc.clone();
@@ -380,6 +383,9 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
                         v, &pc2, ps, &mut p.tr, Some(scratch));
                 }
             }
+            let t_pcs_done = std::time::Instant::now();
+            eprintln!("  [pcs] tmpl[{}] replay={:?} pcs_open={:?}", p.ti,
+                t_replay_done - t_replay, t_pcs_done - t_pcs_start);
             ExpanderProof { data: vec![p.tr.finalize_and_get_proof()] }
         } else {
             let tmpl = &templates[ti];
