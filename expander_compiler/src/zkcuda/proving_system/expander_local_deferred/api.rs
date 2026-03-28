@@ -313,7 +313,10 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         is_broadcast: Vec<bool>,
         // In-memory gate data for GPU FFI (kept alive until FFI call)
         gate_bufs: Vec<(Vec<u32>, Vec<u32>, Vec<u32>)>, // per layer: (mul, add, const)
-        witness_buf: Vec<u32>,
+        witness_buf: Vec<u32>, // empty if using flat_bufs_holder
+        witness_ptr: *const u32, // direct pointer into flat_bufs
+        witness_len: usize,
+        _flat_bufs: Vec<Vec<<Cfg::FieldConfig as gkr_engine::FieldEngine>::SimdCircuitField>>,
     }
     let mut gpu_templates: Vec<Option<PreparedTemplate<C>>> = Vec::new();
     let mut gpu_count = 0usize;
@@ -335,7 +338,7 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         tc.fill_rnd_coefs(&mut tr);
 
         let ki = kernel.layered_circuit_input();
-        let (mut circuits, _flat_bufs) = unsafe { tc.create_batch(pc) };
+        let (mut circuits, flat_bufs) = unsafe { tc.create_batch(pc) };
         let is_bc = tmpl.is_broadcast();
         for pi in 0..pc {
             let input = &mut circuits[pi].layers[0].input_vals;
@@ -374,16 +377,12 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             }
             gate_bufs.push((mul_buf, add_buf, cst_buf));
         }
-        // Witness: raw M31x16 bytes from all instances
-        let mut witness_buf: Vec<u32> = Vec::new();
-        for circuit in circuits.iter() {
-            let vals = &circuit.layers[0].input_vals;
-            let slice: &[u32] = unsafe {
-                std::slice::from_raw_parts(vals.as_ptr() as *const u32, vals.len() * 16)
-            };
-            witness_buf.extend_from_slice(slice);
-        }
+        // Witness: zero-copy — use flat_bufs[0] ptr directly
+        let witness_ptr = flat_bufs[0].as_ptr() as *const u32;
+        let witness_len = flat_bufs[0].len() * 16; // in u32 count
+        let witness_buf = Vec::new();
         unsafe { expander_circuit::Circuit::drop_batch(circuits); }
+        // flat_bufs kept alive in PreparedTemplate
         let prep_ms = t_prep_tmpl.elapsed().as_millis();
         if prep_ms > 10 { eprintln!("  [prep-ffi] tmpl[{}] {}ms", ti, prep_ms); }
 
@@ -391,7 +390,7 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             ti, pc, tc, tr,
             cvs_indices: tmpl.commitment_indices().to_vec(),
             is_broadcast: tmpl.is_broadcast().to_vec(),
-            gate_bufs, witness_buf,
+            gate_bufs, witness_buf, witness_ptr, witness_len, _flat_bufs: flat_bufs,
         }));
         // prep_ms timing already printed above
         gpu_count += 1;
@@ -442,8 +441,8 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
                 n_layers: p.tc.layers.len() as u32,
                 rnd_coef_count: p.tc.rnd_coefs.len() as u32,
                 layers: layer_datas[i].as_ptr(),
-                witness: p.witness_buf.as_ptr(),
-                witness_len: p.witness_buf.len() as u32,
+                witness: p.witness_ptr,
+                witness_len: p.witness_len as u32,
             });
         }
 
