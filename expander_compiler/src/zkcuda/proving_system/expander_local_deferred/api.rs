@@ -327,55 +327,22 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             circuits[pi].evaluate();
         }
 
+        let t_dump = std::time::Instant::now();
+        // Still dump for GPU server fallback, but also prepare in-memory data for FFI
         dump_circuits_for_gpu::<C::FieldConfig>(ti, pc, &tc, &circuits, tc.rnd_coefs.len());
         unsafe { expander_circuit::Circuit::drop_batch(circuits); }
+        let dump_ms = t_dump.elapsed().as_millis();
 
-        // Dump SRS + commitment data for GPU PCS
-        for &ci in tmpl.commitment_indices() {
-            let commit_len = dm[ci].len();
-            // Dump SRS (once per unique commit_len)
-            if let Some(p_key) = ps.p_keys.get(&commit_len) {
-                let p_key_ptr = p_key as *const _ as *const poly_commit::orion::OrionSRS;
-                let srs: &poly_commit::orion::OrionSRS = unsafe { &*p_key_ptr };
-                dump_orion_srs_m31(srs, commit_len);
-            }
-            // Dump commitment data (raw SIMD-packed M31 values)
-            let commit_path = format!("/dev/shm/gpu_data/commit_{}.bin", ci);
-            if !std::path::Path::new(&commit_path).exists() {
-                use std::io::Write;
-                let vals = &dm[ci];
-                let bytes: &[u8] = unsafe {
-                    std::slice::from_raw_parts(
-                        vals.as_ptr() as *const u8,
-                        vals.len() * std::mem::size_of_val(&vals[0]),
-                    )
-                };
-                let mut f = std::fs::File::create(&commit_path).unwrap();
-                f.write_all(bytes).unwrap();
-                eprintln!("  [gpu] commit data ci={} len={} → {} ({} bytes)",
-                          ci, commit_len, commit_path, bytes.len());
-            }
-        }
-
-        // Dump PCS metadata for this template
-        {
-            use std::io::Write;
-            let meta_path = format!("/dev/shm/gpu_data/tmpl_{}/pcs_meta.bin", ti);
-            let mut mf = std::fs::File::create(&meta_path).unwrap();
-            let n_commits = tmpl.commitment_indices().len() as u32;
-            mf.write_all(&n_commits.to_le_bytes()).unwrap();
-            for (&ci, &ib) in tmpl.commitment_indices().iter().zip(tmpl.is_broadcast().iter()) {
-                mf.write_all(&(ci as u32).to_le_bytes()).unwrap();
-                mf.write_all(&(dm[ci].len() as u32).to_le_bytes()).unwrap();
-                mf.write_all(&(if ib { 1u32 } else { 0u32 }).to_le_bytes()).unwrap();
-            }
-        }
+        // SRS + commit data dump skipped (GPU PCS commit disabled, FFI reads gates only)
 
         gpu_templates.push(Some(PreparedTemplate {
             ti, pc, tc, tr,
             cvs_indices: tmpl.commitment_indices().to_vec(),
             is_broadcast: tmpl.is_broadcast().to_vec(),
         }));
+        if dump_ms > 10 {
+            eprintln!("  [dump] tmpl[{}] dump={}ms", ti, dump_ms);
+        }
         gpu_count += 1;
     }
     eprintln!("  [gpu] prep {} templates: {:?}", gpu_count, t_prep.elapsed());
@@ -616,40 +583,48 @@ fn dump_circuits_for_gpu<F: gkr_engine::FieldEngine>(
     // rnd_coef_count: needed for GPU prover to advance transcript state
     hdr.write_all(&(rnd_coef_count as u32).to_le_bytes()).unwrap();
 
-    // Write gates per layer (shared across all instances)
+    // Write gates per layer — bulk serialize to Vec then single write
     for (li, layer) in template_circuit.layers.iter().enumerate() {
-        // Mul gates: [o_id, x_id, y_id, coef] x n_mul
-        let mut gf = std::fs::File::create(format!("{}/layer_{}_mul.bin", dir, li)).unwrap();
-        for gate in &layer.mul {
-            gf.write_all(&(gate.o_id as u32).to_le_bytes()).unwrap();
-            gf.write_all(&(gate.i_ids[0] as u32).to_le_bytes()).unwrap();
-            gf.write_all(&(gate.i_ids[1] as u32).to_le_bytes()).unwrap();
-            // coef is CircuitField (M31 = 4 bytes)
-            let coef_bytes: &[u8] = unsafe {
-                std::slice::from_raw_parts(&gate.coef as *const _ as *const u8, 4)
-            };
-            gf.write_all(&coef_bytes).unwrap();
+        // Mul gates: bulk serialize [o_id, x_id, y_id, coef] x n_mul
+        {
+            let mut buf = Vec::with_capacity(layer.mul.len() * 16);
+            for gate in &layer.mul {
+                buf.extend_from_slice(&(gate.o_id as u32).to_le_bytes());
+                buf.extend_from_slice(&(gate.i_ids[0] as u32).to_le_bytes());
+                buf.extend_from_slice(&(gate.i_ids[1] as u32).to_le_bytes());
+                let coef_bytes: &[u8] = unsafe {
+                    std::slice::from_raw_parts(&gate.coef as *const _ as *const u8, 4)
+                };
+                buf.extend_from_slice(coef_bytes);
+            }
+            std::fs::write(format!("{}/layer_{}_mul.bin", dir, li), &buf).unwrap();
         }
 
-        // Add gates: [o_id, x_id, coef] x n_add
-        let mut af = std::fs::File::create(format!("{}/layer_{}_add.bin", dir, li)).unwrap();
-        for gate in &layer.add {
-            af.write_all(&(gate.o_id as u32).to_le_bytes()).unwrap();
-            af.write_all(&(gate.i_ids[0] as u32).to_le_bytes()).unwrap();
-            let coef_bytes: &[u8] = unsafe {
-                std::slice::from_raw_parts(&gate.coef as *const _ as *const u8, 4)
-            };
-            af.write_all(coef_bytes).unwrap();
+        // Add gates: bulk serialize [o_id, x_id, coef] x n_add
+        {
+            let mut buf = Vec::with_capacity(layer.add.len() * 12);
+            for gate in &layer.add {
+                buf.extend_from_slice(&(gate.o_id as u32).to_le_bytes());
+                buf.extend_from_slice(&(gate.i_ids[0] as u32).to_le_bytes());
+                let coef_bytes: &[u8] = unsafe {
+                    std::slice::from_raw_parts(&gate.coef as *const _ as *const u8, 4)
+                };
+                buf.extend_from_slice(coef_bytes);
+            }
+            std::fs::write(format!("{}/layer_{}_add.bin", dir, li), &buf).unwrap();
         }
 
-        // Const gates: [o_id, coef] x n_const
-        let mut cf = std::fs::File::create(format!("{}/layer_{}_const.bin", dir, li)).unwrap();
-        for gate in &layer.const_ {
-            cf.write_all(&(gate.o_id as u32).to_le_bytes()).unwrap();
-            let coef_bytes: &[u8] = unsafe {
-                std::slice::from_raw_parts(&gate.coef as *const _ as *const u8, 4)
-            };
-            cf.write_all(coef_bytes).unwrap();
+        // Const gates: bulk serialize [o_id, coef] x n_const
+        {
+            let mut buf = Vec::with_capacity(layer.const_.len() * 8);
+            for gate in &layer.const_ {
+                buf.extend_from_slice(&(gate.o_id as u32).to_le_bytes());
+                let coef_bytes: &[u8] = unsafe {
+                    std::slice::from_raw_parts(&gate.coef as *const _ as *const u8, 4)
+                };
+                buf.extend_from_slice(coef_bytes);
+            }
+            std::fs::write(format!("{}/layer_{}_const.bin", dir, li), &buf).unwrap();
         }
     }
 
