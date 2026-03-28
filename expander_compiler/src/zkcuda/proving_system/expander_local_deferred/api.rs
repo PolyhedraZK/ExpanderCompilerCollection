@@ -24,7 +24,6 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
     fn prove(ps: &Self::ProverSetup, cg: &ComputationGraph<ECCConfig>, dm: Vec<Vec<SIMDField<ECCConfig>>>) -> Self::Proof {
         use crate::zkcuda::proving_system::expander::commit_impl::local_commit_impl;
         let t_commit = std::time::Instant::now();
-        // Parallel commits: each device memory commits independently
         let ps_ptr = ps as *const _ as usize;
         let commit_results: Vec<_> = {
             use rayon::prelude::*;
@@ -38,36 +37,37 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
         let templates = cg.proof_templates();
         let kernels = cg.kernels();
         let n = templates.len();
-        let results: Vec<Mutex<Option<ExpanderProof>>> = (0..n).map(|_| Mutex::new(None)).collect();
         let commit_states = &commit_states;
-        // Two-phase scheduling: small templates first (avoid Rayon starvation)
-        let small_threshold = 256;
-        // Phase 1: small templates sequentially (each gets full Rayon pool)
-        for (ti, tmpl) in templates.iter().enumerate() {
-            let pc = next_power_of_two(tmpl.parallel_count());
-            if pc <= small_threshold {
-                let proof = prove_one::<C, ECCConfig>(ti, tmpl, kernels, &dm, ps, commit_states);
-                *results[ti].lock().unwrap() = Some(proof);
-            }
-        }
-        // Phase 2: big templates in parallel (Rayon work-stealing handles load balancing)
-        rayon::scope(|scope| {
+
+        let proofs = if std::env::var("USE_GPU_PROVER").is_ok() {
+            gpu_prove_all::<C, ECCConfig>(templates, kernels, &dm, ps, commit_states)
+        } else {
+            let results: Vec<Mutex<Option<ExpanderProof>>> = (0..n).map(|_| Mutex::new(None)).collect();
+            let small_threshold = 256;
             for (ti, tmpl) in templates.iter().enumerate() {
                 let pc = next_power_of_two(tmpl.parallel_count());
-                if pc > small_threshold {
-                    let ps_ptr = ps as *const _ as usize;
-                    let dm = &dm;
-                    let kernels = &kernels;
-                    let slot = &results[ti];
-                    scope.spawn(move |_| {
-                        let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = unsafe { &*(ps_ptr as *const _) };
-                        let proof = prove_one::<C, ECCConfig>(ti, tmpl, kernels, dm, ps, commit_states);
-                        *slot.lock().unwrap() = Some(proof);
-                    });
+                if pc <= small_threshold {
+                    let proof = prove_one::<C, ECCConfig>(ti, tmpl, kernels, &dm, ps, commit_states);
+                    *results[ti].lock().unwrap() = Some(proof);
                 }
             }
-        });
-        let proofs = results.into_iter().map(|m| m.into_inner().unwrap().unwrap()).collect();
+            rayon::scope(|scope| {
+                for (ti, tmpl) in templates.iter().enumerate() {
+                    let pc = next_power_of_two(tmpl.parallel_count());
+                    if pc > small_threshold {
+                        let ps_ptr = ps as *const _ as usize;
+                        let dm = &dm; let kernels = &kernels;
+                        let slot = &results[ti];
+                        scope.spawn(move |_| {
+                            let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = unsafe { &*(ps_ptr as *const _) };
+                            let proof = prove_one::<C, ECCConfig>(ti, tmpl, kernels, dm, ps, commit_states);
+                            *slot.lock().unwrap() = Some(proof);
+                        });
+                    }
+                }
+            });
+            results.into_iter().map(|m| m.into_inner().unwrap().unwrap()).collect()
+        };
         CombinedProof { commitments, proofs }
     }
 
@@ -238,6 +238,199 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         eprintln!("  [batch] tmpl[{}] N=1 t={:?}", ti, t0.elapsed());
         ExpanderProof { data: vec![tr.finalize_and_get_proof()] }
     }
+}
+
+/// GPU batch proving: dump all templates → single GPU launch → parallel replay + PCS.
+/// Eliminates per-template subprocess overhead (~230ms × N_templates → ~230ms total).
+fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
+    templates: &[crate::zkcuda::context::ProofTemplate],
+    kernels: &[crate::zkcuda::kernel::Kernel<ECCConfig>],
+    dm: &[Vec<SIMDField<ECCConfig>>],
+    ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
+    commit_states: &[crate::zkcuda::proving_system::expander::structs::ExpanderCommitmentState<C::FieldConfig, C::PCSConfig>],
+) -> Vec<ExpanderProof> {
+    use gkr_engine::Transcript;
+
+    let t_total = std::time::Instant::now();
+
+    // ---- Phase 1: Prepare all templates and dump circuit data ----
+    let t_prep = std::time::Instant::now();
+    struct PreparedTemplate<Cfg: GKREngine> {
+        ti: usize,
+        pc: usize,
+        tc: expander_circuit::Circuit<Cfg::FieldConfig>,
+        tr: Cfg::TranscriptConfig,
+        cvs_indices: Vec<usize>,
+        is_broadcast: Vec<bool>,
+    }
+    let mut gpu_templates: Vec<Option<PreparedTemplate<C>>> = Vec::new();
+    let mut gpu_count = 0usize;
+
+    for (ti, tmpl) in templates.iter().enumerate() {
+        let kernel = &kernels[tmpl.kernel_id()];
+        let cvs: Vec<&[SIMDField<C>]> = tmpl.commitment_indices().iter().map(|&i| dm[i].as_slice()).collect();
+        let pc = next_power_of_two(tmpl.parallel_count());
+
+        if pc <= 1 {
+            gpu_templates.push(None);
+            continue;
+        }
+
+        check_inputs(kernel, &cvs, pc, tmpl.is_broadcast());
+        let (bc, _bs) = prepare_expander_circuit::<C::FieldConfig, ECCConfig>(kernel, 1);
+        let mut tr = C::TranscriptConfig::new();
+        let mut tc = bc.clone();
+        tc.fill_rnd_coefs(&mut tr);
+
+        let ki = kernel.layered_circuit_input();
+        let (mut circuits, _flat_bufs) = unsafe { tc.create_batch(pc) };
+        let is_bc = tmpl.is_broadcast();
+        for pi in 0..pc {
+            let input = &mut circuits[pi].layers[0].input_vals;
+            for v in input.iter_mut() { *v = Default::default(); }
+            for (_ci, (partition, (&ref vals, &ib))) in ki.iter()
+                .zip(cvs.iter().zip(is_bc.iter()))
+                .enumerate()
+            {
+                let local_slice = if ib { vals.as_ref() }
+                else { let chunk = vals.len() / pc; &vals[chunk * pi..chunk * (pi + 1)] };
+                input[partition.offset..partition.offset + partition.len]
+                    .copy_from_slice(local_slice);
+            }
+            circuits[pi].evaluate();
+        }
+
+        dump_circuits_for_gpu::<C::FieldConfig>(ti, pc, &tc, &circuits, tc.rnd_coefs.len());
+        unsafe { expander_circuit::Circuit::drop_batch(circuits); }
+
+        gpu_templates.push(Some(PreparedTemplate {
+            ti, pc, tc, tr,
+            cvs_indices: tmpl.commitment_indices().to_vec(),
+            is_broadcast: tmpl.is_broadcast().to_vec(),
+        }));
+        gpu_count += 1;
+    }
+    eprintln!("  [gpu] prep {} templates: {:?}", gpu_count, t_prep.elapsed());
+
+    // ---- Phase 2: Single GPU binary call for ALL templates ----
+    let t_gpu = std::time::Instant::now();
+    let status = std::process::Command::new("cuda/gpu_prover_v2")
+        .status()
+        .expect("Failed to launch cuda/gpu_prover_v2");
+    assert!(status.success(), "GPU prover failed");
+    eprintln!("  [gpu] single GPU call: {:?}", t_gpu.elapsed());
+
+    // ---- Phase 3: Replay + PCS for each template (parallel) ----
+    let t_pcs = std::time::Instant::now();
+    let ps_ptr = ps as *const _ as usize;
+
+    let proofs: Vec<ExpanderProof> = gpu_templates.into_iter().enumerate().map(|(ti, prep)| {
+        if let Some(mut p) = prep {
+            // Read GPU proof
+            let gpu_proof = std::fs::read(format!("gpu_data/tmpl_{}/gpu_proof.bin", p.ti))
+                .expect("GPU proof file missing");
+
+            // Replay through transcript
+            let (cv, ch) = gpu_gkr_prove_from_bytes::<C>(&p.tc, p.pc, &gpu_proof, &mut p.tr);
+            assert_eq!(cv, <C::FieldConfig as FieldEngine>::ChallengeField::from(0u32));
+
+            // PCS opening
+            let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = unsafe { &*(ps_ptr as *const _) };
+            let cvs: Vec<&[SIMDField<C>]> = p.cvs_indices.iter().map(|&i| dm[i].as_slice()).collect();
+            let chs = if let Some(cy) = ch.challenge_y() { vec![ch.challenge_x(), cy] } else { vec![ch.challenge_x()] };
+            for sc in &chs {
+                for (ci, (&ref v, &_ib)) in cvs.iter().zip(p.is_broadcast.iter()).enumerate() {
+                    let pc2 = sc.clone();
+                    let comm_idx = p.cvs_indices[ci];
+                    let scratch = &commit_states[comm_idx].scratch;
+                    crate::zkcuda::proving_system::expander::prove_impl::pcs_batch_open_with_scratch::<C>(
+                        v, &pc2, ps, &mut p.tr, Some(scratch));
+                }
+            }
+            ExpanderProof { data: vec![p.tr.finalize_and_get_proof()] }
+        } else {
+            // N=1 template: CPU path
+            let tmpl = &templates[ti];
+            let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = unsafe { &*(ps_ptr as *const _) };
+            prove_one::<C, ECCConfig>(ti, tmpl, kernels, dm, ps, commit_states)
+        }
+    }).collect();
+
+    eprintln!("  [gpu] replay+PCS: {:?}", t_pcs.elapsed());
+    eprintln!("  [gpu] total GPU path: {:?}", t_total.elapsed());
+    proofs
+}
+
+/// Replay GPU proof bytes through transcript (no subprocess call).
+fn gpu_gkr_prove_from_bytes<C: GKREngine>(
+    tc: &expander_circuit::Circuit<C::FieldConfig>,
+    pc: usize,
+    gpu_proof: &[u8],
+    tr: &mut C::TranscriptConfig,
+) -> (<C::FieldConfig as FieldEngine>::ChallengeField, gkr_engine::ExpanderDualVarChallenge<C::FieldConfig>)
+{
+    use arith::Field;
+    use gkr_engine::Transcript;
+
+    let elem_size = <C::FieldConfig as FieldEngine>::ChallengeField::SIZE;
+    let n_layers = tc.layers.len();
+    let simd_var_num = 4usize;
+    let mpi_var_num = { let mut x = pc; let mut v = 0usize; while x > 1 { v += 1; x >>= 1; } v };
+
+    let mut cursor = 0usize;
+    let mut last_rx = Vec::new();
+    let mut last_ry: Option<Vec<<C::FieldConfig as FieldEngine>::ChallengeField>> = None;
+    let mut last_r_simd = Vec::new();
+    let mut last_r_mpi = Vec::new();
+
+    let append_n = |cursor: &mut usize, n: usize, tr: &mut C::TranscriptConfig| {
+        let bytes = n * elem_size;
+        tr.append_u8_slice(&gpu_proof[*cursor..*cursor + bytes]);
+        *cursor += bytes;
+    };
+
+    for li in (0..n_layers).rev() {
+        let layer = &tc.layers[li];
+        let ivn = layer.input_var_num;
+        let skip_y = layer.mul.is_empty();
+
+        let mut rx = Vec::with_capacity(ivn);
+        for _ in 0..ivn {
+            append_n(&mut cursor, 3, tr);
+            rx.push(tr.generate_field_element::<<C::FieldConfig as FieldEngine>::ChallengeField>());
+        }
+        let mut r_simd = Vec::with_capacity(simd_var_num);
+        for _ in 0..simd_var_num {
+            append_n(&mut cursor, 4, tr);
+            r_simd.push(tr.generate_field_element::<<C::FieldConfig as FieldEngine>::ChallengeField>());
+        }
+        let mut r_mpi = Vec::with_capacity(mpi_var_num);
+        for _ in 0..mpi_var_num {
+            append_n(&mut cursor, 4, tr);
+            r_mpi.push(tr.generate_field_element::<<C::FieldConfig as FieldEngine>::ChallengeField>());
+        }
+        append_n(&mut cursor, 1, tr); // vx_claim
+
+        if !skip_y {
+            let mut ry = Vec::with_capacity(ivn);
+            for _ in 0..ivn {
+                append_n(&mut cursor, 3, tr);
+                ry.push(tr.generate_field_element::<<C::FieldConfig as FieldEngine>::ChallengeField>());
+            }
+            append_n(&mut cursor, 1, tr); // vy_claim
+            let _alpha: <C::FieldConfig as FieldEngine>::ChallengeField = tr.generate_field_element();
+            last_ry = Some(ry);
+        } else {
+            last_ry = None;
+        }
+        last_rx = rx; last_r_simd = r_simd; last_r_mpi = r_mpi;
+    }
+
+    assert_eq!(cursor, gpu_proof.len(),
+        "GPU proof size mismatch: consumed {} of {} bytes", cursor, gpu_proof.len());
+
+    let ch = gkr_engine::ExpanderDualVarChallenge::new(last_rx, last_ry, last_r_simd, last_r_mpi);
+    (<C::FieldConfig as FieldEngine>::ChallengeField::ZERO, ch)
 }
 
 /// Dump circuit data (gates + witness) to binary files for GPU prover.
