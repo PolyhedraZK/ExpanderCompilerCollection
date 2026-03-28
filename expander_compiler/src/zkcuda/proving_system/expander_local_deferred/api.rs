@@ -23,25 +23,47 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
 
     fn prove(ps: &Self::ProverSetup, cg: &ComputationGraph<ECCConfig>, dm: Vec<Vec<SIMDField<ECCConfig>>>) -> Self::Proof {
         use crate::zkcuda::proving_system::expander::commit_impl::local_commit_impl;
-        let t_commit = std::time::Instant::now();
-        let ps_ptr = ps as *const _ as usize;
-        let commit_results: Vec<_> = {
-            use rayon::prelude::*;
-            dm.par_iter().map(|m| {
-                let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = unsafe { &*(ps_ptr as *const _) };
-                local_commit_impl::<C, ECCConfig>(ps.p_keys.get(&m.len()).unwrap(), m)
-            }).collect()
-        };
-        let (commitments, commit_states): (Vec<_>, Vec<_>) = commit_results.into_iter().unzip();
-        eprintln!("  [commit] {:?}", t_commit.elapsed());
         let templates = cg.proof_templates();
         let kernels = cg.kernels();
         let n = templates.len();
-        let commit_states = &commit_states;
 
-        let proofs = if std::env::var("USE_GPU_PROVER").is_ok() {
-            gpu_prove_all::<C, ECCConfig>(templates, kernels, &dm, ps, commit_states)
+        let (commitments, proofs) = if std::env::var("USE_GPU_PROVER").is_ok() {
+            // Launch CPU commit in background thread (overlaps with GPU prep + GKR)
+            let ps_ptr = ps as *const _ as usize;
+            let dm_ptr = &dm as *const _ as usize;
+            let t_commit_start = std::time::Instant::now();
+            // SAFETY: dm and ps outlive the thread (we join before function returns)
+            let commit_handle = unsafe {
+                let dm_ptr = dm_ptr;
+                let ps_ptr = ps_ptr;
+                std::thread::Builder::new().spawn_unchecked(move || {
+                    use rayon::prelude::*;
+                    let dm: &[Vec<SIMDField<ECCConfig>>] = &*(dm_ptr as *const Vec<Vec<SIMDField<ECCConfig>>>);
+                    let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = &*(ps_ptr as *const _);
+                    let results: Vec<_> = dm.par_iter().map(|m| {
+                        local_commit_impl::<C, ECCConfig>(ps.p_keys.get(&m.len()).unwrap(), m)
+                    }).collect();
+                    results.into_iter().unzip()
+                }).unwrap()
+            };
+
+            // GPU prep + GKR run concurrently with commit
+            gpu_prove_all::<C, ECCConfig>(templates, kernels, &dm, ps, commit_handle, t_commit_start)
         } else {
+            // Synchronous commit for CPU path
+            let t_commit = std::time::Instant::now();
+            let ps_ptr = ps as *const _ as usize;
+            let commit_results: Vec<_> = {
+                use rayon::prelude::*;
+                dm.par_iter().map(|m| {
+                    let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = unsafe { &*(ps_ptr as *const _) };
+                    local_commit_impl::<C, ECCConfig>(ps.p_keys.get(&m.len()).unwrap(), m)
+                }).collect()
+            };
+            let (commitments, commit_states_vec): (Vec<_>, Vec<_>) = commit_results.into_iter().unzip();
+            let commit_states = &commit_states_vec;
+            eprintln!("  [commit] {:?}", t_commit.elapsed());
+
             let results: Vec<Mutex<Option<ExpanderProof>>> = (0..n).map(|_| Mutex::new(None)).collect();
             let small_threshold = 256;
             for (ti, tmpl) in templates.iter().enumerate() {
@@ -66,7 +88,8 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
                     }
                 }
             });
-            results.into_iter().map(|m| m.into_inner().unwrap().unwrap()).collect()
+            let proofs: Vec<_> = results.into_iter().map(|m| m.into_inner().unwrap().unwrap()).collect();
+            (commitments, proofs)
         };
         CombinedProof { commitments, proofs }
     }
@@ -247,8 +270,12 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     kernels: &[crate::zkcuda::kernel::Kernel<ECCConfig>],
     dm: &[Vec<SIMDField<ECCConfig>>],
     ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
-    commit_states: &[crate::zkcuda::proving_system::expander::structs::ExpanderCommitmentState<C::FieldConfig, C::PCSConfig>],
-) -> Vec<ExpanderProof> {
+    commit_handle: std::thread::JoinHandle<(
+        Vec<crate::zkcuda::proving_system::expander::structs::ExpanderCommitment<C::FieldConfig, C::PCSConfig>>,
+        Vec<crate::zkcuda::proving_system::expander::structs::ExpanderCommitmentState<C::FieldConfig, C::PCSConfig>>,
+    )>,
+    t_commit_start: std::time::Instant,
+) -> (Vec<crate::zkcuda::proving_system::expander::structs::ExpanderCommitment<C::FieldConfig, C::PCSConfig>>, Vec<ExpanderProof>) {
     use gkr_engine::Transcript;
 
     let t_total = std::time::Instant::now();
@@ -371,6 +398,11 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     gpu_server_prove();
     eprintln!("  [gpu] GPU GKR: {:?}", t_gpu.elapsed());
 
+    // ---- Wait for commit to finish (should be done by now — overlapped with prep+GKR) ----
+    let (commitments, commit_states_vec) = commit_handle.join().expect("commit thread panicked");
+    eprintln!("  [commit] {:?} (overlapped with prep+GKR)", t_commit_start.elapsed());
+    let commit_states = &commit_states_vec;
+
     // ---- Phase 3: Replay + PCS for each template ----
     let t_pcs = std::time::Instant::now();
 
@@ -404,7 +436,7 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
 
     eprintln!("  [gpu] replay+PCS: {:?}", t_pcs.elapsed());
     eprintln!("  [gpu] total GPU path: {:?}", t_total.elapsed());
-    proofs
+    (commitments, proofs)
 }
 
 /// Replay GPU proof bytes through transcript (no subprocess call).
