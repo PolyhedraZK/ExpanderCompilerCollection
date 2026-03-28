@@ -182,11 +182,17 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             &mut _sps_vec
         };
         // Optional: dump circuit data for GPU prover
-        if std::env::var("DUMP_GPU_DATA").is_ok() {
+        if std::env::var("DUMP_GPU_DATA").is_ok() || std::env::var("USE_GPU_PROVER").is_ok() {
             dump_circuits_for_gpu::<C::FieldConfig>(ti, pc, &tc, &circuits, tc.rnd_coefs.len());
         }
         let t1 = std::time::Instant::now();
-        let (cv, ch) = gkr_prove_batch(&circuits, sps, &mut tr);
+        let (cv, ch) = if std::env::var("USE_GPU_PROVER").is_ok() {
+            // GPU path: call GPU binary for GKR, replay transcript, CPU does PCS
+            gpu_gkr_prove::<C>(&tc, pc, ti, &mut tr)
+        } else {
+            let r = gkr_prove_batch(&circuits, sps, &mut tr);
+            r
+        };
         // Drop batch circuits without freeing shared gates or aliased buffers
         unsafe { expander_circuit::Circuit::drop_batch(circuits); }
         assert_eq!(cv, <C::FieldConfig as FieldEngine>::ChallengeField::from(0u32));
@@ -324,4 +330,116 @@ fn dump_circuits_for_gpu<F: gkr_engine::FieldEngine>(
         }
     }
     eprintln!("  [dump] tmpl[{}] N={} layers={} rnd_coefs={} → {}/", ti, pc, num_layers, rnd_coef_count, dir);
+}
+
+/// GPU GKR proving: call GPU binary, read proof bytes, replay through transcript.
+/// Returns the same (claimed_value, challenge) tuple as gkr_prove_batch.
+fn gpu_gkr_prove<C: GKREngine>(
+    tc: &expander_circuit::Circuit<C::FieldConfig>,
+    pc: usize,
+    ti: usize,
+    tr: &mut C::TranscriptConfig,
+) -> (<C::FieldConfig as FieldEngine>::ChallengeField, gkr_engine::ExpanderDualVarChallenge<C::FieldConfig>)
+{
+    use arith::Field;
+    use gkr_engine::Transcript;
+
+    let t_gpu = std::time::Instant::now();
+
+    // 1. Call GPU binary
+    let status = std::process::Command::new("cuda/gpu_prover_v2")
+        .arg("--template").arg(ti.to_string())
+        .status()
+        .expect("Failed to launch cuda/gpu_prover_v2");
+    assert!(status.success(), "GPU prover exited with error");
+
+    // 2. Read GPU proof bytes
+    let gpu_proof = std::fs::read(format!("gpu_data/tmpl_{}/gpu_proof.bin", ti))
+        .expect("Failed to read GPU proof");
+    eprintln!("  [gpu] tmpl[{}] gpu_proof={} bytes ({:?})", ti, gpu_proof.len(), t_gpu.elapsed());
+
+    // 3. Replay through transcript (feeds bytes in correct order, updates hash state)
+    let elem_size = <C::FieldConfig as FieldEngine>::ChallengeField::SIZE;
+    let n_layers = tc.layers.len();
+    let simd_var_num = 4usize;
+    let mpi_var_num = {
+        let mut x = pc; let mut v = 0usize;
+        while x > 1 { v += 1; x >>= 1; }
+        v
+    };
+
+    let mut cursor = 0usize;
+    let mut last_rx = Vec::new();
+    let mut last_ry: Option<Vec<<C::FieldConfig as FieldEngine>::ChallengeField>> = None;
+    let mut last_r_simd = Vec::new();
+    let mut last_r_mpi = Vec::new();
+
+    let append_n = |cursor: &mut usize, n: usize, tr: &mut C::TranscriptConfig| {
+        let bytes = n * elem_size;
+        tr.append_u8_slice(&gpu_proof[*cursor..*cursor + bytes]);
+        *cursor += bytes;
+    };
+
+    for li in (0..n_layers).rev() {
+        let layer = &tc.layers[li];
+        let ivn = layer.input_var_num;
+        let skip_y = layer.mul.is_empty(); // skip_y_phase = no mul gates
+
+        // X-phase: ivn rounds × 3 evals + challenge
+        let mut rx = Vec::with_capacity(ivn);
+        for _ in 0..ivn {
+            append_n(&mut cursor, 3, tr);
+            rx.push(tr.generate_field_element::<<C::FieldConfig as FieldEngine>::ChallengeField>());
+        }
+
+        // SIMD phase: 4 rounds × 4 evals + challenge
+        let mut r_simd = Vec::with_capacity(simd_var_num);
+        for _ in 0..simd_var_num {
+            append_n(&mut cursor, 4, tr);
+            r_simd.push(tr.generate_field_element::<<C::FieldConfig as FieldEngine>::ChallengeField>());
+        }
+
+        // MPI phase: mpi_var_num rounds × 4 evals + challenge
+        let mut r_mpi = Vec::with_capacity(mpi_var_num);
+        for _ in 0..mpi_var_num {
+            append_n(&mut cursor, 4, tr);
+            r_mpi.push(tr.generate_field_element::<<C::FieldConfig as FieldEngine>::ChallengeField>());
+        }
+
+        // vx_claim
+        append_n(&mut cursor, 1, tr);
+
+        // Y-phase
+        if !skip_y {
+            let mut ry = Vec::with_capacity(ivn);
+            for _ in 0..ivn {
+                append_n(&mut cursor, 3, tr);
+                ry.push(tr.generate_field_element::<<C::FieldConfig as FieldEngine>::ChallengeField>());
+            }
+            // vy_claim
+            append_n(&mut cursor, 1, tr);
+            // alpha
+            let _alpha: <C::FieldConfig as FieldEngine>::ChallengeField = tr.generate_field_element();
+            last_ry = Some(ry);
+        } else {
+            last_ry = None;
+        }
+
+        last_rx = rx;
+        last_r_simd = r_simd;
+        last_r_mpi = r_mpi;
+    }
+
+    assert_eq!(cursor, gpu_proof.len(),
+        "GPU proof size mismatch: consumed {} of {} bytes", cursor, gpu_proof.len());
+
+    // 4. Construct challenge from last layer
+    let ch = gkr_engine::ExpanderDualVarChallenge::new(
+        last_rx,
+        last_ry,
+        last_r_simd,
+        last_r_mpi,
+    );
+
+    (<C::FieldConfig as FieldEngine>::ChallengeField::ZERO, ch)
 }
