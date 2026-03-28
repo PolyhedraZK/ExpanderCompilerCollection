@@ -553,6 +553,28 @@ fn gpu_server_send(cmd: &str) -> String {
 }
 
 fn gpu_server_prove() {
+    // Try FFI via dlopen (no subprocess overhead)
+    if std::path::Path::new("cuda/libgpu_prover.so").exists() {
+        type FnType = unsafe extern "C" fn(*const std::ffi::c_char) -> i32;
+        unsafe {
+            let lib = libc::dlopen(
+                b"cuda/libgpu_prover.so\0".as_ptr() as *const _,
+                libc::RTLD_LAZY | libc::RTLD_GLOBAL);
+            if !lib.is_null() {
+                let sym = libc::dlsym(lib, b"gpu_gkr_prove_all_ffi\0".as_ptr() as *const _);
+                if !sym.is_null() {
+                    let func: FnType = std::mem::transmute(sym);
+                    let dir = std::ffi::CString::new("/dev/shm/gpu_data").unwrap();
+                    let ret = func(dir.as_ptr());
+                    libc::dlclose(lib);
+                    if ret == 0 { eprintln!("  [gpu] FFI GKR done"); return; }
+                    eprintln!("  [gpu] FFI failed ({}), falling back to server", ret);
+                } else {
+                    libc::dlclose(lib);
+                }
+            }
+        }
+    }
     let resp = gpu_server_send("PROVE");
     assert!(resp.starts_with("GPU_DONE") || resp.starts_with("GPU_ERROR"),
         "GPU server unexpected: {}", resp);

@@ -29,6 +29,7 @@ mpi.workspace = true
 num_cpus.workspace = true
 poly_commit.workspace = true
 polynomials.workspace = true
+libc = "0.2"
 rand.workspace = true
 rayon.workspace = true
 reqwest.workspace = true
