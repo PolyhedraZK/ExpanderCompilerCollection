@@ -59,7 +59,7 @@ gkr = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 gf2 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 mersenne31 = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 goldilocks = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
-poly_commit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "poly_commit" }
+poly_commit = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "poly_commit", features = ["cuda_pcs"] }
 polynomials = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 sumcheck = { git = "https://github.com/PolyhedraZK/Expander", branch = "main" }
 serdes = { git = "https://github.com/PolyhedraZK/Expander", branch = "main", package = "serdes" }
@@ -78,7 +78,7 @@ gkr = { path = "../Expander/gkr" }
 gf2 = { path = "../Expander/arith/gf2" }
 mersenne31 = { path = "../Expander/arith/mersenne31" }
 goldilocks = { path = "../Expander/arith/goldilocks" }
-poly_commit = { path = "../Expander/poly_commit" }
+poly_commit = { path = "../Expander/poly_commit", features = ["cuda_pcs"] }
 polynomials = { path = "../Expander/arith/polynomials" }
 sumcheck = { path = "../Expander/sumcheck" }
 serdes = { path = "../Expander/serdes" }

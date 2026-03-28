@@ -467,15 +467,15 @@ fn gpu_gkr_prove_from_bytes<C: GKREngine>(
 }
 
 /// Persistent GPU server: launch once, reuse across calls.
-/// Sends "PROVE\n" to stdin, reads "GPU_DONE <ms>\n" from stdout.
-fn gpu_server_prove() {
+/// Supports PROVE, LINEAR_COMBINE, and other commands.
+fn gpu_server_send(cmd: &str) -> String {
     use std::io::{BufRead, BufReader, Write};
     use std::sync::Mutex;
 
     static GPU_SERVER: std::sync::OnceLock<Mutex<GpuServer>> = std::sync::OnceLock::new();
 
     struct GpuServer {
-        child: std::process::Child,
+        _child: std::process::Child,
         stdin: std::process::ChildStdin,
         stdout: BufReader<std::process::ChildStdout>,
     }
@@ -491,8 +491,7 @@ fn gpu_server_prove() {
             .expect("Failed to launch cuda/gpu_prover_v2 --server");
         let stdin = child.stdin.take().unwrap();
         let stdout = BufReader::new(child.stdout.take().unwrap());
-        let mut s = GpuServer { child, stdin, stdout };
-        // Wait for "GPU_SERVER_READY"
+        let mut s = GpuServer { _child: child, stdin, stdout };
         let mut line = String::new();
         s.stdout.read_line(&mut line).expect("GPU server didn't respond");
         assert!(line.starts_with("GPU_SERVER_READY"), "GPU server: {}", line.trim());
@@ -501,13 +500,24 @@ fn gpu_server_prove() {
     });
 
     let mut s = server.lock().unwrap();
-    writeln!(s.stdin, "PROVE").expect("Failed to write to GPU server");
+    writeln!(s.stdin, "{}", cmd).expect("Failed to write to GPU server");
     s.stdin.flush().unwrap();
     let mut line = String::new();
-    s.stdout.read_line(&mut line).expect("GPU server didn't respond to PROVE");
-    assert!(line.starts_with("GPU_DONE") || line.starts_with("GPU_ERROR"),
-        "GPU server unexpected: {}", line.trim());
-    eprintln!("  [gpu] server response: {}", line.trim());
+    s.stdout.read_line(&mut line).expect("GPU server didn't respond");
+    line.trim().to_string()
+}
+
+fn gpu_server_prove() {
+    let resp = gpu_server_send("PROVE");
+    assert!(resp.starts_with("GPU_DONE") || resp.starts_with("GPU_ERROR"),
+        "GPU server unexpected: {}", resp);
+    eprintln!("  [gpu] server response: {}", resp);
+}
+
+/// Send LINEAR_COMBINE to GPU server. Public for use from Expander's PCS.
+pub fn gpu_server_linear_combine() {
+    let resp = gpu_server_send("LINEAR_COMBINE");
+    eprintln!("  [gpu-lc] {}", resp);
 }
 
 /// Dump circuit data (gates + witness) to binary files for GPU prover.
