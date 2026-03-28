@@ -313,10 +313,11 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         is_broadcast: Vec<bool>,
         // In-memory gate data for GPU FFI (kept alive until FFI call)
         gate_bufs: Vec<(Vec<u32>, Vec<u32>, Vec<u32>)>, // per layer: (mul, add, const)
-        witness_buf: Vec<u32>, // empty if using flat_bufs_holder
-        witness_ptr: *const u32, // direct pointer into flat_bufs
+        witness_buf: Vec<u32>,
+        witness_ptr: *const u32,
         witness_len: usize,
         _flat_bufs: Vec<Vec<<Cfg::FieldConfig as gkr_engine::FieldEngine>::SimdCircuitField>>,
+        gpu_proof: Vec<u8>, // GKR proof bytes from GPU FFI (avoids file I/O)
     }
     let mut gpu_templates: Vec<Option<PreparedTemplate<C>>> = Vec::new();
     let mut gpu_count = 0usize;
@@ -391,6 +392,7 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             cvs_indices: tmpl.commitment_indices().to_vec(),
             is_broadcast: tmpl.is_broadcast().to_vec(),
             gate_bufs, witness_buf, witness_ptr, witness_len, _flat_bufs: flat_bufs,
+            gpu_proof: Vec::new(),
         }));
         // prep_ms timing already printed above
         gpu_count += 1;
@@ -465,17 +467,14 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         };
         assert_eq!(ret, 0, "GPU GKR FFI failed");
 
-        // Store proof bytes in PreparedTemplate for Phase 3
+        // Store proof bytes directly in PreparedTemplate (no file I/O!)
         let mut idx = 0;
         for opt in gpu_templates.iter_mut() {
             if let Some(p) = opt {
                 let len = proof_lens[idx] as usize;
                 let ptr = proof_ptrs[idx];
-                let proof = unsafe { std::slice::from_raw_parts(ptr, len).to_vec() };
+                p.gpu_proof = unsafe { std::slice::from_raw_parts(ptr, len).to_vec() };
                 unsafe { libc::free(ptr as *mut _); }
-                // Write to shm for now (Phase 3 reads from there)
-                std::fs::create_dir_all(format!("/dev/shm/gpu_data/tmpl_{}", p.ti)).ok();
-                std::fs::write(format!("/dev/shm/gpu_data/tmpl_{}/gpu_proof.bin", p.ti), &proof).unwrap();
                 idx += 1;
             }
         }
@@ -494,8 +493,7 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         if let Some(mut p) = prep {
             // GPU GKR proof → replay transcript → CPU PCS opening
             let t0 = std::time::Instant::now();
-            let gpu_proof = std::fs::read(format!("/dev/shm/gpu_data/tmpl_{}/gpu_proof.bin", p.ti))
-                .expect("GPU proof file missing");
+            let gpu_proof = std::mem::take(&mut p.gpu_proof); // zero-copy from PreparedTemplate
             let (cv, ch) = gpu_gkr_prove_from_bytes::<C>(&p.tc, p.pc, &gpu_proof, &mut p.tr);
             assert_eq!(cv, <C::FieldConfig as FieldEngine>::ChallengeField::from(0u32));
 
