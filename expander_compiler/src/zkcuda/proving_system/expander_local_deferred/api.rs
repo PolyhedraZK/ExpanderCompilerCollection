@@ -1,6 +1,28 @@
 //! Batch GKR with parallel template proving via Rayon work-stealing.
 use std::io::Cursor;
 use std::sync::Mutex;
+
+// FFI structs matching cuda/gpu_ffi.h
+#[repr(C)]
+pub struct GpuLayerDataFfi {
+    pub input_var_num: u32,
+    pub output_var_num: u32,
+    pub n_mul: u32, pub n_add: u32, pub n_const: u32,
+    pub mul_gates: *const u32,
+    pub add_gates: *const u32,
+    pub const_gates: *const u32,
+}
+#[repr(C)]
+pub struct GpuTemplateDataFfi {
+    pub n_instances: u32,
+    pub n_layers: u32,
+    pub rnd_coef_count: u32,
+    pub layers: *const GpuLayerDataFfi,
+    pub witness: *const u32,
+    pub witness_len: u32,
+}
+unsafe impl Send for GpuLayerDataFfi {}
+unsafe impl Send for GpuTemplateDataFfi {}
 use arith::Field;
 use gkr::{gkr_prove_batch, gkr_verify};
 use gkr_engine::{ExpanderPCS, FieldEngine, GKREngine, MPIConfig, Transcript};
@@ -289,6 +311,9 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         tr: Cfg::TranscriptConfig,
         cvs_indices: Vec<usize>,
         is_broadcast: Vec<bool>,
+        // In-memory gate data for GPU FFI (kept alive until FFI call)
+        gate_bufs: Vec<(Vec<u32>, Vec<u32>, Vec<u32>)>, // per layer: (mul, add, const)
+        witness_buf: Vec<u32>,
     }
     let mut gpu_templates: Vec<Option<PreparedTemplate<C>>> = Vec::new();
     let mut gpu_count = 0usize;
@@ -327,22 +352,48 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             circuits[pi].evaluate();
         }
 
-        let t_dump = std::time::Instant::now();
-        // Still dump for GPU server fallback, but also prepare in-memory data for FFI
-        dump_circuits_for_gpu::<C::FieldConfig>(ti, pc, &tc, &circuits, tc.rnd_coefs.len());
+        // Prepare in-memory gate data for GPU FFI (no file I/O!)
+        let t_prep_tmpl = std::time::Instant::now();
+        let mut gate_bufs = Vec::with_capacity(tc.layers.len());
+        for layer in &tc.layers {
+            let mut mul_buf = Vec::with_capacity(layer.mul.len() * 4);
+            for g in &layer.mul {
+                mul_buf.push(g.o_id as u32); mul_buf.push(g.i_ids[0] as u32);
+                mul_buf.push(g.i_ids[1] as u32);
+                mul_buf.push(unsafe { *(&g.coef as *const _ as *const u32) });
+            }
+            let mut add_buf = Vec::with_capacity(layer.add.len() * 3);
+            for g in &layer.add {
+                add_buf.push(g.o_id as u32); add_buf.push(g.i_ids[0] as u32);
+                add_buf.push(unsafe { *(&g.coef as *const _ as *const u32) });
+            }
+            let mut cst_buf = Vec::with_capacity(layer.const_.len() * 2);
+            for g in &layer.const_ {
+                cst_buf.push(g.o_id as u32);
+                cst_buf.push(unsafe { *(&g.coef as *const _ as *const u32) });
+            }
+            gate_bufs.push((mul_buf, add_buf, cst_buf));
+        }
+        // Witness: raw M31x16 bytes from all instances
+        let mut witness_buf: Vec<u32> = Vec::new();
+        for circuit in circuits.iter() {
+            let vals = &circuit.layers[0].input_vals;
+            let slice: &[u32] = unsafe {
+                std::slice::from_raw_parts(vals.as_ptr() as *const u32, vals.len() * 16)
+            };
+            witness_buf.extend_from_slice(slice);
+        }
         unsafe { expander_circuit::Circuit::drop_batch(circuits); }
-        let dump_ms = t_dump.elapsed().as_millis();
-
-        // SRS + commit data dump skipped (GPU PCS commit disabled, FFI reads gates only)
+        let prep_ms = t_prep_tmpl.elapsed().as_millis();
+        if prep_ms > 10 { eprintln!("  [prep-ffi] tmpl[{}] {}ms", ti, prep_ms); }
 
         gpu_templates.push(Some(PreparedTemplate {
             ti, pc, tc, tr,
             cvs_indices: tmpl.commitment_indices().to_vec(),
             is_broadcast: tmpl.is_broadcast().to_vec(),
+            gate_bufs, witness_buf,
         }));
-        if dump_ms > 10 {
-            eprintln!("  [dump] tmpl[{}] dump={}ms", ti, dump_ms);
-        }
+        // prep_ms timing already printed above
         gpu_count += 1;
     }
     eprintln!("  [gpu] prep {} templates: {:?}", gpu_count, t_prep.elapsed());
@@ -360,9 +411,76 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         eprintln!("  [gpu] CUDA FFI warmed up");
     }
 
-    // ---- Phase 2: GPU GKR via persistent server ----
+    // ---- Phase 2: GPU GKR via direct FFI (no file I/O) ----
     let t_gpu = std::time::Instant::now();
-    gpu_server_prove();
+    {
+        // Build FFI structs from in-memory data
+        let gpu_tmpls: Vec<_> = gpu_templates.iter().filter_map(|opt| opt.as_ref()).collect();
+        let mut layer_datas: Vec<Vec<GpuLayerDataFfi>> = Vec::new();
+        let mut tmpl_datas: Vec<GpuTemplateDataFfi> = Vec::new();
+
+        for p in &gpu_tmpls {
+            let mut layers = Vec::new();
+            for (li, (_mul_buf, _add_buf, _cst_buf)) in p.gate_bufs.iter().enumerate() {
+                let layer = &p.tc.layers[li];
+                layers.push(GpuLayerDataFfi {
+                    input_var_num: layer.input_var_num as u32,
+                    output_var_num: layer.output_var_num as u32,
+                    n_mul: layer.mul.len() as u32,
+                    n_add: layer.add.len() as u32,
+                    n_const: layer.const_.len() as u32,
+                    mul_gates: _mul_buf.as_ptr(),
+                    add_gates: _add_buf.as_ptr(),
+                    const_gates: _cst_buf.as_ptr(),
+                });
+            }
+            layer_datas.push(layers);
+        }
+        for (i, p) in gpu_tmpls.iter().enumerate() {
+            tmpl_datas.push(GpuTemplateDataFfi {
+                n_instances: p.pc as u32,
+                n_layers: p.tc.layers.len() as u32,
+                rnd_coef_count: p.tc.rnd_coefs.len() as u32,
+                layers: layer_datas[i].as_ptr(),
+                witness: p.witness_buf.as_ptr(),
+                witness_len: p.witness_buf.len() as u32,
+            });
+        }
+
+        let mut proof_ptrs: Vec<*mut u8> = vec![std::ptr::null_mut(); gpu_tmpls.len()];
+        let mut proof_lens: Vec<u32> = vec![0; gpu_tmpls.len()];
+
+        type GkrFn = unsafe extern "C" fn(u32, *const GpuTemplateDataFfi, *mut *mut u8, *mut u32) -> i32;
+        let ret = unsafe {
+            let lib = libc::dlopen(
+                b"cuda/libgpu_prover.so\0".as_ptr() as *const _,
+                libc::RTLD_LAZY | libc::RTLD_GLOBAL);
+            assert!(!lib.is_null(), "Failed to load cuda/libgpu_prover.so");
+            let sym = libc::dlsym(lib, b"gpu_gkr_prove_templates\0".as_ptr() as *const _);
+            assert!(!sym.is_null(), "gpu_gkr_prove_templates not found in .so");
+            let func: GkrFn = std::mem::transmute(sym);
+            let r = func(tmpl_datas.len() as u32, tmpl_datas.as_ptr(),
+                proof_ptrs.as_mut_ptr(), proof_lens.as_mut_ptr());
+            libc::dlclose(lib);
+            r
+        };
+        assert_eq!(ret, 0, "GPU GKR FFI failed");
+
+        // Store proof bytes in PreparedTemplate for Phase 3
+        let mut idx = 0;
+        for opt in gpu_templates.iter_mut() {
+            if let Some(p) = opt {
+                let len = proof_lens[idx] as usize;
+                let ptr = proof_ptrs[idx];
+                let proof = unsafe { std::slice::from_raw_parts(ptr, len).to_vec() };
+                unsafe { libc::free(ptr as *mut _); }
+                // Write to shm for now (Phase 3 reads from there)
+                std::fs::create_dir_all(format!("/dev/shm/gpu_data/tmpl_{}", p.ti)).ok();
+                std::fs::write(format!("/dev/shm/gpu_data/tmpl_{}/gpu_proof.bin", p.ti), &proof).unwrap();
+                idx += 1;
+            }
+        }
+    }
     eprintln!("  [gpu] GPU GKR: {:?}", t_gpu.elapsed());
 
     // ---- Wait for commit to finish (should be done by now — overlapped with prep+GKR) ----
