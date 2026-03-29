@@ -327,7 +327,6 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         witness_buf: Vec<u32>,
         witness_ptr: *const u32,
         witness_len: usize,
-        _flat_bufs: Vec<Vec<<Cfg::FieldConfig as gkr_engine::FieldEngine>::SimdCircuitField>>,
         gpu_proof: Vec<u8>,
         gpu_transcript_state: [u8; 36],
         gpu_challenges: Vec<u32>, // flat E3 challenges from GPU
@@ -335,6 +334,9 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     }
     let mut gpu_templates: Vec<Option<PreparedTemplate<C>>> = Vec::new();
     let mut gpu_count = 0usize;
+    // Store flat_bufs globally to keep witness pointers alive until after GPU FFI
+    // Freed in bulk after Phase 3 (avoids per-template deallocation during PCS loop)
+    let mut all_flat_bufs: Vec<Vec<Vec<<C::FieldConfig as FieldEngine>::SimdCircuitField>>> = Vec::new();
 
     for (ti, tmpl) in templates.iter().enumerate() {
         let kernel = &kernels[tmpl.kernel_id()];
@@ -393,11 +395,13 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             gate_bufs.push((mul_buf, add_buf, cst_buf));
         }
         // Witness: zero-copy — use flat_bufs[0] ptr directly
+        // Copy witness pointer, then take ownership of flat_bufs into separate storage
+        // (will be freed in bulk after GPU FFI, not per-template during PCS loop)
         let witness_ptr = flat_bufs[0].as_ptr() as *const u32;
-        let witness_len = flat_bufs[0].len() * 16; // in u32 count
+        let witness_len = flat_bufs[0].len() * 16;
         let witness_buf = Vec::new();
         unsafe { expander_circuit::Circuit::drop_batch(circuits); }
-        // flat_bufs kept alive in PreparedTemplate
+        all_flat_bufs.push(flat_bufs); // store globally, free after Phase 3
         let prep_ms = t_prep_tmpl.elapsed().as_millis();
         if prep_ms > 10 { eprintln!("  [prep-ffi] tmpl[{}] {}ms", ti, prep_ms); }
 
@@ -405,7 +409,7 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             ti, pc, tc, tr,
             cvs_indices: tmpl.commitment_indices().to_vec(),
             is_broadcast: tmpl.is_broadcast().to_vec(),
-            gate_bufs, witness_buf, witness_ptr, witness_len, _flat_bufs: flat_bufs,
+            gate_bufs, witness_buf, witness_ptr, witness_len,
             gpu_proof: Vec::new(),
             gpu_transcript_state: [0u8; 36],
             gpu_challenges: Vec::new(), gpu_n_rx: 0, gpu_n_ry: 0, gpu_n_r_simd: 0, gpu_n_r_mpi: 0,
@@ -514,10 +518,13 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     eprintln!("  [commit] {:?} (join wait: {:?})", t_commit_start.elapsed(), join_wait);
     let commit_states = &commit_states_vec;
 
-    // ---- Phase 3: Replay + PCS for each template ----
+    // ---- Phase 3: PCS for each template ----
     let t_pcs = std::time::Instant::now();
+    let mut t_loop_start = std::time::Instant::now();
 
     let proofs: Vec<ExpanderProof> = gpu_templates.into_iter().enumerate().map(|(ti, prep)| {
+        let t_iter = std::time::Instant::now();
+        let gap = t_iter - t_loop_start;
         if let Some(mut p) = prep {
             let t0 = std::time::Instant::now();
             let gpu_proof = std::mem::take(&mut p.gpu_proof);
@@ -556,12 +563,21 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             let t_pcs_done = std::time::Instant::now();
             let proof_out = p.tr.finalize_and_get_proof();
             let t_final = std::time::Instant::now();
+            if gap.as_millis() > 1 {
+                eprintln!("  [gap] before tmpl[{}]: {:?}", p.ti, gap);
+            }
             eprintln!("  [pcs] tmpl[{}] setup={:?} ch+pcs={:?} fin={:?}", p.ti,
                 t_setup - t0, t_pcs_done - t_setup, t_final - t_pcs_done);
+            t_loop_start = std::time::Instant::now();
             ExpanderProof { data: vec![proof_out] }
         } else {
+            if gap.as_millis() > 1 {
+                eprintln!("  [gap] before N=1 tmpl[{}]: {:?}", ti, gap);
+            }
             let tmpl = &templates[ti];
-            prove_one::<C, ECCConfig>(ti, tmpl, kernels, dm, ps, commit_states)
+            let r = prove_one::<C, ECCConfig>(ti, tmpl, kernels, dm, ps, commit_states);
+            t_loop_start = std::time::Instant::now();
+            r
         }
     }).collect();
 
