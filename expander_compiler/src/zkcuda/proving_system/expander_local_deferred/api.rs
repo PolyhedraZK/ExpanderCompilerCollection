@@ -127,43 +127,7 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
     }
 
     fn verify(vs: &Self::VerifierSetup, cg: &ComputationGraph<ECCConfig>, proof: &Self::Proof) -> bool {
-        use crate::zkcuda::proving_system::expander::verify_impl::verify_pcs_opening_and_aggregation_no_mpi;
-        use serdes::ExpSerde;
-        // Parallel template verification — each template is independent
-        let vs_ptr = vs as *const _ as usize;
-        use rayon::prelude::*;
-        let results: Vec<bool> = cg.proof_templates().par_iter().enumerate().map(|(ti, tmpl)| {
-            let vs: &ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig> = unsafe { &*(vs_ptr as *const _) };
-            let kernel = &cg.kernels()[tmpl.kernel_id()];
-            let pc = next_power_of_two(tmpl.parallel_count());
-            let comms: Vec<_> = tmpl.commitment_indices().iter().map(|&i| &proof.commitments[i]).collect();
-            let lp = &proof.proofs[ti];
-            let mut ec = kernel.layered_circuit().export_to_expander_flatten();
-
-            if pc > 1 {
-                let mut t = C::TranscriptConfig::new();
-                // Soundness: bind commitment roots to transcript before GKR
-                crate::zkcuda::proving_system::common::bind_commitments_to_transcript::<C>(
-                    &mut t, &proof.commitments);
-                ec.fill_rnd_coefs(&mut t);
-                let mut cur = Cursor::new(&lp.data[0].bytes);
-                let (ok, ch, v0, v1) = gkr_verify(pc, &ec, &[], &<C::FieldConfig as FieldEngine>::ChallengeField::ZERO, &mut t, &mut cur);
-                if !ok { return false; }
-                verify_pcs_opening_and_aggregation_no_mpi::<C, ECCConfig>(
-                    &mut cur, kernel, vs, &ch, v0, v1, &comms, tmpl.is_broadcast(), 0, pc, &mut t)
-            } else {
-                let mut t = C::TranscriptConfig::new();
-                // Soundness: bind commitment roots to transcript before GKR
-                crate::zkcuda::proving_system::common::bind_commitments_to_transcript::<C>(
-                    &mut t, &proof.commitments);
-                ec.fill_rnd_coefs(&mut t);
-                let mut cur = Cursor::new(&lp.data[0].bytes);
-                let (ok, ch, v0, v1) = gkr_verify(1, &ec, &[], &<C::FieldConfig as FieldEngine>::ChallengeField::ZERO, &mut t, &mut cur);
-                if !ok { return false; }
-                verify_pcs_opening_and_aggregation_no_mpi::<C, ECCConfig>(&mut cur, kernel, vs, &ch, v0, v1, &comms, tmpl.is_broadcast(), 0, 1, &mut t)
-            }
-        }).collect();
-        results.iter().all(|&x| x)
+        super::verify_impl::verify_all::<C, ECCConfig>(vs, cg, proof)
     }
 }
 
