@@ -69,12 +69,17 @@ where
         let (mut expander_circuit, mut prover_scratch) =
             prepare_expander_circuit::<C::FieldConfig, ECCConfig>(kernel, 1);
 
+        // Collect owned commitments for transcript binding
+        let owned_commitments: Vec<_> = _commitments.iter().map(|c| (*c).clone()).collect();
+
         let mut proof = ExpanderProof { data: vec![] };
 
         // For each parallel index, generate the GKR and PCS opening proof
         for parallel_index in 0..parallel_count {
-            // TODO: Init with commitments
             let mut transcript = C::TranscriptConfig::new();
+            // Soundness: bind commitment roots to transcript before GKR
+            crate::zkcuda::proving_system::common::bind_commitments_to_transcript::<C>(
+                &mut transcript, &owned_commitments);
             let local_vals = get_local_vals(
                 commitments_values,
                 is_broadcast,
@@ -118,8 +123,13 @@ where
         let timer = Timer::new("verify", true);
         let mut expander_circuit = kernel.layered_circuit().export_to_expander_flatten();
 
+        let owned_commitments: Vec<_> = commitments.iter().map(|c| (*c).clone()).collect();
+
         for i in 0..parallel_count {
             let mut transcript = C::TranscriptConfig::new();
+            // Soundness: bind commitment roots to transcript before GKR
+            crate::zkcuda::proving_system::common::bind_commitments_to_transcript::<C>(
+                &mut transcript, &owned_commitments);
             expander_circuit.fill_rnd_coefs(&mut transcript);
 
             let mut cursor = Cursor::new(&proof.data[i].bytes);

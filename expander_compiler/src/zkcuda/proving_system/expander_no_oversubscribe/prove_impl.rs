@@ -350,6 +350,7 @@ where
         prepare_expander_circuit::<FMulti, ECCConfig>(kernel, world_size);
 
     let mut transcript = T::new();
+    // TODO: Soundness — bind commitment roots to transcript via transcript_init_state parameter
     let challenge = prove_gkr_with_local_vals_multi_copies::<FBasic, FMulti, T>(
         &mut expander_circuit,
         &mut prover_scratch,

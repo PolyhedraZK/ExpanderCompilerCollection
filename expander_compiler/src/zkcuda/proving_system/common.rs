@@ -7,8 +7,25 @@ use crate::{
 };
 
 use arith::Field;
+use gkr_engine::{FieldEngine, GKREngine, Transcript};
+use serdes::ExpSerde;
 
 use super::super::kernel::Kernel;
+use super::expander::structs::ExpanderCommitment;
+
+/// Bind all commitment roots into a transcript's digest state (Fiat-Shamir soundness).
+/// Must be called BEFORE fill_rnd_coefs / GKR prove / GKR verify.
+/// Uses hash_and_return_state + set_state to avoid writing commitment data into proof bytes.
+pub fn bind_commitments_to_transcript<C: GKREngine>(
+    transcript: &mut C::TranscriptConfig,
+    commitments: &[ExpanderCommitment<C::FieldConfig, C::PCSConfig>],
+) {
+    let mut hasher = C::TranscriptConfig::new();
+    for c in commitments {
+        hasher.append_serializable_data(&c.commitment);
+    }
+    transcript.set_state(&hasher.hash_and_return_state());
+}
 
 pub fn check_inputs<C: Config>(
     kernel: &Kernel<C>,

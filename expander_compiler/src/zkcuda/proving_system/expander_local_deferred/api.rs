@@ -142,12 +142,9 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
 
             if pc > 1 {
                 let mut t = C::TranscriptConfig::new();
-                // Soundness: bind commitment roots to transcript digest (not proof bytes)
-                {
-                    let mut ch = C::TranscriptConfig::new();
-                    for c in &proof.commitments { ch.append_serializable_data(&c.commitment); }
-                    t.set_state(&ch.hash_and_return_state());
-                }
+                // Soundness: bind commitment roots to transcript before GKR
+                crate::zkcuda::proving_system::common::bind_commitments_to_transcript::<C>(
+                    &mut t, &proof.commitments);
                 ec.fill_rnd_coefs(&mut t);
                 let mut cur = Cursor::new(&lp.data[0].bytes);
                 let (ok, ch, _v0, _v1) = gkr_verify(pc, &ec, &[], &<C::FieldConfig as FieldEngine>::ChallengeField::ZERO, &mut t, &mut cur);
@@ -176,12 +173,9 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
                 true
             } else {
                 let mut t = C::TranscriptConfig::new();
-                // Soundness: bind commitment roots to transcript digest (not proof bytes)
-                {
-                    let mut ch = C::TranscriptConfig::new();
-                    for c in &proof.commitments { ch.append_serializable_data(&c.commitment); }
-                    t.set_state(&ch.hash_and_return_state());
-                }
+                // Soundness: bind commitment roots to transcript before GKR
+                crate::zkcuda::proving_system::common::bind_commitments_to_transcript::<C>(
+                    &mut t, &proof.commitments);
                 ec.fill_rnd_coefs(&mut t);
                 let mut cur = Cursor::new(&lp.data[0].bytes);
                 let (ok, ch, v0, v1) = gkr_verify(1, &ec, &[], &<C::FieldConfig as FieldEngine>::ChallengeField::ZERO, &mut t, &mut cur);
@@ -211,12 +205,9 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
 
     if pc > 1 {
         let mut tr = C::TranscriptConfig::new();
-        // Soundness: bind commitment roots to transcript digest (not proof bytes)
-        {
-            let mut ch = C::TranscriptConfig::new();
-            for c in commitments { ch.append_serializable_data(&c.commitment); }
-            tr.set_state(&ch.hash_and_return_state());
-        }
+        // Soundness: bind commitment roots to transcript before GKR
+        crate::zkcuda::proving_system::common::bind_commitments_to_transcript::<C>(
+            &mut tr, commitments);
         let mut tc = bc.clone(); tc.fill_rnd_coefs(&mut tr);
         let is = 1 << tc.log_input_size();
         // Flat-buffer batch: zero malloc during circuit prep
@@ -294,12 +285,9 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         ExpanderProof { data: vec![final_proof] }
     } else {
         let mut tr = C::TranscriptConfig::new();
-        // Soundness: bind commitment roots to transcript digest (not proof bytes)
-        {
-            let mut ch = C::TranscriptConfig::new();
-            for c in commitments { ch.append_serializable_data(&c.commitment); }
-            tr.set_state(&ch.hash_and_return_state());
-        }
+        // Soundness: bind commitment roots to transcript before GKR
+        crate::zkcuda::proving_system::common::bind_commitments_to_transcript::<C>(
+            &mut tr, commitments);
         let mut c = bc; let mut s = bs;
         let lv = get_local_vals(&cvs, tmpl.is_broadcast(), 0, 1);
         let ch = crate::zkcuda::proving_system::expander::prove_impl::prove_gkr_with_local_vals::<C::FieldConfig, C::TranscriptConfig>(

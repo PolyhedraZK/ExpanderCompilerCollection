@@ -40,6 +40,12 @@ where
     let mut expander_circuit = kernel.layered_circuit().export_to_expander_flatten();
 
     let mut transcript = C::TranscriptConfig::new();
+    // Soundness: bind commitment roots to transcript before GKR
+    {
+        let owned: Vec<_> = commitments.iter().map(|c| (*c).clone()).collect();
+        crate::zkcuda::proving_system::common::bind_commitments_to_transcript::<C>(
+            &mut transcript, &owned);
+    }
     expander_circuit.fill_rnd_coefs(&mut transcript);
 
     let mut cursor = Cursor::new(&proof.data[0].bytes);

@@ -62,6 +62,7 @@ pub fn verify_gkr<C, ECCConfig>(
     kernel: &Kernel<ECCConfig>,
     proof: &ExpanderProof,
     parallel_count: usize,
+    all_commitments: Option<&[ExpanderCommitment<C::FieldConfig, C::PCSConfig>]>,
 ) -> (bool, ExpanderDualVarChallenge<C::FieldConfig>)
 where
     C: GKREngine,
@@ -70,6 +71,11 @@ where
     let mut expander_circuit = kernel.layered_circuit().export_to_expander_flatten();
 
     let mut transcript = C::TranscriptConfig::new();
+    // Soundness: bind commitment roots to transcript before GKR
+    if let Some(comms) = all_commitments {
+        crate::zkcuda::proving_system::common::bind_commitments_to_transcript::<C>(
+            &mut transcript, comms);
+    }
     expander_circuit.fill_rnd_coefs(&mut transcript);
 
     let mut cursor = Cursor::new(&proof.data[0].bytes);
@@ -167,6 +173,7 @@ where
                 &computation_graph.kernels()[template.kernel_id()],
                 local_proof,
                 next_power_of_two(template.parallel_count()),
+                Some(&proof.commitments),
             );
 
             assert!(challenge.challenge_y().is_none());

@@ -134,6 +134,23 @@ where
     T: Transcript,
     ECCConfig: Config<FieldConfig = F>,
 {
+    prove_kernel_gkr_with_transcript_init(
+        mpi_config, kernel, commitments_values, parallel_count, is_broadcast, None)
+}
+
+pub fn prove_kernel_gkr_with_transcript_init<F, T, ECCConfig>(
+    mpi_config: &MPIConfig<'static>,
+    kernel: &Kernel<ECCConfig>,
+    commitments_values: &[&[F::SimdCircuitField]],
+    parallel_count: usize,
+    is_broadcast: &[bool],
+    transcript_init_state: Option<&[u8]>,
+) -> Option<(T, ExpanderDualVarChallenge<F>)>
+where
+    F: FieldEngine,
+    T: Transcript,
+    ECCConfig: Config<FieldConfig = F>,
+{
     let local_mpi_config = generate_local_mpi_config(mpi_config, parallel_count);
 
     local_mpi_config.as_ref()?;
@@ -153,6 +170,10 @@ where
         prepare_expander_circuit::<F, ECCConfig>(kernel, local_world_size);
 
     let mut transcript = T::new();
+    // Soundness: bind commitment roots to transcript if provided
+    if let Some(state) = transcript_init_state {
+        transcript.set_state(state);
+    }
     let challenge = prove_gkr_with_local_vals::<F, T>(
         &mut expander_circuit,
         &mut prover_scratch,
