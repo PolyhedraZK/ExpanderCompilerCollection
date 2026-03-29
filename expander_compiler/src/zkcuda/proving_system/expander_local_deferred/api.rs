@@ -67,19 +67,19 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
             let t_commit_start = std::time::Instant::now();
             // SAFETY: dm and ps outlive the thread (we join before function returns)
             // Commit uses dedicated thread pool to avoid competing with prep's Rayon pool
+            // Background: CPU commits only (ALL of them, parallel via Rayon).
+            // GPU commit will be done AFTER GKR on the main thread (no GPU contention).
             let commit_handle = unsafe {
                 let dm_ptr = dm_ptr;
                 let ps_ptr = ps_ptr;
                 std::thread::Builder::new().spawn_unchecked(move || {
-                    {
-                        use rayon::prelude::*;
-                        let dm: &[Vec<SIMDField<ECCConfig>>] = &*(dm_ptr as *const Vec<Vec<SIMDField<ECCConfig>>>);
-                        let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = &*(ps_ptr as *const _);
-                        let results: Vec<_> = dm.par_iter().map(|m| {
-                            local_commit_impl::<C, ECCConfig>(ps.p_keys.get(&m.len()).unwrap(), m)
-                        }).collect();
-                        results.into_iter().unzip()
-                    }
+                    let dm: &[Vec<SIMDField<ECCConfig>>] = &*(dm_ptr as *const Vec<Vec<SIMDField<ECCConfig>>>);
+                    let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = &*(ps_ptr as *const _);
+                    use rayon::prelude::*;
+                    let results: Vec<_> = dm.par_iter().map(|m| {
+                        local_commit_impl::<C, ECCConfig>(ps.p_keys.get(&m.len()).unwrap(), m)
+                    }).collect();
+                    results.into_iter().unzip()
                 }).unwrap()
             };
 
