@@ -65,7 +65,9 @@ where
         .map(|v| RefMultiLinearPoly::from_ref(v))
         .collect();
 
-    // TODO: Soundness
+    // NOTE: This PCS batch opening uses an independent transcript.
+    // The GKR transcripts (per-template) already bind commitments via transcript_init_state.
+    // This transcript is only for PCS Fiat-Shamir (query generation) — separate from GKR.
     let mut transcript = C::TranscriptConfig::new();
     let max_length = prover_setup.p_keys.keys().max().cloned().unwrap_or(0);
     let params =

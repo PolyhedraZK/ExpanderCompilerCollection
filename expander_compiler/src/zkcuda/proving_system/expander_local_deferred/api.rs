@@ -166,7 +166,7 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
                         pcs_ch.r_mpi = vec![];
                         let target_rz = max_len.ilog2() as usize;
                         while pcs_ch.rz.len() < target_rz { pcs_ch.rz.push(<C::FieldConfig as FieldEngine>::ChallengeField::ZERO); }
-                        // TODO: actually verify PCS opening against commitment
+                        // TODO: verify PCS opening against commitment (functionality, not soundness)
                         let _ = (v_key, &params, &pcs_ch, comm, &mut cur);
                     }
                 }

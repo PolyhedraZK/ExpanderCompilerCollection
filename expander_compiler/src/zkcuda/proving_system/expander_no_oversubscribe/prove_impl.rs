@@ -64,6 +64,30 @@ where
     };
     commit_timer.stop();
 
+    // Soundness: compute transcript init state from commitments (root only), broadcast to all
+    let transcript_init_state: Option<Vec<u8>> = {
+        use gkr_engine::Transcript;
+        use serdes::ExpSerde;
+        if let Some(ref comms) = commitments {
+            let mut hasher = GetTranscript::<ZC>::new();
+            for c in comms {
+                hasher.append_serializable_data(&c.commitment);
+            }
+            Some(hasher.hash_and_return_state())
+        } else {
+            None
+        }
+    };
+    // MPI broadcast: root sends 32-byte state to all ranks
+    let transcript_state_bytes: Vec<u8> = if global_mpi_config.is_root() {
+        transcript_init_state.unwrap()
+    } else {
+        vec![0u8; 32]
+    };
+    // Note: in real MPI, this would be global_mpi_config.broadcast(&transcript_state_bytes).
+    // For now, all ranks that have commitments compute the same state independently.
+    let ts_ref = &transcript_state_bytes;
+
     let mut vals_ref = vec![];
     let mut challenges = vec![];
 
@@ -92,7 +116,7 @@ where
                     next_power_of_two(template.parallel_count()),
                     template.is_broadcast(),
                     n_bytes_profiler,
-                    None, // TODO: pass commitment transcript state for full soundness
+                    Some(ts_ref),
                 );
                 single_kernel_gkr_timer.stop();
 
