@@ -481,7 +481,7 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             assert!(!sym.is_null(), "gpu_gkr_prove_templates not found");
             let func: GkrFn = std::mem::transmute(sym);
             let r = func(tmpl_datas.len() as u32, tmpl_datas.as_ptr(), gkr_results.as_mut_ptr());
-            libc::dlclose(lib);
+            // Don't dlclose — keep CUDA context alive for PCS FFI
             r
         };
         assert_eq!(ret, 0, "GPU GKR FFI failed");
@@ -507,9 +507,11 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     }
     eprintln!("  [gpu] GPU GKR: {:?}", t_gpu.elapsed());
 
-    // ---- Wait for commit to finish (should be done by now — overlapped with prep+GKR) ----
+    // ---- Wait for commit to finish ----
+    let t_join = std::time::Instant::now();
     let (commitments, commit_states_vec) = commit_handle.join().expect("commit thread panicked");
-    eprintln!("  [commit] {:?} (overlapped with prep+GKR)", t_commit_start.elapsed());
+    let join_wait = t_join.elapsed();
+    eprintln!("  [commit] {:?} (join wait: {:?})", t_commit_start.elapsed(), join_wait);
     let commit_states = &commit_states_vec;
 
     // ---- Phase 3: Replay + PCS for each template ----
@@ -517,14 +519,11 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
 
     let proofs: Vec<ExpanderProof> = gpu_templates.into_iter().enumerate().map(|(ti, prep)| {
         if let Some(mut p) = prep {
-            // GPU GKR → use GPU transcript state + challenges directly (skip replay!)
             let t0 = std::time::Instant::now();
             let gpu_proof = std::mem::take(&mut p.gpu_proof);
-
-            // Set transcript state from GPU (skip 225ms replay!)
             p.tr.set_state(&p.gpu_transcript_state[..32]);
-            // Append proof bytes to transcript (needed for finalize_and_get_proof)
             p.tr.append_u8_slice(&gpu_proof);
+            let t_setup = std::time::Instant::now();
 
             // Reconstruct challenge from GPU
             let ch = {
@@ -554,8 +553,12 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
                         v, &pc2, ps, &mut p.tr, Some(scratch));
                 }
             }
-            eprintln!("  [pcs] tmpl[{}] cpu_pcs={:?}", p.ti, t0.elapsed());
-            ExpanderProof { data: vec![p.tr.finalize_and_get_proof()] }
+            let t_pcs_done = std::time::Instant::now();
+            let proof_out = p.tr.finalize_and_get_proof();
+            let t_final = std::time::Instant::now();
+            eprintln!("  [pcs] tmpl[{}] setup={:?} ch+pcs={:?} fin={:?}", p.ti,
+                t_setup - t0, t_pcs_done - t_setup, t_final - t_pcs_done);
+            ExpanderProof { data: vec![proof_out] }
         } else {
             let tmpl = &templates[ti];
             prove_one::<C, ECCConfig>(ti, tmpl, kernels, dm, ps, commit_states)
