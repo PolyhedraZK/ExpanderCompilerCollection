@@ -92,6 +92,7 @@ where
                     next_power_of_two(template.parallel_count()),
                     template.is_broadcast(),
                     n_bytes_profiler,
+                    None, // TODO: pass commitment transcript state for full soundness
                 );
                 single_kernel_gkr_timer.stop();
 
@@ -202,6 +203,7 @@ pub fn prove_kernel_gkr_no_oversubscribe<F, T, ECCConfig>(
     parallel_count: usize,
     is_broadcast: &[bool],
     n_bytes_profiler: &mut NBytesProfiler,
+    transcript_init_state: Option<&[u8]>,
 ) -> Option<(T, ExpanderDualVarChallenge<F>)>
 where
     F: FieldEngine<CircuitField = Fr, ChallengeField = Fr>,
@@ -224,6 +226,7 @@ where
             parallel_count,
             is_broadcast,
             n_bytes_profiler,
+            transcript_init_state,
         ),
         2 => prove_kernel_gkr_internal::<F, BN254ConfigXN<2>, T, ECCConfig>(
             &local_mpi_config,
@@ -232,6 +235,7 @@ where
             parallel_count,
             is_broadcast,
             n_bytes_profiler,
+            transcript_init_state,
         ),
         4 => prove_kernel_gkr_internal::<F, BN254ConfigXN<4>, T, ECCConfig>(
             &local_mpi_config,
@@ -240,6 +244,7 @@ where
             parallel_count,
             is_broadcast,
             n_bytes_profiler,
+            transcript_init_state,
         ),
         8 => prove_kernel_gkr_internal::<F, BN254ConfigXN<8>, T, ECCConfig>(
             &local_mpi_config,
@@ -248,6 +253,7 @@ where
             parallel_count,
             is_broadcast,
             n_bytes_profiler,
+            transcript_init_state,
         ),
         16 => prove_kernel_gkr_internal::<F, BN254ConfigXN<16>, T, ECCConfig>(
             &local_mpi_config,
@@ -256,6 +262,7 @@ where
             parallel_count,
             is_broadcast,
             n_bytes_profiler,
+            transcript_init_state,
         ),
         32 => prove_kernel_gkr_internal::<F, BN254ConfigXN<32>, T, ECCConfig>(
             &local_mpi_config,
@@ -264,6 +271,7 @@ where
             parallel_count,
             is_broadcast,
             n_bytes_profiler,
+            transcript_init_state,
         ),
         64 => prove_kernel_gkr_internal::<F, BN254ConfigXN<64>, T, ECCConfig>(
             &local_mpi_config,
@@ -272,6 +280,7 @@ where
             parallel_count,
             is_broadcast,
             n_bytes_profiler,
+            transcript_init_state,
         ),
         128 => prove_kernel_gkr_internal::<F, BN254ConfigXN<128>, T, ECCConfig>(
             &local_mpi_config,
@@ -280,6 +289,7 @@ where
             parallel_count,
             is_broadcast,
             n_bytes_profiler,
+            transcript_init_state,
         ),
         256 => prove_kernel_gkr_internal::<F, BN254ConfigXN<256>, T, ECCConfig>(
             &local_mpi_config,
@@ -288,6 +298,7 @@ where
             parallel_count,
             is_broadcast,
             n_bytes_profiler,
+            transcript_init_state,
         ),
         512 => prove_kernel_gkr_internal::<F, BN254ConfigXN<512>, T, ECCConfig>(
             &local_mpi_config,
@@ -296,6 +307,7 @@ where
             parallel_count,
             is_broadcast,
             n_bytes_profiler,
+            transcript_init_state,
         ),
         1024 => prove_kernel_gkr_internal::<F, BN254ConfigXN<1024>, T, ECCConfig>(
             &local_mpi_config,
@@ -304,6 +316,7 @@ where
             parallel_count,
             is_broadcast,
             n_bytes_profiler,
+            transcript_init_state,
         ),
         2048 => prove_kernel_gkr_internal::<F, BN254ConfigXN<2048>, T, ECCConfig>(
             &local_mpi_config,
@@ -312,6 +325,7 @@ where
             parallel_count,
             is_broadcast,
             n_bytes_profiler,
+            transcript_init_state,
         ),
         _ => {
             panic!("Unsupported parallel count: {parallel_count}");
@@ -326,6 +340,7 @@ pub fn prove_kernel_gkr_internal<FBasic, FMulti, T, ECCConfig>(
     parallel_count: usize,
     is_broadcast: &[bool],
     n_bytes_profiler: &mut NBytesProfiler,
+    transcript_init_state: Option<&[u8]>,
 ) -> Option<(T, ExpanderDualVarChallenge<FBasic>)>
 where
     FBasic: FieldEngine<CircuitField = Fr, ChallengeField = Fr>,
@@ -350,7 +365,12 @@ where
         prepare_expander_circuit::<FMulti, ECCConfig>(kernel, world_size);
 
     let mut transcript = T::new();
-    // TODO: Soundness — bind commitment roots to transcript via transcript_init_state parameter
+    // Soundness: bind commitment roots to transcript (state passed from caller)
+    // In MPI mode, the root node computes this state from commitments and broadcasts.
+    // For now, all nodes must have the same transcript init state.
+    if let Some(state) = transcript_init_state {
+        transcript.set_state(state);
+    }
     let challenge = prove_gkr_with_local_vals_multi_copies::<FBasic, FMulti, T>(
         &mut expander_circuit,
         &mut prover_scratch,
