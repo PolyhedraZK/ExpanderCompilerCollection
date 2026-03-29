@@ -335,68 +335,42 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         gpu_challenges: Vec<u32>, // flat E3 challenges from GPU
         gpu_n_rx: u32, gpu_n_ry: u32, gpu_n_r_simd: u32, gpu_n_r_mpi: u32,
     }
-    let mut gpu_templates: Vec<Option<PreparedTemplate<C>>> = Vec::new();
-    let mut gpu_count = 0usize;
-    // Store witness buffers globally to keep pointers alive until after GPU FFI
-    let mut all_witness_bufs: Vec<Vec<<C::FieldConfig as FieldEngine>::SimdCircuitField>> = Vec::new();
+    type SCF<C> = <<C as GKREngine>::FieldConfig as FieldEngine>::SimdCircuitField;
+
+    // Phase 1a: Pre-compute sizes and prepare circuits for all templates
+    let t_precomp = std::time::Instant::now();
+    struct TemplateInfo<Cfg: GKREngine> {
+        ti: usize, pc: usize,
+        tc: expander_circuit::Circuit<Cfg::FieldConfig>,
+        tr: Cfg::TranscriptConfig,
+        cvs_indices: Vec<usize>, is_broadcast: Vec<bool>,
+        layer0_size: usize, arena_offset: usize,
+        gate_bufs: Vec<(Vec<u32>, Vec<u32>, Vec<u32>)>,
+    }
+    let mut tmpl_infos: Vec<Option<TemplateInfo<C>>> = Vec::new();
+    let mut arena_total = 0usize;
 
     for (ti, tmpl) in templates.iter().enumerate() {
-        let kernel = &kernels[tmpl.kernel_id()];
-        let cvs: Vec<&[SIMDField<C>]> = tmpl.commitment_indices().iter().map(|&i| dm[i].as_slice()).collect();
         let pc = next_power_of_two(tmpl.parallel_count());
-
         if pc <= 1 {
-            gpu_templates.push(None);
+            tmpl_infos.push(None);
             continue;
         }
-
+        let kernel = &kernels[tmpl.kernel_id()];
+        let cvs: Vec<&[SIMDField<C>]> = tmpl.commitment_indices().iter().map(|&i| dm[i].as_slice()).collect();
         check_inputs(kernel, &cvs, pc, tmpl.is_broadcast());
-        let t_pre = std::time::Instant::now();
+
         let (bc, _bs) = prepare_expander_circuit::<C::FieldConfig, ECCConfig>(kernel, 1);
         let mut tr = C::TranscriptConfig::new();
         let mut tc = bc.clone();
         tc.fill_rnd_coefs(&mut tr);
-        let t_pre_done = t_pre.elapsed();
 
-        // GPU only needs layer 0 (witness) — it recomputes intermediate layers.
-        // Skip allocating layers 1+ and skip CPU evaluate() entirely.
-        let t_alloc = std::time::Instant::now();
         let layer0_size = 1usize << tc.layers[0].input_var_num;
         let total_elems = pc * layer0_size;
-        type SCF<C> = <<C as GKREngine>::FieldConfig as FieldEngine>::SimdCircuitField;
-        let mut witness_buf: Vec<SCF<C>> = if total_elems > 4096 {
-            unsafe {
-                let layout = std::alloc::Layout::array::<SCF<C>>(total_elems).unwrap();
-                let ptr = std::alloc::alloc_zeroed(layout) as *mut SCF<C>;
-                libc::madvise(ptr as *mut _, layout.size(), libc::MADV_HUGEPAGE);
-                Vec::from_raw_parts(ptr, total_elems, total_elems)
-            }
-        } else {
-            vec![SCF::<C>::default(); total_elems]
-        };
-        let t_alloc_done = t_alloc.elapsed();
+        let arena_offset = arena_total;
+        arena_total += total_elems;
 
-        // Fill layer 0 witness directly (no circuit instances needed)
-        let t_fill = std::time::Instant::now();
-        let ki = kernel.layered_circuit_input();
-        let is_bc = tmpl.is_broadcast();
-        for pi in 0..pc {
-            let input = &mut witness_buf[pi * layer0_size..(pi + 1) * layer0_size];
-            for v in input.iter_mut() { *v = Default::default(); }
-            for (_ci, (partition, (&ref vals, &ib))) in ki.iter()
-                .zip(cvs.iter().zip(is_bc.iter()))
-                .enumerate()
-            {
-                let local_slice = if ib { vals.as_ref() }
-                else { let chunk = vals.len() / pc; &vals[chunk * pi..chunk * (pi + 1)] };
-                input[partition.offset..partition.offset + partition.len]
-                    .copy_from_slice(local_slice);
-            }
-        }
-        let t_fill_done = t_fill.elapsed();
-
-        // Serialize gate data for GPU FFI
-        let t_gate = std::time::Instant::now();
+        // Gate serialization
         let mut gate_bufs = Vec::with_capacity(tc.layers.len());
         for layer in &tc.layers {
             let mut mul_buf = Vec::with_capacity(layer.mul.len() * 4);
@@ -418,30 +392,95 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             gate_bufs.push((mul_buf, add_buf, cst_buf));
         }
 
-        let witness_ptr = witness_buf.as_ptr() as *const u32;
-        let witness_len = witness_buf.len() * 16; // SimdCircuitField = M31x16 = 16 u32s
-        all_witness_bufs.push(witness_buf);
-        let t_gate_done = t_gate.elapsed();
-        if t_pre.elapsed().as_millis() > 5 {
-            eprintln!("  [prep] tmpl[{}] pre={:.0}ms alloc={:.0}ms fill={:.0}ms gate={:.0}ms",
-                ti,
-                t_pre_done.as_secs_f64()*1000.0,
-                t_alloc_done.as_secs_f64()*1000.0,
-                t_fill_done.as_secs_f64()*1000.0,
-                t_gate_done.as_secs_f64()*1000.0);
-        }
-
-        gpu_templates.push(Some(PreparedTemplate {
+        tmpl_infos.push(Some(TemplateInfo {
             ti, pc, tc, tr,
             cvs_indices: tmpl.commitment_indices().to_vec(),
             is_broadcast: tmpl.is_broadcast().to_vec(),
-            gate_bufs, witness_buf: Vec::new(), witness_ptr, witness_len,
+            layer0_size, arena_offset, gate_bufs,
+        }));
+    }
+    eprintln!("  [prep] precomp+gates: {:?}", t_precomp.elapsed());
+
+    // Phase 1b: Single arena allocation for ALL witness buffers + prefault
+    let t_arena = std::time::Instant::now();
+    let arena: Vec<SCF<C>> = if arena_total > 4096 {
+        unsafe {
+            let layout = std::alloc::Layout::array::<SCF<C>>(arena_total).unwrap();
+            let ptr = std::alloc::alloc(layout) as *mut u8;
+            libc::madvise(ptr as *mut _, layout.size(), libc::MADV_HUGEPAGE);
+            // Parallel zero-fill: distribute page faults across cores
+            let total_bytes = layout.size();
+            let n_chunks = 8usize;
+            let chunk_bytes = (total_bytes + n_chunks - 1) / n_chunks;
+            let base = ptr as usize; // usize is Send+Sync
+            use rayon::prelude::*;
+            (0..n_chunks).into_par_iter().for_each(|i| {
+                let start = i * chunk_bytes;
+                let end = std::cmp::min(start + chunk_bytes, total_bytes);
+                if end > start {
+                    unsafe { std::ptr::write_bytes((base + start) as *mut u8, 0, end - start); }
+                }
+            });
+            Vec::from_raw_parts(ptr as *mut SCF<C>, arena_total, arena_total)
+        }
+    } else {
+        vec![SCF::<C>::default(); arena_total]
+    };
+    let arena_ptr = arena.as_ptr();
+    eprintln!("  [prep] arena alloc+prefault: {:?} ({:.1}MB)", t_arena.elapsed(),
+        (arena_total * std::mem::size_of::<SCF<C>>()) as f64 / 1e6);
+
+    // Phase 1c: Fill witness data into arena slices
+    let t_fill = std::time::Instant::now();
+    let mut gpu_templates: Vec<Option<PreparedTemplate<C>>> = Vec::new();
+    let mut gpu_count = 0usize;
+
+    for (ti, info_opt) in tmpl_infos.into_iter().enumerate() {
+        let Some(info) = info_opt else {
+            gpu_templates.push(None);
+            continue;
+        };
+        let kernel = &kernels[templates[ti].kernel_id()];
+        let cvs: Vec<&[SIMDField<C>]> = info.cvs_indices.iter().map(|&i| dm[i].as_slice()).collect();
+        let ki = kernel.layered_circuit_input();
+
+        let total_elems = info.pc * info.layer0_size;
+        // SAFETY: arena is a contiguous allocation, each template gets its own non-overlapping slice
+        let witness_slice = unsafe {
+            std::slice::from_raw_parts_mut(
+                arena_ptr.add(info.arena_offset) as *mut SCF<C>,
+                total_elems,
+            )
+        };
+        for pi in 0..info.pc {
+            let input = &mut witness_slice[pi * info.layer0_size..(pi + 1) * info.layer0_size];
+            for (_ci, (partition, (&ref vals, &ib))) in ki.iter()
+                .zip(cvs.iter().zip(info.is_broadcast.iter()))
+                .enumerate()
+            {
+                let local_slice = if ib { vals.as_ref() }
+                else { let chunk = vals.len() / info.pc; &vals[chunk * pi..chunk * (pi + 1)] };
+                input[partition.offset..partition.offset + partition.len]
+                    .copy_from_slice(local_slice);
+            }
+        }
+
+        let witness_ptr = witness_slice.as_ptr() as *const u32;
+        let witness_len = total_elems * 16;
+
+        gpu_templates.push(Some(PreparedTemplate {
+            ti: info.ti, pc: info.pc, tc: info.tc, tr: info.tr,
+            cvs_indices: info.cvs_indices, is_broadcast: info.is_broadcast,
+            gate_bufs: info.gate_bufs, witness_buf: Vec::new(), witness_ptr, witness_len,
             gpu_proof: Vec::new(),
             gpu_transcript_state: [0u8; 36],
             gpu_challenges: Vec::new(), gpu_n_rx: 0, gpu_n_ry: 0, gpu_n_r_simd: 0, gpu_n_r_mpi: 0,
         }));
         gpu_count += 1;
     }
+    // Keep arena alive until after GPU FFI (freed when _arena drops)
+    let _arena = arena;
+    eprintln!("  [prep] fill: {:?}", t_fill.elapsed());
     eprintln!("  [gpu] prep {} templates: {:?}", gpu_count, t_prep.elapsed());
 
     // Warm up CUDA FFI context (avoids 159ms cold start during PCS opening)
