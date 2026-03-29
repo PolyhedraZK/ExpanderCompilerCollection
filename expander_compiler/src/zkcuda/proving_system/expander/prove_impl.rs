@@ -338,7 +338,6 @@ pub fn pcs_batch_open_with_scratch<C: GKREngine>(
     pcs_challenge.rz.extend_from_slice(&pcs_challenge.r_mpi);
     pcs_challenge.r_mpi = vec![];
 
-    // No padding needed — use actual commitment size
     let target_rz_len = commit_len.ilog2() as usize;
     while pcs_challenge.rz.len() < target_rz_len {
         pcs_challenge.rz.push(<C::FieldConfig as FieldEngine>::ChallengeField::ZERO);
