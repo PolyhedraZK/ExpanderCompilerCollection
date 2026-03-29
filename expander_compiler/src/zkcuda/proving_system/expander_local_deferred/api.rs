@@ -352,14 +352,18 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         }
 
         check_inputs(kernel, &cvs, pc, tmpl.is_broadcast());
+        let t_pre = std::time::Instant::now();
         let (bc, _bs) = prepare_expander_circuit::<C::FieldConfig, ECCConfig>(kernel, 1);
         let mut tr = C::TranscriptConfig::new();
         let mut tc = bc.clone();
         tc.fill_rnd_coefs(&mut tr);
+        let t_pre_done = t_pre.elapsed();
 
+        let t_batch = std::time::Instant::now();
         let ki = kernel.layered_circuit_input();
         let (mut circuits, flat_bufs) = unsafe { tc.create_batch(pc) };
         let is_bc = tmpl.is_broadcast();
+        let t_fill = std::time::Instant::now();
         for pi in 0..pc {
             let input = &mut circuits[pi].layers[0].input_vals;
             for v in input.iter_mut() { *v = Default::default(); }
@@ -374,6 +378,7 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             }
             circuits[pi].evaluate();
         }
+        let t_eval_done = std::time::Instant::now();
 
         // Prepare in-memory gate data for GPU FFI (no file I/O!)
         let t_prep_tmpl = std::time::Instant::now();
@@ -406,7 +411,16 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         unsafe { expander_circuit::Circuit::drop_batch(circuits); }
         all_flat_bufs.push(flat_bufs); // store globally, free after Phase 3
         let prep_ms = t_prep_tmpl.elapsed().as_millis();
-        if prep_ms > 10 { eprintln!("  [prep-ffi] tmpl[{}] {}ms", ti, prep_ms); }
+        let total_ms = (t_prep_tmpl.elapsed()).as_millis();
+        if total_ms > 5 {
+            eprintln!("  [prep] tmpl[{}] pre={:.0}ms batch={:.0}ms eval={:.0}ms gate={:.0}ms total={}ms",
+                ti,
+                t_pre_done.as_secs_f64()*1000.0,
+                (t_fill - t_batch).as_secs_f64()*1000.0,
+                (t_eval_done - t_fill).as_secs_f64()*1000.0,
+                prep_ms as f64,
+                total_ms);
+        }
 
         gpu_templates.push(Some(PreparedTemplate {
             ti, pc, tc, tr,
