@@ -147,30 +147,10 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
                     &mut t, &proof.commitments);
                 ec.fill_rnd_coefs(&mut t);
                 let mut cur = Cursor::new(&lp.data[0].bytes);
-                let (ok, ch, _v0, _v1) = gkr_verify(pc, &ec, &[], &<C::FieldConfig as FieldEngine>::ChallengeField::ZERO, &mut t, &mut cur);
+                let (ok, ch, v0, v1) = gkr_verify(pc, &ec, &[], &<C::FieldConfig as FieldEngine>::ChallengeField::ZERO, &mut t, &mut cur);
                 if !ok { return false; }
-                let chs = if let Some(cy) = ch.challenge_y() { vec![ch.challenge_x(), cy] } else { vec![ch.challenge_x()] };
-                for sc in &chs {
-                    for (&ref comm, &_ib) in comms.iter().zip(tmpl.is_broadcast().iter()) {
-                        let commitment_len = comm.vals_len;
-                        let local_size = commitment_len >> sc.r_mpi.len();
-                        let n_local = if local_size > 0 { local_size.ilog2() as usize } else { 0 };
-                        let mut eval_ch = sc.clone();
-                        eval_ch.rz.truncate(n_local);
-                        let _v: <C::FieldConfig as FieldEngine>::ChallengeField = t.generate_field_element();
-                        let max_len = *vs.v_keys.keys().max().unwrap();
-                        let params = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::gen_params(max_len.ilog2() as usize, 1);
-                        let v_key = vs.v_keys.get(&max_len).unwrap();
-                        let mut pcs_ch = sc.clone();
-                        pcs_ch.rz.extend_from_slice(&pcs_ch.r_mpi);
-                        pcs_ch.r_mpi = vec![];
-                        let target_rz = max_len.ilog2() as usize;
-                        while pcs_ch.rz.len() < target_rz { pcs_ch.rz.push(<C::FieldConfig as FieldEngine>::ChallengeField::ZERO); }
-                        // TODO: verify PCS opening against commitment (functionality, not soundness)
-                        let _ = (v_key, &params, &pcs_ch, comm, &mut cur);
-                    }
-                }
-                true
+                verify_pcs_opening_and_aggregation_no_mpi::<C, ECCConfig>(
+                    &mut cur, kernel, vs, &ch, v0, v1, &comms, tmpl.is_broadcast(), 0, pc, &mut t)
             } else {
                 let mut t = C::TranscriptConfig::new();
                 // Soundness: bind commitment roots to transcript before GKR
