@@ -514,26 +514,22 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     }
     eprintln!("  [gpu] GPU GKR: {:?}", t_gpu.elapsed());
 
-    // ---- Wait for commit to finish ----
+    // ---- Wait for commit + Phase 3: PCS ----
+    // Join commit, then immediately start PCS
     let t_join = std::time::Instant::now();
     let (commitments, commit_states_vec) = commit_handle.join().expect("commit thread panicked");
-    let join_wait = t_join.elapsed();
-    eprintln!("  [commit] {:?} (join wait: {:?})", t_commit_start.elapsed(), join_wait);
+    eprintln!("  [commit] {:?} (join wait: {:?})", t_commit_start.elapsed(), t_join.elapsed());
     let commit_states = &commit_states_vec;
 
     // ---- Phase 3: PCS for each template ----
     let t_pcs = std::time::Instant::now();
-    let mut t_loop_start = std::time::Instant::now();
 
     let proofs: Vec<ExpanderProof> = gpu_templates.into_iter().enumerate().map(|(ti, prep)| {
-        let t_iter = std::time::Instant::now();
-        let gap = t_iter - t_loop_start;
         if let Some(mut p) = prep {
             let t0 = std::time::Instant::now();
             let gpu_proof = std::mem::take(&mut p.gpu_proof);
             p.tr.set_state(&p.gpu_transcript_state[..32]);
             p.tr.append_u8_slice(&gpu_proof);
-            let t_setup = std::time::Instant::now();
 
             // Reconstruct challenge from GPU
             let ch = {
@@ -566,21 +562,11 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             let t_pcs_done = std::time::Instant::now();
             let proof_out = p.tr.finalize_and_get_proof();
             let t_final = std::time::Instant::now();
-            if gap.as_millis() > 1 {
-                eprintln!("  [gap] before tmpl[{}]: {:?}", p.ti, gap);
-            }
-            eprintln!("  [pcs] tmpl[{}] setup={:?} ch+pcs={:?} fin={:?}", p.ti,
-                t_setup - t0, t_pcs_done - t_setup, t_final - t_pcs_done);
-            t_loop_start = std::time::Instant::now();
+            eprintln!("  [pcs] tmpl[{}] {:.1}ms", p.ti, (t_final - t0).as_secs_f64() * 1000.0);
             ExpanderProof { data: vec![proof_out] }
         } else {
-            if gap.as_millis() > 1 {
-                eprintln!("  [gap] before N=1 tmpl[{}]: {:?}", ti, gap);
-            }
             let tmpl = &templates[ti];
-            let r = prove_one::<C, ECCConfig>(ti, tmpl, kernels, dm, ps, commit_states);
-            t_loop_start = std::time::Instant::now();
-            r
+            prove_one::<C, ECCConfig>(ti, tmpl, kernels, dm, ps, commit_states)
         }
     }).collect();
 
