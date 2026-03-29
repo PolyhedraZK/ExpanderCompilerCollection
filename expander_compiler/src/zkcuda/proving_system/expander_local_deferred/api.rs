@@ -317,7 +317,8 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         witness_ptr: *const u32,
         witness_len: usize,
         _flat_bufs: Vec<Vec<<Cfg::FieldConfig as gkr_engine::FieldEngine>::SimdCircuitField>>,
-        gpu_proof: Vec<u8>, // GKR proof bytes from GPU FFI (avoids file I/O)
+        gpu_proof: Vec<u8>,
+        gpu_transcript_state: [u8; 36], // 32 digest + 4 hash_cursor from GPU
     }
     let mut gpu_templates: Vec<Option<PreparedTemplate<C>>> = Vec::new();
     let mut gpu_count = 0usize;
@@ -393,6 +394,7 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             is_broadcast: tmpl.is_broadcast().to_vec(),
             gate_bufs, witness_buf, witness_ptr, witness_len, _flat_bufs: flat_bufs,
             gpu_proof: Vec::new(),
+            gpu_transcript_state: [0u8; 36],
         }));
         // prep_ms timing already printed above
         gpu_count += 1;
@@ -450,8 +452,9 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
 
         let mut proof_ptrs: Vec<*mut u8> = vec![std::ptr::null_mut(); gpu_tmpls.len()];
         let mut proof_lens: Vec<u32> = vec![0; gpu_tmpls.len()];
+        let mut transcript_states: Vec<u8> = vec![0u8; gpu_tmpls.len() * 36]; // 32 digest + 4 hash_cursor
 
-        type GkrFn = unsafe extern "C" fn(u32, *const GpuTemplateDataFfi, *mut *mut u8, *mut u32) -> i32;
+        type GkrFn = unsafe extern "C" fn(u32, *const GpuTemplateDataFfi, *mut *mut u8, *mut u32, *mut u8) -> i32;
         let ret = unsafe {
             let lib = libc::dlopen(
                 b"cuda/libgpu_prover.so\0".as_ptr() as *const _,
@@ -461,7 +464,8 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             assert!(!sym.is_null(), "gpu_gkr_prove_templates not found in .so");
             let func: GkrFn = std::mem::transmute(sym);
             let r = func(tmpl_datas.len() as u32, tmpl_datas.as_ptr(),
-                proof_ptrs.as_mut_ptr(), proof_lens.as_mut_ptr());
+                proof_ptrs.as_mut_ptr(), proof_lens.as_mut_ptr(),
+                transcript_states.as_mut_ptr());
             libc::dlclose(lib);
             r
         };
@@ -475,6 +479,7 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
                 let ptr = proof_ptrs[idx];
                 p.gpu_proof = unsafe { std::slice::from_raw_parts(ptr, len).to_vec() };
                 unsafe { libc::free(ptr as *mut _); }
+                p.gpu_transcript_state.copy_from_slice(&transcript_states[idx*36..(idx+1)*36]);
                 idx += 1;
             }
         }
@@ -493,7 +498,7 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         if let Some(mut p) = prep {
             // GPU GKR proof → replay transcript → CPU PCS opening
             let t0 = std::time::Instant::now();
-            let gpu_proof = std::mem::take(&mut p.gpu_proof); // zero-copy from PreparedTemplate
+            let gpu_proof = std::mem::take(&mut p.gpu_proof);
             let (cv, ch) = gpu_gkr_prove_from_bytes::<C>(&p.tc, p.pc, &gpu_proof, &mut p.tr);
             assert_eq!(cv, <C::FieldConfig as FieldEngine>::ChallengeField::from(0u32));
 
