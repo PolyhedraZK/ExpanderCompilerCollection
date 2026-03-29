@@ -63,15 +63,38 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
 
         let (commitments, proofs) = if std::env::var("USE_GPU_PROVER").is_ok() {
             // Soundness: commit must complete BEFORE GKR (commitment roots go into transcript)
+            // Small commits: CPU parallel. Large commits: GPU sequential (no GKR contention).
             let t_commit_start = std::time::Instant::now();
+            let gpu_commit_threshold = 1048576usize;
             let ps_ptr = ps as *const _ as usize;
-            let dm_ptr = &dm as *const _ as usize;
             let (commitments, commit_states) = {
                 use rayon::prelude::*;
-                let results: Vec<_> = dm.par_iter().map(|m| {
-                    let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = unsafe { &*(ps_ptr as *const _) };
-                    local_commit_impl::<C, ECCConfig>(ps.p_keys.get(&m.len()).unwrap(), m)
-                }).collect();
+                // Phase 1: small commits on CPU (parallel, fast)
+                let mut results: Vec<Option<_>> = (0..dm.len()).map(|_| None).collect();
+                {
+                    let small: Vec<(usize, _)> = dm.par_iter().enumerate()
+                        .filter(|(_, m)| m.len() < gpu_commit_threshold)
+                        .map(|(i, m)| {
+                            let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = unsafe { &*(ps_ptr as *const _) };
+                            (i, local_commit_impl::<C, ECCConfig>(ps.p_keys.get(&m.len()).unwrap(), m))
+                        }).collect();
+                    for (i, r) in small { results[i] = Some(r); }
+                }
+                // Phase 2: large commits on GPU (sequential, GPU is free — GKR hasn't started)
+                let t_gpu = std::time::Instant::now();
+                let mut gpu_count = 0usize;
+                for i in 0..dm.len() {
+                    if dm[i].len() >= gpu_commit_threshold {
+                        let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = unsafe { &*(ps_ptr as *const _) };
+                        results[i] = Some(local_commit_impl::<C, ECCConfig>(
+                            ps.p_keys.get(&dm[i].len()).unwrap(), &dm[i]));
+                        gpu_count += 1;
+                    }
+                }
+                if gpu_count > 0 {
+                    eprintln!("  [commit-gpu] {} large: {:?}", gpu_count, t_gpu.elapsed());
+                }
+                let results: Vec<_> = results.into_iter().map(|r| r.unwrap()).collect();
                 let r: (Vec<_>, Vec<_>) = results.into_iter().unzip();
                 r
             };
