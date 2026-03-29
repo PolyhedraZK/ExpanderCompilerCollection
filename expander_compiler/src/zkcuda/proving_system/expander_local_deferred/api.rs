@@ -337,9 +337,8 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     }
     let mut gpu_templates: Vec<Option<PreparedTemplate<C>>> = Vec::new();
     let mut gpu_count = 0usize;
-    // Store flat_bufs globally to keep witness pointers alive until after GPU FFI
-    // Freed in bulk after Phase 3 (avoids per-template deallocation during PCS loop)
-    let mut all_flat_bufs: Vec<Vec<Vec<<C::FieldConfig as FieldEngine>::SimdCircuitField>>> = Vec::new();
+    // Store witness buffers globally to keep pointers alive until after GPU FFI
+    let mut all_witness_bufs: Vec<Vec<<C::FieldConfig as FieldEngine>::SimdCircuitField>> = Vec::new();
 
     for (ti, tmpl) in templates.iter().enumerate() {
         let kernel = &kernels[tmpl.kernel_id()];
@@ -359,13 +358,30 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         tc.fill_rnd_coefs(&mut tr);
         let t_pre_done = t_pre.elapsed();
 
-        let t_batch = std::time::Instant::now();
-        let ki = kernel.layered_circuit_input();
-        let (mut circuits, flat_bufs) = unsafe { tc.create_batch(pc) };
-        let is_bc = tmpl.is_broadcast();
+        // GPU only needs layer 0 (witness) — it recomputes intermediate layers.
+        // Skip allocating layers 1+ and skip CPU evaluate() entirely.
+        let t_alloc = std::time::Instant::now();
+        let layer0_size = 1usize << tc.layers[0].input_var_num;
+        let total_elems = pc * layer0_size;
+        type SCF<C> = <<C as GKREngine>::FieldConfig as FieldEngine>::SimdCircuitField;
+        let mut witness_buf: Vec<SCF<C>> = if total_elems > 4096 {
+            unsafe {
+                let layout = std::alloc::Layout::array::<SCF<C>>(total_elems).unwrap();
+                let ptr = std::alloc::alloc_zeroed(layout) as *mut SCF<C>;
+                libc::madvise(ptr as *mut _, layout.size(), libc::MADV_HUGEPAGE);
+                Vec::from_raw_parts(ptr, total_elems, total_elems)
+            }
+        } else {
+            vec![SCF::<C>::default(); total_elems]
+        };
+        let t_alloc_done = t_alloc.elapsed();
+
+        // Fill layer 0 witness directly (no circuit instances needed)
         let t_fill = std::time::Instant::now();
+        let ki = kernel.layered_circuit_input();
+        let is_bc = tmpl.is_broadcast();
         for pi in 0..pc {
-            let input = &mut circuits[pi].layers[0].input_vals;
+            let input = &mut witness_buf[pi * layer0_size..(pi + 1) * layer0_size];
             for v in input.iter_mut() { *v = Default::default(); }
             for (_ci, (partition, (&ref vals, &ib))) in ki.iter()
                 .zip(cvs.iter().zip(is_bc.iter()))
@@ -376,12 +392,11 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
                 input[partition.offset..partition.offset + partition.len]
                     .copy_from_slice(local_slice);
             }
-            circuits[pi].evaluate();
         }
-        let t_eval_done = std::time::Instant::now();
+        let t_fill_done = t_fill.elapsed();
 
-        // Prepare in-memory gate data for GPU FFI (no file I/O!)
-        let t_prep_tmpl = std::time::Instant::now();
+        // Serialize gate data for GPU FFI
+        let t_gate = std::time::Instant::now();
         let mut gate_bufs = Vec::with_capacity(tc.layers.len());
         for layer in &tc.layers {
             let mut mul_buf = Vec::with_capacity(layer.mul.len() * 4);
@@ -402,36 +417,29 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             }
             gate_bufs.push((mul_buf, add_buf, cst_buf));
         }
-        // Witness: zero-copy — use flat_bufs[0] ptr directly
-        // Copy witness pointer, then take ownership of flat_bufs into separate storage
-        // (will be freed in bulk after GPU FFI, not per-template during PCS loop)
-        let witness_ptr = flat_bufs[0].as_ptr() as *const u32;
-        let witness_len = flat_bufs[0].len() * 16;
-        let witness_buf = Vec::new();
-        unsafe { expander_circuit::Circuit::drop_batch(circuits); }
-        all_flat_bufs.push(flat_bufs); // store globally, free after Phase 3
-        let prep_ms = t_prep_tmpl.elapsed().as_millis();
-        let total_ms = (t_prep_tmpl.elapsed()).as_millis();
-        if total_ms > 5 {
-            eprintln!("  [prep] tmpl[{}] pre={:.0}ms batch={:.0}ms eval={:.0}ms gate={:.0}ms total={}ms",
+
+        let witness_ptr = witness_buf.as_ptr() as *const u32;
+        let witness_len = witness_buf.len() * 16; // SimdCircuitField = M31x16 = 16 u32s
+        all_witness_bufs.push(witness_buf);
+        let t_gate_done = t_gate.elapsed();
+        if t_pre.elapsed().as_millis() > 5 {
+            eprintln!("  [prep] tmpl[{}] pre={:.0}ms alloc={:.0}ms fill={:.0}ms gate={:.0}ms",
                 ti,
                 t_pre_done.as_secs_f64()*1000.0,
-                (t_fill - t_batch).as_secs_f64()*1000.0,
-                (t_eval_done - t_fill).as_secs_f64()*1000.0,
-                prep_ms as f64,
-                total_ms);
+                t_alloc_done.as_secs_f64()*1000.0,
+                t_fill_done.as_secs_f64()*1000.0,
+                t_gate_done.as_secs_f64()*1000.0);
         }
 
         gpu_templates.push(Some(PreparedTemplate {
             ti, pc, tc, tr,
             cvs_indices: tmpl.commitment_indices().to_vec(),
             is_broadcast: tmpl.is_broadcast().to_vec(),
-            gate_bufs, witness_buf, witness_ptr, witness_len,
+            gate_bufs, witness_buf: Vec::new(), witness_ptr, witness_len,
             gpu_proof: Vec::new(),
             gpu_transcript_state: [0u8; 36],
             gpu_challenges: Vec::new(), gpu_n_rx: 0, gpu_n_ry: 0, gpu_n_r_simd: 0, gpu_n_r_mpi: 0,
         }));
-        // prep_ms timing already printed above
         gpu_count += 1;
     }
     eprintln!("  [gpu] prep {} templates: {:?}", gpu_count, t_prep.elapsed());
