@@ -100,6 +100,7 @@ fn verify_template<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>
                     sc.r_simd.clone(), vec![],
                 );
                 if !verify_pcs::<C, ECCConfig>(&mut cur, comm, &pcs_ch, &claim, vs, &mut t) {
+                    eprintln!("      [pcs-fail] vl={} n_pv={} pcs_rz={} pcs_simd={}", val_len, n_pv, pcs_ch.rz.len(), pcs_ch.r_simd.len());
                     return false;
                 }
 
@@ -108,7 +109,11 @@ fn verify_template<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>
                 let v_index = EqPolynomial::ith_eq_vec_elem(component_idx_vars, component_index);
                 target_y += v_index * claim;
             }
-            if *y != target_y { return false; }
+            if *y != target_y {
+                eprintln!("      [agg-fail] y={:?} target={:?} rz_len={} r_mpi_len={}",
+                    y, target_y, sc.rz.len(), sc.r_mpi.len());
+                return false;
+            }
         }
         true
     }
