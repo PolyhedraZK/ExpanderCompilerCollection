@@ -635,8 +635,9 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     let proofs: Vec<ExpanderProof> = gpu_templates.into_iter().enumerate().map(|(ti, prep)| {
         if let Some(mut p) = prep {
             let t0 = std::time::Instant::now();
-            // Replay GPU GKR proof through fresh Rust transcript to get
-            // bit-exact transcript state (GPU SHA-256 may differ from Rust's).
+            // Replay GPU GKR proof through Rust transcript for bit-exact state.
+            // GPU transcript uses per-coef SHA-256 refresh for rnd_coefs,
+            // Rust uses per-32-byte batch refresh. States diverge after fill_rnd_coefs.
             let gpu_proof = std::mem::take(&mut p.gpu_proof);
             p.tr = C::TranscriptConfig::new();
             crate::zkcuda::proving_system::common::bind_commitments_to_transcript::<C>(
