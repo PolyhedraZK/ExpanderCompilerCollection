@@ -183,7 +183,6 @@ pub fn pcs_local_open_with_scratch<C: GKREngine>(
 
     let poly = RefMultiLinearPoly::from_ref(vals);
     let v = if std::env::var("USE_GPU_PROVER").is_ok() && val_len >= 32768 {
-        // GPU eval at challenge (same as pcs_batch_open_with_scratch)
         let rz_flat: Vec<u32> = unsafe {
             std::slice::from_raw_parts(challenge.rz.as_ptr() as *const u32,
                 challenge.rz.len() * 3).to_vec()

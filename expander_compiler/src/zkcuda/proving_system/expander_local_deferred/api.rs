@@ -635,7 +635,7 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     let proofs: Vec<ExpanderProof> = gpu_templates.into_iter().enumerate().map(|(ti, prep)| {
         if let Some(mut p) = prep {
             let t0 = std::time::Instant::now();
-            // Replay: GPU per-coef refresh ≠ Rust batch refresh for rnd_coefs.
+            let t_replay = std::time::Instant::now();
             let gpu_proof = std::mem::take(&mut p.gpu_proof);
             p.tr = C::TranscriptConfig::new();
             crate::zkcuda::proving_system::common::bind_commitments_to_transcript::<C>(
@@ -648,6 +648,7 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
                 let _ = gkr::gkr_verify(p.pc, &ec, &[], &<C::FieldConfig as FieldEngine>::ChallengeField::ZERO, &mut p.tr, &mut cur);
             }
 
+            if ti == 0 { eprintln!("      [replay] tmpl0: {:?}", t_replay.elapsed()); }
             // Reconstruct challenge from GPU
             let ch: gkr_engine::ExpanderDualVarChallenge<C::FieldConfig> = {
                 let cd = &p.gpu_challenges;
@@ -666,13 +667,15 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             };
 
             let cvs: Vec<&[SIMDField<C>]> = p.cvs_indices.iter().map(|&i| dm[i].as_slice()).collect();
+            // PCS open: for large commits with GPU tree, use GPU data directly.
+            // For small commits, fall back to CPU path.
             let chs = if let Some(cy) = ch.challenge_y() { vec![ch.challenge_x(), cy] } else { vec![ch.challenge_x()] };
             for sc in &chs {
                 for (ci, (&ref v, &_ib)) in cvs.iter().zip(p.is_broadcast.iter()).enumerate() {
                     let comm_idx = p.cvs_indices[ci];
                     let partition_size = if _ib { v.len() } else { v.len() / p.pc };
                     let n_partition_vars = if partition_size > 0 { partition_size.ilog2() as usize } else { 0 };
-                    let mut pcs_ch = gkr_engine::ExpanderSingleVarChallenge::new(
+                    let pcs_ch = gkr_engine::ExpanderSingleVarChallenge::new(
                         {
                             let mut rz = sc.rz[..n_partition_vars].to_vec();
                             rz.extend_from_slice(&sc.r_mpi);
@@ -682,8 +685,12 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
                         vec![],
                     );
                     let scratch = &commit_states[comm_idx].scratch;
+                    let t_pcs_one = std::time::Instant::now();
                     crate::zkcuda::proving_system::expander::prove_impl::pcs_local_open_with_scratch::<C>(
                         v, &pcs_ch, ps, &mut p.tr, Some(scratch));
+                    if t_pcs_one.elapsed().as_millis() > 5 {
+                        eprintln!("        [pcs-slow] tmpl[{}] ci={} vl={} {:?}", p.ti, ci, v.len(), t_pcs_one.elapsed());
+                    }
                 }
             }
             let t_pcs_done = std::time::Instant::now();
