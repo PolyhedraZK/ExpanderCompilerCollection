@@ -32,6 +32,10 @@ pub fn verify_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>
         let comms: Vec<_> = tmpl.commitment_indices().iter().map(|&i| &proof.commitments[i]).collect();
         let lp = &proof.proofs[ti];
 
+        if pc > 1 {
+            eprintln!("  [pcs-verify-info] tmpl[{}] pc={} comms={} indices={:?}",
+                ti, pc, comms.len(), tmpl.commitment_indices());
+        }
         let ok = verify_template::<C, ECCConfig>(vs, kernel, lp, &comms, tmpl.is_broadcast(), pc, &proof.commitments);
         if !ok { eprintln!("  [verify-fail] template {} (pc={}) FAILED", ti, pc); }
         ok
@@ -62,36 +66,26 @@ fn verify_template<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>
     );
     if !ok { return false; }
 
-    use crate::zkcuda::proving_system::expander::verify_impl::{
-        verify_pcs, verify_pcs_opening_and_aggregation_no_mpi,
-    };
-    use serdes::ExpSerde;
+    use crate::zkcuda::proving_system::expander::verify_impl::verify_pcs_opening_and_aggregation_no_mpi;
 
+    // Both N=1 and N>1 now use pcs_local_open + partition_challenge (same format).
+    // For N>1: merge r_mpi into rz first, then verify with parallel_count=1.
     if pc <= 1 {
-        // N=1: prover used pcs_local_open_with_scratch (partitioned challenges)
         verify_pcs_opening_and_aggregation_no_mpi::<C, ECCConfig>(
             &mut cur, kernel, vs, &ch, v0, v1, comms, is_broadcast, 0, 1, &mut t)
     } else {
-        // N>1: prover used pcs_batch_open_with_scratch — same merged challenge for ALL commitments.
-        // Do NOT use verify_pcs_opening_and_aggregation (it partitions challenges per commitment).
-        let chs = if let Some(cy) = ch.challenge_y() { vec![ch.challenge_x(), cy] } else { vec![ch.challenge_x()] };
-        for sc in &chs {
-            // Merge r_mpi into rz (matching prover's pcs_batch_open_with_scratch line 337-339)
-            let mut merged = sc.clone();
-            merged.rz.extend_from_slice(&merged.r_mpi);
-            merged.r_mpi = vec![];
-            // Pad rz if needed (matching prover line 342-345), do NOT truncate
-            // (prover also doesn't truncate — PCS::open/verify handle via lift_poly)
-
-            for (&ref comm, &_ib) in comms.iter().zip(is_broadcast.iter()) {
-                let claim = <C::FieldConfig as FieldEngine>::ChallengeField::deserialize_from(&mut cur).unwrap();
-                t.append_field_element(&claim);
-
-                // Use the same merged challenge for ALL commitments (matching prover)
-                let verified = verify_pcs::<C, ECCConfig>(&mut cur, comm, &merged, &claim, vs, &mut t);
-                if !verified { return false; }
-            }
-        }
-        true
+        // Merge r_mpi into rz (prover did the same before partition_challenge)
+        let merge_single = |s: &gkr_engine::ExpanderSingleVarChallenge<C::FieldConfig>| {
+            let mut m = s.clone();
+            m.rz.extend_from_slice(&m.r_mpi);
+            m.r_mpi = vec![];
+            m
+        };
+        let rx = merge_single(&ch.challenge_x());
+        let ry = ch.challenge_y().map(|y| merge_single(&y));
+        let merged_ch = gkr_engine::ExpanderDualVarChallenge::new(
+            rx.rz, ry.map(|y| y.rz), rx.r_simd, vec![]);
+        verify_pcs_opening_and_aggregation_no_mpi::<C, ECCConfig>(
+            &mut cur, kernel, vs, &merged_ch, v0, v1, comms, is_broadcast, 0, 1, &mut t)
     }
 }
