@@ -68,14 +68,28 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
             let t_commit_start = std::time::Instant::now();
             let ps_ptr = ps as *const _ as usize;
             let dm_ptr = &dm as *const _ as usize;
+            let gpu_threshold = 1048576usize;
             let commit_handle = unsafe {
                 std::thread::Builder::new().spawn_unchecked(move || {
                     use rayon::prelude::*;
                     let dm: &[Vec<SIMDField<ECCConfig>>] = &*(dm_ptr as *const Vec<Vec<SIMDField<ECCConfig>>>);
                     let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = &*(ps_ptr as *const _);
-                    let results: Vec<_> = dm.par_iter().map(|m| {
-                        local_commit_impl::<C, ECCConfig>(ps.p_keys.get(&m.len()).unwrap(), m)
-                    }).collect();
+                    // Small commits: CPU parallel. Large commits: sequential (GPU, shared CUDA state).
+                    let mut results: Vec<Option<_>> = (0..dm.len()).map(|_| None).collect();
+                    {
+                        let small: Vec<(usize, _)> = dm.par_iter().enumerate()
+                            .filter(|(_, m)| m.len() < gpu_threshold)
+                            .map(|(i, m)| (i, local_commit_impl::<C, ECCConfig>(ps.p_keys.get(&m.len()).unwrap(), m)))
+                            .collect();
+                        for (i, r) in small { results[i] = Some(r); }
+                    }
+                    for i in 0..dm.len() {
+                        if dm[i].len() >= gpu_threshold {
+                            results[i] = Some(local_commit_impl::<C, ECCConfig>(
+                                ps.p_keys.get(&dm[i].len()).unwrap(), &dm[i]));
+                        }
+                    }
+                    let results: Vec<_> = results.into_iter().map(|r| r.unwrap()).collect();
                     let r: (Vec<_>, Vec<_>) = results.into_iter().unzip();
                     r
                 }).unwrap()
