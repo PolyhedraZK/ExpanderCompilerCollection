@@ -3,6 +3,7 @@ use std::io::Cursor;
 use arith::Field;
 use gkr::gkr_verify;
 use gkr_engine::{FieldEngine, GKREngine, Transcript};
+use polynomials::EqPolynomial;
 
 use crate::{
     frontend::{Config, SIMDField},
@@ -11,8 +12,11 @@ use crate::{
         context::ComputationGraph,
         proving_system::{
             common::bind_commitments_to_transcript,
-            expander::structs::{ExpanderCommitment, ExpanderProof, ExpanderVerifierSetup},
-            CombinedProof,
+            expander::{
+                structs::{ExpanderCommitment, ExpanderProof, ExpanderVerifierSetup},
+                verify_impl::{verify_pcs, verify_pcs_opening_and_aggregation_no_mpi},
+            },
+            CombinedProof, Commitment,
         },
     },
 };
@@ -32,10 +36,6 @@ pub fn verify_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>
         let comms: Vec<_> = tmpl.commitment_indices().iter().map(|&i| &proof.commitments[i]).collect();
         let lp = &proof.proofs[ti];
 
-        if pc > 1 {
-            eprintln!("  [pcs-verify-info] tmpl[{}] pc={} comms={} indices={:?}",
-                ti, pc, comms.len(), tmpl.commitment_indices());
-        }
         let ok = verify_template::<C, ECCConfig>(vs, kernel, lp, &comms, tmpl.is_broadcast(), pc, &proof.commitments);
         if !ok { eprintln!("  [verify-fail] template {} (pc={}) FAILED", ti, pc); }
         ok
@@ -66,26 +66,46 @@ fn verify_template<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>
     );
     if !ok { return false; }
 
-    use crate::zkcuda::proving_system::expander::verify_impl::verify_pcs_opening_and_aggregation_no_mpi;
+    use serdes::ExpSerde;
 
-    // Both N=1 and N>1 now use pcs_local_open + partition_challenge (same format).
-    // For N>1: merge r_mpi into rz first, then verify with parallel_count=1.
     if pc <= 1 {
+        // N=1: standard PCS verify with partition_challenge
         verify_pcs_opening_and_aggregation_no_mpi::<C, ECCConfig>(
             &mut cur, kernel, vs, &ch, v0, v1, comms, is_broadcast, 0, 1, &mut t)
     } else {
-        // Merge r_mpi into rz (prover did the same before partition_challenge)
-        let merge_single = |s: &gkr_engine::ExpanderSingleVarChallenge<C::FieldConfig>| {
-            let mut m = s.clone();
-            m.rz.extend_from_slice(&m.r_mpi);
-            m.r_mpi = vec![];
-            m
-        };
-        let rx = merge_single(&ch.challenge_x());
-        let ry = ch.challenge_y().map(|y| merge_single(&y));
-        let merged_ch = gkr_engine::ExpanderDualVarChallenge::new(
-            rx.rz, ry.map(|y| y.rz), rx.r_simd, vec![]);
-        verify_pcs_opening_and_aggregation_no_mpi::<C, ECCConfig>(
-            &mut cur, kernel, vs, &merged_ch, v0, v1, comms, is_broadcast, 0, 1, &mut t)
+        // N>1 batch: PCS challenge = rz[0..partition_vars] ++ r_mpi
+        // Aggregation: y = Σ eq(component_vars, i) × claim_i
+        // component_vars = rz[partition_vars..output_var_num] (WITHOUT r_mpi)
+        let chs = if let Some(cy) = ch.challenge_y() { vec![ch.challenge_x(), cy] } else { vec![ch.challenge_x()] };
+        let claims = if let Some(v1) = v1 { vec![v0, v1] } else { vec![v0] };
+
+        for (sc, y) in chs.iter().zip(claims.iter()) {
+            let mut target_y = <C::FieldConfig as FieldEngine>::ChallengeField::ZERO;
+            for ((input, &ref comm), &ib) in kernel.layered_circuit_input().iter()
+                .zip(comms.iter()).zip(is_broadcast.iter())
+            {
+                let val_len = <ExpanderCommitment<C::FieldConfig, C::PCSConfig> as Commitment<ECCConfig>>::vals_len(comm);
+                let partition_size = if ib { val_len } else { val_len / pc };
+                let n_pv = if partition_size > 0 { partition_size.ilog2() as usize } else { 0 };
+
+                let claim = <C::FieldConfig as FieldEngine>::ChallengeField::deserialize_from(&mut cur).unwrap();
+                t.append_field_element(&claim);
+
+                let pcs_ch = gkr_engine::ExpanderSingleVarChallenge::new(
+                    { let mut rz = sc.rz[..n_pv].to_vec(); rz.extend_from_slice(&sc.r_mpi); rz },
+                    sc.r_simd.clone(), vec![],
+                );
+                if !verify_pcs::<C, ECCConfig>(&mut cur, comm, &pcs_ch, &claim, vs, &mut t) {
+                    return false;
+                }
+
+                let component_idx_vars = &sc.rz[n_pv..];
+                let component_index = input.offset / input.len;
+                let v_index = EqPolynomial::ith_eq_vec_elem(component_idx_vars, component_index);
+                target_y += v_index * claim;
+            }
+            if *y != target_y { return false; }
+        }
+        true
     }
 }

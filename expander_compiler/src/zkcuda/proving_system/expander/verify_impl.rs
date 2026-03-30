@@ -133,6 +133,17 @@ where
         target_y += v_index * claim;
     }
 
+    if *y != target_y {
+        let ci_vars: Vec<_> = kernel.layered_circuit_input().iter()
+            .zip(commitments.iter()).zip(is_broadcast)
+            .map(|((inp, comm), ib)| {
+                let vl = <ExpanderCommitment<C::FieldConfig, C::PCSConfig> as Commitment<ECCConfig>>::vals_len(comm);
+                let (_, cv) = partition_challenge_and_location_for_pcs_no_mpi(challenge, vl, parallel_index, parallel_count, *ib);
+                (inp.offset, inp.len, vl, cv.len())
+            }).collect();
+        eprintln!("      [agg-mismatch] rz_len={} ci_info={:?}",
+            challenge.rz.len(), ci_vars);
+    }
     *y == target_y
 }
 

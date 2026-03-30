@@ -235,18 +235,23 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         // Use partition_challenge + pcs_local_open (same as N=1 path) for correct PCS verify compat.
         // pcs_batch_open_with_scratch has a bug: writes truncated eval but opens at merged challenge.
         for sc in &chs {
-            // Merge r_mpi into rz so partition_challenge sees r_mpi=0
-            let mut merged = sc.clone();
-            merged.rz.extend_from_slice(&merged.r_mpi);
-            merged.r_mpi = vec![];
             for (ci, (&ref v, &_ib)) in cvs.iter().zip(tmpl.is_broadcast().iter()).enumerate() {
                 let comm_idx = tmpl.commitment_indices()[ci];
-                let val_len = v.len();
-                let (challenge_for_pcs, _) = crate::zkcuda::proving_system::expander::prove_impl::partition_challenge_and_location_for_pcs_no_mpi::<C::FieldConfig>(
-                    &merged, val_len, 0, 1, _ib);
+                // Build PCS challenge: rz[0..partition_vars] ++ r_mpi (not binary index!)
+                let partition_size = if _ib { v.len() } else { v.len() / pc };
+                let n_partition_vars = if partition_size > 0 { partition_size.ilog2() as usize } else { 0 };
+                let mut pcs_ch = gkr_engine::ExpanderSingleVarChallenge::new(
+                    {
+                        let mut rz = sc.rz[..n_partition_vars].to_vec();
+                        rz.extend_from_slice(&sc.r_mpi); // instance random challenge
+                        rz
+                    },
+                    sc.r_simd.clone(),
+                    vec![], // r_mpi folded into rz
+                );
                 let scratch = &commit_states[comm_idx].scratch;
                 crate::zkcuda::proving_system::expander::prove_impl::pcs_local_open_with_scratch::<C>(
-                    v, &challenge_for_pcs, ps, &mut tr, Some(scratch));
+                    v, &pcs_ch, ps, &mut tr, Some(scratch));
             }
         }
         let t3 = std::time::Instant::now();
@@ -586,7 +591,7 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             p.tr.append_u8_slice(&gpu_proof);
 
             // Reconstruct challenge from GPU
-            let ch = {
+            let ch: gkr_engine::ExpanderDualVarChallenge<C::FieldConfig> = {
                 let cd = &p.gpu_challenges;
                 let mut off = 0usize;
                 let read_e3s = |off: &mut usize, n: u32| -> Vec<<C::FieldConfig as FieldEngine>::ChallengeField> {
@@ -605,17 +610,22 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             let cvs: Vec<&[SIMDField<C>]> = p.cvs_indices.iter().map(|&i| dm[i].as_slice()).collect();
             let chs = if let Some(cy) = ch.challenge_y() { vec![ch.challenge_x(), cy] } else { vec![ch.challenge_x()] };
             for sc in &chs {
-                let mut merged = sc.clone();
-                merged.rz.extend_from_slice(&merged.r_mpi);
-                merged.r_mpi = vec![];
                 for (ci, (&ref v, &_ib)) in cvs.iter().zip(p.is_broadcast.iter()).enumerate() {
                     let comm_idx = p.cvs_indices[ci];
-                    let val_len = v.len();
-                    let (challenge_for_pcs, _) = crate::zkcuda::proving_system::expander::prove_impl::partition_challenge_and_location_for_pcs_no_mpi::<C::FieldConfig>(
-                        &merged, val_len, 0, 1, _ib);
+                    let partition_size = if _ib { v.len() } else { v.len() / p.pc };
+                    let n_partition_vars = if partition_size > 0 { partition_size.ilog2() as usize } else { 0 };
+                    let mut pcs_ch = gkr_engine::ExpanderSingleVarChallenge::new(
+                        {
+                            let mut rz = sc.rz[..n_partition_vars].to_vec();
+                            rz.extend_from_slice(&sc.r_mpi);
+                            rz
+                        },
+                        sc.r_simd.clone(),
+                        vec![],
+                    );
                     let scratch = &commit_states[comm_idx].scratch;
                     crate::zkcuda::proving_system::expander::prove_impl::pcs_local_open_with_scratch::<C>(
-                        v, &challenge_for_pcs, ps, &mut p.tr, Some(scratch));
+                        v, &pcs_ch, ps, &mut p.tr, Some(scratch));
                 }
             }
             let t_pcs_done = std::time::Instant::now();
