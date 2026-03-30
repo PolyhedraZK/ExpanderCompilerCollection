@@ -354,7 +354,6 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
 
         let (bc, _bs) = prepare_expander_circuit::<C::FieldConfig, ECCConfig>(kernel, 1);
         let mut tr = C::TranscriptConfig::new();
-        // Soundness: bind commitment roots to transcript digest (not proof bytes)
         tr.set_state(&commit_transcript_state);
         let mut tc = bc.clone();
         tc.fill_rnd_coefs(&mut tr);
