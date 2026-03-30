@@ -37,7 +37,11 @@ pub fn verify_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>
         let lp = &proof.proofs[ti];
 
         let ok = verify_template::<C, ECCConfig>(vs, kernel, lp, &comms, tmpl.is_broadcast(), pc, &proof.commitments);
-        if !ok { eprintln!("  [verify-fail] template {} (pc={}) FAILED", ti, pc); }
+        if !ok {
+            let bc: Vec<_> = tmpl.is_broadcast().iter().map(|&b| if b {"B"} else {"_"}).collect();
+            let vls: Vec<_> = tmpl.commitment_indices().iter().map(|&i| proof.commitments[i].vals_len).collect();
+            eprintln!("  [verify-fail] tmpl {} pc={} bc={:?} vls={:?}", ti, pc, bc, vls);
+        }
         ok
     }).collect();
     results.iter().all(|&x| x)
