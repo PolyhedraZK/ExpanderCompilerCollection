@@ -20,7 +20,8 @@ pub struct GpuTemplateDataFfi {
     pub layers: *const GpuLayerDataFfi,
     pub witness: *const u32,
     pub witness_len: u32,
-    pub init_transcript_state: [u8; 32], // SHA-256 digest after commitment roots
+    pub d_witness: *const u32, // device pointer (skip upload if non-null)
+    pub init_transcript_state: [u8; 32],
 }
 unsafe impl Send for GpuLayerDataFfi {}
 unsafe impl Send for GpuTemplateDataFfi {}
@@ -62,7 +63,7 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
         let n = templates.len();
 
         let (commitments, proofs) = if std::env::var("USE_GPU_PROVER").is_ok() {
-            // Soundness: commit must complete BEFORE GKR (commitment roots go into transcript)
+            // Soundness: commit must complete BEFORE GKR
             let t_commit_start = std::time::Instant::now();
             let ps_ptr = ps as *const _ as usize;
             let (commitments, commit_states) = {
@@ -76,7 +77,6 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
             };
             eprintln!("  [commit] {:?}", t_commit_start.elapsed());
 
-            // GPU prep + GKR + PCS (commit already done, commitments available for transcript)
             let proofs = gpu_prove_all::<C, ECCConfig>(templates, kernels, &dm, ps, &commitments, &commit_states);
             (commitments, proofs)
         } else {
@@ -447,7 +447,23 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         }));
         gpu_count += 1;
     }
-    // Keep arena alive until after GPU FFI (freed when _arena drops)
+    // Upload entire arena to GPU once (avoids per-template H2D in GPU GKR)
+    let t_upload = std::time::Instant::now();
+    let arena_bytes = arena_total * std::mem::size_of::<SCF<C>>();
+    let d_arena: *const u32 = if arena_bytes > 0 {
+        let mut d_ptr: *mut u8 = std::ptr::null_mut();
+        extern "C" { fn cudaMalloc(ptr: *mut *mut u8, size: usize) -> i32; }
+        extern "C" { fn cudaMemcpy(dst: *mut u8, src: *const u8, count: usize, kind: i32) -> i32; }
+        unsafe {
+            cudaMalloc(&mut d_ptr, arena_bytes);
+            cudaMemcpy(d_ptr, arena.as_ptr() as *const u8, arena_bytes, 1); // 1 = H2D
+        }
+        d_ptr as *const u32
+    } else {
+        std::ptr::null()
+    };
+    eprintln!("  [prep] arena→GPU: {:?} ({:.1}MB)", t_upload.elapsed(), arena_bytes as f64 / 1e6);
+
     let _arena = arena;
     eprintln!("  [prep] fill: {:?}", t_fill.elapsed());
     eprintln!("  [gpu] prep {} templates: {:?}", gpu_count, t_prep.elapsed());
@@ -491,6 +507,11 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             layer_datas.push(layers);
         }
         for (i, p) in gpu_tmpls.iter().enumerate() {
+            // Compute device witness pointer from arena device base + offset
+            let host_offset = (p.witness_ptr as usize) - (_arena.as_ptr() as *const u32 as usize);
+            let d_wit = if !d_arena.is_null() {
+                unsafe { d_arena.add(host_offset / 4) }
+            } else { std::ptr::null() };
             tmpl_datas.push(GpuTemplateDataFfi {
                 n_instances: p.pc as u32,
                 n_layers: p.tc.layers.len() as u32,
@@ -498,6 +519,7 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
                 layers: layer_datas[i].as_ptr(),
                 witness: p.witness_ptr,
                 witness_len: p.witness_len as u32,
+                d_witness: d_wit,
                 init_transcript_state: init_ts_arr,
             });
         }
@@ -544,6 +566,12 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         }
     }
     eprintln!("  [gpu] GPU GKR: {:?}", t_gpu.elapsed());
+
+    // Free GPU arena (witness data no longer needed after GKR)
+    if !d_arena.is_null() {
+        extern "C" { fn cudaFree(ptr: *mut u8) -> i32; }
+        unsafe { cudaFree(d_arena as *mut u8); }
+    }
 
     // ---- Phase 3: PCS (commit already done before GKR) ----
 
