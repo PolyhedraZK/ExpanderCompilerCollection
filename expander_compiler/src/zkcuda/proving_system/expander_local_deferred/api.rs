@@ -127,22 +127,14 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
                     *results[ti].lock().unwrap() = Some(proof);
                 }
             }
-            let commitments_ref = &commitments;
-            rayon::scope(|scope| {
-                for (ti, tmpl) in templates.iter().enumerate() {
-                    let pc = next_power_of_two(tmpl.parallel_count());
-                    if pc > small_threshold {
-                        let ps_ptr = ps as *const _ as usize;
-                        let dm = &dm; let kernels = &kernels;
-                        let slot = &results[ti];
-                        scope.spawn(move |_| {
-                            let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = unsafe { &*(ps_ptr as *const _) };
-                            let proof = prove_one::<C, ECCConfig>(ti, tmpl, kernels, dm, ps, commit_states, commitments_ref);
-                            *slot.lock().unwrap() = Some(proof);
-                        });
-                    }
+            // Sequential proving for large templates (avoids Rayon nested parallelism race in ScratchPadBatch)
+            for (ti, tmpl) in templates.iter().enumerate() {
+                let pc = next_power_of_two(tmpl.parallel_count());
+                if pc > small_threshold {
+                    let proof = prove_one::<C, ECCConfig>(ti, tmpl, kernels, &dm, ps, commit_states, &commitments);
+                    *results[ti].lock().unwrap() = Some(proof);
                 }
-            });
+            }
             let proofs: Vec<_> = results.into_iter().map(|m| m.into_inner().unwrap().unwrap()).collect();
             (commitments, proofs)
         };
