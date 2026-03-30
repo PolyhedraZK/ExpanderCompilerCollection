@@ -182,9 +182,35 @@ pub fn pcs_local_open_with_scratch<C: GKREngine>(
     let p_key = p_keys.p_keys.get(&val_len).unwrap();
 
     let poly = RefMultiLinearPoly::from_ref(vals);
-    let v = <C::FieldConfig as FieldEngine>::single_core_eval_circuit_vals_at_expander_challenge(
-        vals, challenge,
-    );
+    let v = if std::env::var("USE_GPU_PROVER").is_ok() && val_len >= 32768 {
+        // GPU eval at challenge (same as pcs_batch_open_with_scratch)
+        let rz_flat: Vec<u32> = unsafe {
+            std::slice::from_raw_parts(challenge.rz.as_ptr() as *const u32,
+                challenge.rz.len() * 3).to_vec()
+        };
+        let simd_flat: Vec<u32> = unsafe {
+            std::slice::from_raw_parts(challenge.r_simd.as_ptr() as *const u32,
+                challenge.r_simd.len() * 3).to_vec()
+        };
+        let mut result = [0u32; 3];
+        extern "C" {
+            fn gpu_eval_at_challenge_m31ext3(
+                packed_vals: *const u32, commit_len: u32,
+                rz: *const u32, n_rz_vars: u32,
+                r_simd: *const u32, result: *mut u32);
+        }
+        unsafe {
+            gpu_eval_at_challenge_m31ext3(
+                vals.as_ptr() as *const u32, val_len as u32,
+                rz_flat.as_ptr(), challenge.rz.len() as u32,
+                simd_flat.as_ptr(), result.as_mut_ptr());
+        }
+        unsafe { std::ptr::read(result.as_ptr() as *const <C::FieldConfig as FieldEngine>::ChallengeField) }
+    } else {
+        <C::FieldConfig as FieldEngine>::single_core_eval_circuit_vals_at_expander_challenge(
+            vals, challenge,
+        )
+    };
     transcript.append_field_element(&v);
 
     let default_scratch = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::init_scratch_pad(
