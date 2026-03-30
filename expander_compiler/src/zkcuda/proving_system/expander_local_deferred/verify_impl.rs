@@ -65,7 +65,7 @@ fn verify_template<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>
         &<C::FieldConfig as FieldEngine>::ChallengeField::ZERO,
         &mut t, &mut cur,
     );
-    if !ok { return false; }
+    if !ok { eprintln!("      [gkr-verify-fail] pc={}", pc); return false; }
 
     use serdes::ExpSerde;
 

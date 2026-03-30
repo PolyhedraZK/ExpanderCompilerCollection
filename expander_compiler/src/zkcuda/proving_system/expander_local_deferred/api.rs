@@ -577,9 +577,19 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     let proofs: Vec<ExpanderProof> = gpu_templates.into_iter().enumerate().map(|(ti, prep)| {
         if let Some(mut p) = prep {
             let t0 = std::time::Instant::now();
+            // Replay GPU GKR proof through fresh Rust transcript to get
+            // bit-exact transcript state (GPU SHA-256 may differ from Rust's).
             let gpu_proof = std::mem::take(&mut p.gpu_proof);
-            p.tr.set_state(&p.gpu_transcript_state[..32]);
-            p.tr.append_u8_slice(&gpu_proof);
+            p.tr = C::TranscriptConfig::new();
+            crate::zkcuda::proving_system::common::bind_commitments_to_transcript::<C>(
+                &mut p.tr, commitments);
+            {
+                let kernel = &kernels[templates[ti].kernel_id()];
+                let mut ec = kernel.layered_circuit().export_to_expander_flatten();
+                ec.fill_rnd_coefs(&mut p.tr);
+                let mut cur = std::io::Cursor::new(&gpu_proof);
+                let _ = gkr::gkr_verify(p.pc, &ec, &[], &<C::FieldConfig as FieldEngine>::ChallengeField::ZERO, &mut p.tr, &mut cur);
+            }
 
             // Reconstruct challenge from GPU
             let ch: gkr_engine::ExpanderDualVarChallenge<C::FieldConfig> = {
