@@ -27,7 +27,10 @@ pub fn verify_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>
     cg: &ComputationGraph<ECCConfig>,
     proof: &CombinedProof<ECCConfig, crate::zkcuda::proving_system::Expander<C>>,
 ) -> bool {
-    let results: Vec<bool> = cg.proof_templates().iter().enumerate().map(|(ti, tmpl)| {
+    use rayon::prelude::*;
+    let vs_ptr = vs as *const _ as usize;
+    let results: Vec<bool> = cg.proof_templates().par_iter().enumerate().map(|(ti, tmpl)| {
+        let vs: &ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig> = unsafe { &*(vs_ptr as *const _) };
         let kernel = &cg.kernels()[tmpl.kernel_id()];
         let pc = next_power_of_two(tmpl.parallel_count());
         let comms: Vec<_> = tmpl.commitment_indices().iter().map(|&i| &proof.commitments[i]).collect();

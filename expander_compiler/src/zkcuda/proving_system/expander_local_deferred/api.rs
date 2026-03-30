@@ -63,22 +63,26 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
         let n = templates.len();
 
         let (commitments, proofs) = if std::env::var("USE_GPU_PROVER").is_ok() {
-            // Soundness: commit must complete BEFORE GKR
+            // Launch commit in background — prep (arena, fill, gates) runs in parallel.
+            // Commit must finish before GKR (soundness: roots bind to transcript).
             let t_commit_start = std::time::Instant::now();
             let ps_ptr = ps as *const _ as usize;
-            let (commitments, commit_states) = {
-                use rayon::prelude::*;
-                let results: Vec<_> = dm.par_iter().map(|m| {
-                    let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = unsafe { &*(ps_ptr as *const _) };
-                    local_commit_impl::<C, ECCConfig>(ps.p_keys.get(&m.len()).unwrap(), m)
-                }).collect();
-                let r: (Vec<_>, Vec<_>) = results.into_iter().unzip();
-                r
+            let dm_ptr = &dm as *const _ as usize;
+            let commit_handle = unsafe {
+                std::thread::Builder::new().spawn_unchecked(move || {
+                    use rayon::prelude::*;
+                    let dm: &[Vec<SIMDField<ECCConfig>>] = &*(dm_ptr as *const Vec<Vec<SIMDField<ECCConfig>>>);
+                    let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = &*(ps_ptr as *const _);
+                    let results: Vec<_> = dm.par_iter().map(|m| {
+                        local_commit_impl::<C, ECCConfig>(ps.p_keys.get(&m.len()).unwrap(), m)
+                    }).collect();
+                    let r: (Vec<_>, Vec<_>) = results.into_iter().unzip();
+                    r
+                }).unwrap()
             };
-            eprintln!("  [commit] {:?}", t_commit_start.elapsed());
 
-            let proofs = gpu_prove_all::<C, ECCConfig>(templates, kernels, &dm, ps, &commitments, &commit_states);
-            (commitments, proofs)
+            let proofs = gpu_prove_all::<C, ECCConfig>(templates, kernels, &dm, ps, commit_handle, t_commit_start);
+            proofs
         } else {
             // Synchronous commit for CPU path
             let t_commit = std::time::Instant::now();
@@ -265,9 +269,12 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     kernels: &[crate::zkcuda::kernel::Kernel<ECCConfig>],
     dm: &[Vec<SIMDField<ECCConfig>>],
     ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig>,
-    commitments: &[crate::zkcuda::proving_system::expander::structs::ExpanderCommitment<C::FieldConfig, C::PCSConfig>],
-    commit_states: &[crate::zkcuda::proving_system::expander::structs::ExpanderCommitmentState<C::FieldConfig, C::PCSConfig>],
-) -> Vec<ExpanderProof> {
+    commit_handle: std::thread::JoinHandle<(
+        Vec<crate::zkcuda::proving_system::expander::structs::ExpanderCommitment<C::FieldConfig, C::PCSConfig>>,
+        Vec<crate::zkcuda::proving_system::expander::structs::ExpanderCommitmentState<C::FieldConfig, C::PCSConfig>>,
+    )>,
+    t_commit_start: std::time::Instant,
+) -> (Vec<crate::zkcuda::proving_system::expander::structs::ExpanderCommitment<C::FieldConfig, C::PCSConfig>>, Vec<ExpanderProof>) {
     use gkr_engine::Transcript;
     use serdes::ExpSerde;
 
@@ -304,17 +311,8 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         layer0_size: usize, arena_offset: usize,
         gate_bufs: Vec<(Vec<u32>, Vec<u32>, Vec<u32>)>,
     }
-    // Compute commitment-bound transcript state once (shared by all templates)
-    let commit_transcript_state: Vec<u8> = {
-        let mut tr_init = C::TranscriptConfig::new();
-        for c in commitments {
-            tr_init.append_serializable_data(&c.commitment);
-        }
-        tr_init.hash_and_return_state()
-    };
-    let mut init_ts_arr = [0u8; 32];
-    init_ts_arr.copy_from_slice(&commit_transcript_state[..32]);
-
+    // Prep phase runs WITHOUT commitments (arena alloc, fill, gates).
+    // Commitment-bound transcript state computed after commit finishes.
     let mut tmpl_infos: Vec<Option<TemplateInfo<C>>> = Vec::new();
     let mut arena_total = 0usize;
 
@@ -329,10 +327,8 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         check_inputs(kernel, &cvs, pc, tmpl.is_broadcast());
 
         let (bc, _bs) = prepare_expander_circuit::<C::FieldConfig, ECCConfig>(kernel, 1);
-        let mut tr = C::TranscriptConfig::new();
-        tr.set_state(&commit_transcript_state);
-        let mut tc = bc.clone();
-        tc.fill_rnd_coefs(&mut tr);
+        let tr = C::TranscriptConfig::new();
+        let tc = bc.clone(); // fill_rnd_coefs deferred to after commit join
 
         let layer0_size = 1usize << tc.layers[0].input_var_num;
         let total_elems = pc * layer0_size;
@@ -468,6 +464,50 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     eprintln!("  [prep] fill: {:?}", t_fill.elapsed());
     eprintln!("  [gpu] prep {} templates: {:?}", gpu_count, t_prep.elapsed());
 
+    // Join commit (was running in parallel with prep)
+    let t_join = std::time::Instant::now();
+    let (commitments, commit_states_vec) = commit_handle.join().expect("commit panicked");
+    let commit_states = &commit_states_vec;
+    eprintln!("  [commit] {:?} (join wait: {:?})", t_commit_start.elapsed(), t_join.elapsed());
+
+    // Now compute commitment-bound transcript state and fill_rnd_coefs for all templates
+    let commit_transcript_state: Vec<u8> = {
+        let mut tr_init = C::TranscriptConfig::new();
+        for c in &commitments {
+            tr_init.append_serializable_data(&c.commitment);
+        }
+        tr_init.hash_and_return_state()
+    };
+    let mut init_ts_arr = [0u8; 32];
+    init_ts_arr.copy_from_slice(&commit_transcript_state[..32]);
+    for opt in gpu_templates.iter_mut() {
+        if let Some(p) = opt {
+            p.tr.set_state(&commit_transcript_state);
+            p.tc.fill_rnd_coefs(&mut p.tr);
+            // Re-serialize gates (fill_rnd_coefs modified gate coefs via raw pointers)
+            p.gate_bufs.clear();
+            for layer in &p.tc.layers {
+                let mut mul_buf = Vec::with_capacity(layer.mul.len() * 4);
+                for g in &layer.mul {
+                    mul_buf.push(g.o_id as u32); mul_buf.push(g.i_ids[0] as u32);
+                    mul_buf.push(g.i_ids[1] as u32);
+                    mul_buf.push(unsafe { *(&g.coef as *const _ as *const u32) });
+                }
+                let mut add_buf = Vec::with_capacity(layer.add.len() * 3);
+                for g in &layer.add {
+                    add_buf.push(g.o_id as u32); add_buf.push(g.i_ids[0] as u32);
+                    add_buf.push(unsafe { *(&g.coef as *const _ as *const u32) });
+                }
+                let mut cst_buf = Vec::with_capacity(layer.const_.len() * 2);
+                for g in &layer.const_ {
+                    cst_buf.push(g.o_id as u32);
+                    cst_buf.push(unsafe { *(&g.coef as *const _ as *const u32) });
+                }
+                p.gate_bufs.push((mul_buf, add_buf, cst_buf));
+            }
+        }
+    }
+
     // Warm up CUDA FFI context (avoids 159ms cold start during PCS opening)
     {
         extern "C" { fn gpu_linear_combine_m31ext3(
@@ -586,7 +626,7 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             let gpu_proof = std::mem::take(&mut p.gpu_proof);
             p.tr = C::TranscriptConfig::new();
             crate::zkcuda::proving_system::common::bind_commitments_to_transcript::<C>(
-                &mut p.tr, commitments);
+                &mut p.tr, &commitments);
             {
                 let kernel = &kernels[templates[ti].kernel_id()];
                 let mut ec = kernel.layered_circuit().export_to_expander_flatten();
@@ -646,7 +686,7 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
 
     eprintln!("  [gpu] replay+PCS: {:?}", t_pcs.elapsed());
     eprintln!("  [gpu] total GPU path: {:?}", t_total.elapsed());
-    proofs
+    (commitments, proofs)
 }
 
 /// Replay GPU proof bytes through transcript (no subprocess call).
