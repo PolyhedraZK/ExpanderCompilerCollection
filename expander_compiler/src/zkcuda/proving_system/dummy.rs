@@ -215,6 +215,17 @@ impl<C: Config> ProvingSystem<C> for DummyProvingSystem<C> {
         verified.iter().all(|x| *x)
     }
 
+    fn commit_single(
+        prover_setup: &Self::ProverSetup,
+        device_memory: &[SIMDField<C>],
+    ) -> Vec<u8> {
+        let (commitment, _state) =
+            <Self as KernelWiseProvingSystem<C>>::commit(prover_setup, device_memory);
+        let mut buf = Vec::new();
+        serdes::ExpSerde::serialize_into(&commitment, &mut buf).expect("commitment serialization");
+        buf
+    }
+
     fn post_process() {
         <Self as KernelWiseProvingSystem<C>>::post_process();
     }

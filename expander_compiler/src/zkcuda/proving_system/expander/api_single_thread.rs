@@ -256,6 +256,17 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
         verified.iter().all(|x| *x)
     }
 
+    fn commit_single(
+        prover_setup: &Self::ProverSetup,
+        device_memory: &[SIMDField<ECCConfig>],
+    ) -> Vec<u8> {
+        let (commitment, _state) =
+            <Self as KernelWiseProvingSystem<ECCConfig>>::commit(prover_setup, device_memory);
+        let mut buf = Vec::new();
+        serdes::ExpSerde::serialize_into(&commitment, &mut buf).expect("commitment serialization");
+        buf
+    }
+
     fn post_process() {
         <Self as KernelWiseProvingSystem<ECCConfig>>::post_process();
     }

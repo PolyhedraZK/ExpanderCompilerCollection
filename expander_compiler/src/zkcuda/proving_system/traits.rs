@@ -79,6 +79,14 @@ pub trait ProvingSystem<C: Config> {
         proof: &Self::Proof,
     ) -> bool;
 
+    /// Commit a single device memory and return the serialized commitment bytes.
+    /// Used for deriving challenges from Round 1 commitments in two-round protocols.
+    /// Default implementation is not provided — each backend must implement this.
+    fn commit_single(
+        prover_setup: &Self::ProverSetup,
+        device_memory: &[SIMDField<C>],
+    ) -> Vec<u8>;
+
     /// This is a dedicated function to stop the running service
     /// For most proving systems, this is a no-op
     fn post_process() {}

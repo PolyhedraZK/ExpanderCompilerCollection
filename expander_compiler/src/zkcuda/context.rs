@@ -36,6 +36,13 @@ pub struct DeviceMemoryHandleRaw {
     shape_history: ShapeHistory,
 }
 
+impl DeviceMemoryHandleRaw {
+    /// Returns the device memory index (position in the device_memories vector).
+    pub fn device_memory_id(&self) -> usize {
+        self.id
+    }
+}
+
 pub type DeviceMemoryHandle = Option<DeviceMemoryHandleRaw>;
 
 #[derive(Clone, ExpSerde)]

@@ -71,6 +71,19 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
         CombinedProof { commitments, proofs }
     }
 
+    fn commit_single(
+        ps: &Self::ProverSetup,
+        device_memory: &[SIMDField<ECCConfig>],
+    ) -> Vec<u8> {
+        use crate::zkcuda::proving_system::expander::commit_impl::local_commit_impl;
+        let (commitment, _state) = local_commit_impl::<C, ECCConfig>(
+            ps.p_keys.get(&device_memory.len()).unwrap(), device_memory,
+        );
+        let mut buf = Vec::new();
+        serdes::ExpSerde::serialize_into(&commitment, &mut buf).expect("commitment serialization");
+        buf
+    }
+
     fn verify(vs: &Self::VerifierSetup, cg: &ComputationGraph<ECCConfig>, proof: &Self::Proof) -> bool {
         use crate::zkcuda::proving_system::expander::verify_impl::verify_pcs_opening_and_aggregation_no_mpi;
         // Parallel template verification — each template is independent

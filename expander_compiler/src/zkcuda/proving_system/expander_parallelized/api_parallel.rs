@@ -81,6 +81,13 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
         verified.iter().all(|x| *x)
     }
 
+    fn commit_single(
+        _prover_setup: &Self::ProverSetup,
+        _device_memory: &[SIMDField<ECCConfig>],
+    ) -> Vec<u8> {
+        unimplemented!("commit_single not supported for ParallelizedExpander")
+    }
+
     fn post_process() {
         wait_async(ClientHttpHelper::request_exit())
     }

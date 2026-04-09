@@ -69,6 +69,13 @@ where
         }
     }
 
+    fn commit_single(
+        _prover_setup: &Self::ProverSetup,
+        _device_memory: &[SIMDField<ZC::ECCConfig>],
+    ) -> Vec<u8> {
+        unimplemented!("commit_single not supported for ExpanderNoOverSubscribe")
+    }
+
     fn post_process() {
         wait_async(ClientHttpHelper::request_exit())
     }
