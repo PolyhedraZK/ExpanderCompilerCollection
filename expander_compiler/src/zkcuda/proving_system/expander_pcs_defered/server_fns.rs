@@ -31,6 +31,7 @@ where
         verifier_setup: &mut ExpanderVerifierSetup<C::FieldConfig, C::PCSConfig>,
         mpi_win: &mut Option<SharedMemoryWINWrapper>,
     ) {
+        eprintln!("Entering setup_request_handler for ExpanderPCSDefered");
         let setup_file = if global_mpi_config.is_root() {
             let setup_file = setup_file.expect("Setup file path must be provided");
             broadcast_string(global_mpi_config, Some(setup_file))
@@ -44,6 +45,7 @@ where
             (*prover_setup, *verifier_setup) =
                 pcs_setup_max_length_only::<C, ECCConfig>(computation_graph);
         }
+        eprintln!("Exiting setup_request_handler for ExpanderPCSDefered");
     }
 
     fn prove_request_handler(

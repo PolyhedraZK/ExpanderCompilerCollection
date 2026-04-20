@@ -16,7 +16,7 @@ pub fn start_server<C: GKREngine>(
 
     let batch_pcs_option = if batch_pcs { "--batch-pcs" } else { "" };
     let cmd_str = format!(
-        "mpiexec -n {max_parallel_count} {overscribe} {binary} --field-type {field_name} --poly-commit {pcs_name} --port-number {port_number} {batch_pcs_option} --fiat-shamir-hash {fiat_shamir_hash}"
+        "mpiexec -n {max_parallel_count} --output-filename worker_log {overscribe} {binary} --field-type {field_name} --poly-commit {pcs_name} --port-number {port_number} {batch_pcs_option} --fiat-shamir-hash {fiat_shamir_hash}",
     );
     exec_command(&cmd_str, false);
 }
