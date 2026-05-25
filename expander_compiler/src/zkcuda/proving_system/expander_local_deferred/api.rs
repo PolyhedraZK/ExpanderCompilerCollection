@@ -6,7 +6,7 @@ use gkr::{gkr_prove_batch, gkr_verify};
 use gkr_engine::{ExpanderPCS, FieldEngine, GKREngine, MPIConfig, Transcript};
 use crate::{frontend::{Config, SIMDField}, utils::misc::next_power_of_two,
     zkcuda::{context::ComputationGraph, proving_system::{common::check_inputs,
-        expander::{prove_impl::{get_local_vals, prepare_expander_circuit, prepare_inputs_with_local_vals},
+        expander::{prove_impl::{get_local_vals, prepare_expander_circuit},
             structs::{ExpanderProof, ExpanderProverSetup, ExpanderVerifierSetup}},
                 CombinedProof, Expander, ProvingSystem}}};
 
@@ -92,7 +92,7 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
                 if !ok { return false; }
                 let chs = if let Some(cy) = ch.challenge_y() { vec![ch.challenge_x(), cy] } else { vec![ch.challenge_x()] };
                 for sc in &chs {
-                    for (&ref comm, &_ib) in comms.iter().zip(tmpl.is_broadcast().iter()) {
+                    for (comm, &_ib) in comms.iter().zip(tmpl.is_broadcast().iter()) {
                         let commitment_len = comm.vals_len;
                         let local_size = commitment_len >> sc.r_mpi.len();
                         let n_local = if local_size > 0 { local_size.ilog2() as usize } else { 0 };
@@ -142,7 +142,7 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     if pc > 1 {
         let mut tr = C::TranscriptConfig::new();
         let mut tc = bc.clone(); tc.fill_rnd_coefs(&mut tr);
-        let is = 1 << tc.log_input_size();
+        let _is = 1 << tc.log_input_size();
         // Flat-buffer batch: zero malloc during circuit prep
         let ki = kernel.layered_circuit_input();
         let (mut circuits, _flat_bufs) = unsafe { tc.create_batch(pc) };
@@ -151,12 +151,11 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             // Inline get_local_vals: zero alloc, write directly into flat buffer
             let input = &mut circuits[pi].layers[0].input_vals;
             for v in input.iter_mut() { *v = Default::default(); }
-            for (ci, (partition, (&ref vals, &ib))) in ki.iter()
+            for (partition, (vals, &ib)) in ki.iter()
                 .zip(cvs.iter().zip(is_bc.iter()))
-                .enumerate()
             {
                 let local_slice = if ib {
-                    vals.as_ref()
+                    vals
                 } else {
                     let chunk = vals.len() / pc;
                     &vals[chunk * pi..chunk * (pi + 1)]
@@ -193,7 +192,7 @@ fn prove_one<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         let t2 = std::time::Instant::now();
         let chs = if let Some(cy) = ch.challenge_y() { vec![ch.challenge_x(), cy] } else { vec![ch.challenge_x()] };
         for sc in &chs {
-            for (ci, (&ref v, &_ib)) in cvs.iter().zip(tmpl.is_broadcast().iter()).enumerate() {
+            for (ci, (v, &_ib)) in cvs.iter().zip(tmpl.is_broadcast().iter()).enumerate() {
                 let pc2 = sc.clone();
                 let comm_idx = tmpl.commitment_indices()[ci];
                 let scratch = &commit_states[comm_idx].scratch;
@@ -237,13 +236,13 @@ fn dump_circuits_for_gpu<F: gkr_engine::FieldEngine>(
     circuits: &[expander_circuit::Circuit<F>],
 ) {
     use std::io::Write;
-    let dir = format!("gpu_data/tmpl_{}", ti);
+    let dir = format!("gpu_data/tmpl_{ti}");
     std::fs::create_dir_all(&dir).ok();
 
     let num_layers = template_circuit.layers.len();
 
     // Write header: N, num_layers, per-layer sizes
-    let mut hdr = std::fs::File::create(format!("{}/header.bin", dir)).unwrap();
+    let mut hdr = std::fs::File::create(format!("{dir}/header.bin")).unwrap();
     hdr.write_all(&(pc as u32).to_le_bytes()).unwrap();
     hdr.write_all(&(num_layers as u32).to_le_bytes()).unwrap();
     for layer in &template_circuit.layers {
@@ -256,7 +255,7 @@ fn dump_circuits_for_gpu<F: gkr_engine::FieldEngine>(
     // Write gates per layer (shared across all instances)
     for (li, layer) in template_circuit.layers.iter().enumerate() {
         // Mul gates: [o_id, x_id, y_id, coef] x n_mul
-        let mut gf = std::fs::File::create(format!("{}/layer_{}_mul.bin", dir, li)).unwrap();
+        let mut gf = std::fs::File::create(format!("{dir}/layer_{li}_mul.bin")).unwrap();
         for gate in &layer.mul {
             gf.write_all(&(gate.o_id as u32).to_le_bytes()).unwrap();
             gf.write_all(&(gate.i_ids[0] as u32).to_le_bytes()).unwrap();
@@ -265,11 +264,11 @@ fn dump_circuits_for_gpu<F: gkr_engine::FieldEngine>(
             let coef_bytes: &[u8] = unsafe {
                 std::slice::from_raw_parts(&gate.coef as *const _ as *const u8, 4)
             };
-            gf.write_all(&coef_bytes).unwrap();
+            gf.write_all(coef_bytes).unwrap();
         }
 
         // Add gates: [o_id, x_id, coef] x n_add
-        let mut af = std::fs::File::create(format!("{}/layer_{}_add.bin", dir, li)).unwrap();
+        let mut af = std::fs::File::create(format!("{dir}/layer_{li}_add.bin")).unwrap();
         for gate in &layer.add {
             af.write_all(&(gate.o_id as u32).to_le_bytes()).unwrap();
             af.write_all(&(gate.i_ids[0] as u32).to_le_bytes()).unwrap();
@@ -284,7 +283,7 @@ fn dump_circuits_for_gpu<F: gkr_engine::FieldEngine>(
     // Layout: [instance_0_layer0_input_vals | instance_1_layer0_input_vals | ...]
     // Each instance = layer0.input_vals as raw M31x16 bytes (contiguous)
     {
-        let mut wf = std::fs::File::create(format!("{}/witness.bin", dir)).unwrap();
+        let mut wf = std::fs::File::create(format!("{dir}/witness.bin")).unwrap();
         for circuit in circuits.iter() {
             let vals = &circuit.layers[0].input_vals;
             let bytes: &[u8] = unsafe {
@@ -297,5 +296,5 @@ fn dump_circuits_for_gpu<F: gkr_engine::FieldEngine>(
         }
     }
 
-    eprintln!("  [dump] tmpl[{}] N={} layers={} → {}/", ti, pc, num_layers, dir);
+    eprintln!("  [dump] tmpl[{ti}] N={pc} layers={num_layers} -> {dir}/");
 }

@@ -106,6 +106,26 @@ pub trait BasicAPI<C: Config> {
         }
         res
     }
+
+    /// compute constant + sum_i(coef_i * var_i) in a single instruction
+    /// Builder<C> overrides this with a LinComb instruction (O(1) per neuron vs O(2n) for mul+add).
+    /// default fallback uses repeated mul+add and is semantically equivalent.
+    fn linear_combination(
+        &mut self,
+        terms: &[(Variable, CircuitField<C>)],
+        constant: CircuitField<C>,
+    ) -> Variable {
+        // fallback: 2 instructions per non-zero term; Builder<C> overrides with LinComb.
+        // Skip zero-coef terms to mirror Builder's behaviour and avoid useless mul+add pairs.
+        let mut acc = self.constant(constant);
+        for (var, coef) in terms {
+            if !coef.is_zero() {
+                let scaled = self.mul(*var, *coef);
+                acc = self.add(acc, scaled);
+            }
+        }
+        acc
+    }
 }
 
 pub trait UnconstrainedAPI<C: Config> {

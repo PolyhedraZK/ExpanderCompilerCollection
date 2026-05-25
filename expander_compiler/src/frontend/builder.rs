@@ -466,6 +466,43 @@ impl<C: Config> BasicAPI<C> for Builder<C> {
         }
     }
 
+    /// emits a single LinComb instruction for constant + sum_i(coef_i * var_i)
+    /// reduces instruction count from O(2n) to O(1) per output neuron;
+    /// eliminates the optimizer's expression-expansion blowup on wide linear layers
+    /// (naive mul+add hits ~70 GB RSS at 1.47M gates; LinComb stays ~1.1 GB)
+    fn linear_combination(
+        &mut self,
+        terms: &[(Variable, CircuitField<C>)],
+        constant: CircuitField<C>,
+    ) -> Variable {
+        // validate all variables before accessing their ids
+        for (var, _) in terms {
+            ensure_variable_valid(*var);
+        }
+        // drop zero-coefficient terms; they add no constraint and inflate the LinComb vec
+        let mut lc_terms: Vec<LinCombTerm<C>> = Vec::with_capacity(terms.len());
+        lc_terms.extend(
+            terms
+                .iter()
+                .filter(|(_, coef)| !coef.is_zero())
+                .map(|(var, coef)| LinCombTerm {
+                    var: var.id,
+                    coef: *coef,
+                }),
+        );
+
+        if lc_terms.is_empty() {
+            // pure constant
+            return self.constant(constant);
+        }
+
+        self.instructions.push(SourceInstruction::LinComb(LinComb {
+            terms: lc_terms,
+            constant,
+        }));
+        self.new_var()
+    }
+
     // return 1 if x > y; 0 otherwise
     //
     fn gt(
@@ -705,6 +742,14 @@ impl<C: Config> BasicAPI<C> for RootBuilder<C> {
         y: impl ToVariableOrValue<CircuitField<C>>,
     ) -> Variable {
         self.last_builder().geq(x, y)
+    }
+
+    fn linear_combination(
+        &mut self,
+        terms: &[(Variable, CircuitField<C>)],
+        constant: CircuitField<C>,
+    ) -> Variable {
+        self.last_builder().linear_combination(terms, constant)
     }
 }
 
