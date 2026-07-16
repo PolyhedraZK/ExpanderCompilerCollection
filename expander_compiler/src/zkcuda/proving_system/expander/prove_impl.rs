@@ -210,12 +210,14 @@ pub fn pcs_local_open_with_scratch<C: GKREngine>(
             vals, challenge,
         )
     };
+    let t0 = std::time::Instant::now();
     transcript.append_field_element(&v);
 
     let default_scratch = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::init_scratch_pad(
         &params, &MPIConfig::prover_new(None, None));
     let scratch = commit_scratch.unwrap_or(&default_scratch);
     transcript.lock_proof();
+    let t1 = std::time::Instant::now();
     let opening = <C::PCSConfig as ExpanderPCS<C::FieldConfig>>::open(
         &params,
         &MPIConfig::prover_new(None, None),
@@ -226,13 +228,69 @@ pub fn pcs_local_open_with_scratch<C: GKREngine>(
         scratch,
     )
     .unwrap();
+    let t2 = std::time::Instant::now();
     transcript.unlock_proof();
 
-    let mut buffer = vec![];
-    opening
-        .serialize_into(&mut buffer)
-        .expect("Failed to serialize opening");
-    transcript.append_u8_slice(&buffer);
+    // Raw binary dump — skip ExpSerde overhead for large openings.
+    // For OrionProof<EvalF>: eval_row (Vec<EvalF>), proximity_rows (Vec<Vec<EvalF>>),
+    // query_openings (Vec<RangePath>), merkle_cap (Vec<Node>).
+    // All fields are trivially copyable. Write length + raw bytes for each.
+    let t3 = std::time::Instant::now();
+    type EvalF<C2> = <<C2 as GKREngine>::FieldConfig as FieldEngine>::ChallengeField;
+    if val_len >= 32768 && std::env::var("USE_GPU_PROVER").is_ok() {
+        // Fast path: directly access OrionProof fields via unsafe cast
+        use std::io::Write;
+        let proof_ptr = &opening as *const _ as *const poly_commit::orion::OrionProof<EvalF<C>>;
+        let proof = unsafe { &*proof_ptr };
+        let ef_size = std::mem::size_of::<EvalF<C>>();
+        // Pre-compute total size
+        let mut total = 0usize;
+        total += 8 + proof.eval_row.len() * ef_size; // len + raw data
+        total += 8; // proximity_rows outer len
+        for row in &proof.proximity_rows { total += 8 + row.len() * ef_size; }
+        total += 8; // query_openings len
+        for qo in &proof.query_openings {
+            total += 8 + qo.leaves.len() * 64; // leaves: len + raw Leaf data
+            total += 8 + qo.path_nodes.len() * 32; // path_nodes: len + raw Node data
+            total += 8 + 8; // left, right as usize
+        }
+        total += 8 + proof.merkle_cap.len() * 32; // merkle_cap: len + raw Node data
+
+        let mut buffer = Vec::with_capacity(total);
+        // eval_row
+        buffer.write_all(&(proof.eval_row.len() as u64).to_le_bytes()).unwrap();
+        buffer.write_all(unsafe { std::slice::from_raw_parts(proof.eval_row.as_ptr() as *const u8, proof.eval_row.len() * ef_size) }).unwrap();
+        // proximity_rows
+        buffer.write_all(&(proof.proximity_rows.len() as u64).to_le_bytes()).unwrap();
+        for row in &proof.proximity_rows {
+            buffer.write_all(&(row.len() as u64).to_le_bytes()).unwrap();
+            buffer.write_all(unsafe { std::slice::from_raw_parts(row.as_ptr() as *const u8, row.len() * ef_size) }).unwrap();
+        }
+        // query_openings
+        buffer.write_all(&(proof.query_openings.len() as u64).to_le_bytes()).unwrap();
+        for qo in &proof.query_openings {
+            buffer.write_all(&(qo.leaves.len() as u64).to_le_bytes()).unwrap();
+            buffer.write_all(unsafe { std::slice::from_raw_parts(qo.leaves.as_ptr() as *const u8, qo.leaves.len() * 64) }).unwrap();
+            buffer.write_all(&(qo.path_nodes.len() as u64).to_le_bytes()).unwrap();
+            buffer.write_all(unsafe { std::slice::from_raw_parts(qo.path_nodes.as_ptr() as *const u8, qo.path_nodes.len() * 32) }).unwrap();
+            buffer.write_all(&(qo.left as u64).to_le_bytes()).unwrap();
+            buffer.write_all(&(qo.right as u64).to_le_bytes()).unwrap();
+        }
+        // merkle_cap
+        buffer.write_all(&(proof.merkle_cap.len() as u64).to_le_bytes()).unwrap();
+        buffer.write_all(unsafe { std::slice::from_raw_parts(proof.merkle_cap.as_ptr() as *const u8, proof.merkle_cap.len() * 32) }).unwrap();
+
+        transcript.append_u8_slice(&buffer);
+    } else {
+        let mut buffer = Vec::with_capacity(val_len * 16);
+        opening.serialize_into(&mut buffer).expect("Failed to serialize opening");
+        transcript.append_u8_slice(&buffer);
+    }
+    let t4 = std::time::Instant::now();
+    if val_len >= 1048576 {
+        eprintln!("      [pcs-detail] vl={} eval={:?} open={:?} ser={:?}",
+            val_len, t1-t0, t2-t1, t4-t3);
+    }
 }
 
 #[inline(always)]

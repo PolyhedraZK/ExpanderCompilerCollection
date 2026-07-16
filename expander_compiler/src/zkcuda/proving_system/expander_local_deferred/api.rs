@@ -26,6 +26,18 @@ pub struct GpuTemplateDataFfi {
 unsafe impl Send for GpuLayerDataFfi {}
 unsafe impl Send for GpuTemplateDataFfi {}
 
+// GPU witness scatter descriptor — matches cuda/gpu_prover.cu GpuScatterDesc
+#[repr(C)]
+pub struct GpuScatterDescFfi {
+    pub d_poly: *const u32,  // source polynomial on GPU
+    pub src_stride: u32,     // elements between instances in source (0 = broadcast)
+    pub dst_stride: u32,     // layer0_size
+    pub dst_offset: u32,     // partition.offset within each instance
+    pub len: u32,            // partition.len per instance
+    pub n_instances: u32,    // pc
+    pub dst_base: u32,       // arena_offset for this template
+}
+
 #[repr(C)]
 pub struct GpuGkrResultFfi {
     pub proof_ptr: *mut u8,
@@ -63,6 +75,11 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
         let n = templates.len();
 
         let (commitments, proofs) = if std::env::var("USE_GPU_PROVER").is_ok() {
+            // CUDA context warmup (190ms one-time cost, moved out of commit timing)
+            {
+                extern "C" { fn cudaFree(ptr: *mut u8) -> i32; }
+                unsafe { cudaFree(std::ptr::null_mut()); }
+            }
             // Launch commit in background — prep (arena, fill, gates) runs in parallel.
             // Commit must finish before GKR (soundness: roots bind to transcript).
             let t_commit_start = std::time::Instant::now();
@@ -74,7 +91,9 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
                     use rayon::prelude::*;
                     let dm: &[Vec<SIMDField<ECCConfig>>] = &*(dm_ptr as *const Vec<Vec<SIMDField<ECCConfig>>>);
                     let ps: &ExpanderProverSetup<C::FieldConfig, C::PCSConfig> = &*(ps_ptr as *const _);
+                    // Warm up CUDA context + preload SRS for GPU commits (overlaps with prep)
                     // Small commits: CPU parallel. Large commits: sequential (GPU, shared CUDA state).
+                    let t_cpu = std::time::Instant::now();
                     let mut results: Vec<Option<_>> = (0..dm.len()).map(|_| None).collect();
                     {
                         let small: Vec<(usize, _)> = dm.par_iter().enumerate()
@@ -83,12 +102,15 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
                             .collect();
                         for (i, r) in small { results[i] = Some(r); }
                     }
+                    eprintln!("    [commit] CPU small: {:?}", t_cpu.elapsed());
+                    let t_gpu = std::time::Instant::now();
                     for i in 0..dm.len() {
                         if dm[i].len() >= gpu_threshold {
                             results[i] = Some(local_commit_impl::<C, ECCConfig>(
                                 ps.p_keys.get(&dm[i].len()).unwrap(), &dm[i]));
                         }
                     }
+                    eprintln!("    [commit] GPU large: {:?}", t_gpu.elapsed());
                     let results: Vec<_> = results.into_iter().map(|r| r.unwrap()).collect();
                     let r: (Vec<_>, Vec<_>) = results.into_iter().unzip();
                     r
@@ -308,6 +330,8 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         witness_buf: Vec<u32>,
         witness_ptr: *const u32,
         witness_len: usize,
+        arena_offset: usize,
+        layer0_size: usize,
         gpu_proof: Vec<u8>,
         gpu_transcript_state: [u8; 36],
         gpu_challenges: Vec<u32>, // flat E3 challenges from GPU
@@ -380,102 +404,30 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
     }
     eprintln!("  [prep] precomp+gates: {:?}", t_precomp.elapsed());
 
-    // Phase 1b: Single arena allocation for ALL witness buffers + prefault
-    let t_arena = std::time::Instant::now();
-    let arena: Vec<SCF<C>> = if arena_total > 4096 {
-        unsafe {
-            let layout = std::alloc::Layout::array::<SCF<C>>(arena_total).unwrap();
-            let ptr = std::alloc::alloc(layout) as *mut u8;
-            libc::madvise(ptr as *mut _, layout.size(), libc::MADV_HUGEPAGE);
-            // Parallel zero-fill: distribute page faults across cores
-            let total_bytes = layout.size();
-            let n_chunks = 8usize;
-            let chunk_bytes = (total_bytes + n_chunks - 1) / n_chunks;
-            let base = ptr as usize; // usize is Send+Sync
-            use rayon::prelude::*;
-            (0..n_chunks).into_par_iter().for_each(|i| {
-                let start = i * chunk_bytes;
-                let end = std::cmp::min(start + chunk_bytes, total_bytes);
-                if end > start {
-                    unsafe { std::ptr::write_bytes((base + start) as *mut u8, 0, end - start); }
-                }
-            });
-            Vec::from_raw_parts(ptr as *mut SCF<C>, arena_total, arena_total)
-        }
-    } else {
-        vec![SCF::<C>::default(); arena_total]
-    };
-    let arena_ptr = arena.as_ptr();
-    eprintln!("  [prep] arena alloc+prefault: {:?} ({:.1}MB)", t_arena.elapsed(),
-        (arena_total * std::mem::size_of::<SCF<C>>()) as f64 / 1e6);
-
-    // Phase 1c: Fill witness data into arena slices
-    let t_fill = std::time::Instant::now();
+    // Phase 1b: Build PreparedTemplate structs (no data alloc — witness built on GPU later)
     let mut gpu_templates: Vec<Option<PreparedTemplate<C>>> = Vec::new();
     let mut gpu_count = 0usize;
 
-    for (ti, info_opt) in tmpl_infos.into_iter().enumerate() {
+    for info_opt in tmpl_infos.into_iter() {
         let Some(info) = info_opt else {
             gpu_templates.push(None);
             continue;
         };
-        let kernel = &kernels[templates[ti].kernel_id()];
-        let cvs: Vec<&[SIMDField<C>]> = info.cvs_indices.iter().map(|&i| dm[i].as_slice()).collect();
-        let ki = kernel.layered_circuit_input();
-
         let total_elems = info.pc * info.layer0_size;
-        // SAFETY: arena is a contiguous allocation, each template gets its own non-overlapping slice
-        let witness_slice = unsafe {
-            std::slice::from_raw_parts_mut(
-                arena_ptr.add(info.arena_offset) as *mut SCF<C>,
-                total_elems,
-            )
-        };
-        for pi in 0..info.pc {
-            let input = &mut witness_slice[pi * info.layer0_size..(pi + 1) * info.layer0_size];
-            for (_ci, (partition, (&ref vals, &ib))) in ki.iter()
-                .zip(cvs.iter().zip(info.is_broadcast.iter()))
-                .enumerate()
-            {
-                let local_slice = if ib { vals.as_ref() }
-                else { let chunk = vals.len() / info.pc; &vals[chunk * pi..chunk * (pi + 1)] };
-                input[partition.offset..partition.offset + partition.len]
-                    .copy_from_slice(local_slice);
-            }
-        }
-
-        let witness_ptr = witness_slice.as_ptr() as *const u32;
         let witness_len = total_elems * 16;
 
         gpu_templates.push(Some(PreparedTemplate {
             ti: info.ti, pc: info.pc, tc: info.tc, tr: info.tr,
             cvs_indices: info.cvs_indices, is_broadcast: info.is_broadcast,
-            gate_bufs: info.gate_bufs, witness_buf: Vec::new(), witness_ptr, witness_len,
+            gate_bufs: info.gate_bufs, witness_buf: Vec::new(),
+            witness_ptr: std::ptr::null(), witness_len,
+            arena_offset: info.arena_offset, layer0_size: info.layer0_size,
             gpu_proof: Vec::new(),
             gpu_transcript_state: [0u8; 36],
             gpu_challenges: Vec::new(), gpu_n_rx: 0, gpu_n_ry: 0, gpu_n_r_simd: 0, gpu_n_r_mpi: 0,
         }));
         gpu_count += 1;
     }
-    // Upload entire arena to GPU once (avoids per-template H2D in GPU GKR)
-    let t_upload = std::time::Instant::now();
-    let arena_bytes = arena_total * std::mem::size_of::<SCF<C>>();
-    let d_arena: *const u32 = if arena_bytes > 0 {
-        let mut d_ptr: *mut u8 = std::ptr::null_mut();
-        extern "C" { fn cudaMalloc(ptr: *mut *mut u8, size: usize) -> i32; }
-        extern "C" { fn cudaMemcpy(dst: *mut u8, src: *const u8, count: usize, kind: i32) -> i32; }
-        unsafe {
-            cudaMalloc(&mut d_ptr, arena_bytes);
-            cudaMemcpy(d_ptr, arena.as_ptr() as *const u8, arena_bytes, 1); // 1 = H2D
-        }
-        d_ptr as *const u32
-    } else {
-        std::ptr::null()
-    };
-    eprintln!("  [prep] arena→GPU: {:?} ({:.1}MB)", t_upload.elapsed(), arena_bytes as f64 / 1e6);
-
-    let _arena = arena;
-    eprintln!("  [prep] fill: {:?}", t_fill.elapsed());
     eprintln!("  [gpu] prep {} templates: {:?}", gpu_count, t_prep.elapsed());
 
     // Join commit (was running in parallel with prep)
@@ -522,18 +474,100 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
         }
     }
 
-    // Warm up CUDA FFI context (avoids 159ms cold start during PCS opening)
-    {
-        extern "C" { fn gpu_linear_combine_m31ext3(
-            a: *const u32, b: *const u32, c: u32, d: u32, e: *mut u32,
-            f: u32, g: *const u32, h: *mut u32); }
-        let dummy = [0u32; 48];
-        let mut out = [0u32; 3];
-        unsafe { gpu_linear_combine_m31ext3(
-            dummy.as_ptr(), dummy.as_ptr(), 1, 1, out.as_mut_ptr(),
-            0, dummy.as_ptr(), std::ptr::null_mut()); }
-        eprintln!("  [gpu] CUDA FFI warmed up");
+    // ---- Phase 1c: Build witness arena on GPU ----
+    // Hybrid: GPU scatter for dm[i]'s with d_poly in VRAM, CPU fill + H2D for the rest.
+    let t_scatter = std::time::Instant::now();
+    extern "C" {
+        fn gpu_tree_find_poly(h_ptr: *const u32, commit_len: u32) -> *const u32;
+        fn cudaMalloc(ptr: *mut *mut u8, size: usize) -> i32;
+        fn cudaMemcpy(dst: *mut u8, src: *const u8, count: usize, kind: i32) -> i32;
     }
+    // 1. Build scatter descriptors for ALL dm[i]'s.
+    // For GPU-resident (d_poly found): scatter from VRAM.
+    // For CPU-only: upload dm[i] to temp GPU buffer, then scatter from there.
+    let mut scatter_descs: Vec<GpuScatterDescFfi> = Vec::new();
+    let mut cpu_uploads: Vec<(*const u32, usize, usize)> = Vec::new(); // (d_temp, dm_idx, dm_len)
+    // Dedup: each dm[i] uploaded at most once
+    let mut dm_device_ptrs: std::collections::HashMap<usize, *const u32> = std::collections::HashMap::new();
+    extern "C" { fn cudaMemset(ptr: *mut u8, val: i32, count: usize) -> i32; }
+    for opt in gpu_templates.iter() {
+        if let Some(p) = opt {
+            let kernel = &kernels[templates[p.ti].kernel_id()];
+            let ki = kernel.layered_circuit_input();
+            for (ci, (partition, &ib)) in ki.iter()
+                .zip(p.is_broadcast.iter())
+                .enumerate()
+            {
+                let dm_idx = p.cvs_indices[ci];
+                let dm_ptr = dm[dm_idx].as_ptr() as *const u32;
+                let dm_len = dm[dm_idx].len();
+                // Try GPU-resident first
+                let d_src = unsafe { gpu_tree_find_poly(dm_ptr, dm_len as u32) };
+                let d_src = if !d_src.is_null() { d_src } else {
+                    // Upload dm[i] to temp GPU buffer (dedup by dm_idx)
+                    *dm_device_ptrs.entry(dm_idx).or_insert_with(|| {
+                        let bytes = dm_len * std::mem::size_of::<SCF<C>>();
+                        let mut d_tmp: *mut u8 = std::ptr::null_mut();
+                        unsafe {
+                            cudaMalloc(&mut d_tmp, bytes);
+                            cudaMemcpy(d_tmp, dm_ptr as *const u8, bytes, 1); // H2D
+                        }
+                        cpu_uploads.push((d_tmp as *const u32, dm_idx, dm_len));
+                        d_tmp as *const u32
+                    })
+                };
+                let src_stride = if ib { 0u32 } else { (dm_len / p.pc) as u32 };
+                scatter_descs.push(GpuScatterDescFfi {
+                    d_poly: d_src,
+                    src_stride,
+                    dst_stride: p.layer0_size as u32,
+                    dst_offset: partition.offset as u32,
+                    len: partition.len as u32,
+                    n_instances: p.pc as u32,
+                    dst_base: p.arena_offset as u32,
+                });
+            }
+        }
+    }
+    // 2. Allocate GPU arena (zeroed) and scatter all data
+    let elem_bytes = std::mem::size_of::<SCF<C>>();
+    let arena_bytes = arena_total * elem_bytes;
+    let d_arena: *const u32 = if arena_bytes == 0 {
+        std::ptr::null()
+    } else {
+        let mut d_ptr: *mut u8 = std::ptr::null_mut();
+        unsafe {
+            cudaMalloc(&mut d_ptr, arena_bytes);
+            cudaMemset(d_ptr, 0, arena_bytes);
+        }
+        if !scatter_descs.is_empty() {
+            type ScatterFn = unsafe extern "C" fn(*const GpuScatterDescFfi, u32, *mut u32);
+            unsafe {
+                let lib = libc::dlopen(
+                    b"cuda/libgpu_prover.so\0".as_ptr() as *const _,
+                    libc::RTLD_LAZY | libc::RTLD_GLOBAL);
+                assert!(!lib.is_null(), "Failed to load cuda/libgpu_prover.so");
+                let sym = libc::dlsym(lib, b"gpu_scatter_into_arena\0".as_ptr() as *const _);
+                assert!(!sym.is_null(), "gpu_scatter_into_arena not found");
+                let func: ScatterFn = std::mem::transmute(sym);
+                func(scatter_descs.as_ptr(), scatter_descs.len() as u32, d_ptr as *mut u32);
+            }
+        }
+        // Free temp GPU buffers for CPU-uploaded dm[i]'s
+        if !cpu_uploads.is_empty() {
+            extern "C" { fn cudaFree(ptr: *mut u8) -> i32; }
+            let cpu_bytes: usize = cpu_uploads.iter().map(|&(_, _, len)| len * elem_bytes).sum();
+            for &(d_tmp, _, _) in &cpu_uploads {
+                unsafe { cudaFree(d_tmp as *mut u8); }
+            }
+            eprintln!("  [scatter] hybrid: {:?} ({:.1}MB arena, {:.1}MB cpu upload, {} descs)",
+                t_scatter.elapsed(), arena_bytes as f64 / 1e6, cpu_bytes as f64 / 1e6, scatter_descs.len());
+        } else {
+            eprintln!("  [scatter] pure GPU: {:?} ({:.1}MB, {} descs)",
+                t_scatter.elapsed(), arena_bytes as f64 / 1e6, scatter_descs.len());
+        }
+        d_ptr as *const u32
+    };
 
     // ---- Phase 2: GPU GKR via direct FFI (no file I/O) ----
     let t_gpu = std::time::Instant::now();
@@ -561,17 +595,16 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             layer_datas.push(layers);
         }
         for (i, p) in gpu_tmpls.iter().enumerate() {
-            // Compute device witness pointer from arena device base + offset
-            let host_offset = (p.witness_ptr as usize) - (_arena.as_ptr() as *const u32 as usize);
+            // d_witness points into GPU arena at template's offset
             let d_wit = if !d_arena.is_null() {
-                unsafe { d_arena.add(host_offset / 4) }
+                unsafe { d_arena.add(p.arena_offset * 16) }
             } else { std::ptr::null() };
             tmpl_datas.push(GpuTemplateDataFfi {
                 n_instances: p.pc as u32,
                 n_layers: p.tc.layers.len() as u32,
                 rnd_coef_count: p.tc.rnd_coefs.len() as u32,
                 layers: layer_datas[i].as_ptr(),
-                witness: p.witness_ptr,
+                witness: std::ptr::null(), // no host witness needed
                 witness_len: p.witness_len as u32,
                 d_witness: d_wit,
                 init_transcript_state: init_ts_arr,
@@ -637,18 +670,16 @@ fn gpu_prove_all<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>>(
             let t0 = std::time::Instant::now();
             let t_replay = std::time::Instant::now();
             let gpu_proof = std::mem::take(&mut p.gpu_proof);
+            // Direct GPU transcript state — no replay.
+            // GPU transcript state = (digest[32], hash_cursor[4]).
+            // Construct Rust transcript: proof[0..hcur] already hashed, digest set, proof[hcur..] unhashed.
+            let gpu_hcur = u32::from_le_bytes([
+                p.gpu_transcript_state[32], p.gpu_transcript_state[33],
+                p.gpu_transcript_state[34], p.gpu_transcript_state[35]]) as usize;
             p.tr = C::TranscriptConfig::new();
-            crate::zkcuda::proving_system::common::bind_commitments_to_transcript::<C>(
-                &mut p.tr, &commitments);
-            {
-                let kernel = &kernels[templates[ti].kernel_id()];
-                let mut ec = kernel.layered_circuit().export_to_expander_flatten();
-                ec.fill_rnd_coefs(&mut p.tr);
-                let mut cur = std::io::Cursor::new(&gpu_proof);
-                let _ = gkr::gkr_verify(p.pc, &ec, &[], &<C::FieldConfig as FieldEngine>::ChallengeField::ZERO, &mut p.tr, &mut cur);
-            }
-
-            if ti == 0 { eprintln!("      [replay] tmpl0: {:?}", t_replay.elapsed()); }
+            p.tr.append_u8_slice(&gpu_proof[..gpu_hcur]);
+            p.tr.set_state(&p.gpu_transcript_state[..32].to_vec());
+            p.tr.append_u8_slice(&gpu_proof[gpu_hcur..]);
             // Reconstruct challenge from GPU
             let ch: gkr_engine::ExpanderDualVarChallenge<C::FieldConfig> = {
                 let cd = &p.gpu_challenges;
