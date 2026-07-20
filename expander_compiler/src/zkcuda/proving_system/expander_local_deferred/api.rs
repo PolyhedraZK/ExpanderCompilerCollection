@@ -85,7 +85,14 @@ impl<C: GKREngine, ECCConfig: Config<FieldConfig = C::FieldConfig>> ProvingSyste
             let t_commit_start = std::time::Instant::now();
             let ps_ptr = ps as *const _ as usize;
             let dm_ptr = &dm as *const _ as usize;
-            let gpu_threshold = 1048576usize;
+            // GPU commit/open threshold. Polys >= this commit on GPU (VRAM-resident tree)
+            // AND open on GPU (tree found via gpu_tree_find_poly); they MUST stay in the
+            // sequential loop below since GPU commits share global CUDA state.
+            // Measured knee on sha256_100 (RTX 4090, verify-passing): 65536 -> ~390 KHz
+            // vs 347 KHz at the old 2^20 (a ~1M-leaf commit is ~220ms CPU vs ~9ms GPU).
+            // Must equal the gate in Expander/poly_commit/src/orion/utils.rs.
+            let gpu_threshold = std::env::var("GPU_COMMIT_THRESHOLD").ok()
+                .and_then(|s| s.parse().ok()).unwrap_or(65536usize);
             let commit_handle = unsafe {
                 std::thread::Builder::new().spawn_unchecked(move || {
                     use rayon::prelude::*;
